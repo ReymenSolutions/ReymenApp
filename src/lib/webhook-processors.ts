@@ -5,6 +5,10 @@ import { automationFailureEmail } from "./email-templates";
 import { assertPlanCapacity } from "./plan-limits";
 import { recordMetric, METRIC_KEYS } from "./metrics";
 import { appUrl } from "./app-url";
+import { phoneKey } from "./phone";
+import { findLeadByPhone, linkOrphanConversations } from "./crm-link";
+import { hasModule } from "./modules";
+import { UserError } from "./user-error";
 
 /**
  * Processing logic for each n8n webhook event type, shared between the
@@ -42,13 +46,15 @@ export async function processLeadEvent(payload: unknown, orgId: string): Promise
 
   await assertPlanCapacity(orgId, "leads");
 
+  let created: { id: string };
   try {
-    await prisma.lead.create({
+    created = await prisma.lead.create({
       data: {
         organizationId: orgId,
         name: body.name,
         email: body.email,
         phone: body.phone,
+        phoneKey: phoneKey(body.phone),
         source: body.source ?? "n8n",
         externalId: body.externalId,
         metadata: (body.metadata as Prisma.InputJsonValue) ?? undefined,
@@ -63,6 +69,7 @@ export async function processLeadEvent(payload: unknown, orgId: string): Promise
   }
 
   await recordMetric(orgId, METRIC_KEYS.LEADS_CAPTURED);
+  await linkOrphanConversations(orgId, created.id, body.phone);
 }
 
 export async function processConversationEvent(payload: unknown, orgId: string): Promise<{ conversationId: string }> {
@@ -74,12 +81,16 @@ export async function processConversationEvent(payload: unknown, orgId: string):
     message: { role: "USER" | "ASSISTANT" | "SYSTEM"; content: string; externalId?: string };
   };
 
+  const key = phoneKey(body.contactPhone);
   let conversation = body.conversationId
     ? await prisma.conversation.findFirst({
         where: { id: body.conversationId, organizationId: orgId },
       })
     : await prisma.conversation.findFirst({
-        where: { organizationId: orgId, contactPhone: body.contactPhone, status: "OPEN" },
+        // Por llave de teléfono: el mismo número con otro formato sigue siendo la misma conversación.
+        where: key
+          ? { organizationId: orgId, phoneKey: key, status: "OPEN" }
+          : { organizationId: orgId, contactPhone: body.contactPhone, status: "OPEN" },
       });
 
   if (!conversation) {
@@ -88,9 +99,18 @@ export async function processConversationEvent(payload: unknown, orgId: string):
         organizationId: orgId,
         channel: body.channel,
         contactPhone: body.contactPhone,
+        phoneKey: key,
         contactName: body.contactName,
       },
     });
+  }
+
+  // Enlace con el contacto del CRM. Si quien escribe es nuevo, se crea el
+  // lead; si el cliente llegó al límite de su plan o no tiene CRM, el mensaje
+  // se guarda igual y simplemente no hay contacto.
+  if (!conversation.leadId) {
+    const leadId = await resolveLeadForConversation(orgId, body, body.message.role === "USER");
+    if (leadId) conversation = await prisma.conversation.update({ where: { id: conversation.id }, data: { leadId } });
   }
 
   // Same idempotency pattern as leads: dedup by the provider's own message
@@ -124,6 +144,43 @@ export async function processConversationEvent(payload: unknown, orgId: string):
   }
 
   return { conversationId: conversation.id };
+}
+
+/**
+ * Contacto del CRM para una conversación de WhatsApp: el lead existente con
+ * ese teléfono o, si escribe alguien nuevo (mensaje entrante), uno creado al
+ * momento. Devuelve null si no se puede (sin CRM, sin teléfono, plan lleno).
+ */
+async function resolveLeadForConversation(
+  orgId: string,
+  body: { contactPhone: string; contactName?: string; channel: string },
+  isInbound: boolean
+): Promise<string | null> {
+  const existing = await findLeadByPhone(orgId, body.contactPhone);
+  if (existing) return existing.id;
+
+  const key = phoneKey(body.contactPhone);
+  if (!isInbound || !key) return null;
+  if (!(await hasModule(orgId, "CRM"))) return null;
+
+  try {
+    await assertPlanCapacity(orgId, "leads");
+  } catch (err) {
+    if (err instanceof UserError) return null;
+    throw err;
+  }
+
+  const lead = await prisma.lead.create({
+    data: {
+      organizationId: orgId,
+      name: body.contactName?.trim() || body.contactPhone,
+      phone: body.contactPhone,
+      phoneKey: key,
+      source: body.channel,
+    },
+  });
+  await recordMetric(orgId, METRIC_KEYS.LEADS_CAPTURED);
+  return lead.id;
 }
 
 export async function processScoringEvent(payload: unknown, orgId: string): Promise<void> {
