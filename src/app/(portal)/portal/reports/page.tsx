@@ -15,6 +15,8 @@ import { RoiCalculator } from "@/components/portal/RoiCalculator";
 import { Users, Zap, Calendar, TrendingUp } from "lucide-react";
 import type { PlatformModule } from "@prisma/client";
 import { buildLeadTrend } from "@/lib/lead-trend";
+import { getCrmReport, parseReportRange } from "@/lib/crm-reports";
+import { CrmReportSections } from "@/components/portal/CrmReportSections";
 
 // STATUS_LABELS sourced from server translations at render time
 
@@ -30,7 +32,6 @@ async function getReportData(orgId: string) {
 
   const [
     leadsByStatus,
-    leadsBySource,
     eventsByStatus,
     appointmentsByStatus,
     totalLeads,
@@ -40,11 +41,6 @@ async function getReportData(orgId: string) {
   ] = await Promise.all([
     prisma.lead.groupBy({
       by: ["status"],
-      where: { organizationId: orgId, deletedAt: null },
-      _count: { id: true },
-    }),
-    prisma.lead.groupBy({
-      by: ["source"],
       where: { organizationId: orgId, deletedAt: null },
       _count: { id: true },
     }),
@@ -68,15 +64,16 @@ async function getReportData(orgId: string) {
   ]);
 
   return {
-    leadsByStatus, leadsBySource, eventsByStatus, appointmentsByStatus,
+    leadsByStatus, eventsByStatus, appointmentsByStatus,
     totalLeads, totalAutomationRuns, recentLeads, confirmedAppointments,
   };
 }
 
-export default async function PortalReportsPage() {
+export default async function PortalReportsPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
   const orgId = session.user.organizationId;
+  const range = parseReportRange((await searchParams).range);
 
   const [t, data, enabledModules, org, lang] = await Promise.all([
     getServerT(),
@@ -86,6 +83,7 @@ export default async function PortalReportsPage() {
     getServerLang(),
   ]);
   const roi = await getRoiData(orgId, org.plan);
+  const crmReport = enabledModules.includes("CRM") ? await getCrmReport(orgId, range) : null;
 
   const hasModule = (m: PlatformModule) => enabledModules.includes(m);
   const planLabel = (PLAN_LIMITS[org.plan] ?? PLAN_LIMITS.starter).label;
@@ -153,36 +151,9 @@ export default async function PortalReportsPage() {
           </Card>
         )}
 
-        {hasModule("CRM") && (
-          <Card>
-            <CardHeader><CardTitle>{t.leadsBySource}</CardTitle></CardHeader>
-            <CardContent>
-              {data.leadsBySource.length === 0 ? (
-                <p className="text-sm text-slate-400 text-center py-8">{t.noData}</p>
-              ) : (
-                <div className="space-y-3 pt-2">
-                  {data.leadsBySource
-                    .sort((a, b) => b._count.id - a._count.id)
-                    .map((item) => {
-                      const pct = data.totalLeads > 0 ? Math.round((item._count.id / data.totalLeads) * 100) : 0;
-                      return (
-                        <div key={item.source ?? "unknown"}>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span className="text-slate-600 capitalize">{item.source ?? t.noSource}</span>
-                            <span className="font-semibold">{item._count.id} <span className="text-slate-400 font-normal">({pct}%)</span></span>
-                          </div>
-                          <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                            <div className="h-full rounded-full bg-brand-500" style={{ width: `${pct}%` }} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
       </div>
+
+      {crmReport && <CrmReportSections report={crmReport} lang={lang === "en" ? "en" : "es"} basePath="/portal/reports" />}
 
       {hasModule("CRM") && <RoiCalculator data={roi} planLabel={planLabel} lang={lang} />}
     </div>

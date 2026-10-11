@@ -122,7 +122,10 @@ export async function markOpportunityLost(opportunityId: string, lossReason: str
   const orgId = session.user.organizationId!;
 
   const opportunity = await assertOpportunityAccess(orgId, opportunityId);
-  const lostStage = await prisma.pipelineStage.findFirst({ where: { organizationId: orgId, isLost: true } });
+  const [lostStage, fromStage] = await Promise.all([
+    prisma.pipelineStage.findFirst({ where: { organizationId: orgId, isLost: true } }),
+    prisma.pipelineStage.findFirst({ where: { id: opportunity.pipelineStageId, organizationId: orgId }, select: { name: true } }),
+  ]);
   if (!lostStage) throw new UserError("No hay una etapa marcada como 'perdida' configurada");
 
   await prisma.opportunity.update({
@@ -136,7 +139,8 @@ export async function markOpportunityLost(opportunityId: string, lossReason: str
     action: "opportunity.lost",
     resource: "Opportunity",
     resourceId: opportunityId,
-    metadata: { lossReason },
+    // La etapa en la que estaba sirve para el reporte "dónde se caen".
+    metadata: { lossReason, fromStageName: fromStage?.name ?? null },
   });
   await syncLeadStatusFromOpportunity({ organizationId: orgId, opportunityId, userId: session.user.id });
 

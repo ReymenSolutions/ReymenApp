@@ -168,5 +168,8 @@ describe("opportunities actions", () => {
     const { opportunityId } = await createOpportunity({ leadId: lead.id, title: "Única" });
     await markOpportunityLost(opportunityId, "Muy caro");
     expect((await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } })).status).toBe("LOST");
+    // Guarda en qué etapa estaba, para el reporte "dónde se caen".
+    const log = await prisma.auditLog.findFirstOrThrow({ where: { resourceId: opportunityId, action: "opportunity.lost" } });
+    expect(log.metadata).toMatchObject({ lossReason: "Muy caro", fromStageName: "Nuevo" });
   });
 });
