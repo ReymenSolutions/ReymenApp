@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  ChevronDown, Home, ListChecks, LayoutDashboard, Users, Zap, BarChart3, Settings, MessageSquare, Calendar, FileText, LogOut, Bot, Upload, GitBranch, Rocket, UtensilsCrossed, CreditCard, X,
+  ChevronDown, Home, ListChecks, LayoutDashboard, Users, Zap, BarChart3, Settings, MessageSquare, Calendar, FileText, LogOut, Bot, Upload, GitBranch, Rocket, UtensilsCrossed, CreditCard, Contact, X,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import type { PlatformModule } from "@prisma/client";
@@ -28,6 +28,7 @@ function useNavItems() {
     dashboard: t.dashboard,
     onboarding: t.onboarding,
     leads: t.leads,
+    customersNav: t.customersNav,
     pipeline: t.pipeline,
     automations: t.automations,
     whatsapp: t.whatsapp,
@@ -64,6 +65,7 @@ const NAV_ITEMS: { href: string; key: keyof ReturnType<typeof useNavItems>; icon
 
   { href: "/portal/today", key: "today", icon: ListChecks, section: "customers", module: "CRM" },
   { href: "/portal/leads", key: "leads", icon: Users, section: "customers", module: "CRM" },
+  { href: "/portal/customers", key: "customersNav", icon: Contact, section: "customers", module: "FOOD_OPS" },
   { href: "/portal/pipeline", key: "pipeline", icon: GitBranch, section: "customers", module: "CRM" },
   { href: "/portal/appointments", key: "appointments", icon: Calendar, section: "customers" },
 

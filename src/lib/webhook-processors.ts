@@ -6,7 +6,7 @@ import { assertPlanCapacity } from "./plan-limits";
 import { recordMetric, METRIC_KEYS } from "./metrics";
 import { appUrl } from "./app-url";
 import { phoneKey } from "./phone";
-import { findLeadByPhone, linkOrphanConversations } from "./crm-link";
+import { findLeadByPhone, linkOrphanConversations, linkOrphanCustomers } from "./crm-link";
 import { findPotentialDuplicateLeads } from "./duplicate-detection";
 import { hasModule } from "./modules";
 import { UserError } from "./user-error";
@@ -74,6 +74,7 @@ export async function processLeadEvent(payload: unknown, orgId: string): Promise
       },
     });
     await linkOrphanConversations(orgId, existingPerson.id, existingPerson.phone ?? body.phone);
+    await linkOrphanCustomers(orgId, existingPerson.id, existingPerson.phone ?? body.phone);
     return;
   }
 
@@ -104,6 +105,7 @@ export async function processLeadEvent(payload: unknown, orgId: string): Promise
 
   await recordMetric(orgId, METRIC_KEYS.LEADS_CAPTURED);
   await linkOrphanConversations(orgId, created.id, body.phone);
+  await linkOrphanCustomers(orgId, created.id, body.phone);
 }
 
 export async function processConversationEvent(payload: unknown, orgId: string): Promise<{ conversationId: string }> {
@@ -213,6 +215,7 @@ async function resolveLeadForConversation(
       source: body.channel,
     },
   });
+  await linkOrphanCustomers(orgId, lead.id, body.contactPhone);
   await recordMetric(orgId, METRIC_KEYS.LEADS_CAPTURED);
   return lead.id;
 }

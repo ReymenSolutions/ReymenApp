@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { assertPlanCapacity } from "@/lib/plan-limits";
 import { phoneKey } from "@/lib/phone";
-import { linkOrphanConversations } from "@/lib/crm-link";
+import { linkOrphanConversations, linkOrphanCustomers } from "@/lib/crm-link";
 import { assertModuleEnabled } from "@/lib/modules";
 import { findPotentialDuplicateLeads } from "@/lib/duplicate-detection";
 import { recordMetric, METRIC_KEYS } from "@/lib/metrics";
@@ -48,6 +48,7 @@ export async function createLead(formData: FormData) {
     },
   });
   await linkOrphanConversations(session.user.organizationId, lead.id, lead.phone);
+  await linkOrphanCustomers(session.user.organizationId, lead.id, lead.phone);
 
   await logAudit({
     organizationId: session.user.organizationId,
@@ -244,6 +245,7 @@ export async function mergeLeads(primaryLeadId: string, duplicateLeadId: string)
     prisma.appointment.updateMany({ where: { leadId: duplicateLeadId }, data: { leadId: primaryLeadId } }),
     prisma.conversation.updateMany({ where: { leadId: duplicateLeadId }, data: { leadId: primaryLeadId } }),
     prisma.followUpLog.updateMany({ where: { leadId: duplicateLeadId }, data: { leadId: primaryLeadId } }),
+    prisma.customer.updateMany({ where: { leadId: duplicateLeadId }, data: { leadId: primaryLeadId } }),
     prisma.lead.update({
       where: { id: primaryLeadId },
       data: {

@@ -12,7 +12,9 @@ export type LeadTimelineEvent =
   | { type: "follow_up"; date: Date; ruleName: string | null }
   | { type: "opportunity_created"; date: Date; title: string }
   | { type: "stage_change"; date: Date; opportunityTitle: string; toStageName: string }
-  | { type: "opportunity_lost"; date: Date; opportunityTitle: string; reason: string | null };
+  | { type: "opportunity_lost"; date: Date; opportunityTitle: string; reason: string | null }
+  /** Compra del cliente enlazado (POS). `amount` con IVA; una cancelación llega con `cancelled`. */
+  | { type: "purchase"; date: Date; amount: number; cancelled: boolean };
 
 type TimelineLead = { id: string; organizationId: string; createdAt: Date; source: string | null; phoneKey: string | null };
 
@@ -40,7 +42,7 @@ export async function getLeadTimeline(lead: TimelineLead, limit = TIMELINE_PAGE)
   const oppIds = opportunities.map((o) => o.id);
   const convWhere = conversationsOfLead(lead);
 
-  const [notes, messages, escalations, appointments, followUps, leadAudits, oppAudits] = await Promise.all([
+  const [notes, messages, escalations, appointments, followUps, leadAudits, oppAudits, purchases] = await Promise.all([
     prisma.note.findMany({ where: { leadId: lead.id, organizationId: orgId }, orderBy: { createdAt: "desc" }, take, include: { author: { select: { name: true, email: true } } } }),
     prisma.message.findMany({ where: { conversation: convWhere }, orderBy: { createdAt: "desc" }, take }),
     prisma.conversation.findMany({ where: { ...convWhere, escalatedAt: { not: null } }, orderBy: { escalatedAt: "desc" }, take, select: { escalatedAt: true } }),
@@ -54,6 +56,8 @@ export async function getLeadTimeline(lead: TimelineLead, limit = TIMELINE_PAGE)
           take,
         })
       : Promise.resolve([]),
+    // Compras del POS de los clientes enlazados a este contacto (mismo teléfono).
+    prisma.foodSale.findMany({ where: { organizationId: orgId, customer: { leadId: lead.id } }, orderBy: { occurredAt: "desc" }, take, select: { occurredAt: true, grossAmount: true } }),
   ]);
 
   const ruleIds = [...new Set(followUps.map((f) => f.ruleId))];
@@ -70,6 +74,7 @@ export async function getLeadTimeline(lead: TimelineLead, limit = TIMELINE_PAGE)
     ...escalations.map((c): LeadTimelineEvent => ({ type: "escalated", date: c.escalatedAt as Date })),
     ...appointments.map((a): LeadTimelineEvent => ({ type: "appointment", date: a.startTime, title: a.title, status: a.status })),
     ...followUps.map((f): LeadTimelineEvent => ({ type: "follow_up", date: f.sentAt, ruleName: ruleName.get(f.ruleId) ?? null })),
+    ...purchases.map((p): LeadTimelineEvent => ({ type: "purchase", date: p.occurredAt, amount: Math.abs(Number(p.grossAmount)), cancelled: Number(p.grossAmount) < 0 })),
     ...leadAudits.map((a): LeadTimelineEvent => {
       const meta = (a.metadata ?? {}) as { from?: string; to?: string; via?: string };
       return { type: "status_change", date: a.createdAt, from: meta.from ?? null, to: meta.to ?? "—", actorName: a.userId ? actorName.get(a.userId) ?? null : null, viaPipeline: meta.via === "pipeline" };
