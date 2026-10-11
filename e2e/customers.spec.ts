@@ -16,7 +16,7 @@ test.describe("clientes del negocio", () => {
       data: { name: `E2E Customers ${Date.now()}`, slug: `e2e-customers-${Date.now()}`, n8nWebhookSecret: randomBytes(32).toString("hex"), plan: "professional" },
     });
     orgId = org.id;
-    for (const module of ["FOOD_OPS", "CRM"] as const) await prisma.organizationModule.create({ data: { organizationId: org.id, module, status: "ACTIVE", source: "SUBSCRIBED" } });
+    for (const mod of ["FOOD_OPS", "CRM"] as const) await prisma.organizationModule.create({ data: { organizationId: org.id, module: mod, status: "ACTIVE", source: "SUBSCRIBED" } });
     await prisma.user.create({
       data: { email: TEST_EMAIL, name: "E2E Customers Owner", role: "OWNER", organizationId: org.id, passwordHash: await bcrypt.hash(TEST_PASSWORD, 12), language: "es" },
     });
