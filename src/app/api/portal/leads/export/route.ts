@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hasModule } from "@/lib/modules";
+import { getActiveCustomFields } from "@/lib/custom-fields-db";
+import { displayValue } from "@/lib/custom-fields";
 
 // Prefixes values that could be interpreted as a formula (=, +, -, @, or a
 // leading tab/CR) with a single quote so Excel/Sheets always render CSV
@@ -31,12 +33,15 @@ export async function GET() {
     return NextResponse.json({ error: "Módulo CRM no habilitado" }, { status: 403 });
   }
 
-  const leads = await prisma.lead.findMany({
-    where: { organizationId: session.user.organizationId, deletedAt: null },
-    orderBy: { createdAt: "desc" },
-  });
+  const [leads, customFields] = await Promise.all([
+    prisma.lead.findMany({
+      where: { organizationId: session.user.organizationId, deletedAt: null },
+      orderBy: { createdAt: "desc" },
+    }),
+    getActiveCustomFields(session.user.organizationId),
+  ]);
 
-  const headers = ["Nombre", "Email", "Teléfono", "Fuente", "Estado", "Score AI", "Notas", "Fecha"];
+  const headers = ["Nombre", "Email", "Teléfono", "Fuente", "Estado", "Score AI", "Notas", "Fecha", ...customFields.map((f) => escapeCsv(f.label))];
   const rows = leads.map((l) => [
     escapeCsv(l.name),
     escapeCsv(l.email),
@@ -46,6 +51,7 @@ export async function GET() {
     escapeCsv(l.score != null ? String(l.score) : null),
     escapeCsv(l.notes),
     escapeCsv(l.createdAt.toISOString().split("T")[0]),
+    ...customFields.map((f) => escapeCsv(displayValue(f, (l.customFields as Record<string, unknown> | null)?.[f.key]))),
   ]);
 
   const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");

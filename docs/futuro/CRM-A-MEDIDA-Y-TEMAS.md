@@ -16,7 +16,8 @@ con una razón fuerte.
 
 Capas, en orden:
 1. Configuración por cliente (campos, etapas, plantillas de mensajes,
-   vocabulario: "paciente" en vez de "lead"). Es la mejora 4 del roadmap.
+   vocabulario: "paciente" en vez de "lead"). **Campos y etapas ya están hechos**
+   (mejoras 4 y 6 del roadmap); faltan plantillas de mensajes y el vocabulario.
 2. Plantillas por industria (clínica, restaurante, despacho), sobre la idea
    existente de paquetes de plantillas.
 3. Pantallas a medida dentro de Reymen solo para lo que no encaje

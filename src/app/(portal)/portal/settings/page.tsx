@@ -18,12 +18,14 @@ import { PLAN_LIMITS, PLAN_MODULES, isUnlimited } from "@/lib/permissions";
 import { getModuleLabel } from "@/lib/modules";
 import { isStripeConfigured } from "@/lib/stripe";
 import type { UserRole } from "@prisma/client";
+import { CustomFieldsPanel } from "@/components/portal/CustomFieldsPanel";
+import { MAX_CUSTOM_FIELDS } from "@/lib/custom-fields";
 
 export default async function PortalSettingsPage() {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
 
-  const [t, lang, org, crmEnabled, pipelineStages] = await Promise.all([
+  const [t, lang, org, crmEnabled, pipelineStages, customFields] = await Promise.all([
     getServerT(),
     getServerLang(),
     prisma.organization.findUnique({
@@ -42,6 +44,7 @@ export default async function PortalSettingsPage() {
       orderBy: { order: "asc" },
       include: { _count: { select: { opportunities: true } } },
     }),
+    prisma.customField.findMany({ where: { organizationId: session.user.organizationId }, orderBy: [{ order: "asc" }, { createdAt: "asc" }] }),
   ]);
 
   if (!org) return redirect("/login");
@@ -156,6 +159,22 @@ export default async function PortalSettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Campos personalizados de los contactos (CRM module only) */}
+        {crmEnabled && (
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>{lang === "es" ? "Campos personalizados" : "Custom fields"}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CustomFieldsPanel
+                fields={customFields.map((f) => ({ id: f.id, label: f.label, type: f.type, options: f.options, isActive: f.isActive }))}
+                canManage={canManageBilling}
+                max={MAX_CUSTOM_FIELDS}
+              />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Pipeline stages (CRM module only) */}
         {crmEnabled && (

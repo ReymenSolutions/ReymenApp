@@ -16,6 +16,9 @@ import { LeadTagsEditor } from "@/components/portal/LeadTagsEditor";
 import { LeadDoNotContactToggle } from "@/components/portal/LeadDoNotContactToggle";
 import { LeadTimeline } from "@/components/portal/LeadTimeline";
 import { getLeadTimeline, TIMELINE_PAGE } from "@/lib/lead-timeline";
+import { LeadCustomFieldsPanel } from "@/components/portal/LeadCustomFieldsPanel";
+import { getActiveCustomFields } from "@/lib/custom-fields-db";
+import { inputValue } from "@/lib/custom-fields";
 import { LeadNotesPanel } from "@/components/portal/LeadNotesPanel";
 import { LeadDuplicatesPanel } from "@/components/portal/LeadDuplicatesPanel";
 import { CreateOpportunityDialog } from "@/components/portal/CreateOpportunityDialog";
@@ -35,7 +38,7 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
   const lead = await prisma.lead.findFirst({ where: { id, organizationId: orgId, deletedAt: null } });
   if (!lead) return notFound();
 
-  const [t, lang, opportunities, notes, stages, users, duplicates, timeline] = await Promise.all([
+  const [t, lang, opportunities, notes, stages, users, duplicates, timeline, customFields] = await Promise.all([
     getServerT(),
     getServerLang(),
     prisma.opportunity.findMany({
@@ -52,6 +55,7 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
     prisma.user.findMany({ where: { organizationId: orgId, isActive: true }, select: { id: true, name: true, email: true }, orderBy: { createdAt: "asc" } }),
     findPotentialDuplicateLeads(orgId, lead, lead.id),
     getLeadTimeline(lead, timelineLimit),
+    getActiveCustomFields(orgId),
   ]);
 
   const canManageOpps = can(session.user.role as UserRole, "opportunities:manage");
@@ -109,6 +113,25 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
               </div>
             </CardContent>
           </Card>
+
+          {customFields.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle>{lang === "es" ? "Datos adicionales" : "Additional details"}</CardTitle></CardHeader>
+              <CardContent>
+                <LeadCustomFieldsPanel
+                  leadId={lead.id}
+                  canEdit={can(session.user.role as UserRole, "leads:create")}
+                  fields={customFields.map((f) => ({
+                    key: f.key,
+                    label: f.label,
+                    type: f.type,
+                    options: f.options,
+                    value: inputValue(f, (lead.customFields as Record<string, unknown> | null)?.[f.key]),
+                  }))}
+                />
+              </CardContent>
+            </Card>
+          )}
 
           <LeadDuplicatesPanel leadId={lead.id} duplicates={duplicates.map((d) => ({ id: d.id, name: d.name, email: d.email, phone: d.phone }))} />
 

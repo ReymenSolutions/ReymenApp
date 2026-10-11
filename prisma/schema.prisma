@@ -63,6 +63,7 @@ model Organization {
   templateInstallations   TemplateInstallation[]
   modules                 OrganizationModule[]
   pipelineStages          PipelineStage[]
+  customFields            CustomField[]
   opportunities           Opportunity[]
   notes                   Note[]
   services                Service[]
@@ -197,6 +198,10 @@ model Lead {
   // cross-org tag reuse or tag-level metadata).
   tags           String[]   @default([])
   metadata       Json?
+  // Valores de los campos personalizados de la organización (CustomField),
+  // por clave: { "aseguradora": "GNP", "fecha_de_nacimiento": "1990-05-01" }.
+  // Distinto de `metadata`, que lo llena la integración (n8n).
+  customFields   Json?
   assignedTo     String?
   // Opt-out flag: a lead with this set is never a candidate for automated
   // follow-ups (see FollowUpRule below), regardless of status or timing.
@@ -217,6 +222,40 @@ model Lead {
   @@index([organizationId, phoneKey])
   @@index([organizationId, status])
   @@index([organizationId, createdAt])
+}
+
+// Tipos de campo personalizado de un contacto.
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  DATE
+  SELECT
+  BOOLEAN
+}
+
+// Campo propio de una organización para sus contactos (p. ej. "Aseguradora" o
+// "Tratamiento de interés" en una clínica). Los valores viven en
+// Lead.customFields, por `key`. Se archiva en lugar de borrarse para no perder
+// los datos ya capturados.
+model CustomField {
+  id             String          @id @default(cuid())
+  organizationId String
+  // Identificador estable (se genera del nombre al crearlo y no cambia aunque
+  // se renombre la etiqueta): es la clave en Lead.customFields.
+  key            String
+  label          String
+  type           CustomFieldType
+  // Solo para SELECT.
+  options        String[]        @default([])
+  order          Int             @default(0)
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, key])
+  @@index([organizationId, isActive])
 }
 
 enum LeadStatus {
