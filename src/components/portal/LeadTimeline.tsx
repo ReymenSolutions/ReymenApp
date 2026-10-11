@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { AlertTriangle, Bot, Calendar, GitBranch, MessageSquare, Send, Sparkles, StickyNote, UserCheck, UserPlus, XCircle, type LucideIcon } from "lucide-react";
+import { AlertTriangle, Bot, Calendar, GitBranch, MessageSquare, Send, ShoppingBag, Sparkles, StickyNote, UserCheck, UserPlus, XCircle, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, formatMoney } from "@/lib/utils";
 import type { LeadTimelineEvent } from "@/lib/lead-timeline";
 
 const COPY = {
@@ -23,6 +23,8 @@ const COPY = {
     movedTo: "movida a",
     lost: "perdida",
     reason: "Motivo",
+    purchase: "Compra en el negocio",
+    purchaseCancelled: "Compra cancelada",
     more: "Ver actividad anterior",
   },
   en: {
@@ -42,6 +44,8 @@ const COPY = {
     movedTo: "moved to",
     lost: "lost",
     reason: "Reason",
+    purchase: "Purchase at the business",
+    purchaseCancelled: "Purchase cancelled",
     more: "Show earlier activity",
   },
 };
@@ -57,6 +61,7 @@ const ICON: Record<LeadTimelineEvent["type"], LucideIcon> = {
   opportunity_created: Sparkles,
   stage_change: GitBranch,
   opportunity_lost: XCircle,
+  purchase: ShoppingBag,
 };
 
 function messageBadge(role: string, t: (typeof COPY)["es"]) {
@@ -125,6 +130,11 @@ export function LeadTimeline({ events, hasMore, moreHref, lang }: { events: Lead
                 {event.type === "stage_change" && (
                   <div className="text-slate-700">
                     {event.opportunityTitle} {t.movedTo} <span className="font-medium">{event.toStageName}</span>
+                  </div>
+                )}
+                {event.type === "purchase" && (
+                  <div className="text-slate-700">
+                    {event.cancelled ? t.purchaseCancelled : t.purchase}: <span className={event.cancelled ? "font-medium text-red-600" : "font-medium"}>{formatMoney(event.amount)}</span>
                   </div>
                 )}
                 {event.type === "opportunity_lost" && (
