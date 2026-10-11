@@ -4,7 +4,7 @@ export const TIMELINE_PAGE = 30;
 
 export type LeadTimelineEvent =
   | { type: "created"; date: Date; source: string | null }
-  | { type: "status_change"; date: Date; from: string | null; to: string; actorName: string | null }
+  | { type: "status_change"; date: Date; from: string | null; to: string; actorName: string | null; viaPipeline: boolean }
   | { type: "note"; date: Date; content: string; authorName: string | null }
   | { type: "message"; date: Date; content: string; role: string }
   | { type: "escalated"; date: Date }
@@ -71,8 +71,8 @@ export async function getLeadTimeline(lead: TimelineLead, limit = TIMELINE_PAGE)
     ...appointments.map((a): LeadTimelineEvent => ({ type: "appointment", date: a.startTime, title: a.title, status: a.status })),
     ...followUps.map((f): LeadTimelineEvent => ({ type: "follow_up", date: f.sentAt, ruleName: ruleName.get(f.ruleId) ?? null })),
     ...leadAudits.map((a): LeadTimelineEvent => {
-      const meta = (a.metadata ?? {}) as { from?: string; to?: string };
-      return { type: "status_change", date: a.createdAt, from: meta.from ?? null, to: meta.to ?? "—", actorName: a.userId ? actorName.get(a.userId) ?? null : null };
+      const meta = (a.metadata ?? {}) as { from?: string; to?: string; via?: string };
+      return { type: "status_change", date: a.createdAt, from: meta.from ?? null, to: meta.to ?? "—", actorName: a.userId ? actorName.get(a.userId) ?? null : null, viaPipeline: meta.via === "pipeline" };
     }),
     ...oppAudits.map((a): LeadTimelineEvent => {
       const title = oppTitle.get(a.resourceId ?? "") ?? "";

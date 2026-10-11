@@ -216,7 +216,11 @@ PRs fusionados en `main` (#1–#28):
 - [D] Probar el ticket real en la TM-T20III (acentos, márgenes, corte) y mandar foto.
 - [D] Si en VG-TEST-03 se quiere otro titular en lugar de "Consultorio 2", cambiarlo en `admin.reymen.mx`.
 
+- [D] **Respaldo fuera del servidor (decidido por el usuario: al final de las fases del CRM).** `deploy/update.sh` ya respalda la base solo antes de cada migración (`backups/antes-de-migrar-*.dump`, en el mismo servidor); eso protege de una migración fallida, no de perder el servidor. Al terminar las fases: copiar el respaldo MÁS RECIENTE (`ls -lt backups/`) fuera del VPS (`scp usuario@IP:/home/emilianorm/reymen-ai-ops-preview/backups/<archivo>.dump .`) y borrar los viejos de `backups/` para no llenar el disco. Hasta entonces los datos viven en un solo lugar (riesgo aceptado).
+- [D] Desplegar lo que ya está en `main` del CRM (#37 incluye migración, #38–#40 y esta fase): ver `docs/crm/ROADMAP-CRM.md`.
+
 **De desarrollo:**
+- [D] **CRM:** roadmap de 9 mejoras en `docs/crm/ROADMAP-CRM.md` (hechas 1, 2, 3, 5, 6, 7; faltan 4, 8, 9). Opciones para investigar después (CRM a medida por cliente, temas por cliente): `docs/futuro/CRM-A-MEDIDA-Y-TEMAS.md`.
 - [D] **Automatizaciones (motor de eventos + n8n):** arquitectura **aprobada** en `docs/automations/ARQUITECTURA.md` (ReymenApp). Decisiones del usuario y orden de PRs en su **§K**; el siguiente paso exacto está al final de §K (PR 1: `Customer` en ReymenApp). Alcance agregado: descuentos en el POS y eventos de cocina y cierre de turno hacia Reymen. Aviso de privacidad pendiente: hasta tenerlo, solo dry-run y alertas internas.
 - [D] Sucursales en el POS (en pausa por decisión del usuario).
 - [D] Delivery: conectar con credenciales reales de Uber Eats, Rappi y DiDi (dependen de los partners).

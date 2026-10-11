@@ -11,6 +11,7 @@ const COPY = {
     created: (source: string | null) => `Llegó${source ? ` por ${source}` : ""}`,
     statusChange: "Estado",
     by: "por",
+    viaPipeline: "desde el pipeline",
     note: "Nota de",
     customer: "Cliente",
     ai: "Asistente IA",
@@ -29,6 +30,7 @@ const COPY = {
     created: (source: string | null) => `Arrived${source ? ` via ${source}` : ""}`,
     statusChange: "Status",
     by: "by",
+    viaPipeline: "from the pipeline",
     note: "Note by",
     customer: "Customer",
     ai: "AI assistant",
@@ -84,7 +86,12 @@ export function LeadTimeline({ events, hasMore, moreHref, lang }: { events: Lead
                   <div className="text-slate-700">
                     {t.statusChange}: {event.from && <><StatusBadge status={event.from} /> → </>}
                     <StatusBadge status={event.to} />
-                    {event.actorName && <span className="text-slate-400"> {t.by} {event.actorName}</span>}
+                    {(event.actorName || event.viaPipeline) && (
+                      <span className="text-slate-400">
+                        {event.actorName && <> {t.by} {event.actorName}</>}
+                        {event.viaPipeline && <> · {t.viaPipeline}</>}
+                      </span>
+                    )}
                   </div>
                 )}
                 {event.type === "note" && (

@@ -171,6 +171,7 @@ export default async function PortalSettingsPage() {
                   order: s.order,
                   isWon: s.isWon,
                   isLost: s.isLost,
+                  leadStatus: s.leadStatus,
                   opportunityCount: s._count.opportunities,
                 }))}
                 canManage={canManagePipeline}

@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { assertModuleEnabled } from "@/lib/modules";
 import { logAudit } from "@/lib/audit";
-import type { UserRole } from "@prisma/client";
+import { LeadStatus, type UserRole } from "@prisma/client";
 import { UserError } from "@/lib/user-error";
 
 async function requireOrgAndPipelinePermission() {
@@ -22,6 +22,7 @@ const createSchema = z.object({
   name: z.string().min(1),
   isWon: z.boolean().optional(),
   isLost: z.boolean().optional(),
+  leadStatus: z.nativeEnum(LeadStatus).nullable().optional(),
 });
 
 export async function createPipelineStage(data: z.infer<typeof createSchema>) {
@@ -41,6 +42,7 @@ export async function createPipelineStage(data: z.infer<typeof createSchema>) {
       order: (maxOrder._max.order ?? -1) + 1,
       isWon: parsed.isWon ?? false,
       isLost: parsed.isLost ?? false,
+      leadStatus: parsed.leadStatus ?? null,
     },
   });
 
@@ -63,6 +65,8 @@ const updateSchema = z.object({
   name: z.string().min(1).optional(),
   isWon: z.boolean().optional(),
   isLost: z.boolean().optional(),
+  /** Estado del contacto al que lleva esta etapa; null = ninguno (solo cuenta ganada/perdida). */
+  leadStatus: z.nativeEnum(LeadStatus).nullable().optional(),
 });
 
 export async function updatePipelineStage(data: z.infer<typeof updateSchema>) {

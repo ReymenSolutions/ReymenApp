@@ -244,6 +244,10 @@ model PipelineStage {
   order          Int
   isWon          Boolean  @default(false)
   isLost         Boolean  @default(false)
+  // Estado del contacto (Lead.status) al que lleva una oportunidad que llega
+  // a esta etapa. Null = no cambia el estado, salvo que la etapa esté marcada
+  // como ganada/perdida (entonces WON/LOST). Ver src/lib/lead-status-sync.ts.
+  leadStatus     LeadStatus?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
