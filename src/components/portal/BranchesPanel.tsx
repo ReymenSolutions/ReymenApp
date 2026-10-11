@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { usePreferences } from "@/context/preferences";
 import Link from "next/link";
 import { createBranch, renameBranch, setBranchActive } from "@/actions/branches";
-import { setMenuPerBranch } from "@/actions/branch-menu";
+import { setInventoryPerBranch, setMenuPerBranch } from "@/actions/branch-menu";
 import { getErrorMessage } from "@/lib/user-error";
 
 interface BranchRow {
@@ -18,7 +18,7 @@ interface BranchRow {
 }
 
 /** Sucursales del negocio. La "Principal" siempre existe; aquí se agregan las demás. */
-export function BranchesPanel({ branches, canManage, max, menuPerBranch }: { branches: BranchRow[]; canManage: boolean; max: number; menuPerBranch: boolean }) {
+export function BranchesPanel({ branches, canManage, max, menuPerBranch, inventoryPerBranch }: { branches: BranchRow[]; canManage: boolean; max: number; menuPerBranch: boolean; inventoryPerBranch: boolean }) {
   const { lang } = usePreferences();
   const es = lang === "es";
   const [pending, startTransition] = useTransition();
@@ -108,6 +108,21 @@ export function BranchesPanel({ branches, canManage, max, menuPerBranch }: { bra
               checked={menuPerBranch}
               disabled={!canManage || pending}
               onChange={(e) => run(() => setMenuPerBranch(e.target.checked), es ? "No se pudo guardar" : "Couldn't save")}
+            />
+          </label>
+          <label className="flex items-start justify-between gap-4 border-t border-slate-100 pt-3">
+            <span className="text-sm text-slate-700">
+              <span className="block font-medium text-slate-900">{es ? "Inventario por sucursal" : "Inventory per branch"}</span>
+              {es
+                ? "Apagado: un solo inventario. Encendido: cada sucursal lleva sus propias existencias (la Principal conserva las actuales y las demás empiezan en 0), las ventas descuentan de la sucursal que vendió y hay traspasos entre sucursales. Proveedores y costos son los mismos."
+                : "Off: a single inventory. On: each branch keeps its own stock (Main keeps the current one, the others start at 0), sales deduct from the selling branch and there are transfers between branches. Suppliers and costs are shared."}
+            </span>
+            <input
+              type="checkbox"
+              className="mt-1 h-5 w-5 shrink-0 accent-orange-500"
+              checked={inventoryPerBranch}
+              disabled={!canManage || pending}
+              onChange={(e) => run(() => setInventoryPerBranch(e.target.checked), es ? "No se pudo guardar" : "Couldn't save")}
             />
           </label>
           {menuPerBranch && (

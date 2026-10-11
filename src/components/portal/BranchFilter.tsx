@@ -2,11 +2,11 @@ import Link from "next/link";
 import { MAIN_BRANCH_PARAM, type BranchFilter as Filter } from "@/lib/branches";
 
 /** Chips "Todas / Principal / sucursales" para filtrar un reporte; el filtro vive en `?branch=`. */
-export function BranchFilter({ branches, current, es, basePath }: { branches: { id: string; name: string }[]; current: Filter; es: boolean; basePath: string }) {
+export function BranchFilter({ branches, current, es, basePath, showAll = true }: { branches: { id: string; name: string }[]; current: Filter; es: boolean; basePath: string; /** false: sin "Todas" (p. ej. existencias, que no se suman entre sucursales). */ showAll?: boolean }) {
   if (branches.length === 0) return null;
   const options: { key: string; label: string; href: string; active: boolean }[] = [
-    { key: "all", label: es ? "Todas las sucursales" : "All branches", href: basePath, active: current === undefined },
-    { key: "main", label: es ? "Principal" : "Main", href: `${basePath}?branch=${MAIN_BRANCH_PARAM}`, active: current === null },
+    ...(showAll ? [{ key: "all", label: es ? "Todas las sucursales" : "All branches", href: basePath, active: current === undefined }] : []),
+    { key: "main", label: es ? "Principal" : "Main", href: `${basePath}?branch=${MAIN_BRANCH_PARAM}`, active: current === null || (!showAll && current === undefined) },
     ...branches.map((b) => ({ key: b.id, label: b.name, href: `${basePath}?branch=${b.id}`, active: current === b.id })),
   ];
   return (

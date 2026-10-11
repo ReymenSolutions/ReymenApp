@@ -39,6 +39,9 @@ model Organization {
   // Interruptor "menú por sucursal": apagado, todas las sucursales venden el mismo menú y precios;
   // encendido, cada sucursal puede ocultar platillos y fijar sus precios (BranchDish / BranchVariantPrice).
   menuPerBranch            Boolean   @default(false)
+  // Interruptor "inventario por sucursal": apagado, un solo inventario (FoodInventoryItem.currentStock);
+  // encendido, la Principal sigue en currentStock y cada sucursal lleva su existencia en BranchStock.
+  inventoryPerBranch       Boolean   @default(false)
   // Set once the org's onboarding checklist (src/lib/onboarding.ts) is
   // either fully completed or explicitly skipped — null means "still
   // showing the setup nudge on the dashboard" (Fase 10).
@@ -81,6 +84,7 @@ model Organization {
   branches                Branch[]
   branchDishes            BranchDish[]
   branchVariantPrices     BranchVariantPrice[]
+  branchStocks            BranchStock[]
   foodInventoryItems      FoodInventoryItem[]
   foodSuppliers           FoodSupplier[]
   foodDishes              FoodDish[]
@@ -1179,6 +1183,7 @@ model Branch {
   sales         FoodSale[]
   dishes        BranchDish[]
   variantPrices BranchVariantPrice[]
+  stocks        BranchStock[]
 
   @@index([organizationId])
 }
@@ -1199,6 +1204,25 @@ model BranchDish {
 
   @@unique([branchId, dishId])
   @@index([organizationId])
+}
+
+// Existencia de un insumo en una sucursal (solo con inventoryPerBranch). Sin fila = 0. La Principal
+// usa FoodInventoryItem.currentStock. Puede quedar negativa, igual que el inventario general.
+model BranchStock {
+  id              String   @id @default(cuid())
+  organizationId  String
+  branchId        String
+  inventoryItemId String
+  currentStock    Decimal  @default(0) @db.Decimal(12, 3)
+  updatedAt       DateTime @updatedAt
+
+  organization  Organization      @relation(fields: [organizationId], references: [id])
+  branch        Branch            @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  inventoryItem FoodInventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@unique([branchId, inventoryItemId])
+  @@index([organizationId])
+  @@index([inventoryItemId])
 }
 
 // Precio propio de una variante en una sucursal. Sin fila = el precio base.
@@ -1281,6 +1305,7 @@ model FoodInventoryItem {
   modifierLinks FoodModifierOptionIngredient[]
   movements     FoodInventoryMovement[]
   purchaseItems FoodPurchaseItem[]
+  branchStocks  BranchStock[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -1320,6 +1345,7 @@ enum FoodInventoryMovementType {
   STOCK_IN // ingreso de stock sin compra registrada (donación, traspaso, inventario inicial)
   PRODUCTION // producción de un preparado: suma el preparado y resta sus insumos (mismo batchId)
   WASTE // desecho / merma con motivo
+  TRANSFER // traspaso entre sucursales: sale de una y entra a la otra (mismo batchId)
 }
 
 model FoodInventoryMovement {
@@ -1334,6 +1360,8 @@ model FoodInventoryMovement {
   // Agrupa los movimientos de un mismo ajuste rápido (p. ej. una producción:
   // el preparado que entra y los insumos que salen).
   batchId         String?
+  // Sucursal cuya existencia movió (null = la Principal / un solo inventario).
+  branchId        String?
   note            String?                   @db.Text
   // Quién lo hizo (null = automático, p. ej. una venta del POS). Sin FK, igual
   // que AuditLog: el historial no debe depender de que el usuario exista.
@@ -1346,6 +1374,7 @@ model FoodInventoryMovement {
   @@index([organizationId, createdAt])
   @@index([inventoryItemId, createdAt])
   @@index([batchId])
+  @@index([organizationId, branchId])
 }
 
 // ─── FOOD OPS — Compras ──────────────────────────────────────────────
@@ -1363,6 +1392,8 @@ model FoodPurchase {
   userId         String?
   voidedAt       DateTime?
   voidReason     String?   @db.Text
+  // Sucursal que recibió la compra (null = Principal).
+  branchId       String?
   createdAt      DateTime  @default(now())
 
   organization Organization       @relation(fields: [organizationId], references: [id])
@@ -1680,6 +1711,8 @@ model FoodRecipeUsage {
   occurredAt       DateTime
   type             FoodInventoryMovementType
   foodSaleId       String?
+  // Sucursal de cuya existencia se descontó (null = Principal).
+  branchId         String?
   applied          Json
   createdAt        DateTime                  @default(now())
   updatedAt        DateTime                  @updatedAt

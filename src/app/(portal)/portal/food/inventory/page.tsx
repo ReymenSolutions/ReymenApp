@@ -13,6 +13,10 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Package } from "lucide-react";
 import { FoodInventoryItemEditDialog } from "@/components/portal/FoodInventoryItemEditDialog";
+import { listBranches, parseBranchParam } from "@/lib/branches";
+import { branchStockMap } from "@/lib/food";
+import { BranchFilter } from "@/components/portal/BranchFilter";
+import { FoodTransferDialog } from "@/components/portal/FoodTransferDialog";
 import { FoodStockAdjustDialog } from "@/components/portal/FoodStockAdjustDialog";
 import { FoodArchiveButtons } from "@/components/portal/FoodArchiveButtons";
 import { FoodInventoryQuickAdjust, type ProductionTemplates } from "@/components/portal/FoodInventoryQuickAdjust";
@@ -20,12 +24,22 @@ import { can } from "@/lib/permissions";
 import { FOOD_UNIT_LABELS, FOOD_UNITS } from "@/lib/food-units";
 import type { FoodInventoryItem, FoodInventoryMovementType } from "@prisma/client";
 
-export default async function FoodInventoryPage() {
+export default async function FoodInventoryPage({ searchParams }: { searchParams: Promise<{ branch?: string }> }) {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
   await requireModule(session.user.organizationId, "FOOD_OPS");
 
   const orgId = session.user.organizationId;
+  const { branch: branchParam } = await searchParams;
+  const [orgFlags, branches] = await Promise.all([
+    prisma.organization.findUniqueOrThrow({ where: { id: orgId }, select: { inventoryPerBranch: true } }),
+    listBranches(orgId, { activeOnly: true }),
+  ]);
+  // Con inventario por sucursal, esta pantalla muestra UNA sucursal a la vez (la Principal por defecto).
+  const perBranch = orgFlags.inventoryPerBranch && branches.length > 0;
+  const parsedBranch = parseBranchParam(branchParam, branches);
+  const stockBranch = perBranch && typeof parsedBranch === "string" ? parsedBranch : null;
+  const branchStock = perBranch ? await branchStockMap(orgId, stockBranch) : null;
 
   const [t, lang, items, movements, productions] = await Promise.all([
     getServerT(),
@@ -35,7 +49,7 @@ export default async function FoodInventoryPage() {
       orderBy: { name: "asc" },
     }),
     prisma.foodInventoryMovement.findMany({
-      where: { organizationId: orgId },
+      where: { organizationId: orgId, ...(perBranch ? { branchId: stockBranch } : {}) },
       orderBy: { createdAt: "desc" },
       take: 20,
       include: { inventoryItem: { select: { name: true, unit: true } } },
@@ -76,14 +90,17 @@ export default async function FoodInventoryPage() {
     STOCK_IN: f.movStockIn,
     PRODUCTION: f.movProduction,
     WASTE: f.movWaste,
+    TRANSFER: f.movTransfer,
   };
   const canManage = can(session.user.role, "food:manage");
   const activeItems = items.filter((i) => i.isActive);
   const inactiveItems = items.filter((i) => !i.isActive);
-  const hasNegative = activeItems.some((i) => Number(i.currentStock) < 0);
+  // Existencia de la sucursal elegida (sin fila = 0); sin sucursales, la general.
+  const stockOf = (i: FoodInventoryItem) => (branchStock ? (branchStock.get(i.id) ?? 0) : Number(i.currentStock));
+  const hasNegative = activeItems.some((i) => stockOf(i) < 0);
 
   const renderItem = (item: FoodInventoryItem) => {
-    const stock = Number(item.currentStock);
+    const stock = stockOf(item);
     const low = item.isActive && stock <= Number(item.minStock);
     return (
       <li key={item.id} className="flex items-center justify-between gap-3 px-6 py-3">
@@ -108,7 +125,7 @@ export default async function FoodInventoryPage() {
           </div>
           {canManage && (
             <div className="flex items-center">
-              {item.isActive && <FoodStockAdjustDialog itemId={item.id} name={item.name} unit={item.unit} currentStock={stock} />}
+              {item.isActive && <FoodStockAdjustDialog itemId={item.id} name={item.name} unit={item.unit} currentStock={stock} branchId={stockBranch} />}
               {item.isActive && (
                 <FoodInventoryItemEditDialog
                   item={{
@@ -128,7 +145,7 @@ export default async function FoodInventoryPage() {
       </li>
     );
   };
-  const lowStock = items.filter((i) => i.isActive && Number(i.currentStock) <= Number(i.minStock));
+  const lowStock = items.filter((i) => i.isActive && stockOf(i) <= Number(i.minStock));
 
   return (
     <div>
@@ -141,12 +158,22 @@ export default async function FoodInventoryPage() {
         }
       />
 
+      {perBranch && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <BranchFilter branches={branches} current={stockBranch} es={lang === "es"} basePath="/portal/food/inventory" showAll={false} />
+          {canManage && activeItems.length > 0 && (
+            <FoodTransferDialog items={activeItems.map((i) => ({ id: i.id, name: i.name, unit: i.unit }))} branches={branches.map((b) => ({ id: b.id, name: b.name }))} defaultFrom={stockBranch} />
+          )}
+        </div>
+      )}
+
       {canManage && activeItems.length > 0 && (
         <Card className="mb-6">
           <CardContent className="p-4">
             <FoodInventoryQuickAdjust
-              items={activeItems.map((i) => ({ id: i.id, name: i.name, unit: i.unit, currentStock: Number(i.currentStock) }))}
+              items={activeItems.map((i) => ({ id: i.id, name: i.name, unit: i.unit, currentStock: stockOf(i) }))}
               templates={templates}
+              branchId={stockBranch}
             />
           </CardContent>
         </Card>

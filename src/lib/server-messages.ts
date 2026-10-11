@@ -12,6 +12,8 @@ const EN: Record<string, string> = {
   "Escribe el nombre de la sucursal": "Enter the branch name",
   "Ya tienes una sucursal con ese nombre": "You already have a branch with that name",
   "Sucursal no encontrada": "Branch not found",
+  "Activa el inventario por sucursal para hacer traspasos": "Turn on inventory per branch to make transfers",
+  "El origen y el destino deben ser distintos": "The origin and destination must be different",
   "El precio no es válido": "The price is not valid",
   "Campo no encontrado": "Field not found",
   "Solo las listas tienen opciones": "Only lists have options",

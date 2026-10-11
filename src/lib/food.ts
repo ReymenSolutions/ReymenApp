@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { hasModule } from "./modules";
-import { consumeRecipes } from "./food-inventory";
+import { consumeRecipes, effectiveStockBranch } from "./food-inventory";
 import { branchWhere, type BranchFilter } from "./branches";
 import { parsePosCustomer, upsertCustomer, applySaleToCustomer } from "./customers";
 
@@ -174,18 +174,33 @@ export interface FoodLowStockEntry {
   minStock: number;
 }
 
-export async function getFoodLowStockItems(organizationId: string, limit = 5): Promise<FoodLowStockEntry[]> {
-  const items = await prisma.foodInventoryItem.findMany({
-    where: { organizationId, isActive: true },
-    select: { id: true, name: true, unit: true, currentStock: true, minStock: true },
-  });
+/**
+ * Existencias de una sucursal por insumo, o null cuando la lectura es la general (un solo
+ * inventario, la Principal, o "inventario por sucursal" apagado). Sin fila = 0.
+ */
+export async function branchStockMap(organizationId: string, branchId: string | null | undefined): Promise<Map<string, number> | null> {
+  const branch = await effectiveStockBranch(organizationId, branchId);
+  if (!branch) return null;
+  const rows = await prisma.branchStock.findMany({ where: { organizationId, branchId: branch }, select: { inventoryItemId: true, currentStock: true } });
+  return new Map(rows.map((r) => [r.inventoryItemId, Number(r.currentStock)]));
+}
+
+/** Insumos en o bajo su mínimo; con `branchId` y "inventario por sucursal" encendido, con la existencia de esa sucursal. */
+export async function getFoodLowStockItems(organizationId: string, limit = 5, branchId?: string | null): Promise<FoodLowStockEntry[]> {
+  const [items, perBranch] = await Promise.all([
+    prisma.foodInventoryItem.findMany({
+      where: { organizationId, isActive: true },
+      select: { id: true, name: true, unit: true, currentStock: true, minStock: true },
+    }),
+    branchStockMap(organizationId, branchId),
+  ]);
 
   return items
     .map((i) => ({
       id: i.id,
       name: i.name,
       unit: i.unit,
-      currentStock: Number(i.currentStock),
+      currentStock: perBranch ? (perBranch.get(i.id) ?? 0) : Number(i.currentStock),
       minStock: Number(i.minStock),
     }))
     .filter((i) => i.currentStock <= i.minStock)
@@ -372,14 +387,16 @@ export function flattenVariants(dishes: FoodDishWithCost[]): FoodDishVariantWith
  */
 export type FoodStockStatus = "ok" | "low" | "out" | null;
 
-type StockLine = { quantity: Prisma.Decimal; inventoryItem: { currentStock: Prisma.Decimal; minStock: Prisma.Decimal } };
+type StockLine = { quantity: Prisma.Decimal; inventoryItemId?: string; inventoryItem: { currentStock: Prisma.Decimal | number; minStock: Prisma.Decimal } };
 
-export function stockStatusFor(lines: StockLine[]): FoodStockStatus {
+export function stockStatusFor(lines: StockLine[], branchStock?: ReadonlyMap<string, number> | null): FoodStockStatus {
   // Solo cuenta lo que consume; una línea negativa ("Sin cebolla") no gasta.
   const used = lines.filter((l) => Number(l.quantity) > 0);
   if (used.length === 0) return null;
-  if (used.some((l) => Number(l.inventoryItem.currentStock) <= 0)) return "out";
-  if (used.some((l) => Number(l.inventoryItem.currentStock) <= Number(l.inventoryItem.minStock))) return "low";
+  // Con existencias por sucursal, cada línea usa la de la sucursal (sin fila = 0).
+  const stockOf = (l: StockLine) => (branchStock && l.inventoryItemId ? (branchStock.get(l.inventoryItemId) ?? 0) : Number(l.inventoryItem.currentStock));
+  if (used.some((l) => stockOf(l) <= 0)) return "out";
+  if (used.some((l) => stockOf(l) <= Number(l.inventoryItem.minStock))) return "low";
   return "ok";
 }
 
@@ -427,6 +444,7 @@ export interface FoodMenuDish {
 
 const STOCK_LINE_SELECT = {
   quantity: true,
+  inventoryItemId: true,
   inventoryItem: { select: { currentStock: true, minStock: true } },
 } as const;
 
@@ -436,7 +454,8 @@ const STOCK_LINE_SELECT = {
  * (branchId null) y las organizaciones con el interruptor apagado ven el menú base.
  */
 export async function getFoodMenuForPos(organizationId: string, branchId: string | null = null): Promise<FoodMenuDish[]> {
-  const all = await getBaseFoodMenuForPos(organizationId);
+  const branchStock = await branchStockMap(organizationId, branchId);
+  const all = await getBaseFoodMenuForPos(organizationId, branchStock);
   if (!branchId) return all;
   const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { menuPerBranch: true } });
   if (!org?.menuPerBranch) return all;
@@ -456,7 +475,7 @@ export function applyBranchMenu(dishes: FoodMenuDish[], hiddenDishIds: ReadonlyS
     .map((d) => ({ ...d, variants: d.variants.map((v) => (priceByVariant.has(v.variantId) ? { ...v, price: priceByVariant.get(v.variantId)! } : v)) }));
 }
 
-async function getBaseFoodMenuForPos(organizationId: string): Promise<FoodMenuDish[]> {
+async function getBaseFoodMenuForPos(organizationId: string, branchStock: ReadonlyMap<string, number> | null = null): Promise<FoodMenuDish[]> {
   const dishes = await prisma.foodDish.findMany({
     where: { organizationId, isActive: true },
     select: {
@@ -496,7 +515,7 @@ async function getBaseFoodMenuForPos(organizationId: string): Promise<FoodMenuDi
       label: v.label,
       price: Number(v.price),
       externalPosId: v.externalPosId,
-      stockStatus: stockStatusFor(v.ingredients),
+      stockStatus: stockStatusFor(v.ingredients, branchStock),
     }));
     return {
       dishId: d.id,
@@ -517,7 +536,7 @@ async function getBaseFoodMenuForPos(organizationId: string): Promise<FoodMenuDi
             optionId: o.id,
             name: o.name,
             priceDelta: Number(o.priceDelta),
-            stockStatus: stockStatusFor(o.ingredients),
+            stockStatus: stockStatusFor(o.ingredients, branchStock),
           })),
         })),
     };
@@ -533,8 +552,8 @@ export interface FoodPosLowStockItem {
 }
 
 /** Insumos activos en o bajo su mínimo, para que el gerente los vea en el POS. */
-export async function getFoodLowStockForPos(organizationId: string): Promise<FoodPosLowStockItem[]> {
-  const items = await getFoodLowStockItems(organizationId, 50);
+export async function getFoodLowStockForPos(organizationId: string, branchId: string | null = null): Promise<FoodPosLowStockItem[]> {
+  const items = await getFoodLowStockItems(organizationId, 50, branchId);
   return items.map((i) => ({
     name: i.name,
     unit: i.unit,
@@ -1170,6 +1189,8 @@ export async function processFoodPosOrder(payload: unknown, organizationId: stri
       },
     });
     if (customerId) await applySaleToCustomer(tx, customerId, { grossAmount: body.grossAmount!, occurredAt });
+    // Con inventario por sucursal, los insumos salen de la existencia de la sucursal que vendió.
+    const stockBranch = await effectiveStockBranch(organizationId, branchId ?? original?.branchId ?? null);
     for (const item of items) {
       await tx.foodDishSale.upsert({
         where: { variantId_occurredAt: { variantId: item.variantId, occurredAt: businessDay } },
@@ -1201,9 +1222,9 @@ export async function processFoodPosOrder(payload: unknown, organizationId: stri
     });
     const sold = items.filter((i) => i.quantity > 0);
     const cancelled = items.filter((i) => i.quantity < 0);
-    if (sold.length) await consumeRecipes(tx, organizationId, withModifiers(sold), { type: "SALE", occurredAt, foodSaleId: sale.id });
+    if (sold.length) await consumeRecipes(tx, organizationId, withModifiers(sold), { type: "SALE", occurredAt, foodSaleId: sale.id, branchId: stockBranch });
     if (cancelled.length) {
-      await consumeRecipes(tx, organizationId, withModifiers(cancelled), { type: "SALE_CANCELLATION", occurredAt, foodSaleId: sale.id });
+      await consumeRecipes(tx, organizationId, withModifiers(cancelled), { type: "SALE_CANCELLATION", occurredAt, foodSaleId: sale.id, branchId: stockBranch });
     }
   });
 }

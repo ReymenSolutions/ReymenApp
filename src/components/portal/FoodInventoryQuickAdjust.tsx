@@ -104,7 +104,7 @@ interface Row {
 
 const fmt = (n: number) => n.toLocaleString("es-MX", { maximumFractionDigits: 3 });
 
-export function FoodInventoryQuickAdjust({ items, templates }: { items: QuickAdjustItem[]; templates: ProductionTemplates }) {
+export function FoodInventoryQuickAdjust({ items, templates, branchId }: { items: QuickAdjustItem[]; templates: ProductionTemplates; branchId?: string | null }) {
   const { lang } = usePreferences();
   const t = TEXT[lang === "en" ? "en" : "es"];
   const [kind, setKind] = useState<Kind | null>(null);
@@ -132,12 +132,12 @@ export function FoodInventoryQuickAdjust({ items, templates }: { items: QuickAdj
           );
         })}
       </div>
-      {kind && <AdjustDialog key={kind} kind={kind} items={items} templates={templates} onClose={() => setKind(null)} />}
+      {kind && <AdjustDialog key={kind} kind={kind} items={items} templates={templates} branchId={branchId ?? null} onClose={() => setKind(null)} />}
     </div>
   );
 }
 
-function AdjustDialog({ kind, items, templates, onClose }: { kind: Kind; items: QuickAdjustItem[]; templates: ProductionTemplates; onClose: () => void }) {
+function AdjustDialog({ kind, items, templates, branchId, onClose }: { kind: Kind; items: QuickAdjustItem[]; templates: ProductionTemplates; branchId: string | null; onClose: () => void }) {
   const { lang } = usePreferences();
   const t = TEXT[lang === "en" ? "en" : "es"];
   const listId = useId();
@@ -198,6 +198,7 @@ function AdjustDialog({ kind, items, templates, onClose }: { kind: Kind; items: 
         lines,
         output: out ? { itemId: out.id, quantity: Number(output.qty) || 0 } : undefined,
         note: note || undefined,
+        branchId,
       });
       toast.success(result.movements > 0 ? t.done(result.movements) : t.nothing);
       onClose();

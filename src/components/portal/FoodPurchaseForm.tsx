@@ -36,10 +36,11 @@ function todayLocal(): string {
 const selectClass = "h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm outline-none focus:border-brand-500";
 
 /** Captura de una compra: proveedor, fecha y renglones insumo/cantidad/costo. */
-export function FoodPurchaseForm({ suppliers, items }: { suppliers: { id: string; name: string }[]; items: PurchasableItem[] }) {
+export function FoodPurchaseForm({ suppliers, items, branches = [] }: { suppliers: { id: string; name: string }[]; items: PurchasableItem[]; /** Con inventario por sucursal: a cuál se recibe la compra. */ branches?: { id: string; name: string }[] }) {
   const { lang } = usePreferences();
   const f = pickDict(foodStrings, lang);
   const [supplierId, setSupplierId] = useState("");
+  const [branchId, setBranchId] = useState("");
   const [date, setDate] = useState(todayLocal);
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<Line[]>([{ key: 0, inventoryItemId: "", quantity: "", unitCost: "" }]);
@@ -77,6 +78,7 @@ export function FoodPurchaseForm({ suppliers, items }: { suppliers: { id: string
         // Mediodía local para que la fecha no se corra de día por la zona horaria.
         purchasedAt: new Date(`${date}T12:00:00`).toISOString(),
         notes: notes || undefined,
+        branchId: branchId || null,
         items: lines.map((l) => ({ inventoryItemId: l.inventoryItemId, quantity: Number(l.quantity), unitCost: Number(l.unitCost) })),
       });
       toast.success(f.purchaseSaved);
@@ -104,6 +106,17 @@ export function FoodPurchaseForm({ suppliers, items }: { suppliers: { id: string
             ))}
           </select>
         </div>
+        {branches.length > 0 && (
+          <div className="space-y-1">
+            <Label htmlFor="purchase-branch" className="text-xs text-slate-600">{lang === "es" ? "Sucursal que la recibe" : "Receiving branch"}</Label>
+            <select id="purchase-branch" value={branchId} onChange={(e) => setBranchId(e.target.value)} className={selectClass}>
+              <option value="">{lang === "es" ? "Principal" : "Main"}</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="space-y-1">
           <Label htmlFor="purchase-date" className="text-xs text-slate-600">{f.purchaseDate}</Label>
           <Input id="purchase-date" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />

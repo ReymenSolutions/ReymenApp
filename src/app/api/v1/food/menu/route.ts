@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   const [dishes, categories, lowStock, branches] = await Promise.all([
     getFoodMenuForPos(orgId, req.nextUrl.searchParams.get("branchId")),
     getFoodDishCategories(orgId),
-    getFoodLowStockForPos(orgId),
+    getFoodLowStockForPos(orgId, req.nextUrl.searchParams.get("branchId")),
     listBranches(orgId, { activeOnly: true }),
   ]);
   // stockStatus (por platillo, variante y opción) e inventory.lowStock son
