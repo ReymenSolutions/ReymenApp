@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm, useFieldArray, useFormContext, useWatch, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { IngredientCombobox } from "@/components/portal/IngredientCombobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -279,7 +280,6 @@ function VariantEditor({
     control,
     name: `variants.${variantIndex}.ingredients`,
   });
-  const listId = useId();
   const pickerRefs = useRef(new Map<string, HTMLInputElement>());
   const focusNew = useRef(false);
   useEffect(() => {
@@ -356,9 +356,9 @@ function VariantEditor({
             return (
               <div key={field.id} className="flex flex-col gap-2 rounded-md border border-slate-100 bg-slate-50/60 p-2 sm:flex-row sm:items-start">
                 <div className="flex-1 space-y-1">
-                  <IngredientPicker
-                    listId={listId}
+                  <IngredientCombobox
                     items={inventoryItems}
+                    usedIds={(watchedIngredients ?? []).map((w) => w?.inventoryItemId).filter((x): x is string => !!x)}
                     value={watchedIngredients?.[ingIndex]?.inventoryItemId ?? ""}
                     onChange={(id) =>
                       setValue(`variants.${variantIndex}.ingredients.${ingIndex}.inventoryItemId` as const, id, { shouldValidate: !!id })
@@ -411,15 +411,8 @@ function VariantEditor({
             );
           })}
         </div>
-        <datalist id={listId}>
-          {inventoryItems.map((i) => (
-            <option key={i.id} value={i.name}>
-              {i.unit}
-            </option>
-          ))}
-        </datalist>
         <p className="text-[11px] text-slate-400">
-          {lang === "es" ? "Escribe para buscar el insumo; Enter en la cantidad agrega otro." : "Type to search; Enter on the quantity adds another."}
+          {lang === "es" ? "Elige el insumo de la lista o escribe para buscar; Enter en la cantidad agrega otro." : "Pick from the list or type to search; Enter on the quantity adds another."}
         </p>
       </div>
 
@@ -438,48 +431,5 @@ function VariantEditor({
         )}
       </div>
     </div>
-  );
-}
-
-/** Ingredient search: type part of the name (native datalist), the id is set when it matches one. */
-function IngredientPicker({
-  listId,
-  items,
-  value,
-  onChange,
-  inputRef,
-}: {
-  listId: string;
-  items: FoodInventoryOption[];
-  value: string;
-  onChange: (id: string) => void;
-  inputRef: (el: HTMLInputElement | null) => void;
-}) {
-  const { lang } = usePreferences();
-  const current = items.find((i) => i.id === value);
-  const [text, setText] = useState(current?.name ?? "");
-  // The form changed the id (e.g. a copied variant): show its name.
-  const [shownId, setShownId] = useState(value);
-  if (value !== shownId) {
-    setShownId(value);
-    if (current) setText(current.name);
-  }
-  const unknown = text.trim() !== "" && !current;
-  return (
-    <input
-      ref={inputRef}
-      list={listId}
-      value={text}
-      placeholder={lang === "es" ? "Insumo (escribe para buscar)" : "Supply item (type to search)"}
-      onChange={(e) => {
-        setText(e.target.value);
-        const match = items.find((i) => i.name.trim().toLowerCase() === e.target.value.trim().toLowerCase());
-        onChange(match?.id ?? "");
-      }}
-      className={cn(
-        "w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-brand-500",
-        unknown ? "border-red-300" : "border-slate-300",
-      )}
-    />
   );
 }
