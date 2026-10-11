@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { rebuildCustomerStats } from "./customers";
 
 /**
  * Borra ventas del POS de un rango de días -- pensado para limpiar las
@@ -55,7 +56,7 @@ type Db = Pick<typeof prisma, "foodSale" | "foodRecipeUsage" | "foodDishSale">;
 async function collect(db: Db, organizationId: string, range: { gte: Date; lt: Date }) {
   const sales = await db.foodSale.findMany({
     where: { organizationId, source: "POS", occurredAt: range },
-    select: { id: true, grossAmount: true, occurredAt: true },
+    select: { id: true, grossAmount: true, occurredAt: true, customerId: true },
     orderBy: { occurredAt: "asc" },
   });
   const usages = sales.length
@@ -181,6 +182,8 @@ export async function purgePosSales(organizationId: string, from: string, to: st
       await tx.foodInventoryMovement.deleteMany({ where: { organizationId, foodSaleId: { in: saleIds } } });
       await tx.foodRecipeUsage.deleteMany({ where: { organizationId, foodSaleId: { in: saleIds } } });
       await tx.foodSale.deleteMany({ where: { organizationId, id: { in: saleIds } } });
+      // Las visitas y el gasto de los clientes de esas ventas se recalculan con lo que queda.
+      await rebuildCustomerStats(tx, organizationId, sales.flatMap((s) => (s.customerId ? [s.customerId] : [])));
       if (usesPos) await rebuildDailyCounts(tx, organizationId, range);
       return summary;
     },
