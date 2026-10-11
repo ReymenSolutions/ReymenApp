@@ -12,7 +12,7 @@ import { usePreferences } from "@/context/preferences";
 import { getErrorMessage } from "@/lib/user-error";
 
 /** Conteo físico: se captura lo que realmente hay y la diferencia queda como ajuste. */
-export function FoodStockAdjustDialog({ itemId, name, unit, currentStock }: { itemId: string; name: string; unit: string; currentStock: number }) {
+export function FoodStockAdjustDialog({ itemId, name, unit, currentStock, branchId }: { itemId: string; name: string; unit: string; currentStock: number; branchId?: string | null }) {
   const { lang } = usePreferences();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -26,7 +26,7 @@ export function FoodStockAdjustDialog({ itemId, name, unit, currentStock }: { it
     if (!valid) return;
     setLoading(true);
     try {
-      await adjustFoodInventoryStock(itemId, { countedStock: countedNumber, note: note || undefined });
+      await adjustFoodInventoryStock(itemId, { countedStock: countedNumber, note: note || undefined, branchId: branchId ?? null });
       toast.success(lang === "es" ? "Existencia ajustada" : "Stock adjusted");
       setOpen(false);
     } catch (e) {

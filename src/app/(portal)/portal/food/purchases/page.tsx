@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Badge } from "@/components/ui/badge";
+import { listBranches } from "@/lib/branches";
 import { FoodPurchaseForm } from "@/components/portal/FoodPurchaseForm";
 import { FoodPurchaseVoidDialog } from "@/components/portal/FoodPurchaseVoidDialog";
 import { ShoppingCart } from "lucide-react";
@@ -22,6 +23,10 @@ export default async function FoodPurchasesPage() {
 
   const orgId = session.user.organizationId;
 
+  const [orgFlags, branches] = await Promise.all([
+    prisma.organization.findUniqueOrThrow({ where: { id: orgId }, select: { inventoryPerBranch: true } }),
+    listBranches(orgId, { activeOnly: true }),
+  ]);
   const [t, lang, purchases, suppliers, items] = await Promise.all([
     getServerT(),
     getServerLang(),
@@ -109,6 +114,7 @@ export default async function FoodPurchasesPage() {
             <CardContent>
               <FoodPurchaseForm
                 suppliers={suppliers}
+                branches={orgFlags.inventoryPerBranch ? branches.map((b) => ({ id: b.id, name: b.name })) : []}
                 items={items.map((i) => ({ id: i.id, name: i.name, unit: i.unit, unitCost: i.unitCost === null ? null : Number(i.unitCost) }))}
               />
             </CardContent>

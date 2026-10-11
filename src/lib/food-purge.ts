@@ -62,13 +62,15 @@ async function collect(db: Db, organizationId: string, range: { gte: Date; lt: D
   const usages = sales.length
     ? await db.foodRecipeUsage.findMany({
         where: { organizationId, foodSaleId: { in: sales.map((s) => s.id) } },
-        select: { id: true, variantId: true, modifierOptionId: true, units: true, occurredAt: true, applied: true },
+        select: { id: true, variantId: true, modifierOptionId: true, units: true, occurredAt: true, applied: true, branchId: true },
       })
     : [];
+  // Lo que regresa al inventario, por sucursal de la que salió ("" = Principal): clave "sucursal|insumo".
   const stockBack = new Map<string, number>();
   for (const u of usages) {
     for (const [itemId, used] of Object.entries((u.applied ?? {}) as Record<string, number>)) {
-      stockBack.set(itemId, (stockBack.get(itemId) ?? 0) + Number(used));
+      const key = `${u.branchId ?? ""}|${itemId}`;
+      stockBack.set(key, (stockBack.get(key) ?? 0) + Number(used));
     }
   }
   const recorded = await db.foodDishSale.aggregate({ where: { organizationId, occurredAt: range }, _sum: { quantity: true } });
@@ -76,7 +78,7 @@ async function collect(db: Db, organizationId: string, range: { gte: Date; lt: D
     sales: sales.length,
     grossAmount: Math.round(sales.reduce((n, s) => n + Number(s.grossAmount), 0) * 100) / 100,
     units: usages.filter((u) => u.variantId).reduce((n, u) => n + Number(u.units), 0),
-    inventoryItems: [...stockBack.values()].filter((v) => Math.round(v * 1000) !== 0).length,
+    inventoryItems: new Set([...stockBack].filter(([, v]) => Math.round(v * 1000) !== 0).map(([k]) => k.split("|")[1])).size,
     firstAt: sales[0]?.occurredAt.toISOString() ?? null,
     lastAt: sales.at(-1)?.occurredAt.toISOString() ?? null,
     recordedUnits: recorded._sum.quantity ?? 0,
@@ -148,11 +150,16 @@ export async function purgePosSales(organizationId: string, from: string, to: st
       if (sales.length === 0 && !(usesPos && summary.recordedUnits !== 0)) return summary;
       const saleIds = sales.map((s) => s.id);
 
-      for (const [inventoryItemId, qty] of stockBack) {
+      for (const [key, qty] of stockBack) {
         const rounded = Math.round(qty * 1000) / 1000;
         if (rounded === 0) continue;
+        const [branchId, inventoryItemId] = key.split("|");
         // updateMany: un insumo borrado después de la venta simplemente no está.
-        await tx.foodInventoryItem.updateMany({ where: { id: inventoryItemId, organizationId }, data: { currentStock: { increment: rounded } } });
+        if (branchId) {
+          await tx.branchStock.updateMany({ where: { branchId, inventoryItemId, organizationId }, data: { currentStock: { increment: rounded } } });
+        } else {
+          await tx.foodInventoryItem.updateMany({ where: { id: inventoryItemId, organizationId }, data: { currentStock: { increment: rounded } } });
+        }
       }
 
       if (!usesPos) {

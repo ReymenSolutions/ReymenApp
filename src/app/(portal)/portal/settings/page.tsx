@@ -171,7 +171,7 @@ export default async function PortalSettingsPage() {
               <CardTitle>{lang === "es" ? "Sucursales" : "Branches"}</CardTitle>
             </CardHeader>
             <CardContent>
-              <BranchesPanel branches={branches.map((b) => ({ id: b.id, name: b.name, isActive: b.isActive }))} canManage={canManageBilling} max={MAX_BRANCHES} menuPerBranch={org.menuPerBranch} />
+              <BranchesPanel branches={branches.map((b) => ({ id: b.id, name: b.name, isActive: b.isActive }))} canManage={canManageBilling} max={MAX_BRANCHES} menuPerBranch={org.menuPerBranch} inventoryPerBranch={org.inventoryPerBranch} />
             </CardContent>
           </Card>
         )}

@@ -33,6 +33,22 @@ export async function setMenuPerBranch(enabled: boolean) {
   return { success: true };
 }
 
+/**
+ * Interruptor "inventario por sucursal". Encendido: la Principal conserva la existencia actual y cada
+ * sucursal empieza en 0 (se llena con compras, conteos o traspasos). Apagado: todo vuelve a salir del
+ * inventario general; las existencias de las sucursales se conservan pero no se usan.
+ */
+export async function setInventoryPerBranch(enabled: boolean) {
+  const session = await requireManager();
+  const orgId = session.user.organizationId!;
+  await prisma.organization.update({ where: { id: orgId }, data: { inventoryPerBranch: !!enabled } });
+  await logAudit({ organizationId: orgId, userId: session.user.id, action: enabled ? "branch.inventory_enable" : "branch.inventory_disable", resource: "Organization", resourceId: orgId });
+  revalidatePath("/portal/settings");
+  revalidatePath("/portal/food");
+  revalidatePath("/portal/food/inventory");
+  return { success: true };
+}
+
 async function ownedBranch(orgId: string, branchId: string) {
   const branch = await prisma.branch.findFirst({ where: { id: branchId, organizationId: orgId } });
   if (!branch) throw new UserError("Sucursal no encontrada");

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
 import { requireFoodManager } from "@/lib/guards";
-import { applyStockMovements, recalculateRecipeUsage } from "@/lib/food-inventory";
+import { applyStockMovements, effectiveStockBranch, recalculateRecipeUsage } from "@/lib/food-inventory";
 import { UserError } from "@/lib/user-error";
 import { normalizeFoodUnit } from "@/lib/food-units";
 
@@ -121,9 +121,17 @@ export async function deleteFoodInventoryItem(itemId: string) {
   revalidateInventory();
 }
 
+/** Existencia actual de un insumo en la sucursal (o la general si branchId es null). */
+async function currentStockOf(tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0], itemId: string, branchId: string | null): Promise<number> {
+  if (!branchId) return Number((await tx.foodInventoryItem.findFirst({ where: { id: itemId }, select: { currentStock: true } }))?.currentStock ?? 0);
+  return Number((await tx.branchStock.findUnique({ where: { branchId_inventoryItemId: { branchId, inventoryItemId: itemId } }, select: { currentStock: true } }))?.currentStock ?? 0);
+}
+
 const adjustSchema = z.object({
   countedStock: z.number().finite("Cantidad inválida"),
   note: z.string().trim().max(500).optional(),
+  /** Sucursal contada (solo con inventario por sucursal; ausente = Principal / general). */
+  branchId: z.string().nullable().optional(),
 });
 
 /** Conteo físico: fija la existencia al valor contado y registra la diferencia como ajuste. */
@@ -133,14 +141,16 @@ export async function adjustFoodInventoryStock(itemId: string, data: z.input<typ
   const parsed = adjustSchema.safeParse(data);
   if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos inválidos");
 
+  const branchId = await effectiveStockBranch(organizationId, parsed.data.branchId);
   await prisma.$transaction(async (tx) => {
-    const item = await tx.foodInventoryItem.findFirst({ where: { id: itemId, organizationId }, select: { currentStock: true } });
+    const item = await tx.foodInventoryItem.findFirst({ where: { id: itemId, organizationId }, select: { id: true } });
     if (!item) throw new UserError("Insumo no encontrado");
-    const delta = parsed.data.countedStock - Number(item.currentStock);
+    const delta = parsed.data.countedStock - (await currentStockOf(tx, itemId, branchId));
     await applyStockMovements(tx, organizationId, [{ inventoryItemId: itemId, delta }], {
       type: "ADJUSTMENT",
       note: parsed.data.note || undefined,
       userId: session.user.id,
+      branchId,
     });
   });
 
@@ -150,7 +160,7 @@ export async function adjustFoodInventoryStock(itemId: string, data: z.input<typ
     action: "food.inventory_adjust",
     resource: "FoodInventoryItem",
     resourceId: itemId,
-    metadata: { countedStock: parsed.data.countedStock, note: parsed.data.note ?? null },
+    metadata: { countedStock: parsed.data.countedStock, note: parsed.data.note ?? null, branchId },
   });
   revalidateInventory();
 }
@@ -171,6 +181,8 @@ const quickAdjustSchema = z.object({
   /** Producción: el preparado que se obtiene. */
   output: quickLineSchema.optional(),
   note: z.string().trim().max(300).optional(),
+  /** Sucursal (solo con inventario por sucursal; ausente = Principal / general). */
+  branchId: z.string().nullable().optional(),
 });
 
 export type QuickAdjustInput = z.input<typeof quickAdjustSchema>;
@@ -195,6 +207,7 @@ export async function recordInventoryAdjustment(data: QuickAdjustInput): Promise
 
   const ids = [...lines.map((l) => l.itemId), ...(output ? [output.itemId] : [])];
   const batchId = crypto.randomUUID();
+  const branchId = await effectiveStockBranch(organizationId, parsed.data.branchId);
   const movements = await prisma.$transaction(async (tx) => {
     const items = await tx.foodInventoryItem.findMany({
       where: { organizationId, id: { in: ids }, isActive: true },
@@ -202,14 +215,15 @@ export async function recordInventoryAdjustment(data: QuickAdjustInput): Promise
     });
     if (items.length !== new Set(ids).size) throw new UserError("Insumo no encontrado");
     const byId = new Map(items.map((i) => [i.id, i]));
-    const meta = { batchId, userId: session.user.id };
+    const meta = { batchId, userId: session.user.id, branchId };
 
     if (kind === "in") {
       await applyStockMovements(tx, organizationId, lines.map((l) => ({ inventoryItemId: l.itemId, delta: l.quantity })), { ...meta, type: "STOCK_IN", note });
     } else if (kind === "waste") {
       await applyStockMovements(tx, organizationId, lines.map((l) => ({ inventoryItemId: l.itemId, delta: -l.quantity })), { ...meta, type: "WASTE", note });
     } else if (kind === "count") {
-      const deltas = lines.map((l) => ({ inventoryItemId: l.itemId, delta: l.quantity - Number(byId.get(l.itemId)!.currentStock) }));
+      const deltas: { inventoryItemId: string; delta: number }[] = [];
+      for (const l of lines) deltas.push({ inventoryItemId: l.itemId, delta: l.quantity - (await currentStockOf(tx, l.itemId, branchId)) });
       await applyStockMovements(tx, organizationId, deltas, { ...meta, type: "ADJUSTMENT", note: note ? `Conteo de stock · ${note}` : "Conteo de stock" });
     } else if (output) {
       const outName = byId.get(output.itemId)!.name;
@@ -336,6 +350,8 @@ const purchaseSchema = z.object({
   supplierId: z.string().nullable(),
   purchasedAt: z.string().min(1, "Fecha requerida"),
   notes: z.string().trim().max(2000).optional(),
+  /** Sucursal que recibe la compra (solo con inventario por sucursal; ausente = Principal / general). */
+  branchId: z.string().nullable().optional(),
   items: z
     .array(
       z.object({
@@ -376,6 +392,7 @@ export async function createFoodPurchase(data: z.input<typeof purchaseSchema>) {
   }
 
   const total = Math.round(parsed.data.items.reduce((sum, i) => sum + i.quantity * i.unitCost, 0) * 100) / 100;
+  const branchId = await effectiveStockBranch(organizationId, parsed.data.branchId);
 
   const purchase = await prisma.$transaction(async (tx) => {
     // Costo vigente de cada insumo antes de esta compra, para regresarlo si se anula.
@@ -389,6 +406,7 @@ export async function createFoodPurchase(data: z.input<typeof purchaseSchema>) {
         total,
         notes: parsed.data.notes || null,
         userId: session.user.id,
+        branchId,
         items: {
           create: parsed.data.items.map((i) => ({
             inventoryItemId: i.inventoryItemId,
@@ -403,7 +421,7 @@ export async function createFoodPurchase(data: z.input<typeof purchaseSchema>) {
       tx,
       organizationId,
       parsed.data.items.map((i) => ({ inventoryItemId: i.inventoryItemId, delta: i.quantity })),
-      { type: "PURCHASE", purchaseId: created.id, userId: session.user.id }
+      { type: "PURCHASE", purchaseId: created.id, userId: session.user.id, branchId }
     );
     for (const i of parsed.data.items) {
       await tx.foodInventoryItem.update({ where: { id: i.inventoryItemId }, data: { unitCost: i.unitCost } });
@@ -417,7 +435,7 @@ export async function createFoodPurchase(data: z.input<typeof purchaseSchema>) {
     action: "food.purchase_create",
     resource: "FoodPurchase",
     resourceId: purchase.id,
-    metadata: { total, items: parsed.data.items.length },
+    metadata: { total, items: parsed.data.items.length, branchId },
   });
   revalidateInventory();
   return { id: purchase.id };
@@ -448,7 +466,7 @@ export async function voidFoodPurchase(purchaseId: string, reason: string) {
       tx,
       organizationId,
       purchase.items.map((i) => ({ inventoryItemId: i.inventoryItemId, delta: -Number(i.quantity) })),
-      { type: "PURCHASE_VOID", purchaseId, note: trimmed, userId: session.user.id }
+      { type: "PURCHASE_VOID", purchaseId, note: trimmed, userId: session.user.id, branchId: purchase.branchId }
     );
     for (const line of purchase.items) {
       const current = await tx.foodInventoryItem.findUnique({ where: { id: line.inventoryItemId }, select: { unitCost: true } });
@@ -502,4 +520,59 @@ export async function recalculateFoodRecipeUsage(since: string) {
   });
   revalidateInventory();
   return result;
+}
+
+// ── Traspasos entre sucursales ───────────────────────────────────────
+
+const transferSchema = z.object({
+  /** null = la Principal. */
+  fromBranchId: z.string().nullable(),
+  toBranchId: z.string().nullable(),
+  note: z.string().trim().max(300).optional(),
+  lines: z
+    .array(z.object({ itemId: z.string().min(1, "Selecciona un insumo"), quantity: z.number().finite("Cantidad inválida").positive("Cantidad debe ser mayor a 0") }))
+    .min(1, "Agrega al menos un insumo")
+    .max(100),
+});
+
+/**
+ * Pasa existencias de una sucursal a otra (la Principal incluida): sale de una y entra a la otra en
+ * la misma transacción, con el mismo batchId. Solo con inventario por sucursal encendido; el costo
+ * del insumo no cambia (es general).
+ */
+export async function transferInventoryBetweenBranches(data: z.input<typeof transferSchema>): Promise<{ movements: number }> {
+  const session = await requireFoodManager();
+  const organizationId = session.user.organizationId;
+  const parsed = transferSchema.safeParse(data);
+  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos inválidos");
+  const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { inventoryPerBranch: true } });
+  if (!org?.inventoryPerBranch) throw new UserError("Activa el inventario por sucursal para hacer traspasos");
+  const { fromBranchId, toBranchId } = parsed.data;
+  if ((fromBranchId ?? null) === (toBranchId ?? null)) throw new UserError("El origen y el destino deben ser distintos");
+  const from = await effectiveStockBranch(organizationId, fromBranchId);
+  const to = await effectiveStockBranch(organizationId, toBranchId);
+  if ((fromBranchId && !from) || (toBranchId && !to)) throw new UserError("Sucursal no encontrada");
+  const ids = parsed.data.lines.map((l) => l.itemId);
+  if (new Set(ids).size !== ids.length) throw new UserError("Un insumo aparece dos veces");
+
+  const batchId = crypto.randomUUID();
+  const movements = await prisma.$transaction(async (tx) => {
+    const found = await tx.foodInventoryItem.count({ where: { organizationId, id: { in: ids }, isActive: true } });
+    if (found !== ids.length) throw new UserError("Insumo no encontrado");
+    const meta = { type: "TRANSFER" as const, batchId, userId: session.user.id, note: parsed.data.note || undefined };
+    await applyStockMovements(tx, organizationId, parsed.data.lines.map((l) => ({ inventoryItemId: l.itemId, delta: -l.quantity })), { ...meta, branchId: from });
+    await applyStockMovements(tx, organizationId, parsed.data.lines.map((l) => ({ inventoryItemId: l.itemId, delta: l.quantity })), { ...meta, branchId: to });
+    return tx.foodInventoryMovement.count({ where: { batchId } });
+  });
+
+  await logAudit({
+    organizationId,
+    userId: session.user.id,
+    action: "food.inventory_transfer",
+    resource: "FoodInventoryMovement",
+    resourceId: batchId,
+    metadata: { from: fromBranchId, to: toBranchId, lines: parsed.data.lines.length },
+  });
+  revalidateInventory();
+  return { movements };
 }
