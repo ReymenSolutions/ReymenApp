@@ -7,7 +7,7 @@ La sucursal **Principal** es implícita: son las ventas con `branchId = null`. L
 | Fase | Repo | Contenido | Estado |
 |---|---|---|---|
 | 1 | App | Modelo `Branch`, alta/renombrar/archivar en Configuración → Sucursales, `FoodSale.branchId`, el webhook del POS acepta `branchId` (desconocido o ajeno → Principal; una cancelación hereda la de la venta), filtro "Todas / Principal / sucursal" en el inicio de Foods | hecho |
-| 2 | App | Que el POS conozca las sucursales: lista en el endpoint del menú / vínculo del dispositivo | pendiente |
+| 2 | App | Que el POS conozca las sucursales: `GET /api/v1/food/menu` devuelve `branches` (activas de la organización; entra en el ETag) | hecho |
 | 3 | POS | Cada dispositivo elige su sucursal al enlazarse; cuentas, comandas y cocina (KDS) se filtran por sucursal; `branchId` en los eventos y el adaptador | pendiente |
 | 4 | App | Filtro por sucursal en el resto de Foods (ventas, analítica, rentabilidad) y en el Centro de operaciones | pendiente |
 | 5 | App + POS | Interruptor "menú por sucursal" (platillos, precios y disponibilidad por sucursal) | pendiente |
