@@ -54,11 +54,13 @@ export async function upsertCustomer(tx: Tx, organizationId: string, input: PosC
   const consent = input.consent
     ? { consentAccepted: input.consent.accepted, consentTextVersion: input.consent.textVersion ?? null, consentAt: Number.isNaN(consentAt.getTime()) ? new Date() : consentAt }
     : {};
-  return tx.customer.upsert({
+  const existed = !!(await tx.customer.findUnique({ where: { organizationId_phoneKey: { organizationId, phoneKey: key } }, select: { id: true } }));
+  const customer = await tx.customer.upsert({
     where: { organizationId_phoneKey: { organizationId, phoneKey: key } },
     create: { organizationId, phone: input.phone, phoneKey: key, name: input.name ?? null, leadId: lead?.id ?? null, ...consent },
     update: { ...(input.name ? { name: input.name } : {}), ...(lead ? { leadId: lead.id } : {}), ...consent },
   });
+  return { ...customer, created: !existed };
 }
 
 /** Suma (o resta, en una cancelación) una venta a las estadísticas del cliente. */

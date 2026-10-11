@@ -372,3 +372,19 @@ Mismo esquema de firma e idempotencia que `/api/webhooks/pos/orders` (HMAC con e
 - `POST /api/webhooks/pos/kitchen` — `kitchen.ticket_ready`: `{ orderId, orderNumber, tableName, branchId?, deviceCode?, items: [{ itemId, name, quantity, station, sentAt, readyAt }] }`. Guarda un `FoodKitchenTicket` por producto (idempotente por `itemId`); descarta tiempos imposibles (listo antes de enviarse o más de 24 h).
 - `POST /api/webhooks/pos/shifts` — `shift.closed`: `{ sessionId, number, deviceCode?, branchId?, openedAt, closedAt, openedByName, closedByName, openingFloat, expected, counted, difference, salesTotal, salesCount, tips, cancelledTotal, cancelledCount, notes? }`. Guarda un `FoodShiftClose` por turno (la diferencia se recalcula como contado − esperado).
 - Se ven en Foods → Operación (tiempos de preparación por estación y últimos cortes). Habilitan `kitchen.sla_exceeded` y `shift.closed` en el motor de eventos (PR 5).
+
+## M. Bandeja de eventos y reloj implementados (PR 5)
+
+- **`DomainEvent`** (migración `domain_events`): `type`, `subjectType/Id`, `occurredAt`, `payload`, `dedupeKey` (único por organización), `correlationId`, `causationId`, `status` (`PENDING`/`PROCESSED`/`FAILED`), `attempts`, `nextAttemptAt`, `error`.
+- **Emisión** (`emitDomainEvent` en `src/lib/domain-events.ts`): es un `INSERT` dentro de la misma transacción del hecho. Hoy `processFoodPosOrder` emite:
+  - `sale.completed` (llave `sale.completed:<orderId>`; sin `orderId` usa el id de la venta),
+  - `sale.cancelled` (llave con el monto, para no fusionar cancelaciones parciales distintas),
+  - `customer.created` (solo la primera vez que aparece ese teléfono).
+  Si la venta falla no queda evento; si el POS reenvía el mismo pedido, no se duplica.
+- **Reloj:** `POST /api/cron/automations/tick` (Bearer `CRON_SECRET`, falla cerrado). Un candado `pg_try_advisory_xact_lock` impide dos ticks simultáneos (el segundo responde `ran: false, reason: "locked"`). Cada tick procesa hasta 200 eventos pendientes y borra los procesados de más de 90 días.
+- **Consumidores:** `registerDomainEventConsumer()` es el punto donde se conecta el motor de blueprints (PR 6). Un consumidor que lanza error deja el evento en reintento con espera de 1, 5, 30 min, 2 h y 12 h; al quinto fallo queda `FAILED` (visible para revisión). Sin consumidores, los eventos solo se marcan procesados.
+- **Cron del VPS** (cada 5 minutos; usa el mismo `CRON_SECRET` que el reintento de webhooks):
+
+```bash
+*/5 * * * * curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://app.reymen.mx/api/cron/automations/tick >/dev/null
+```
