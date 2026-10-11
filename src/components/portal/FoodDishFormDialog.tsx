@@ -83,6 +83,9 @@ interface FoodDishFormDialogProps {
   categories?: FoodCategoryOption[];
   modifierGroups?: FoodModifierGroupOption[];
   dish?: ExistingDish;
+  /** Controlled mode (e.g. opened by clicking the dish row): the parent owns the open state. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 function emptyVariant(): FormData["variants"][number] {
@@ -102,9 +105,10 @@ function dishDefaults(dish: ExistingDish): FormData {
   };
 }
 
-export function FoodDishFormDialog({ inventoryItems, categories = [], modifierGroups = [], dish }: FoodDishFormDialogProps) {
+export function FoodDishFormDialog({ inventoryItems, categories = [], modifierGroups = [], dish, open: controlledOpen, onOpenChange }: FoodDishFormDialogProps) {
   const { lang } = usePreferences();
-  const [open, setOpen] = useState(false);
+  const [innerOpen, setInnerOpen] = useState(false);
+  const open = controlledOpen ?? innerOpen;
   const [loading, setLoading] = useState(false);
   const isEdit = !!dish;
 
@@ -117,9 +121,11 @@ export function FoodDishFormDialog({ inventoryItems, categories = [], modifierGr
   const { fields: variantFields, append: appendVariant, remove: removeVariant } = useFieldArray({ control, name: "variants" });
   const watchedModifierGroupIds = useWatch({ control, name: "modifierGroupIds" }) ?? [];
 
-  function openDialog() {
-    reset(dish ? dishDefaults(dish) : emptyDefaults());
-    setOpen(true);
+  // Every way of opening (pencil, row click) starts from the saved values.
+  function setOpen(next: boolean) {
+    if (next) reset(dish ? dishDefaults(dish) : emptyDefaults());
+    setInnerOpen(next);
+    onOpenChange?.(next);
   }
 
   async function onSubmit(data: FormData) {
@@ -144,11 +150,11 @@ export function FoodDishFormDialog({ inventoryItems, categories = [], modifierGr
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {isEdit ? (
-          <Button variant="ghost" size="sm" onClick={openDialog} className="h-7 w-7 p-0 text-slate-400 hover:text-brand-600">
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-slate-400 hover:text-brand-600" aria-label={lang === "es" ? "Editar platillo" : "Edit dish"}>
             <Pencil className="h-3.5 w-3.5" />
           </Button>
         ) : (
-          <Button size="sm" onClick={openDialog}>
+          <Button size="sm">
             <Plus className="h-4 w-4" />
             {lang === "es" ? "Nuevo platillo" : "New dish"}
           </Button>

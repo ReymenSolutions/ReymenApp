@@ -9,26 +9,17 @@ import { pickDict } from "@/lib/i18n-dict";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { Badge } from "@/components/ui/badge";
 import { FoodDishFormDialog } from "@/components/portal/FoodDishFormDialog";
-import { FoodDishActiveToggle } from "@/components/portal/FoodDishActiveToggle";
+import { FoodDishList } from "@/components/portal/FoodDishList";
 import { FoodDailyDishSalesForm } from "@/components/portal/FoodDailyDishSalesForm";
 import { FoodDishCategoryFormDialog } from "@/components/portal/FoodDishCategoryFormDialog";
 import { FoodDishCategoryDeleteButton } from "@/components/portal/FoodDishCategoryDeleteButton";
 import { FoodModifierGroupFormDialog } from "@/components/portal/FoodModifierGroupFormDialog";
 import { FoodModifierGroupDeleteButton } from "@/components/portal/FoodModifierGroupDeleteButton";
-import { cn } from "@/lib/utils";
 import { ChefHat, Tag, SlidersHorizontal } from "lucide-react";
 import { PosLockedNotice } from "@/components/portal/PosLockedNotice";
 import { FoodRecipeRecalcForm } from "@/components/portal/FoodRecipeRecalcForm";
 import { can } from "@/lib/permissions";
-
-function marginColor(marginPct: number | null): string {
-  if (marginPct === null) return "text-slate-400";
-  if (marginPct < 15) return "text-red-600";
-  if (marginPct < 30) return "text-amber-600";
-  return "text-emerald-600";
-}
 
 function startOfToday(): Date {
   const d = new Date();
@@ -69,7 +60,6 @@ export default async function FoodRecipesPage() {
   const activeVariants = flattenVariants(dishes.filter((d) => d.isActive));
   const categoryOptions = categories.map((c) => ({ id: c.id, name: c.name }));
   const modifierGroupOptions = modifierGroups.map((g) => ({ id: g.id, name: g.name }));
-  const modifierGroupById = new Map(modifierGroups.map((g) => [g.id, g]));
 
   return (
     <div>
@@ -93,67 +83,28 @@ export default async function FoodRecipesPage() {
                   <EmptyState icon={ChefHat} title={f.noDishesYet} description={f.createFirstWithButton} />
                 </div>
               ) : (
-                <ul className="divide-y divide-slate-100">
-                  {dishes.map((dish) => (
-                    <li key={dish.id} className={cn("px-6 py-3", !dish.isActive && "opacity-50")}>
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex min-w-0 flex-1 items-center gap-2">
-                          <p className="truncate text-sm font-medium text-slate-900">{dish.name}</p>
-                          {dish.categoryName && (
-                            <Badge variant="outline" className="text-[10px]">{dish.categoryName}</Badge>
-                          )}
-                          {!dish.isActive && <Badge variant="secondary" className="text-[10px]">{f.inactive}</Badge>}
-                        </div>
-                        {canManage && (
-                          <div className="flex flex-shrink-0 items-center gap-1">
-                            <FoodDishFormDialog
-                              inventoryItems={inventoryItems}
-                              categories={categoryOptions}
-                              modifierGroups={modifierGroupOptions}
-                              dish={{
-                                id: dish.id,
-                                name: dish.name,
-                                categoryId: dish.categoryId,
-                                modifierGroupIds: dish.modifierGroupIds,
-                                variants: dish.variants.map((v) => ({
-                                  id: v.id,
-                                  label: v.label,
-                                  price: v.price,
-                                  ingredients: v.ingredients.map((i) => ({ inventoryItemId: i.inventoryItemId, quantity: i.quantity })),
-                                })),
-                              }}
-                            />
-                            <FoodDishActiveToggle dishId={dish.id} isActive={dish.isActive} />
-                          </div>
-                        )}
-                      </div>
-                      <ul className="mt-1.5 space-y-0.5 pl-0.5">
-                        {dish.variants.map((v) => (
-                          <li key={v.id} className="text-xs text-slate-500">
-                            {dish.variants.length > 1 && <span className="font-medium text-slate-600">{v.label}: </span>}
-                            {f.costPriceLine(`$${v.cost.toFixed(2)}`, `$${v.price.toFixed(2)}`)}
-                            {v.marginPct !== null && (
-                              <span className={cn("ml-1 font-medium", marginColor(v.marginPct))}>{f.marginLine(v.marginPct)}</span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                      {dish.modifierGroupIds.length > 0 && (
-                        <div className="mt-1.5 flex flex-wrap gap-1 pl-0.5">
-                          {dish.modifierGroupIds.map((gid) => {
-                            const g = modifierGroupById.get(gid);
-                            if (!g) return null;
-                            return (
-                              <span key={gid} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
-                                {g.name}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                <FoodDishList
+                  dishes={dishes.map((d) => ({
+                    id: d.id,
+                    name: d.name,
+                    isActive: d.isActive,
+                    categoryId: d.categoryId,
+                    categoryName: d.categoryName,
+                    modifierGroupIds: d.modifierGroupIds,
+                    variants: d.variants.map((v) => ({
+                      id: v.id,
+                      label: v.label,
+                      price: v.price,
+                      cost: v.cost,
+                      marginPct: v.marginPct,
+                      ingredients: v.ingredients.map((i) => ({ inventoryItemId: i.inventoryItemId, quantity: i.quantity })),
+                    })),
+                  }))}
+                  inventoryItems={inventoryItems}
+                  categories={categoryOptions}
+                  modifierGroups={modifierGroupOptions}
+                  canManage={canManage}
+                />
               )}
             </CardContent>
           </Card>
