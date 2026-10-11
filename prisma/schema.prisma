@@ -177,6 +177,9 @@ model Lead {
   name           String
   email          String?
   phone          String?
+  // Últimos 10 dígitos del teléfono (ver src/lib/phone.ts): sirve para unir
+  // conversaciones y detectar duplicados aunque el formato del número cambie.
+  phoneKey       String?
   source         String?
   // Caller-supplied idempotency key (e.g. the lead's ID in the client's own
   // CRM, or a WhatsApp message ID) — lets a resent/retried webhook upsert
@@ -207,9 +210,11 @@ model Lead {
   noteHistory   Note[]
   appointments  Appointment[]
   followUpLogs  FollowUpLog[]
+  conversations Conversation[]
 
   @@unique([organizationId, externalId])
   @@index([organizationId])
+  @@index([organizationId, phoneKey])
   @@index([organizationId, status])
   @@index([organizationId, createdAt])
 }
@@ -357,6 +362,11 @@ model Conversation {
   organizationId String
   channel        String
   contactPhone   String?
+  // Misma llave que Lead.phoneKey, para encontrar la conversación aunque el
+  // número llegue con otro formato.
+  phoneKey       String?
+  // Contacto del CRM con el que está enlazada (null si aún no hay uno).
+  leadId         String?
   contactName    String?
   status         ConversationStatus @default(OPEN)
   aiHandled      Boolean            @default(true)
@@ -368,9 +378,12 @@ model Conversation {
 
   organization Organization @relation(fields: [organizationId], references: [id])
   assignedTo   User?        @relation("ConversationAssignee", fields: [assignedToId], references: [id])
+  lead         Lead?        @relation(fields: [leadId], references: [id])
   messages     Message[]
 
   @@index([organizationId])
+  @@index([organizationId, phoneKey])
+  @@index([leadId])
   @@index([organizationId, status])
   @@index([organizationId, assignedToId])
 }

@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { assertPlanCapacity } from "@/lib/plan-limits";
+import { phoneKey } from "@/lib/phone";
+import { linkOrphanConversations } from "@/lib/crm-link";
 import { assertModuleEnabled } from "@/lib/modules";
 import { findPotentialDuplicateLeads } from "@/lib/duplicate-detection";
 import { recordMetric, METRIC_KEYS } from "@/lib/metrics";
@@ -41,9 +43,11 @@ export async function createLead(formData: FormData) {
     data: {
       ...parsed.data,
       email: parsed.data.email || null,
+      phoneKey: phoneKey(parsed.data.phone),
       organizationId: session.user.organizationId,
     },
   });
+  await linkOrphanConversations(session.user.organizationId, lead.id, lead.phone);
 
   await logAudit({
     organizationId: session.user.organizationId,

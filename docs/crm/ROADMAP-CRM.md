@@ -13,8 +13,8 @@ Estado: [ ] pendiente · [~] en curso · [x] hecho
 
 | # | Mejora | Estado |
 |---|---|---|
-| 1 | Unir conversaciones con contactos por un enlace real: `Conversation.leadId` + teléfonos normalizados (E.164) | [ ] |
-| 2 | Crear el lead automáticamente cuando escribe alguien nuevo por WhatsApp (respetando el límite del plan y `doNotContact`) | [ ] |
+| 1 | Unir conversaciones con contactos por un enlace real: `Conversation.leadId` + llave de teléfono (últimos 10 dígitos, `src/lib/phone.ts`); migración con relleno de datos existentes | [x] |
+| 2 | Crear el lead automáticamente cuando escribe alguien nuevo por WhatsApp (respetando el límite del plan y `doNotContact`) | [x] |
 | 3 | Vista "qué hago hoy": leads sin respuesta, seguimientos vencidos, citas de hoy, oportunidades sin actividad | [ ] |
 | 4 | Campos y etiquetas propios por cliente (ej. "tratamiento de interés", "aseguradora") | [ ] |
 | 5 | Línea de tiempo única en la ficha del contacto: mensajes, citas, notas, cambios de estado | [ ] |

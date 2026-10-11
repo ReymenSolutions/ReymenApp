@@ -51,13 +51,14 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       include: { author: { select: { id: true, name: true, email: true } } },
     }),
     prisma.appointment.findMany({ where: { leadId: lead.id }, orderBy: { startTime: "desc" } }),
-    lead.phone
-      ? prisma.conversation.findMany({
-          where: { organizationId: orgId, contactPhone: lead.phone },
-          orderBy: { updatedAt: "desc" },
-          include: { messages: { orderBy: { createdAt: "desc" }, take: 15 } },
-        })
-      : Promise.resolve([]),
+    prisma.conversation.findMany({
+      where: {
+        organizationId: orgId,
+        OR: [{ leadId: lead.id }, ...(lead.phoneKey ? [{ leadId: null, phoneKey: lead.phoneKey }] : [])],
+      },
+      orderBy: { updatedAt: "desc" },
+      include: { messages: { orderBy: { createdAt: "desc" }, take: 15 } },
+    }),
     prisma.pipelineStage.findMany({ where: { organizationId: orgId }, orderBy: { order: "asc" }, select: { id: true, name: true } }),
     prisma.user.findMany({ where: { organizationId: orgId, isActive: true }, select: { id: true, name: true, email: true }, orderBy: { createdAt: "asc" } }),
     findPotentialDuplicateLeads(orgId, lead, lead.id),
