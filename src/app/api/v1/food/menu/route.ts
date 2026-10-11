@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateOrgRequest } from "@/lib/api-key-auth";
 import { hasModule } from "@/lib/modules";
+import { listBranches } from "@/lib/branches";
 import { getFoodMenuForPos, getFoodDishCategories, getFoodLowStockForPos } from "@/lib/food";
 
 // Menú (platillos + categoría + variantes + precio + externalPosId + grupos
@@ -22,10 +23,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Food module not enabled for this organization" }, { status: 403 });
   }
 
-  const [dishes, categories, lowStock] = await Promise.all([
+  const [dishes, categories, lowStock, branches] = await Promise.all([
     getFoodMenuForPos(orgId),
     getFoodDishCategories(orgId),
     getFoodLowStockForPos(orgId),
+    listBranches(orgId, { activeOnly: true }),
   ]);
   // stockStatus (por platillo, variante y opción) e inventory.lowStock son
   // avisos para el POS, nunca bloqueos. Van dentro del hash: un cambio de
@@ -34,6 +36,8 @@ export async function GET(req: NextRequest) {
     data: dishes,
     categories: categories.map((c) => ({ id: c.id, name: c.name, sortOrder: c.sortOrder })),
     inventory: { lowStock },
+    // Sucursales adicionales activas: cada caja del POS elige a cuál pertenece. La Principal es implícita.
+    branches: branches.map((b) => ({ id: b.id, name: b.name })),
     total: dishes.length,
   };
 
@@ -51,7 +55,7 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json(
-    { data: content.data, categories: content.categories, inventory: content.inventory, meta: { total: content.total, version } },
+    { data: content.data, categories: content.categories, inventory: content.inventory, branches: content.branches, meta: { total: content.total, version } },
     { headers: { ETag: etag } }
   );
 }

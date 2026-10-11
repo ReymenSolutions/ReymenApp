@@ -39,6 +39,20 @@ describe("GET /api/v1/food/menu", () => {
     expect(body.data.some((d: { name: string }) => d.name === "Org A Secret Dish")).toBe(true);
   });
 
+  it("lists only the org's active branches (never another org's, never archived ones) and changes the ETag when they change", async () => {
+    authMock.mockResolvedValue(null);
+    const call = () => GET(makeRequest(`http://localhost/api/v1/food/menu?orgId=${orgA.id}`, { "x-api-key": orgA.n8nWebhookSecret }));
+    const before = await call();
+    expect((await before.json()).branches).toEqual([]);
+
+    const centro = await prisma.branch.create({ data: { organizationId: orgA.id, name: "Centro" } });
+    await prisma.branch.create({ data: { organizationId: orgA.id, name: "Vieja", isActive: false } });
+    await prisma.branch.create({ data: { organizationId: orgB.id, name: "Ajena" } });
+    const after = await call();
+    expect((await after.json()).branches).toEqual([{ id: centro.id, name: "Centro" }]);
+    expect(after.headers.get("etag")).not.toBe(before.headers.get("etag"));
+  });
+
   it("CRITICAL: rejects org B's secret used to read org A's menu", async () => {
     authMock.mockResolvedValue(null);
     const res = await GET(makeRequest(`http://localhost/api/v1/food/menu?orgId=${orgA.id}`, { "x-api-key": orgB.n8nWebhookSecret }));
