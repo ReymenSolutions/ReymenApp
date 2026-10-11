@@ -1,57 +1,72 @@
 // @vitest-environment node
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { createTestOrg, cleanupOrg } from "@/test/helpers";
-import { findPotentialDuplicateLeads } from "./duplicate-detection";
+import { countDuplicateGroups, findDuplicateGroups, findPotentialDuplicateLeads } from "./duplicate-detection";
+import { phoneKey } from "./phone";
 
-describe("findPotentialDuplicateLeads", () => {
-  let org: { id: string };
-  let orgB: { id: string };
+describe("duplicate detection", () => {
+  const orgs: string[] = [];
+  afterEach(async () => {
+    for (const id of orgs.splice(0)) await cleanupOrg(id);
+  });
+  const newOrg = async () => {
+    const o = await createTestOrg("Dup Org");
+    orgs.push(o.id);
+    return o;
+  };
+  const mk = (organizationId: string, name: string, data: { phone?: string; email?: string; deletedAt?: Date } = {}) =>
+    prisma.lead.create({ data: { organizationId, name, email: data.email, phone: data.phone, phoneKey: phoneKey(data.phone), deletedAt: data.deletedAt } });
 
-  beforeAll(async () => {
-    org = await createTestOrg("Dup Detection Org");
-    orgB = await createTestOrg("Dup Detection Org B");
+  it("matches the same phone in any format, and the same email in any case", async () => {
+    const org = await newOrg();
+    const a = await mk(org.id, "A", { phone: "+52 1 55 1234 5678" });
+    const b = await mk(org.id, "B", { email: "Persona@Correo.com" });
+    await mk(org.id, "Otro", { phone: "55 9999 0000", email: "otro@correo.com" });
+
+    const byPhone = await findPotentialDuplicateLeads(org.id, { phone: "(55) 1234-5678" });
+    expect(byPhone.map((l) => l.id)).toEqual([a.id]);
+    const byEmail = await findPotentialDuplicateLeads(org.id, { email: "persona@correo.com" });
+    expect(byEmail.map((l) => l.id)).toEqual([b.id]);
+    expect((await findPotentialDuplicateLeads(org.id, { email: "  persona@correo.com " })).map((l) => l.id)).toEqual([b.id]); // con espacios
+    expect(await findPotentialDuplicateLeads(org.id, {})).toEqual([]);
+    expect(await findPotentialDuplicateLeads(org.id, { phone: "12", email: null })).toEqual([]);
   });
 
-  afterAll(async () => {
-    await cleanupOrg(org.id);
-    await cleanupOrg(orgB.id);
+  it("ignores deleted leads and other organizations, and can exclude the lead itself", async () => {
+    const org = await newOrg();
+    const other = await newOrg();
+    const live = await mk(org.id, "Vivo", { phone: "55 1111 2222" });
+    await mk(org.id, "Borrado", { phone: "55 1111 2222", deletedAt: new Date() });
+    await mk(other.id, "De otra org", { phone: "55 1111 2222" });
+
+    expect((await findPotentialDuplicateLeads(org.id, { phone: "55 1111 2222" })).map((l) => l.id)).toEqual([live.id]);
+    expect(await findPotentialDuplicateLeads(org.id, { phone: "55 1111 2222" }, live.id)).toEqual([]);
   });
 
-  it("returns [] when neither email nor phone is provided", async () => {
-    const result = await findPotentialDuplicateLeads(org.id, {});
-    expect(result).toEqual([]);
+  it("groups contacts that share a phone or an email, oldest first, without repeating a group", async () => {
+    const org = await newOrg();
+    const old = await prisma.lead.create({ data: { organizationId: org.id, name: "Más antiguo", phone: "55 3333 4444", phoneKey: "5533334444", email: "x@correo.com", createdAt: new Date(Date.now() - 86_400_000) } });
+    const dup = await mk(org.id, "Más nuevo", { phone: "+52 1 55 3333 4444", email: "X@correo.com" }); // mismo teléfono Y mismo correo: un solo grupo
+    const e1 = await mk(org.id, "Correo 1", { email: "solo@correo.com" });
+    const e2 = await mk(org.id, "Correo 2", { email: "SOLO@correo.com" });
+    await mk(org.id, "Único", { phone: "55 7777 8888" });
+
+    const groups = await findDuplicateGroups(org.id);
+    expect(groups).toHaveLength(2);
+    const phoneGroup = groups.find((g) => g.reason === "phone");
+    expect(phoneGroup?.leads.map((l) => l.id)).toEqual([old.id, dup.id]);
+    const emailGroup = groups.find((g) => g.reason === "email" && g.value === "solo@correo.com");
+    expect(emailGroup?.leads.map((l) => l.id).sort()).toEqual([e1.id, e2.id].sort());
+    // El conteo cuenta por separado teléfono y correo (3 grupos aquí), el listado los junta si son las mismas personas.
+    expect(await countDuplicateGroups(org.id)).toBe(3);
   });
 
-  it("matches phones ignoring formatting characters", async () => {
-    const lead = await prisma.lead.create({ data: { organizationId: org.id, name: "Phone Lead", phone: "(555) 123-4567" } });
-    const result = await findPotentialDuplicateLeads(org.id, { phone: "5551234567" });
-    expect(result.map((l) => l.id)).toContain(lead.id);
-  });
-
-  it("matches emails ignoring case and surrounding whitespace", async () => {
-    const lead = await prisma.lead.create({ data: { organizationId: org.id, name: "Email Lead", email: "Someone@Example.com" } });
-    const result = await findPotentialDuplicateLeads(org.id, { email: "  someone@example.com " });
-    expect(result.map((l) => l.id)).toContain(lead.id);
-  });
-
-  it("excludes the given leadId from results", async () => {
-    const lead = await prisma.lead.create({ data: { organizationId: org.id, name: "Self", phone: "555-0001" } });
-    const result = await findPotentialDuplicateLeads(org.id, { phone: "555-0001" }, lead.id);
-    expect(result.map((l) => l.id)).not.toContain(lead.id);
-  });
-
-  it("ignores soft-deleted leads", async () => {
-    const lead = await prisma.lead.create({
-      data: { organizationId: org.id, name: "Deleted", phone: "555-0002", deletedAt: new Date() },
-    });
-    const result = await findPotentialDuplicateLeads(org.id, { phone: "555-0002" });
-    expect(result.map((l) => l.id)).not.toContain(lead.id);
-  });
-
-  it("never matches leads from another organization", async () => {
-    await prisma.lead.create({ data: { organizationId: orgB.id, name: "Other Org Lead", phone: "555-0003" } });
-    const result = await findPotentialDuplicateLeads(org.id, { phone: "555-0003" });
-    expect(result).toEqual([]);
+  it("reports nothing when there are no duplicates or the duplicates were already merged", async () => {
+    const org = await newOrg();
+    await mk(org.id, "Uno", { phone: "55 1212 3434" });
+    await mk(org.id, "Dos", { phone: "55 1212 3434", deletedAt: new Date() });
+    expect(await findDuplicateGroups(org.id)).toEqual([]);
+    expect(await countDuplicateGroups(org.id)).toBe(0);
   });
 });

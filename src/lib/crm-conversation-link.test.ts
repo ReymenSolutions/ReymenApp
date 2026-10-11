@@ -113,4 +113,44 @@ describe("conversation ↔ contact link", () => {
     const lead = await prisma.lead.findFirstOrThrow({ where: { organizationId: org.id, name: "Alta posterior" } });
     expect((await prisma.conversation.findUniqueOrThrow({ where: { id: conversationId } })).leadId).toBe(lead.id);
   });
+
+  describe("lead webhook does not create a second contact for the same person", () => {
+    it("same phone in another format: completes the existing lead instead of creating one", async () => {
+      const org = await newOrg();
+      const existing = await prisma.lead.create({ data: { organizationId: org.id, name: "Ana", phone: "55 1234 5678", phoneKey: "5512345678" } });
+      await processLeadEvent({ name: "Ana García", email: "ana@correo.com", phone: "+52 1 55 1234 5678", externalId: "crm-9" }, org.id);
+
+      expect(await prisma.lead.count({ where: { organizationId: org.id } })).toBe(1);
+      const after = await prisma.lead.findUniqueOrThrow({ where: { id: existing.id } });
+      expect(after.name).toBe("Ana"); // no pisa un nombre real
+      expect(after.email).toBe("ana@correo.com"); // completa lo que faltaba
+      expect(after.externalId).toBe("crm-9");
+    });
+
+    it("same email in another case matches too", async () => {
+      const org = await newOrg();
+      await prisma.lead.create({ data: { organizationId: org.id, name: "Luis", email: "luis@correo.com" } });
+      await processLeadEvent({ name: "Luis R", email: "LUIS@correo.com" }, org.id);
+      expect(await prisma.lead.count({ where: { organizationId: org.id } })).toBe(1);
+    });
+
+    it("a lead auto-created from WhatsApp (named after its phone) gets the real name when the sign-up arrives", async () => {
+      const org = await newOrg();
+      const { conversationId } = await processConversationEvent(inbound("+52 55 9090 1212"), org.id);
+      await processLeadEvent({ name: "Carlos Ramírez", phone: "55 9090 1212" }, org.id);
+
+      const leads = await prisma.lead.findMany({ where: { organizationId: org.id } });
+      expect(leads).toHaveLength(1);
+      expect(leads[0].name).toBe("Carlos Ramírez");
+      expect((await prisma.conversation.findUniqueOrThrow({ where: { id: conversationId } })).leadId).toBe(leads[0].id);
+    });
+
+    it("different people are still created, and a deleted lead doesn't block a new one", async () => {
+      const org = await newOrg();
+      await prisma.lead.create({ data: { organizationId: org.id, name: "Borrado", phone: "55 5555 0000", phoneKey: "5555550000", deletedAt: new Date() } });
+      await processLeadEvent({ name: "Nuevo", phone: "55 5555 0000" }, org.id);
+      await processLeadEvent({ name: "Otro", phone: "55 5555 0001" }, org.id);
+      expect(await prisma.lead.count({ where: { organizationId: org.id, deletedAt: null } })).toBe(2);
+    });
+  });
 });

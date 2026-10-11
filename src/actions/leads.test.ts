@@ -247,6 +247,32 @@ describe("leads actions", () => {
     expect(dupLead.deletedAt).not.toBeNull();
   });
 
+  it("mergeLeads also moves conversations and follow-up history, backfills the phone key and keeps 'do not contact'", async () => {
+    authMock.mockResolvedValue(fakeSession({ id: userA.id, role: "OWNER", organizationId: orgA.id }));
+    const fdPrimary = new FormData();
+    fdPrimary.set("name", "Primary Full");
+    const primary = await createLead(fdPrimary);
+    const fdDup = new FormData();
+    fdDup.set("name", "Duplicate Full");
+    fdDup.set("phone", "+52 1 55 4444 5555");
+    const duplicate = await createLead(fdDup);
+    await prisma.lead.update({ where: { id: duplicate.leadId }, data: { doNotContact: true } });
+
+    const conv = await prisma.conversation.create({
+      data: { organizationId: orgA.id, channel: "whatsapp", contactPhone: "+52 1 55 4444 5555", phoneKey: "5544445555", leadId: duplicate.leadId },
+    });
+    const rule = await prisma.followUpRule.create({ data: { organizationId: orgA.id, name: "Regla merge", triggerStatus: "NEW", delayMinutes: 10, template: "Hola" } });
+    const log = await prisma.followUpLog.create({ data: { leadId: duplicate.leadId, ruleId: rule.id } });
+
+    await mergeLeads(primary.leadId, duplicate.leadId);
+
+    expect((await prisma.conversation.findUniqueOrThrow({ where: { id: conv.id } })).leadId).toBe(primary.leadId);
+    expect((await prisma.followUpLog.findUniqueOrThrow({ where: { id: log.id } })).leadId).toBe(primary.leadId);
+    const merged = await prisma.lead.findUniqueOrThrow({ where: { id: primary.leadId } });
+    expect(merged.phoneKey).toBe("5544445555");
+    expect(merged.doNotContact).toBe(true);
+  });
+
   it("enforces tenant isolation: org B cannot merge org A's leads", async () => {
     authMock.mockResolvedValue(fakeSession({ id: userA.id, role: "OWNER", organizationId: orgA.id }));
     const fd1 = new FormData();
