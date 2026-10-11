@@ -12,6 +12,7 @@ describe("shortcutsFor", () => {
     expect(keys.slice(0, 5)).toEqual(["sales", "operations", "inventory", "delivery", "messages"]);
     expect(keys.slice(-2)).toEqual(["help", "settings"]);
     expect(keys).toContain("clients");
+    expect(keys).toContain("today");
     expect(keys).toContain("card");
     expect(keys).not.toContain("automations");
   });

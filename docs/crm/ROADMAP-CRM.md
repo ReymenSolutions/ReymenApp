@@ -15,7 +15,7 @@ Estado: [ ] pendiente · [~] en curso · [x] hecho
 |---|---|---|
 | 1 | Unir conversaciones con contactos por un enlace real: `Conversation.leadId` + llave de teléfono (últimos 10 dígitos, `src/lib/phone.ts`); migración con relleno de datos existentes | [x] |
 | 2 | Crear el lead automáticamente cuando escribe alguien nuevo por WhatsApp (respetando el límite del plan y `doNotContact`) | [x] |
-| 3 | Vista "qué hago hoy": leads sin respuesta, seguimientos vencidos, citas de hoy, oportunidades sin actividad | [ ] |
+| 3 | Vista "qué hago hoy" (`/portal/today`, `src/lib/crm-today.ts`): clientes esperando respuesta, leads nuevos sin atender, citas de hoy, seguimientos vencidos y oportunidades sin movimiento. La lógica de seguimientos vencidos se compartió en `src/lib/follow-ups.ts` | [x] |
 | 4 | Campos y etiquetas propios por cliente (ej. "tratamiento de interés", "aseguradora") | [ ] |
 | 5 | Línea de tiempo única en la ficha del contacto: mensajes, citas, notas, cambios de estado | [ ] |
 | 6 | Un estado en vez de dos: la etapa del pipeline es la fuente y `Lead.status` se deriva (compatibilidad con reportes/webhooks) | [ ] |

@@ -10,7 +10,7 @@ export interface HomeShortcut {
   key: string;
   href: string;
   /** Nombre de un ícono de lucide-react (ver HomeShortcuts). */
-  icon: "utensils" | "inventory" | "chat" | "calendar" | "users" | "zap" | "card" | "chart" | "help" | "settings" | "truck";
+  icon: "utensils" | "inventory" | "list" | "chat" | "calendar" | "users" | "zap" | "card" | "chart" | "help" | "settings" | "truck";
   module?: PlatformModule;
 }
 
@@ -23,6 +23,7 @@ export const HOME_SHORTCUTS: HomeShortcut[] = [
   { key: "delivery", href: "/portal/food/delivery", icon: "truck", module: "FOOD_OPS" },
   { key: "messages", href: "/portal/conversations", icon: "chat", module: "AI_WHATSAPP" },
   { key: "appointments", href: "/portal/appointments", icon: "calendar" },
+  { key: "today", href: "/portal/today", icon: "list", module: "CRM" },
   { key: "clients", href: "/portal/leads", icon: "users", module: "CRM" },
   { key: "card", href: "/portal/smartcard", icon: "card", module: "NFC_QR" },
   { key: "automations", href: "/portal/automations", icon: "zap", module: "AUTOMATIONS" },
