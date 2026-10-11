@@ -17,7 +17,7 @@ Estado: [ ] pendiente · [~] en curso · [x] hecho
 | 2 | Crear el lead automáticamente cuando escribe alguien nuevo por WhatsApp (respetando el límite del plan y `doNotContact`) | [x] |
 | 3 | Vista "qué hago hoy" (`/portal/today`, `src/lib/crm-today.ts`): clientes esperando respuesta, leads nuevos sin atender, citas de hoy, seguimientos vencidos y oportunidades sin movimiento. La lógica de seguimientos vencidos se compartió en `src/lib/follow-ups.ts` | [x] |
 | 4 | Campos y etiquetas propios por cliente (ej. "tratamiento de interés", "aseguradora") | [ ] |
-| 5 | Línea de tiempo única en la ficha del contacto: mensajes, citas, notas, cambios de estado | [ ] |
+| 5 | Línea de tiempo única en la ficha del contacto (`src/lib/lead-timeline.ts`, `LeadTimeline.tsx`): llegada, cambios de estado (ahora se registran en auditoría con quién), notas, mensajes (cliente/IA/equipo), escalaciones, citas, seguimientos enviados y movimientos de oportunidades; con "Ver actividad anterior" | [x] |
 | 6 | Un estado en vez de dos: la etapa del pipeline es la fuente y `Lead.status` se deriva (compatibilidad con reportes/webhooks) | [ ] |
 | 7 | Fusionar duplicados y evitar crearlos al importar o recibir webhooks | [ ] |
 | 8 | Reportes que respondan una pregunta: origen de los que compran, tiempo a cerrar, dónde se caen | [ ] |

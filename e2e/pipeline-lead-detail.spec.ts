@@ -91,7 +91,10 @@ test.describe("pipeline board and lead detail golden path", () => {
     await page.goto(`/portal/leads/${leadId}`);
 
     await expect(page.getByRole("heading", { name: "Lead Pipeline E2E" })).toBeVisible();
-    await expect(page.getByText("Deal Pipeline E2E")).toBeVisible();
+    // La oportunidad aparece en su tarjeta y también en el historial
+    // ("Oportunidad creada: ..."), así que se verifican las dos por separado.
+    await expect(page.getByRole("paragraph").filter({ hasText: "Deal Pipeline E2E" })).toBeVisible();
+    await expect(page.getByRole("list").getByText("Deal Pipeline E2E")).toBeVisible();
   });
 
   test("adding a note on the lead detail page appears immediately", async ({ page }) => {

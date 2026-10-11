@@ -86,7 +86,19 @@ export async function updateLeadStatus(leadId: string, status: LeadStatus) {
     data: { status },
   });
 
+  if (lead.status !== status) {
+    await logAudit({
+      organizationId: session.user.organizationId,
+      userId: session.user.id,
+      action: "lead.status_change",
+      resource: "Lead",
+      resourceId: leadId,
+      metadata: { from: lead.status, to: status },
+    });
+  }
+
   revalidatePath("/portal/leads");
+  revalidatePath(`/portal/leads/${leadId}`);
   return { success: true };
 }
 
