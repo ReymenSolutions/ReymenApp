@@ -388,3 +388,16 @@ Mismo esquema de firma e idempotencia que `/api/webhooks/pos/orders` (HMAC con e
 ```bash
 */5 * * * * curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://app.reymen.mx/api/cron/automations/tick >/dev/null
 ```
+
+## N. Blueprints, ejecuciones y dry-run implementados (PR 6)
+
+- **Blueprint = código** (`src/lib/automation/blueprints/`): `key`, `version`, `trigger` (tipo de `DomainEvent`), `requiredModules`, `configSchema` (Zod con valores por defecto), `decide()` (función pura) y `contactRules()` (canal, enfriamiento, horas de silencio). El catálogo (`blueprints/index.ts`) es la fuente de verdad; una v2 se agrega junto a la v1.
+- **Primer blueprint:** `welcome_new_customer` v1 — trigger `customer.created`, requiere el módulo Reymen POS, mensaje de bienvenida solo con consentimiento. Configuración: `channel` (`whatsapp`/`sms`), `cooldownDays` (365), horas de silencio 21:00–09:00 (hora del negocio).
+- **Instancia = `Automation`** con `blueprintKey`, `blueprintVersion`, `trigger`, `dryRun` (por defecto **true**), `lastRunAt`, `lastStatus`; una por organización y blueprint. Las automatizaciones n8n heredadas (sin `blueprintKey`) no cambian.
+- **Motor** (`src/lib/automation/engine.ts`), consumidor de la bandeja que corre el `tick`: por cada evento busca las automatizaciones ACTIVAS de esa organización con ese trigger y crea una `AutomationExecution` (única por automatización + evento):
+  - `SKIPPED` con `skipReason`: `blueprint_unavailable`, `module_disabled`, `invalid_config`, `no_customer`, `no_consent`, `cooldown`, `quiet_hours` o la que decida el blueprint;
+  - `DRY_RUN`: "se habría enviado a…" con la acción completa (canal, plantilla, destinatario) y sin contactar a nadie;
+  - `PENDING`: con el dry-run apagado, queda lista para el despachador (PR 7).
+- **Política de contacto** (`policy.ts`, única para todos los blueprints): consentimiento aceptado, enfriamiento por cliente y automatización, y horas de silencio en la zona horaria de la organización.
+- **Admin:** Admin → Cliente → "Automatizaciones (blueprints)": habilitar (exige los módulos del blueprint; nace en dry-run), pasar a envío real (con confirmación), pausar/reanudar y ver el conteo de ejecuciones por estado. Todo queda en la bitácora de auditoría (`automation.blueprint_*`).
+- **Pendiente de PR 7:** enviar las ejecuciones `PENDING` a n8n (firmado, con reintentos) y recibir el resultado.

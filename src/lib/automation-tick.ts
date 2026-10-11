@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { runAutomationsForEvent } from "@/lib/automation/engine";
 import { processDomainEvents, purgeProcessedDomainEvents, type OutboxResult } from "@/lib/domain-events";
 
 // Llave del candado del reloj de automatizaciones (cualquier entero fijo; solo debe ser única en la base).
@@ -11,12 +12,12 @@ export type TickResult = { ran: true; outbox: OutboxResult; purged: number } | {
  * viejos. Un candado de Postgres (advisory lock de transacción) evita que dos ticks corran a la vez; si
  * otro tick sigue trabajando, este responde `locked` y no hace nada.
  */
-export async function runAutomationTick(now: Date = new Date()): Promise<TickResult> {
+export async function runAutomationTick(now: Date = new Date(), opts: { organizationId?: string } = {}): Promise<TickResult> {
   return prisma.$transaction(
     async (tx) => {
       const [{ locked }] = await tx.$queryRaw<{ locked: boolean }[]>`SELECT pg_try_advisory_xact_lock(${TICK_LOCK_KEY}) AS locked`;
       if (!locked) return { ran: false as const, reason: "locked" as const };
-      const outbox = await processDomainEvents({ now });
+      const outbox = await processDomainEvents({ now, organizationId: opts.organizationId, consumers: [(event) => runAutomationsForEvent(event, now)] });
       const purged = await purgeProcessedDomainEvents(now);
       return { ran: true as const, outbox, purged };
     },
