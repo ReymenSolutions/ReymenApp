@@ -215,13 +215,11 @@ export async function checkLeadDuplicates(leadId: string) {
 
 /**
  * Controlled unification: folds `duplicateLeadId` into `primaryLeadId`.
- * Moves the duplicate's opportunities and notes onto the primary, merges
- * tags, backfills the primary's email/phone if it's missing one the
- * duplicate has (never overwrites a value the primary already has), then
- * soft-deletes the duplicate. Conversations aren't re-pointed (they aren't
- * linked to a Lead by a hard foreign key — they're matched by phone number
- * at display time), so backfilling `phone` onto the primary is what makes
- * the duplicate's conversation history show up under the surviving lead.
+ * Moves the duplicate's opportunities, notes, appointments, conversations and
+ * follow-up history onto the primary, merges tags, backfills the primary's
+ * email/phone if it's missing one the duplicate has (never overwrites a value
+ * the primary already has), keeps "do not contact" if either had it (an
+ * opt-out must survive a merge), then soft-deletes the duplicate.
  */
 export async function mergeLeads(primaryLeadId: string, duplicateLeadId: string) {
   const session = await auth();
@@ -240,12 +238,16 @@ export async function mergeLeads(primaryLeadId: string, duplicateLeadId: string)
     prisma.opportunity.updateMany({ where: { leadId: duplicateLeadId }, data: { leadId: primaryLeadId } }),
     prisma.note.updateMany({ where: { leadId: duplicateLeadId }, data: { leadId: primaryLeadId } }),
     prisma.appointment.updateMany({ where: { leadId: duplicateLeadId }, data: { leadId: primaryLeadId } }),
+    prisma.conversation.updateMany({ where: { leadId: duplicateLeadId }, data: { leadId: primaryLeadId } }),
+    prisma.followUpLog.updateMany({ where: { leadId: duplicateLeadId }, data: { leadId: primaryLeadId } }),
     prisma.lead.update({
       where: { id: primaryLeadId },
       data: {
         tags: Array.from(new Set([...primary.tags, ...duplicate.tags])),
         email: primary.email ?? duplicate.email,
         phone: primary.phone ?? duplicate.phone,
+        phoneKey: primary.phoneKey ?? duplicate.phoneKey,
+        doNotContact: primary.doNotContact || duplicate.doNotContact,
       },
     }),
     prisma.lead.update({ where: { id: duplicateLeadId }, data: { deletedAt: new Date() } }),
@@ -261,6 +263,7 @@ export async function mergeLeads(primaryLeadId: string, duplicateLeadId: string)
   });
 
   revalidatePath("/portal/leads");
+  revalidatePath("/portal/leads/duplicates");
   revalidatePath(`/portal/leads/${primaryLeadId}`);
   return { success: true };
 }

@@ -12,7 +12,8 @@ import { CreateLeadDialog } from "@/components/portal/CreateLeadDialog";
 import { ExportLeadsButton } from "@/components/portal/ExportLeadsButton";
 import { LeadTableClient } from "@/components/portal/LeadTableClient";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { Users, Settings } from "lucide-react";
+import { Users, Settings, Copy } from "lucide-react";
+import { countDuplicateGroups } from "@/lib/duplicate-detection";
 import type { LeadStatus, Prisma, UserRole } from "@prisma/client";
 
 const PAGE_SIZE = 50;
@@ -69,10 +70,11 @@ export default async function PortalLeadsPage({
   const page = Math.max(1, Number(pageParam) || 1);
   const status = parseStatus(statusParam);
 
-  const [t, lang, { leads, total, totalUnfiltered }] = await Promise.all([
+  const [t, lang, { leads, total, totalUnfiltered }, duplicateGroups] = await Promise.all([
     getServerT(),
     getServerLang(),
     getLeads(session.user.organizationId, { query: q, status, page }),
+    countDuplicateGroups(session.user.organizationId),
   ]);
 
   const canManageSettings = can(session.user.role as UserRole, "settings:manage");
@@ -84,6 +86,14 @@ export default async function PortalLeadsPage({
         description={`${totalUnfiltered} ${t.totalLeadsCount}`}
         actions={
           <div className="flex items-center gap-2">
+            {duplicateGroups > 0 && (
+              <Button asChild variant="outline" size="sm" className="border-amber-300 text-amber-800 hover:bg-amber-50">
+                <Link href="/portal/leads/duplicates">
+                  <Copy className="h-4 w-4" />
+                  {lang === "es" ? `${duplicateGroups} posibles duplicados` : `${duplicateGroups} possible duplicates`}
+                </Link>
+              </Button>
+            )}
             {canManageSettings && (
               <Button asChild variant="outline" size="sm">
                 <Link href="/portal/leads/settings">

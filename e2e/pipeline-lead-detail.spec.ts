@@ -42,7 +42,7 @@ test.describe("pipeline board and lead detail golden path", () => {
     });
 
     const lead = await prisma.lead.create({
-      data: { organizationId: org.id, name: "Lead Pipeline E2E", phone: "555-7000", email: "leadpipeline@example.com" },
+      data: { organizationId: org.id, name: "Lead Pipeline E2E", phone: "555-7000", phoneKey: "5557000", email: "leadpipeline@example.com" },
     });
     leadId = lead.id;
   });
@@ -109,7 +109,8 @@ test.describe("pipeline board and lead detail golden path", () => {
 
   test("a same-phone duplicate lead is flagged with a merge option", async ({ page }) => {
     const duplicate = await prisma.lead.create({
-      data: { organizationId: orgId, name: "Lead Duplicado E2E", phone: "555-7000" },
+      // La app guarda la llave de teléfono (phoneKey) al crear un lead; aquí se crea directo en la base.
+      data: { organizationId: orgId, name: "Lead Duplicado E2E", phone: "555-7000", phoneKey: "5557000" },
     });
 
     await login(page);

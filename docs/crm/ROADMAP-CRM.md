@@ -19,7 +19,7 @@ Estado: [ ] pendiente · [~] en curso · [x] hecho
 | 4 | Campos y etiquetas propios por cliente (ej. "tratamiento de interés", "aseguradora") | [ ] |
 | 5 | Línea de tiempo única en la ficha del contacto (`src/lib/lead-timeline.ts`, `LeadTimeline.tsx`): llegada, cambios de estado (ahora se registran en auditoría con quién), notas, mensajes (cliente/IA/equipo), escalaciones, citas, seguimientos enviados y movimientos de oportunidades; con "Ver actividad anterior" | [x] |
 | 6 | Un estado en vez de dos: la etapa del pipeline es la fuente y `Lead.status` se deriva (compatibilidad con reportes/webhooks) | [ ] |
-| 7 | Fusionar duplicados y evitar crearlos al importar o recibir webhooks | [ ] |
+| 7 | Fusionar duplicados y evitar crearlos: detección por llave de teléfono/correo (indexada), `/portal/leads/duplicates` con fusión en un paso, fusión que mueve conversaciones y seguimientos y conserva "no contactar", y el webhook de leads ya no crea un segundo contacto para la misma persona. (No existe importación CSV de leads; solo exportación.) | [x] |
 | 8 | Reportes que respondan una pregunta: origen de los que compran, tiempo a cerrar, dónde se caen | [ ] |
 | 9 | Conectar con Foods/POS mediante el modelo `Customer` (ver `docs/automations/ARQUITECTURA.md` §K) | [ ] |
 

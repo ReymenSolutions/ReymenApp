@@ -7,6 +7,7 @@ import { recordMetric, METRIC_KEYS } from "./metrics";
 import { appUrl } from "./app-url";
 import { phoneKey } from "./phone";
 import { findLeadByPhone, linkOrphanConversations } from "./crm-link";
+import { findPotentialDuplicateLeads } from "./duplicate-detection";
 import { hasModule } from "./modules";
 import { UserError } from "./user-error";
 
@@ -42,6 +43,27 @@ export async function processLeadEvent(payload: unknown, orgId: string): Promise
       where: { organizationId_externalId: { organizationId: orgId, externalId: body.externalId } },
     });
     if (existing) return;
+  }
+
+  // Misma persona (mismo teléfono —en cualquier formato— o mismo correo): no
+  // se crea otro lead, se completa la ficha del que ya existe. Pasa, por
+  // ejemplo, cuando alguien ya escribió por WhatsApp y luego llega su alta.
+  const [existingPerson] = await findPotentialDuplicateLeads(orgId, { email: body.email, phone: body.phone });
+  if (existingPerson) {
+    const looksLikePhone = /^[\d\s()+.-]+$/.test(existingPerson.name);
+    await prisma.lead.update({
+      where: { id: existingPerson.id },
+      data: {
+        // Un lead creado desde WhatsApp sin nombre se llama como su teléfono: ahora ya hay un nombre real.
+        name: looksLikePhone ? body.name : undefined,
+        email: existingPerson.email ? undefined : body.email,
+        phone: existingPerson.phone ? undefined : body.phone,
+        phoneKey: existingPerson.phoneKey ? undefined : phoneKey(body.phone),
+        externalId: existingPerson.externalId ? undefined : body.externalId,
+      },
+    });
+    await linkOrphanConversations(orgId, existingPerson.id, existingPerson.phone ?? body.phone);
+    return;
   }
 
   await assertPlanCapacity(orgId, "leads");
