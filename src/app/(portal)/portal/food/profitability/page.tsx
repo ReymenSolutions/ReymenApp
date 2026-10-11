@@ -11,6 +11,8 @@ import { getServerLang, getServerT } from "@/lib/i18n-server";
 import { foodStrings } from "@/lib/i18n-food";
 import { pickDict } from "@/lib/i18n-dict";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { listBranches, parseBranchParam } from "@/lib/branches";
+import { BranchFilter } from "@/components/portal/BranchFilter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -35,12 +37,15 @@ const RECOMMENDATION_BADGE: Record<string, "destructive" | "warning" | "info"> =
   promote: "info",
 };
 
-export default async function FoodProfitabilityPage() {
+export default async function FoodProfitabilityPage({ searchParams }: { searchParams: Promise<{ branch?: string }> }) {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
   await requireModule(session.user.organizationId, "FOOD_OPS");
 
   const orgId = session.user.organizationId;
+  const { branch: branchParam } = await searchParams;
+  const branches = await listBranches(orgId, { activeOnly: true });
+  const branch = parseBranchParam(branchParam, branches);
 
   const [
     t, lang, operatingCosts, fixedCostsMonthly, breakEven, profitToday, profit7d, profit30d,
@@ -51,12 +56,12 @@ export default async function FoodProfitabilityPage() {
     getFoodOperatingCosts(orgId),
     getTotalMonthlyFixedCosts(orgId),
     getFoodBreakEven(orgId),
-    getFoodNetProfit(orgId, "today"),
-    getFoodNetProfit(orgId, "7d"),
-    getFoodNetProfit(orgId, "30d"),
+    getFoodNetProfit(orgId, "today", branch),
+    getFoodNetProfit(orgId, "7d", branch),
+    getFoodNetProfit(orgId, "30d", branch),
     getFoodCostReductionInsights(orgId),
-    getFoodProfitRecommendations(orgId),
-    getFoodLeastSoldDishes(orgId, 30, 5),
+    getFoodProfitRecommendations(orgId, branch),
+    getFoodLeastSoldDishes(orgId, 30, 5, branch),
     getFoodDishesWithCost(orgId, { activeOnly: true }),
     prisma.organization.findUnique({ where: { id: orgId }, select: { foodTargetCostPct: true } }),
   ]);
@@ -77,6 +82,14 @@ export default async function FoodProfitabilityPage() {
   return (
     <div>
       <PageHeader title={t.foodProfitability} description={f.profitabilityDesc} />
+      <BranchFilter branches={branches} current={branch} es={lang === "es"} basePath="/portal/food/profitability" />
+      {branch !== undefined && (
+        <p className="mb-4 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          {lang === "es"
+            ? "Vista de una sucursal: ingresos, costo de lo vendido y platillos de esa sucursal. Los costos fijos y el punto de equilibrio son de todo el negocio y no se restan aquí."
+            : "Single-branch view: revenue, cost of goods and dishes for that branch. Fixed costs and break-even are business-wide and are not deducted here."}
+        </p>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">

@@ -121,7 +121,7 @@ export default async function FoodOverviewPage({ searchParams }: { searchParams:
     getFoodHourlySales(orgId, branch),
     getFoodDailySales(orgId, 7, branch),
     getFoodLowStockItems(orgId, 5),
-    getFoodTopSellingDishes(orgId, 30, 5),
+    getFoodTopSellingDishes(orgId, 30, 5, branch),
     prisma.foodSupplier.findMany({
       where: { organizationId: orgId, isActive: true },
       select: {

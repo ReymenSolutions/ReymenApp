@@ -101,6 +101,8 @@ export async function consumeRecipes(
     userId?: string | null;
     /** Sucursal (ya resuelta con effectiveStockBranch) de cuya existencia se descuenta; null = Principal. */
     branchId?: string | null;
+    /** Sucursal que hizo la venta (para platillos vendidos y rentabilidad por sucursal); null = Principal. */
+    saleBranchId?: string | null;
   }
 ): Promise<void> {
   const unitsByVariant = sumBy(sold.variants, (i) => i.variantId, (i) => i.quantity);
@@ -113,7 +115,7 @@ export async function consumeRecipes(
     const applied = consumptionFor(recipe, units);
     // También sin receta: si después se le agrega una, el recálculo la alcanza.
     await tx.foodRecipeUsage.create({
-      data: { organizationId, ...source, units, occurredAt: meta.occurredAt, type: meta.type, foodSaleId: meta.foodSaleId ?? null, branchId: meta.branchId ?? null, applied },
+      data: { organizationId, ...source, units, occurredAt: meta.occurredAt, type: meta.type, foodSaleId: meta.foodSaleId ?? null, branchId: meta.branchId ?? null, saleBranchId: meta.saleBranchId ?? null, applied },
     });
     for (const [itemId, used] of Object.entries(applied)) total.set(itemId, (total.get(itemId) ?? 0) + used);
   };
