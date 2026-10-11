@@ -1,0 +1,86 @@
+import { Prisma, type AutomationExecutionStatus } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { hasModule } from "@/lib/modules";
+import type { StoredDomainEvent } from "@/lib/domain-events";
+import { getBlueprint } from "./blueprints";
+import { evaluateContactPolicy } from "./policy";
+
+type Outcome = { status: AutomationExecutionStatus; skipReason?: string; action?: Prisma.InputJsonValue; subjectType?: string; subjectId?: string };
+
+/**
+ * Consumidor de la bandeja de eventos: por cada evento busca las automatizaciones ACTIVAS de esa
+ * organización con ese trigger y registra una ejecución por cada una (SKIPPED con su razón, DRY_RUN
+ * "se habría enviado…", o PENDING para el despachador). Única por automatización + evento: un evento
+ * reprocesado nunca dispara dos veces.
+ */
+export async function runAutomationsForEvent(event: StoredDomainEvent, now: Date = new Date()): Promise<void> {
+  const automations = await prisma.automation.findMany({
+    where: { organizationId: event.organizationId, status: "ACTIVE", trigger: event.type, blueprintKey: { not: null } },
+  });
+  if (automations.length === 0) return;
+
+  const organization = await prisma.organization.findUniqueOrThrow({ where: { id: event.organizationId }, select: { id: true, name: true, timezone: true } });
+  const payload = (event.payload ?? {}) as { customerId?: string | null };
+  const customer = payload.customerId ? await prisma.customer.findFirst({ where: { id: payload.customerId, organizationId: event.organizationId } }) : null;
+
+  for (const automation of automations) {
+    const outcome = await evaluate(automation, event, { organization, customer, now });
+    const subjectType = outcome.subjectType ?? (customer ? "customer" : event.subjectType);
+    const subjectId = outcome.subjectId ?? (customer ? customer.id : event.subjectId);
+    try {
+      await prisma.automationExecution.create({
+        data: {
+          organizationId: event.organizationId,
+          automationId: automation.id,
+          domainEventId: event.id,
+          subjectType,
+          subjectId,
+          status: outcome.status,
+          skipReason: outcome.skipReason ?? null,
+          action: outcome.action,
+        },
+      });
+    } catch (err) {
+      // Ya existe la ejecución de este evento para esta automatización: se ignora (idempotencia).
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") continue;
+      throw err;
+    }
+    await prisma.automation.update({ where: { id: automation.id }, data: { lastRunAt: now, lastStatus: outcome.status } });
+  }
+}
+
+async function evaluate(
+  automation: Awaited<ReturnType<typeof prisma.automation.findMany>>[number],
+  event: StoredDomainEvent,
+  ctx: { organization: { id: string; name: string; timezone: string }; customer: Awaited<ReturnType<typeof prisma.customer.findFirst>>; now: Date },
+): Promise<Outcome> {
+  const blueprint = automation.blueprintKey ? getBlueprint(automation.blueprintKey, automation.blueprintVersion) : null;
+  if (!blueprint) return { status: "SKIPPED", skipReason: "blueprint_unavailable" };
+  for (const required of blueprint.requiredModules) {
+    if (!(await hasModule(event.organizationId, required))) return { status: "SKIPPED", skipReason: "module_disabled" };
+  }
+  const parsed = blueprint.configSchema.safeParse(automation.config ?? {});
+  if (!parsed.success) return { status: "SKIPPED", skipReason: "invalid_config" };
+  const config = parsed.data;
+
+  const decision = blueprint.decide(event, ctx, config);
+  if (decision.kind === "skip") return { status: "SKIPPED", skipReason: decision.reason };
+
+  const rules = blueprint.contactRules(config);
+  const last = ctx.customer
+    ? await prisma.automationExecution.findFirst({
+        where: { automationId: automation.id, subjectId: ctx.customer.id, status: { in: ["PENDING", "DISPATCHED", "SUCCEEDED", "DRY_RUN"] } },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      })
+    : null;
+  const policy = evaluateContactPolicy({ customer: ctx.customer, rules, now: ctx.now, timezone: ctx.organization.timezone, lastContactAt: last?.createdAt ?? null });
+  if (!policy.ok) return { status: "SKIPPED", skipReason: policy.reason };
+
+  const action = {
+    ...decision.action,
+    channel: rules.channel,
+    recipient: { phone: ctx.customer!.phone, name: ctx.customer!.name },
+  } as unknown as Prisma.InputJsonValue;
+  return { status: automation.dryRun ? "DRY_RUN" : "PENDING", action };
+}

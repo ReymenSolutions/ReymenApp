@@ -112,13 +112,13 @@ describe("bandeja de eventos de dominio", () => {
 
   it("el tick procesa la bandeja y no corre dos a la vez", async () => {
     await prisma.$transaction((tx) => emitDomainEvent(tx, { organizationId: org.id, type: "a", subjectType: "t", subjectId: "1", occurredAt: new Date(), dedupeKey: "tick" }));
-    const res = await runAutomationTick();
+    const res = await runAutomationTick(new Date(), { organizationId: org.id });
     expect(res.ran).toBe(true);
     // Mientras otra transacción sostiene el candado, el tick responde "locked".
     let locked: Awaited<ReturnType<typeof runAutomationTick>> | undefined;
     await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(7204001)`;
-      locked = await runAutomationTick();
+      locked = await runAutomationTick(new Date(), { organizationId: org.id });
     });
     expect(locked).toEqual({ ran: false, reason: "locked" });
   });

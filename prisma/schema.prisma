@@ -82,6 +82,7 @@ model Organization {
   foodSales               FoodSale[]
   customers               Customer[]
   domainEvents            DomainEvent[]
+  automationExecutions    AutomationExecution[]
   branches                Branch[]
   branchDishes            BranchDish[]
   branchVariantPrices     BranchVariantPrice[]
@@ -365,22 +366,73 @@ model Note {
 // ─── AUTOMATIONS ──────────────────────────────────────────────────
 
 model Automation {
-  id             String           @id @default(cuid())
-  organizationId String
-  name           String
-  description    String?
-  type           String
-  status         AutomationStatus @default(ACTIVE)
-  n8nWorkflowId  String?
-  webhookSecret  String
-  config         Json?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  id               String                     @id @default(cuid())
+  organizationId   String
+  name             String
+  description      String?
+  type             String
+  status           AutomationStatus           @default(ACTIVE)
+  n8nWorkflowId    String?
+  webhookSecret    String
+  config           Json?
+  // Instancia de un blueprint (lógica en código, src/lib/automation/blueprints). Sin blueprintKey es una
+  // automatización n8n heredada y sigue funcionando igual.
+  blueprintKey     String?
+  blueprintVersion Int?
+  trigger          String?
+  // En dry-run el motor evalúa y registra "se habría enviado a X" sin contactar a nadie.
+  dryRun           Boolean                    @default(true)
+  lastRunAt        DateTime?
+  lastStatus       AutomationExecutionStatus?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
 
-  organization Organization      @relation(fields: [organizationId], references: [id])
+  organization Organization          @relation(fields: [organizationId], references: [id])
   events       AutomationEvent[]
+  executions   AutomationExecution[]
 
+  @@unique([organizationId, blueprintKey])
   @@index([organizationId])
+}
+
+enum AutomationExecutionStatus {
+  SKIPPED
+  PENDING
+  DISPATCHED
+  SUCCEEDED
+  FAILED
+  DRY_RUN
+}
+
+/// Qué hizo (o por qué no hizo nada) una automatización con un evento. Única por automatización + evento:
+/// reprocesar el mismo evento nunca dispara dos veces.
+model AutomationExecution {
+  id                String                    @id @default(cuid())
+  organizationId    String
+  automationId      String
+  domainEventId     String
+  subjectType       String
+  subjectId         String
+  status            AutomationExecutionStatus
+  skipReason        String?
+  // Lo que se habría enviado / se envía: canal, destinatario, plantilla y variables.
+  action            Json?
+  attempts          Int                       @default(0)
+  nextAttemptAt     DateTime?
+  lastError         String?
+  providerMessageId String?
+  dispatchedAt      DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime                  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  automation   Automation   @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  domainEvent  DomainEvent  @relation(fields: [domainEventId], references: [id], onDelete: Cascade)
+
+  @@unique([automationId, domainEventId])
+  @@index([organizationId, createdAt])
+  @@index([status, nextAttemptAt])
+  @@index([automationId, subjectId])
 }
 
 enum AutomationStatus {
@@ -1303,7 +1355,8 @@ model DomainEvent {
   error          String?
   createdAt      DateTime          @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  executions   AutomationExecution[]
 
   @@unique([organizationId, dedupeKey])
   @@index([status, nextAttemptAt])

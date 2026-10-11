@@ -13,6 +13,8 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { ChangePlanDialog } from "@/components/admin/ChangePlanDialog";
 import { ToggleClientStatusButton } from "@/components/admin/ToggleClientStatusButton";
 import { OrgWebhookInfoDialog } from "@/components/admin/OrgWebhookInfoDialog";
+import { OrganizationBlueprintsPanel } from "@/components/admin/OrganizationBlueprintsPanel";
+import { getOrganizationBlueprints } from "@/actions/admin/blueprints";
 import { OrganizationModulesPanel } from "@/components/admin/OrganizationModulesPanel";
 import { PurgePosSalesPanel } from "@/components/admin/PurgePosSalesPanel";
 import { SmartcardLinkPanel } from "@/components/admin/SmartcardLinkPanel";
@@ -90,12 +92,13 @@ async function getClientDetail(clientId: string) {
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ clientId: string }> }) {
   const { clientId } = await params;
-  const [t, { client, escalatedConversations, openRequestsCount }, moduleEntitlements, enabledModules, consumption] = await Promise.all([
+  const [t, { client, escalatedConversations, openRequestsCount }, moduleEntitlements, enabledModules, consumption, blueprints] = await Promise.all([
     getServerT(),
     getClientDetail(clientId),
     getOrganizationModules(clientId),
     getEnabledModules(clientId),
     getConsumption(clientId),
+    getOrganizationBlueprints(clientId),
   ]);
   if (!client) notFound();
 
@@ -334,6 +337,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
           planLabel={planInfo.label}
           planModules={planModules}
         />
+
+        <OrganizationBlueprintsPanel orgId={client.id} blueprints={blueprints} />
 
         {hasModule("FOOD_OPS") && <PurgePosSalesPanel orgId={client.id} />}
 
