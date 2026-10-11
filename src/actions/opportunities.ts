@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { assertModuleEnabled } from "@/lib/modules";
 import { logAudit } from "@/lib/audit";
+import { syncLeadStatusFromOpportunity } from "@/lib/lead-status-sync";
 import type { UserRole } from "@prisma/client";
 import { UserError } from "@/lib/user-error";
 
@@ -64,8 +65,10 @@ export async function createOpportunity(data: z.infer<typeof createSchema>) {
     resourceId: opportunity.id,
     metadata: { title: opportunity.title, leadId: parsed.leadId },
   });
+  await syncLeadStatusFromOpportunity({ organizationId: orgId, opportunityId: opportunity.id, userId: session.user.id });
 
   revalidatePath("/portal/pipeline");
+  revalidatePath("/portal/leads");
   revalidatePath(`/portal/leads/${parsed.leadId}`);
   return { success: true, opportunityId: opportunity.id };
 }
@@ -104,8 +107,10 @@ export async function moveOpportunityStage(opportunityId: string, pipelineStageI
     resourceId: opportunityId,
     metadata: { fromStageId: opportunity.pipelineStageId, toStageId: pipelineStageId, toStageName: stage.name },
   });
+  await syncLeadStatusFromOpportunity({ organizationId: orgId, opportunityId, userId: session.user.id });
 
   revalidatePath("/portal/pipeline");
+  revalidatePath("/portal/leads");
   revalidatePath(`/portal/leads/${opportunity.leadId}`);
   return { success: true };
 }
@@ -133,8 +138,10 @@ export async function markOpportunityLost(opportunityId: string, lossReason: str
     resourceId: opportunityId,
     metadata: { lossReason },
   });
+  await syncLeadStatusFromOpportunity({ organizationId: orgId, opportunityId, userId: session.user.id });
 
   revalidatePath("/portal/pipeline");
+  revalidatePath("/portal/leads");
   revalidatePath(`/portal/leads/${opportunity.leadId}`);
   return { success: true };
 }

@@ -11,6 +11,7 @@ import {
   createPipelineStage, updatePipelineStage, swapPipelineStageOrder, deletePipelineStage,
 } from "@/actions/pipeline-stages";
 import { getErrorMessage } from "@/lib/user-error";
+import type { LeadStatus } from "@prisma/client";
 
 interface StageRow {
   id: string;
@@ -18,8 +19,18 @@ interface StageRow {
   order: number;
   isWon: boolean;
   isLost: boolean;
+  leadStatus: LeadStatus | null;
   opportunityCount: number;
 }
+
+const STATUS_LABEL: Record<LeadStatus, { es: string; en: string }> = {
+  NEW: { es: "Nuevo", en: "New" },
+  CONTACTED: { es: "Contactado", en: "Contacted" },
+  QUALIFIED: { es: "Calificado", en: "Qualified" },
+  PROPOSAL: { es: "Propuesta", en: "Proposal" },
+  WON: { es: "Ganado", en: "Won" },
+  LOST: { es: "Perdido", en: "Lost" },
+};
 
 export function PipelineStagesPanel({ stages, canManage }: { stages: StageRow[]; canManage: boolean }) {
   const { lang } = usePreferences();
@@ -41,6 +52,16 @@ export function PipelineStagesPanel({ stages, canManage }: { stages: StageRow[];
     startTransition(async () => {
       try {
         await updatePipelineStage({ stageId, [field]: value });
+      } catch (e) {
+        toast.error(getErrorMessage(e, (lang === "es" ? "Error al actualizar" : "Error updating")));
+      }
+    });
+  }
+
+  function handleLeadStatus(stageId: string, value: string) {
+    startTransition(async () => {
+      try {
+        await updatePipelineStage({ stageId, leadStatus: value === "" ? null : (value as LeadStatus) });
       } catch (e) {
         toast.error(getErrorMessage(e, (lang === "es" ? "Error al actualizar" : "Error updating")));
       }
@@ -90,6 +111,11 @@ export function PipelineStagesPanel({ stages, canManage }: { stages: StageRow[];
 
   return (
     <div className="space-y-2">
+      <p className="text-xs text-slate-500">
+        {lang === "es"
+          ? "Cuando una oportunidad llega a una etapa, el contacto pasa al estado que elijas aquí. El estado solo avanza (no retrocede) y un contacto sin más oportunidades abiertas se marca perdido al perder la última."
+          : "When an opportunity reaches a stage, the contact moves to the status you choose here. Status only moves forward (never back), and a contact is marked lost when its last open opportunity is lost."}
+      </p>
       {stages.map((stage, i) => (
         <div key={stage.id} className="flex items-center gap-2 rounded-md border border-slate-100 p-2">
           {canManage ? (
@@ -102,6 +128,22 @@ export function PipelineStagesPanel({ stages, canManage }: { stages: StageRow[];
           ) : (
             <span className="flex-1 text-sm font-medium text-slate-900">{stage.name}</span>
           )}
+
+          <label className="flex items-center gap-1 text-xs text-slate-500">
+            <span className="hidden sm:inline">{lang === "es" ? "El contacto pasa a:" : "Contact becomes:"}</span>
+            <select
+              value={stage.leadStatus ?? ""}
+              onChange={(e) => handleLeadStatus(stage.id, e.target.value)}
+              disabled={!canManage || isPending}
+              aria-label={lang === "es" ? "Estado del contacto al llegar a esta etapa" : "Contact status on reaching this stage"}
+              className="h-8 rounded-md border border-slate-200 bg-white px-1.5 text-xs text-slate-700 disabled:opacity-60"
+            >
+              <option value="">{lang === "es" ? "(sin cambio)" : "(no change)"}</option>
+              {(Object.keys(STATUS_LABEL) as LeadStatus[]).map((v) => (
+                <option key={v} value={v}>{STATUS_LABEL[v][lang === "es" ? "es" : "en"]}</option>
+              ))}
+            </select>
+          </label>
 
           {stage.isWon && <Badge variant="success" className="text-xs">{lang === "es" ? "Ganado" : "Won"}</Badge>}
           {stage.isLost && <Badge variant="destructive" className="text-xs">{lang === "es" ? "Perdido" : "Lost"}</Badge>}

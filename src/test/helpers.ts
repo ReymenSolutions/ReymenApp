@@ -26,12 +26,12 @@ export async function createTestOrg(namePrefix: string) {
 /** Mirrors the default 6-stage pipeline every org gets via createClient()/the add_crm_pipeline backfill. */
 export async function createTestPipelineStages(orgId: string) {
   const stages = [
-    { name: "Nuevo", order: 0 },
-    { name: "Contactado", order: 1 },
-    { name: "Calificado", order: 2 },
-    { name: "Propuesta", order: 3 },
-    { name: "Ganado", order: 4, isWon: true },
-    { name: "Perdido", order: 5, isLost: true },
+    { name: "Nuevo", order: 0, leadStatus: "NEW" as const },
+    { name: "Contactado", order: 1, leadStatus: "CONTACTED" as const },
+    { name: "Calificado", order: 2, leadStatus: "QUALIFIED" as const },
+    { name: "Propuesta", order: 3, leadStatus: "PROPOSAL" as const },
+    { name: "Ganado", order: 4, isWon: true, leadStatus: "WON" as const },
+    { name: "Perdido", order: 5, isLost: true, leadStatus: "LOST" as const },
   ];
   await prisma.pipelineStage.createMany({ data: stages.map((s) => ({ ...s, organizationId: orgId })) });
   return prisma.pipelineStage.findMany({ where: { organizationId: orgId }, orderBy: { order: "asc" } });

@@ -148,4 +148,25 @@ describe("opportunities actions", () => {
 
     await cleanupOrg(orgC.id);
   });
+
+  it("moving an opportunity updates the contact's status through the pipeline (and the lead page shows one status)", async () => {
+    authMock.mockResolvedValue(fakeSession({ id: owner.id, role: "OWNER", organizationId: org.id }));
+    const lead = await prisma.lead.create({ data: { organizationId: org.id, name: "Estado único" } });
+    const { opportunityId } = await createOpportunity({ leadId: lead.id, title: "Venta única" });
+    const proposal = stages.find((s) => s.name === "Propuesta")!;
+    const won = stages.find((s) => s.isWon)!;
+
+    await moveOpportunityStage(opportunityId, proposal.id);
+    expect((await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } })).status).toBe("PROPOSAL");
+    await moveOpportunityStage(opportunityId, won.id);
+    expect((await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } })).status).toBe("WON");
+  });
+
+  it("markOpportunityLost marks the lead as lost when it was its only open opportunity", async () => {
+    authMock.mockResolvedValue(fakeSession({ id: owner.id, role: "OWNER", organizationId: org.id }));
+    const lead = await prisma.lead.create({ data: { organizationId: org.id, name: "Pierde única" } });
+    const { opportunityId } = await createOpportunity({ leadId: lead.id, title: "Única" });
+    await markOpportunityLost(opportunityId, "Muy caro");
+    expect((await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } })).status).toBe("LOST");
+  });
 });

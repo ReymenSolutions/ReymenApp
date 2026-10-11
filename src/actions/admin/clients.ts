@@ -58,12 +58,12 @@ export async function createClient(formData: FormData) {
       // with it instead of starting with an empty, unusable pipeline.
       pipelineStages: {
         create: [
-          { name: "Nuevo", order: 0 },
-          { name: "Contactado", order: 1 },
-          { name: "Calificado", order: 2 },
-          { name: "Propuesta", order: 3 },
-          { name: "Ganado", order: 4, isWon: true },
-          { name: "Perdido", order: 5, isLost: true },
+          { name: "Nuevo", order: 0, leadStatus: "NEW" },
+          { name: "Contactado", order: 1, leadStatus: "CONTACTED" },
+          { name: "Calificado", order: 2, leadStatus: "QUALIFIED" },
+          { name: "Propuesta", order: 3, leadStatus: "PROPOSAL" },
+          { name: "Ganado", order: 4, isWon: true, leadStatus: "WON" },
+          { name: "Perdido", order: 5, isLost: true, leadStatus: "LOST" },
         ],
       },
     },
