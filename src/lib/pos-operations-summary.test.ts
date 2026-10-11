@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { summarizeOperations, type PosDeviceStatus, type PosOrder, type PosSnapshot } from "./pos-operations-summary";
+import { filterSnapshotByBranch, summarizeOperations, type PosDeviceStatus, type PosOrder, type PosSnapshot } from "./pos-operations-summary";
 import { fetchPosSnapshot, posOpsSignature } from "./pos-operations";
 
 const NOW = "2026-10-02T20:00:00.000Z";
@@ -150,5 +150,38 @@ describe("fetchPosSnapshot", () => {
     expect(await fetchPosSnapshot("org1", "k")).toMatchObject({ kind: "unreachable" });
     vi.stubGlobal("fetch", async () => Response.json({ nope: true }));
     expect((await fetchPosSnapshot("org1", "k")).kind).toBe("unreachable");
+  });
+});
+
+describe("filterSnapshotByBranch", () => {
+  const snapshot = (): PosSnapshot => ({
+    serverTime: NOW,
+    floor: {
+      tables: [
+        { id: "t1", name: "Mesa 1", area: "", seats: 4, active: true },
+        { id: "t2", name: "Mesa 2", area: "", seats: 4, active: true, branchId: "centro" },
+      ],
+      orders: [order("a", { items: [item("preparing", 5)] }), order("b", { branchId: "centro", items: [item("ready", 20)] }), order("c", { branchId: null })],
+      kitchen: { lateMinutes: 15 },
+    },
+    devices: [],
+    staffCount: 2,
+  });
+
+  it("sin filtro deja todo; null = Principal (incluye lo anterior a las sucursales); un id = esa sucursal", () => {
+    expect(filterSnapshotByBranch(snapshot(), undefined).floor.orders).toHaveLength(3);
+    expect(filterSnapshotByBranch(snapshot(), null).floor.orders.map((o) => o.id)).toEqual(["a", "c"]);
+    expect(filterSnapshotByBranch(snapshot(), null).floor.tables.map((t) => t.id)).toEqual(["t1"]);
+    expect(filterSnapshotByBranch(snapshot(), "centro").floor.orders.map((o) => o.id)).toEqual(["b"]);
+    expect(filterSnapshotByBranch(snapshot(), "otra").floor.orders).toEqual([]);
+  });
+
+  it("el resumen de operaciones cuenta solo la sucursal elegida", () => {
+    const centro = summarizeOperations(filterSnapshotByBranch(snapshot(), "centro"));
+    expect(centro.kitchen.readyCount).toBe(1);
+    expect(centro.openOrders).toHaveLength(1);
+    const principal = summarizeOperations(filterSnapshotByBranch(snapshot(), null));
+    expect(principal.kitchen.readyCount).toBe(0);
+    expect(principal.kitchen.preparingCount).toBe(1);
   });
 });

@@ -4,6 +4,8 @@ import { hasModule, requireModule } from "@/lib/modules";
 import { prisma } from "@/lib/prisma";
 import { getFoodSalesSummary, getFoodSalesByChannel } from "@/lib/food";
 import { createFoodSale } from "@/actions/food";
+import { branchWhere, listBranches, parseBranchParam } from "@/lib/branches";
+import { BranchFilter } from "@/components/portal/BranchFilter";
 import { FoodSaleActions } from "@/components/portal/FoodSaleActions";
 import { can } from "@/lib/permissions";
 import { getServerLang, getServerT } from "@/lib/i18n-server";
@@ -28,20 +30,24 @@ function toLocalDateTimeInput(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export default async function FoodSalesPage() {
+export default async function FoodSalesPage({ searchParams }: { searchParams: Promise<{ branch?: string }> }) {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
   await requireModule(session.user.organizationId, "FOOD_OPS");
 
   const orgId = session.user.organizationId;
+  const { branch: branchParam } = await searchParams;
+  const branches = await listBranches(orgId);
+  const branch = parseBranchParam(branchParam, branches);
+  const branchName = new Map(branches.map((b) => [b.id, b.name]));
 
   const [t, lang, summary, byChannel, recentSales, usesPos] = await Promise.all([
     getServerT(),
     getServerLang(),
-    getFoodSalesSummary(orgId),
-    getFoodSalesByChannel(orgId),
+    getFoodSalesSummary(orgId, branch),
+    getFoodSalesByChannel(orgId, branch),
     prisma.foodSale.findMany({
-      where: { organizationId: orgId },
+      where: { organizationId: orgId, ...branchWhere(branch) },
       orderBy: { occurredAt: "desc" },
       take: 25,
     }),
@@ -55,6 +61,7 @@ export default async function FoodSalesPage() {
   return (
     <div>
       <PageHeader title={t.foodSales} description={f.salesAnalyticsDesc} />
+      <BranchFilter branches={branches.filter((b) => b.isActive)} current={branch} es={lang === "es"} basePath="/portal/food/sales" />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard title={f.today} value={formatMoney(summary.today.gross)} description={f.salesCountGross(summary.today.count)} icon={DollarSign} />
@@ -120,7 +127,10 @@ export default async function FoodSalesPage() {
                           <p className="text-sm font-medium text-slate-900">{formatDateTime(sale.occurredAt)}</p>
                           {sale.source === "POS" && <Badge variant="secondary" className="text-[10px]">{f.posSaleBadge}</Badge>}
                         </div>
-                        <p className="text-xs text-slate-500">{sale.channel ?? f.noChannel}</p>
+                        <p className="text-xs text-slate-500">
+                          {sale.channel ?? f.noChannel}
+                          {branches.length > 0 && ` · ${sale.branchId ? (branchName.get(sale.branchId) ?? "—") : lang === "es" ? "Principal" : "Main"}`}
+                        </p>
                         {sale.notes && <p className="truncate text-xs text-slate-400">{sale.notes}</p>}
                       </div>
                       <div className="flex shrink-0 items-center gap-2">

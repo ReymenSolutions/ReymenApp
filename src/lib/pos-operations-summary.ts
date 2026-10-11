@@ -32,6 +32,8 @@ export interface PosOrder {
   waiterName: string;
   items: PosOrderItem[];
   closedAt: string | null;
+  /** Sucursal de Reymen (null/ausente: Principal). POS anteriores a las sucursales no lo mandan. */
+  branchId?: string | null;
 }
 
 export interface PosDeviceStatus {
@@ -61,7 +63,7 @@ export interface PosDeviceStatus {
 export interface PosSnapshot {
   serverTime: string;
   floor: {
-    tables: { id: string; name: string; area: string; seats: number; active: boolean }[];
+    tables: { id: string; name: string; area: string; seats: number; active: boolean; branchId?: string | null }[];
     orders: PosOrder[];
     kitchen: { lateMinutes: number };
   };
@@ -234,4 +236,14 @@ export function summarizeOperations(snapshot: PosSnapshot, now = new Date(snapsh
     pendingEvents: reporting.reduce((n, s) => n + s.outbox.pending, 0),
     failedEvents: reporting.reduce((n, s) => n + s.outbox.failed, 0),
   };
+}
+
+/**
+ * Deja solo las mesas y cuentas de una sucursal (undefined = todas, null = Principal). Los
+ * dispositivos y el personal no se filtran: el POS no los asocia a una sucursal.
+ */
+export function filterSnapshotByBranch(snapshot: PosSnapshot, branch: string | null | undefined): PosSnapshot {
+  if (branch === undefined) return snapshot;
+  const keep = (x: { branchId?: string | null }) => (x.branchId ?? null) === branch;
+  return { ...snapshot, floor: { ...snapshot.floor, tables: snapshot.floor.tables.filter(keep), orders: snapshot.floor.orders.filter(keep) } };
 }
