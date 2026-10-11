@@ -3,6 +3,7 @@ import { prisma } from "./prisma";
 import { hasModule } from "./modules";
 import { consumeRecipes, effectiveStockBranch } from "./food-inventory";
 import { branchWhere, type BranchFilter } from "./branches";
+import { emitDomainEvent } from "./domain-events";
 import { parsePosCustomer, upsertCustomer, applySaleToCustomer } from "./customers";
 
 // ─── FOOD OPS — agregados de Ventas ──────────────────────────────────
@@ -1186,7 +1187,8 @@ export async function processFoodPosOrder(payload: unknown, organizationId: stri
       isCancel && externalOrderId
         ? await tx.foodSale.findFirst({ where: { organizationId, externalOrderId, grossAmount: { gt: 0 } }, orderBy: { createdAt: "desc" }, select: { id: true, customerId: true, branchId: true } })
         : null;
-    const customerId = customerInput ? (await upsertCustomer(tx, organizationId, customerInput)).id : (original?.customerId ?? null);
+    const upserted = customerInput ? await upsertCustomer(tx, organizationId, customerInput) : null;
+    const customerId = upserted ? upserted.id : (original?.customerId ?? null);
     const sale = await tx.foodSale.create({
       data: {
         organizationId,
@@ -1204,6 +1206,34 @@ export async function processFoodPosOrder(payload: unknown, organizationId: stri
       },
     });
     if (customerId) await applySaleToCustomer(tx, customerId, { grossAmount: body.grossAmount!, occurredAt });
+
+    // Hechos para el motor de automatizaciones: se escriben en esta misma transacción (si la venta se
+    // revierte, no quedan) y con llave única (un reintento del POS no los duplica).
+    const subjectRef = externalOrderId ?? sale.id;
+    const saleFact = { saleId: sale.id, orderId: externalOrderId, customerId, branchId: sale.branchId, grossAmount: body.grossAmount!, netAmount: body.netAmount!, discountAmount };
+    await emitDomainEvent(tx, {
+      organizationId,
+      type: isCancel ? "sale.cancelled" : "sale.completed",
+      subjectType: "sale",
+      subjectId: sale.id,
+      occurredAt,
+      payload: saleFact,
+      dedupeKey: isCancel ? `sale.cancelled:${subjectRef}:${body.grossAmount}` : `sale.completed:${subjectRef}`,
+      correlationId: externalOrderId,
+    });
+    if (upserted?.created) {
+      await emitDomainEvent(tx, {
+        organizationId,
+        type: "customer.created",
+        subjectType: "customer",
+        subjectId: upserted.id,
+        occurredAt,
+        payload: { customerId: upserted.id, saleId: sale.id },
+        dedupeKey: `customer.created:${upserted.id}`,
+        correlationId: externalOrderId,
+        causationId: sale.id,
+      });
+    }
     // Con inventario por sucursal, los insumos salen de la existencia de la sucursal que vendió.
     const saleBranch = branchId ?? original?.branchId ?? null;
     const stockBranch = await effectiveStockBranch(organizationId, saleBranch);

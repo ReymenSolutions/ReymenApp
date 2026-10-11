@@ -81,6 +81,7 @@ model Organization {
   promptExperiments       PromptExperiment[]
   foodSales               FoodSale[]
   customers               Customer[]
+  domainEvents            DomainEvent[]
   branches                Branch[]
   branchDishes            BranchDish[]
   branchVariantPrices     BranchVariantPrice[]
@@ -1273,6 +1274,40 @@ model Customer {
 
   @@unique([organizationId, phoneKey])
   @@index([leadId])
+}
+
+enum DomainEventStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
+
+/// Bandeja de salida (outbox) de hechos del negocio: se escribe en la MISMA transacción que el hecho
+/// (una venta, una cancelación, un cliente nuevo) y el cron `automations/tick` la procesa después.
+model DomainEvent {
+  id             String            @id @default(cuid())
+  organizationId String
+  type           String
+  subjectType    String
+  subjectId      String
+  occurredAt     DateTime
+  payload        Json              @default("{}")
+  // Único por organización: reprocesar el mismo hecho nunca crea un segundo evento.
+  dedupeKey      String
+  correlationId  String?
+  causationId    String?
+  status         DomainEventStatus @default(PENDING)
+  attempts       Int               @default(0)
+  nextAttemptAt  DateTime          @default(now())
+  processedAt    DateTime?
+  error          String?
+  createdAt      DateTime          @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, dedupeKey])
+  @@index([status, nextAttemptAt])
+  @@index([organizationId, type, occurredAt])
 }
 
 enum FoodSaleSource {
