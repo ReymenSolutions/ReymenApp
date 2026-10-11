@@ -760,6 +760,8 @@ export interface FoodNetProfitResult {
   revenue: number;
   cogs: number;
   fixedCostsProrated: number;
+  /** Vista de una sucursal: los costos fijos son de todo el negocio y no se restan. */
+  fixedCostsExcluded: boolean;
   netProfit: number;
   coverage: { itemsWithSales: number; totalActiveItems: number };
 }
@@ -775,27 +777,50 @@ async function getModifierOptionCosts(organizationId: string): Promise<Map<strin
   return costs;
 }
 
-export async function getFoodNetProfit(organizationId: string, period: FoodProfitPeriod): Promise<FoodNetProfitResult> {
+/**
+ * Unidades vendidas por variante desde `from`. Sin filtro (o "todas"): los conteos diarios de siempre.
+ * Con sucursal (null = Principal, id = esa sucursal): se suman los consumos de receta de las ventas de
+ * esa sucursal, que sí llevan la sucursal (los conteos diarios no).
+ */
+async function variantUnitsSince(organizationId: string, from: Date, branch?: BranchFilter): Promise<{ variantId: string; quantity: number }[]> {
+  if (branch === undefined) {
+    const rows = await prisma.foodDishSale.groupBy({ by: ["variantId"], where: { organizationId, occurredAt: { gte: from } }, _sum: { quantity: true } });
+    return rows.map((r) => ({ variantId: r.variantId, quantity: r._sum.quantity ?? 0 }));
+  }
+  const rows = await prisma.foodRecipeUsage.groupBy({
+    by: ["variantId"],
+    where: { organizationId, occurredAt: { gte: from }, variantId: { not: null }, saleBranchId: branch },
+    _sum: { units: true },
+  });
+  return rows.map((r) => ({ variantId: r.variantId!, quantity: Math.round(Number(r._sum.units ?? 0)) }));
+}
+
+async function optionUnitsSince(organizationId: string, from: Date, branch?: BranchFilter): Promise<{ optionId: string; quantity: number }[]> {
+  if (branch === undefined) {
+    const rows = await prisma.foodModifierOptionSale.groupBy({ by: ["optionId"], where: { organizationId, occurredAt: { gte: from } }, _sum: { quantity: true } });
+    return rows.map((r) => ({ optionId: r.optionId, quantity: r._sum.quantity ?? 0 }));
+  }
+  const rows = await prisma.foodRecipeUsage.groupBy({
+    by: ["modifierOptionId"],
+    where: { organizationId, occurredAt: { gte: from }, modifierOptionId: { not: null }, saleBranchId: branch },
+    _sum: { units: true },
+  });
+  return rows.map((r) => ({ optionId: r.modifierOptionId!, quantity: Math.round(Number(r._sum.units ?? 0)) }));
+}
+
+export async function getFoodNetProfit(organizationId: string, period: FoodProfitPeriod, branch?: BranchFilter): Promise<FoodNetProfitResult> {
   const days = PERIOD_LABEL_DAYS[period];
   const from = period === "today" ? startOfDay(new Date()) : daysAgo(days);
 
   const [salesAgg, variantSales, dishes, fixedCostsMonthly, optionSales, optionCosts] = await Promise.all([
     prisma.foodSale.aggregate({
-      where: { organizationId, occurredAt: { gte: from } },
+      where: { organizationId, ...branchWhere(branch), occurredAt: { gte: from } },
       _sum: { netAmount: true },
     }),
-    prisma.foodDishSale.groupBy({
-      by: ["variantId"],
-      where: { organizationId, occurredAt: { gte: from } },
-      _sum: { quantity: true },
-    }),
+    variantUnitsSince(organizationId, from, branch),
     getFoodDishesWithCost(organizationId, { activeOnly: true, includeInactiveVariants: true }),
     getTotalMonthlyFixedCosts(organizationId),
-    prisma.foodModifierOptionSale.groupBy({
-      by: ["optionId"],
-      where: { organizationId, occurredAt: { gte: from } },
-      _sum: { quantity: true },
-    }),
+    optionUnitsSince(organizationId, from, branch),
     getModifierOptionCosts(organizationId),
   ]);
 
@@ -806,14 +831,15 @@ export async function getFoodNetProfit(organizationId: string, period: FoodProfi
   for (const row of variantSales) {
     const variant = variantById.get(row.variantId);
     if (!variant) continue;
-    cogs += variant.cost * (row._sum.quantity ?? 0);
+    cogs += variant.cost * row.quantity;
     if (variant.isActive) variantsWithSalesIds.add(row.variantId);
   }
   // Los extras con receta ("Extra queso") también cuestan; "Sin ..." resta.
-  for (const row of optionSales) cogs += (optionCosts.get(row.optionId) ?? 0) * (row._sum.quantity ?? 0);
+  for (const row of optionSales) cogs += (optionCosts.get(row.optionId) ?? 0) * row.quantity;
 
   const revenue = Number(salesAgg._sum.netAmount ?? 0);
-  const fixedCostsProrated = Math.round((fixedCostsMonthly / 30) * days * 100) / 100;
+  // Los costos fijos son de todo el negocio: en la vista de una sucursal no se reparten ni se restan.
+  const fixedCostsProrated = branch === undefined ? Math.round((fixedCostsMonthly / 30) * days * 100) / 100 : 0;
   const netProfit = Math.round((revenue - cogs - fixedCostsProrated) * 100) / 100;
 
   return {
@@ -821,6 +847,7 @@ export async function getFoodNetProfit(organizationId: string, period: FoodProfi
     revenue,
     cogs: Math.round(cogs * 100) / 100,
     fixedCostsProrated,
+    fixedCostsExcluded: branch !== undefined,
     netProfit,
     coverage: { itemsWithSales: variantsWithSalesIds.size, totalActiveItems: variants.filter((v) => v.isActive).length },
   };
@@ -914,18 +941,14 @@ export interface FoodProfitRecommendation {
 const LOW_MARGIN_PCT = 15;
 const HIGH_MARGIN_PCT = 40;
 
-export async function getFoodProfitRecommendations(organizationId: string): Promise<FoodProfitRecommendation[]> {
+export async function getFoodProfitRecommendations(organizationId: string, branch?: BranchFilter): Promise<FoodProfitRecommendation[]> {
   const dishes = await getFoodDishesWithCost(organizationId, { activeOnly: true });
   const variants = flattenVariants(dishes);
   if (variants.length === 0) return [];
 
   const since = daysAgo(30);
-  const salesRows = await prisma.foodDishSale.groupBy({
-    by: ["variantId"],
-    where: { organizationId, occurredAt: { gte: since } },
-    _sum: { quantity: true },
-  });
-  const unitsByVariant = new Map(salesRows.map((r) => [r.variantId, r._sum.quantity ?? 0]));
+  const salesRows = await variantUnitsSince(organizationId, since, branch);
+  const unitsByVariant = new Map(salesRows.map((r) => [r.variantId, r.quantity]));
 
   const recommendations: FoodProfitRecommendation[] = [];
 
@@ -993,16 +1016,12 @@ export interface FoodLeastSoldItem {
   marginPct: number | null;
 }
 
-export async function getFoodLeastSoldDishes(organizationId: string, days = 30, limit = 5): Promise<FoodLeastSoldItem[]> {
+export async function getFoodLeastSoldDishes(organizationId: string, days = 30, limit = 5, branch?: BranchFilter): Promise<FoodLeastSoldItem[]> {
   const dishes = await getFoodDishesWithCost(organizationId, { activeOnly: true });
   const variants = flattenVariants(dishes);
   const since = daysAgo(days);
-  const salesRows = await prisma.foodDishSale.groupBy({
-    by: ["variantId"],
-    where: { organizationId, occurredAt: { gte: since } },
-    _sum: { quantity: true },
-  });
-  const unitsByVariant = new Map(salesRows.map((r) => [r.variantId, r._sum.quantity ?? 0]));
+  const salesRows = await variantUnitsSince(organizationId, since, branch);
+  const unitsByVariant = new Map(salesRows.map((r) => [r.variantId, r.quantity]));
 
   return variants
     .filter((v) => unitsByVariant.has(v.id))
@@ -1024,13 +1043,9 @@ export interface FoodTopSellingItem {
   revenue: number;
 }
 
-export async function getFoodTopSellingDishes(organizationId: string, days = 30, limit = 5): Promise<FoodTopSellingItem[]> {
+export async function getFoodTopSellingDishes(organizationId: string, days = 30, limit = 5, branch?: BranchFilter): Promise<FoodTopSellingItem[]> {
   const since = daysAgo(days);
-  const salesRows = await prisma.foodDishSale.groupBy({
-    by: ["variantId"],
-    where: { organizationId, occurredAt: { gte: since } },
-    _sum: { quantity: true },
-  });
+  const salesRows = await variantUnitsSince(organizationId, since, branch);
   if (salesRows.length === 0) return [];
 
   const variants = flattenVariants(await getFoodDishesWithCost(organizationId, { includeInactiveVariants: true }));
@@ -1039,7 +1054,7 @@ export async function getFoodTopSellingDishes(organizationId: string, days = 30,
   return salesRows
     .flatMap((r) => {
       const v = variantById.get(r.variantId);
-      const unitsSold = r._sum.quantity ?? 0;
+      const unitsSold = r.quantity;
       if (!v || unitsSold <= 0) return [];
       return [{ variantId: v.id, name: v.displayName, unitsSold, revenue: Math.round(unitsSold * v.price * 100) / 100 }];
     })
@@ -1190,7 +1205,8 @@ export async function processFoodPosOrder(payload: unknown, organizationId: stri
     });
     if (customerId) await applySaleToCustomer(tx, customerId, { grossAmount: body.grossAmount!, occurredAt });
     // Con inventario por sucursal, los insumos salen de la existencia de la sucursal que vendió.
-    const stockBranch = await effectiveStockBranch(organizationId, branchId ?? original?.branchId ?? null);
+    const saleBranch = branchId ?? original?.branchId ?? null;
+    const stockBranch = await effectiveStockBranch(organizationId, saleBranch);
     for (const item of items) {
       await tx.foodDishSale.upsert({
         where: { variantId_occurredAt: { variantId: item.variantId, occurredAt: businessDay } },
@@ -1222,9 +1238,9 @@ export async function processFoodPosOrder(payload: unknown, organizationId: stri
     });
     const sold = items.filter((i) => i.quantity > 0);
     const cancelled = items.filter((i) => i.quantity < 0);
-    if (sold.length) await consumeRecipes(tx, organizationId, withModifiers(sold), { type: "SALE", occurredAt, foodSaleId: sale.id, branchId: stockBranch });
+    if (sold.length) await consumeRecipes(tx, organizationId, withModifiers(sold), { type: "SALE", occurredAt, foodSaleId: sale.id, branchId: stockBranch, saleBranchId: saleBranch });
     if (cancelled.length) {
-      await consumeRecipes(tx, organizationId, withModifiers(cancelled), { type: "SALE_CANCELLATION", occurredAt, foodSaleId: sale.id, branchId: stockBranch });
+      await consumeRecipes(tx, organizationId, withModifiers(cancelled), { type: "SALE_CANCELLATION", occurredAt, foodSaleId: sale.id, branchId: stockBranch, saleBranchId: saleBranch });
     }
   });
 }

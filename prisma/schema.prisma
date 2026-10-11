@@ -1713,6 +1713,9 @@ model FoodRecipeUsage {
   foodSaleId       String?
   // Sucursal de cuya existencia se descontó (null = Principal).
   branchId         String?
+  // Sucursal que hizo la venta (null = Principal), con o sin inventario por sucursal: de aquí salen
+  // los platillos vendidos y la rentabilidad por sucursal.
+  saleBranchId     String?
   applied          Json
   createdAt        DateTime                  @default(now())
   updatedAt        DateTime                  @updatedAt
@@ -1722,6 +1725,7 @@ model FoodRecipeUsage {
   modifierOption FoodModifierOption? @relation(fields: [modifierOptionId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, occurredAt])
+  @@index([organizationId, saleBranchId, occurredAt])
   @@index([variantId])
   @@index([modifierOptionId])
 }
