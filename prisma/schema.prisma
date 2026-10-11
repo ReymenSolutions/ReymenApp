@@ -75,6 +75,7 @@ model Organization {
   promptExperiments       PromptExperiment[]
   foodSales               FoodSale[]
   customers               Customer[]
+  branches                Branch[]
   foodInventoryItems      FoodInventoryItem[]
   foodSuppliers           FoodSupplier[]
   foodDishes              FoodDish[]
@@ -1141,6 +1142,8 @@ model FoodSale {
   cancelsSaleId   String?
   // Cliente que el POS capturó al cobrar (opcional, ver Customer).
   customerId      String?
+  // Sucursal donde se vendió (null = la sucursal principal / ventas anteriores a que existieran sucursales).
+  branchId        String?
   // Descuento aplicado en el POS (opcional): monto y motivo.
   discountAmount  Decimal?       @db.Decimal(10, 2)
   discountReason  String?
@@ -1148,11 +1151,29 @@ model FoodSale {
 
   organization Organization @relation(fields: [organizationId], references: [id])
   customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  branch       Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   @@index([organizationId])
   @@index([organizationId, occurredAt])
   @@index([organizationId, externalOrderId])
   @@index([customerId])
+  @@index([organizationId, branchId])
+}
+
+// Sucursal del negocio, además de la "principal" implícita (la que no tiene fila:
+// ventas con branchId null). Se archiva en lugar de borrarse para conservar su historial.
+model Branch {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  sales        FoodSale[]
+
+  @@index([organizationId])
 }
 
 // Persona que compró en el negocio (capturada en el POS al cobrar). Es un

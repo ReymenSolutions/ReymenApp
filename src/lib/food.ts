@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { hasModule } from "./modules";
 import { consumeRecipes } from "./food-inventory";
+import { branchWhere, type BranchFilter } from "./branches";
 import { parsePosCustomer, upsertCustomer, applySaleToCustomer } from "./customers";
 
 // ─── FOOD OPS — agregados de Ventas ──────────────────────────────────
@@ -44,10 +45,11 @@ function daysAgo(n: number): Date {
   return startOfDay(d);
 }
 
-async function sumRange(organizationId: string, from: Date, to?: Date) {
+async function sumRange(organizationId: string, from: Date, to?: Date, branch?: BranchFilter) {
   const result = await prisma.foodSale.aggregate({
     where: {
       organizationId,
+      ...branchWhere(branch),
       occurredAt: to ? { gte: from, lt: to } : { gte: from },
     },
     _sum: { grossAmount: true, netAmount: true },
@@ -61,13 +63,13 @@ async function sumRange(organizationId: string, from: Date, to?: Date) {
   };
 }
 
-export async function getFoodSalesSummary(organizationId: string): Promise<FoodSalesSummary> {
+export async function getFoodSalesSummary(organizationId: string, branch?: BranchFilter): Promise<FoodSalesSummary> {
   const [today, yesterday, last7Days, last30Days, previous30Days] = await Promise.all([
-    sumRange(organizationId, startOfDay(new Date())),
-    sumRange(organizationId, daysAgo(1), startOfDay(new Date())),
-    sumRange(organizationId, daysAgo(7)),
-    sumRange(organizationId, daysAgo(30)),
-    sumRange(organizationId, daysAgo(60), daysAgo(30)),
+    sumRange(organizationId, startOfDay(new Date()), undefined, branch),
+    sumRange(organizationId, daysAgo(1), startOfDay(new Date()), branch),
+    sumRange(organizationId, daysAgo(7), undefined, branch),
+    sumRange(organizationId, daysAgo(30), undefined, branch),
+    sumRange(organizationId, daysAgo(60), daysAgo(30), branch),
   ]);
 
   const pctChange = (curr: number, prev: number): number | null =>
@@ -107,10 +109,10 @@ export interface FoodSalesByChannel {
   count: number;
 }
 
-export async function getFoodSalesByChannel(organizationId: string): Promise<FoodSalesByChannel[]> {
+export async function getFoodSalesByChannel(organizationId: string, branch?: BranchFilter): Promise<FoodSalesByChannel[]> {
   const rows = await prisma.foodSale.groupBy({
     by: ["channel"],
-    where: { organizationId, occurredAt: { gte: daysAgo(30) } },
+    where: { organizationId, ...branchWhere(branch), occurredAt: { gte: daysAgo(30) } },
     _sum: { grossAmount: true },
     _count: { _all: true },
   });
@@ -136,9 +138,9 @@ export interface FoodHourlyBucket {
   count: number;
 }
 
-export async function getFoodHourlySales(organizationId: string): Promise<FoodHourlyBucket[]> {
+export async function getFoodHourlySales(organizationId: string, branch?: BranchFilter): Promise<FoodHourlyBucket[]> {
   const sales = await prisma.foodSale.findMany({
-    where: { organizationId, occurredAt: { gte: startOfDay(new Date()) } },
+    where: { organizationId, ...branchWhere(branch), occurredAt: { gte: startOfDay(new Date()) } },
     select: { occurredAt: true, grossAmount: true },
   });
 
@@ -205,10 +207,10 @@ export interface FoodDailyBucket {
   count: number;
 }
 
-export async function getFoodDailySales(organizationId: string, days = 7): Promise<FoodDailyBucket[]> {
+export async function getFoodDailySales(organizationId: string, days = 7, branch?: BranchFilter): Promise<FoodDailyBucket[]> {
   const from = daysAgo(days - 1);
   const sales = await prisma.foodSale.findMany({
-    where: { organizationId, occurredAt: { gte: from } },
+    where: { organizationId, ...branchWhere(branch), occurredAt: { gte: from } },
     select: { occurredAt: true, grossAmount: true },
   });
 
@@ -1037,6 +1039,7 @@ export interface FoodPosOrderPayload {
   orderId?: string; // id de la orden en el POS; en una cancelación, el de la orden original
   customer?: { phone: string; name?: string; consent?: { accepted: boolean; textVersion?: string; at?: string } };
   discount?: { amount: number; reason?: string };
+  branchId?: string; // sucursal de Reymen donde se vendió; ausente o desconocida = principal
 }
 
 export async function processFoodPosOrder(payload: unknown, organizationId: string): Promise<void> {
@@ -1111,12 +1114,17 @@ export async function processFoodPosOrder(payload: unknown, organizationId: stri
   const discountAmount =
     body.discount && typeof body.discount.amount === "number" && Number.isFinite(body.discount.amount) && body.discount.amount > 0 ? body.discount.amount : null;
   const discountReason = discountAmount !== null && typeof body.discount?.reason === "string" ? body.discount.reason.trim().slice(0, 200) || null : null;
+  // Una sucursal que no existe o no es de esta organización nunca tira la venta: cae en la principal.
+  const branchId =
+    typeof body.branchId === "string" && body.branchId
+      ? ((await prisma.branch.findFirst({ where: { id: body.branchId, organizationId }, select: { id: true } }))?.id ?? null)
+      : null;
   await prisma.$transaction(async (tx) => {
     // Una cancelación hereda el cliente de la orden original si el POS no lo repite.
     const isCancel = body.grossAmount! < 0;
     const original =
       isCancel && externalOrderId
-        ? await tx.foodSale.findFirst({ where: { organizationId, externalOrderId, grossAmount: { gt: 0 } }, orderBy: { createdAt: "desc" }, select: { id: true, customerId: true } })
+        ? await tx.foodSale.findFirst({ where: { organizationId, externalOrderId, grossAmount: { gt: 0 } }, orderBy: { createdAt: "desc" }, select: { id: true, customerId: true, branchId: true } })
         : null;
     const customerId = customerInput ? (await upsertCustomer(tx, organizationId, customerInput)).id : (original?.customerId ?? null);
     const sale = await tx.foodSale.create({
@@ -1129,6 +1137,7 @@ export async function processFoodPosOrder(payload: unknown, organizationId: stri
         source: "POS",
         externalOrderId,
         customerId,
+        branchId: branchId ?? original?.branchId ?? null,
         cancelsSaleId: original?.id ?? null,
         discountAmount,
         discountReason,

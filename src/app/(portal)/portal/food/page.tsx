@@ -13,6 +13,8 @@ import { foodStrings } from "@/lib/i18n-food";
 import { pickDict } from "@/lib/i18n-dict";
 import { cn, formatMoney } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BranchFilter } from "@/components/portal/BranchFilter";
+import { listBranches, parseBranchParam } from "@/lib/branches";
 import { Badge } from "@/components/ui/badge";
 import {
   DollarSign, Package, ChefHat, ClipboardList, ArrowRight, Receipt, Clock,
@@ -102,19 +104,22 @@ function FoodKpiCard({ icon: Icon, label, value, description, trendPct, trendLab
   );
 }
 
-export default async function FoodOverviewPage() {
+export default async function FoodOverviewPage({ searchParams }: { searchParams: Promise<{ branch?: string }> }) {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
   await requireModule(session.user.organizationId, "FOOD_OPS");
 
   const orgId = session.user.organizationId;
+  const { branch: branchParam } = await searchParams;
+  const branches = await listBranches(orgId, { activeOnly: true });
+  const branch = parseBranchParam(branchParam, branches);
 
   const [t, lang, summary, hourly, daily, lowStock, topDishes, suppliers, smartcardCompanyId, org] = await Promise.all([
     getServerT(),
     getServerLang(),
-    getFoodSalesSummary(orgId),
-    getFoodHourlySales(orgId),
-    getFoodDailySales(orgId, 7),
+    getFoodSalesSummary(orgId, branch),
+    getFoodHourlySales(orgId, branch),
+    getFoodDailySales(orgId, 7, branch),
     getFoodLowStockItems(orgId, 5),
     getFoodTopSellingDishes(orgId, 30, 5),
     prisma.foodSupplier.findMany({
@@ -174,6 +179,8 @@ export default async function FoodOverviewPage() {
           </div>
         </div>
       </div>
+
+      <BranchFilter branches={branches} current={branch} es={lang === "es"} basePath="/portal/food" />
 
       {/* ── KPIs superiores ──────────────────────────────────────────── */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
