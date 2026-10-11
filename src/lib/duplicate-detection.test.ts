@@ -28,6 +28,8 @@ describe("duplicate detection", () => {
     expect(byPhone.map((l) => l.id)).toEqual([a.id]);
     const byEmail = await findPotentialDuplicateLeads(org.id, { email: "persona@correo.com" });
     expect(byEmail.map((l) => l.id)).toEqual([b.id]);
+    expect((await findPotentialDuplicateLeads(org.id, { email: "  persona@correo.com " })).map((l) => l.id)).toEqual([b.id]); // con espacios
+    expect(await findPotentialDuplicateLeads(org.id, {})).toEqual([]);
     expect(await findPotentialDuplicateLeads(org.id, { phone: "12", email: null })).toEqual([]);
   });
 
