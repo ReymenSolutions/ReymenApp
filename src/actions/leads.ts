@@ -221,6 +221,10 @@ export async function checkLeadDuplicates(leadId: string) {
  * the primary already has), keeps "do not contact" if either had it (an
  * opt-out must survive a merge), then soft-deletes the duplicate.
  */
+function asRecord(value: unknown): Record<string, string | number | boolean> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, string | number | boolean>) : {};
+}
+
 export async function mergeLeads(primaryLeadId: string, duplicateLeadId: string) {
   const session = await auth();
   if (!session?.user.organizationId) throw new UserError("No autorizado");
@@ -248,6 +252,8 @@ export async function mergeLeads(primaryLeadId: string, duplicateLeadId: string)
         phone: primary.phone ?? duplicate.phone,
         phoneKey: primary.phoneKey ?? duplicate.phoneKey,
         doNotContact: primary.doNotContact || duplicate.doNotContact,
+        // Campos personalizados: los del contacto que se conserva mandan; los vacíos se completan con los del duplicado.
+        customFields: { ...asRecord(duplicate.customFields), ...asRecord(primary.customFields) },
       },
     }),
     prisma.lead.update({ where: { id: duplicateLeadId }, data: { deletedAt: new Date() } }),

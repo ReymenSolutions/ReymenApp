@@ -220,7 +220,7 @@ PRs fusionados en `main` (#1–#28):
 - [D] Desplegar lo que ya está en `main` del CRM (#37 incluye migración, #38–#40 y esta fase): ver `docs/crm/ROADMAP-CRM.md`.
 
 **De desarrollo:**
-- [D] **CRM:** roadmap de 9 mejoras en `docs/crm/ROADMAP-CRM.md` (hechas 1, 2, 3, 5, 6, 7, 8; faltan 4 y 9). Opciones para investigar después (CRM a medida por cliente, temas por cliente): `docs/futuro/CRM-A-MEDIDA-Y-TEMAS.md`.
+- [D] **CRM:** roadmap de 9 mejoras en `docs/crm/ROADMAP-CRM.md` (hechas 1–8; falta solo la 9, conexión con Foods/POS vía `Customer`). Opciones para investigar después (CRM a medida por cliente, temas por cliente): `docs/futuro/CRM-A-MEDIDA-Y-TEMAS.md`.
 - [D] **Automatizaciones (motor de eventos + n8n):** arquitectura **aprobada** en `docs/automations/ARQUITECTURA.md` (ReymenApp). Decisiones del usuario y orden de PRs en su **§K**; el siguiente paso exacto está al final de §K (PR 1: `Customer` en ReymenApp). Alcance agregado: descuentos en el POS y eventos de cocina y cierre de turno hacia Reymen. Aviso de privacidad pendiente: hasta tenerlo, solo dry-run y alertas internas.
 - [D] Sucursales en el POS (en pausa por decisión del usuario).
 - [D] Delivery: conectar con credenciales reales de Uber Eats, Rappi y DiDi (dependen de los partners).

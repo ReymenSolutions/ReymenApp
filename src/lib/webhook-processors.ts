@@ -10,6 +10,8 @@ import { findLeadByPhone, linkOrphanConversations } from "./crm-link";
 import { findPotentialDuplicateLeads } from "./duplicate-detection";
 import { hasModule } from "./modules";
 import { UserError } from "./user-error";
+import { sanitizeCustomFields } from "./custom-fields";
+import { getActiveCustomFields } from "./custom-fields-db";
 
 /**
  * Processing logic for each n8n webhook event type, shared between the
@@ -17,6 +19,10 @@ import { UserError } from "./user-error";
  * the retry path (which re-runs a previously FAILED WebhookEvent by id,
  * already authenticated by virtue of having been accepted the first time).
  */
+
+function asRecord(value: unknown): Record<string, string | number | boolean> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, string | number | boolean>) : {};
+}
 
 export async function processLeadEvent(payload: unknown, orgId: string): Promise<void> {
   const body = payload as {
@@ -26,6 +32,8 @@ export async function processLeadEvent(payload: unknown, orgId: string): Promise
     source?: string;
     externalId?: string;
     metadata?: Record<string, unknown>;
+    /** Valores de los campos personalizados del cliente, por clave; lo que no corresponde a un campo activo o a su tipo se ignora. */
+    customFields?: Record<string, unknown>;
   };
 
   if (!body.name) throw new Error("Missing lead name");
@@ -49,6 +57,7 @@ export async function processLeadEvent(payload: unknown, orgId: string): Promise
   // se crea otro lead, se completa la ficha del que ya existe. Pasa, por
   // ejemplo, cuando alguien ya escribió por WhatsApp y luego llega su alta.
   const [existingPerson] = await findPotentialDuplicateLeads(orgId, { email: body.email, phone: body.phone });
+  const customFields = body.customFields && typeof body.customFields === "object" ? sanitizeCustomFields(await getActiveCustomFields(orgId), body.customFields).values : {};
   if (existingPerson) {
     const looksLikePhone = /^[\d\s()+.-]+$/.test(existingPerson.name);
     await prisma.lead.update({
@@ -60,6 +69,8 @@ export async function processLeadEvent(payload: unknown, orgId: string): Promise
         phone: existingPerson.phone ? undefined : body.phone,
         phoneKey: existingPerson.phoneKey ? undefined : phoneKey(body.phone),
         externalId: existingPerson.externalId ? undefined : body.externalId,
+        // Completa lo que falta; no pisa lo que ya se había capturado.
+        customFields: Object.keys(customFields).length ? { ...customFields, ...asRecord(existingPerson.customFields) } : undefined,
       },
     });
     await linkOrphanConversations(orgId, existingPerson.id, existingPerson.phone ?? body.phone);
@@ -80,6 +91,7 @@ export async function processLeadEvent(payload: unknown, orgId: string): Promise
         source: body.source ?? "n8n",
         externalId: body.externalId,
         metadata: (body.metadata as Prisma.InputJsonValue) ?? undefined,
+        customFields: Object.keys(customFields).length ? customFields : undefined,
       },
     });
   } catch (err) {

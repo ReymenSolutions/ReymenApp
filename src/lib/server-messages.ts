@@ -6,6 +6,11 @@
 // su versión en español). Un mensaje que no esté aquí se muestra tal cual.
 
 const EN: Record<string, string> = {
+  "Escribe el nombre del campo": "Write the field name",
+  "Agrega al menos una opción a la lista": "Add at least one option to the list",
+  "Ya tienes un campo con ese nombre": "You already have a field with that name",
+  "Campo no encontrado": "Field not found",
+  "Solo las listas tienen opciones": "Only lists have options",
   "Agrega al menos un insumo": "Add at least one supply item",
   "Agrega al menos una opción": "Add at least one option",
   "Agrega al menos una variante": "Add at least one variant",
@@ -237,6 +242,8 @@ const EN_PATTERNS: [RegExp, (...groups: string[]) => string][] = [
     /^El Laboratorio de IA no pudo generar una respuesta: ([\s\S]*)$/,
     (rest) => `The AI Lab couldn't generate a reply: ${rest.replace("n8n no configurado", "n8n not configured")}`,
   ],
+  [/^Alcanzaste el máximo de (\d+) campos personalizados$/, (max) => `You reached the maximum of ${max} custom fields`],
+  [/^El valor de «(.+)» no es válido$/, (label) => `The value of "${label}" isn't valid`],
   [/^La versión (.+) ya existe$/, (version) => `Version ${version} already exists`],
   [/^No hay un precio de Stripe configurado para el plan (.+)$/, (plan) => `There's no Stripe price configured for the ${plan} plan`],
   [/^Tu organización no tiene el módulo "(.+)" habilitado\.$/, (module) => `Your organization doesn't have the "${module}" module enabled.`],
