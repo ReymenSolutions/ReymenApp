@@ -36,6 +36,9 @@ model Organization {
   // físico. null hasta que un admin la genera desde el panel; nunca se
   // usa para firmar nada.
   foodPosReadKey           String?   @unique
+  // Interruptor "menú por sucursal": apagado, todas las sucursales venden el mismo menú y precios;
+  // encendido, cada sucursal puede ocultar platillos y fijar sus precios (BranchDish / BranchVariantPrice).
+  menuPerBranch            Boolean   @default(false)
   // Set once the org's onboarding checklist (src/lib/onboarding.ts) is
   // either fully completed or explicitly skipped — null means "still
   // showing the setup nudge on the dashboard" (Fase 10).
@@ -76,6 +79,8 @@ model Organization {
   foodSales               FoodSale[]
   customers               Customer[]
   branches                Branch[]
+  branchDishes            BranchDish[]
+  branchVariantPrices     BranchVariantPrice[]
   foodInventoryItems      FoodInventoryItem[]
   foodSuppliers           FoodSupplier[]
   foodDishes              FoodDish[]
@@ -1170,9 +1175,46 @@ model Branch {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id])
-  sales        FoodSale[]
+  organization  Organization         @relation(fields: [organizationId], references: [id])
+  sales         FoodSale[]
+  dishes        BranchDish[]
+  variantPrices BranchVariantPrice[]
 
+  @@index([organizationId])
+}
+
+// Un platillo oculto en una sucursal (solo con menuPerBranch). Sin fila = disponible. La sucursal
+// Principal usa siempre el menú base (FoodDish.isActive y FoodDishVariant.price).
+model BranchDish {
+  id             String   @id @default(cuid())
+  organizationId String
+  branchId       String
+  dishId         String
+  isActive       Boolean  @default(true)
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  branch       Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  dish         FoodDish     @relation(fields: [dishId], references: [id], onDelete: Cascade)
+
+  @@unique([branchId, dishId])
+  @@index([organizationId])
+}
+
+// Precio propio de una variante en una sucursal. Sin fila = el precio base.
+model BranchVariantPrice {
+  id             String   @id @default(cuid())
+  organizationId String
+  branchId       String
+  variantId      String
+  price          Decimal  @db.Decimal(10, 2)
+  updatedAt      DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  branch       Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  variant      FoodDishVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([branchId, variantId])
   @@index([organizationId])
 }
 
@@ -1392,6 +1434,7 @@ model FoodDish {
   category       FoodDishCategory?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   variants       FoodDishVariant[]
   modifierGroups FoodDishModifierGroup[]
+  branchDishes   BranchDish[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -1424,6 +1467,7 @@ model FoodDishVariant {
   updatedAt      DateTime @updatedAt
 
   dish         FoodDish                    @relation(fields: [dishId], references: [id], onDelete: Cascade)
+  branchPrices BranchVariantPrice[]
   organization Organization                @relation(fields: [organizationId], references: [id])
   ingredients  FoodDishVariantIngredient[]
   sales        FoodDishSale[]

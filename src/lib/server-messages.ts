@@ -12,6 +12,7 @@ const EN: Record<string, string> = {
   "Escribe el nombre de la sucursal": "Enter the branch name",
   "Ya tienes una sucursal con ese nombre": "You already have a branch with that name",
   "Sucursal no encontrada": "Branch not found",
+  "El precio no es válido": "The price is not valid",
   "Campo no encontrado": "Field not found",
   "Solo las listas tienen opciones": "Only lists have options",
   "Agrega al menos un insumo": "Add at least one supply item",
