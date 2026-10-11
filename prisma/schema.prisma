@@ -74,6 +74,7 @@ model Organization {
   promptTestCases         PromptTestCase[]
   promptExperiments       PromptExperiment[]
   foodSales               FoodSale[]
+  customers               Customer[]
   foodInventoryItems      FoodInventoryItem[]
   foodSuppliers           FoodSupplier[]
   foodDishes              FoodDish[]
@@ -211,7 +212,8 @@ model Lead {
   updatedAt      DateTime   @updatedAt
   deletedAt      DateTime?
 
-  organization  Organization  @relation(fields: [organizationId], references: [id])
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+  customers     Customer[]
   opportunities Opportunity[]
   noteHistory   Note[]
   appointments  Appointment[]
@@ -278,18 +280,18 @@ enum LeadStatus {
 // purely additive.
 
 model PipelineStage {
-  id             String   @id @default(cuid())
+  id             String      @id @default(cuid())
   organizationId String
   name           String
   order          Int
-  isWon          Boolean  @default(false)
-  isLost         Boolean  @default(false)
+  isWon          Boolean     @default(false)
+  isLost         Boolean     @default(false)
   // Estado del contacto (Lead.status) al que lleva una oportunidad que llega
   // a esta etapa. Null = no cambia el estado, salvo que la etapa esté marcada
   // como ganada/perdida (entonces WON/LOST). Ver src/lib/lead-status-sync.ts.
   leadStatus     LeadStatus?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   organization  Organization  @relation(fields: [organizationId], references: [id])
   opportunities Opportunity[]
@@ -1118,27 +1120,70 @@ model OrganizationModule {
 // páginas que aparentan estar conectadas a algo real.
 
 model FoodSale {
-  id             String         @id @default(cuid())
-  organizationId String
+  id              String         @id @default(cuid())
+  organizationId  String
   // Fecha del negocio a la que pertenece la venta -- no necesariamente el
   // mismo día que createdAt si algún día se permite captura tardía.
-  occurredAt     DateTime       @default(now())
+  occurredAt      DateTime       @default(now())
   // Canal de venta (mostrador, domicilio, app, etc.) -- texto libre por
   // ahora, igual que Lead.source; si más adelante hace falta un catálogo
   // fijo con reportes por canal, se vuelve enum entonces.
-  channel        String?
-  grossAmount    Decimal        @db.Decimal(10, 2)
-  netAmount      Decimal        @db.Decimal(10, 2)
-  notes          String?        @db.Text
+  channel         String?
+  grossAmount     Decimal        @db.Decimal(10, 2)
+  netAmount       Decimal        @db.Decimal(10, 2)
+  notes           String?        @db.Text
   // Quién la registró: una venta del POS nunca se edita ni se borra desde
   // el portal (la corrección es una cancelación en el POS); una manual sí.
-  source         FoodSaleSource @default(MANUAL)
-  createdAt      DateTime       @default(now())
+  source          FoodSaleSource @default(MANUAL)
+  // Id de la orden en el POS (opcional: los POS viejos no lo mandan) y, en una
+  // cancelación, el id de la orden original que cancela.
+  externalOrderId String?
+  cancelsSaleId   String?
+  // Cliente que el POS capturó al cobrar (opcional, ver Customer).
+  customerId      String?
+  // Descuento aplicado en el POS (opcional): monto y motivo.
+  discountAmount  Decimal?       @db.Decimal(10, 2)
+  discountReason  String?
+  createdAt       DateTime       @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id])
+  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   @@index([organizationId])
   @@index([organizationId, occurredAt])
+  @@index([organizationId, externalOrderId])
+  @@index([customerId])
+}
+
+// Persona que compró en el negocio (capturada en el POS al cobrar). Es un
+// modelo aparte de Lead: un cliente que solo compra no es un prospecto, pero
+// si su teléfono coincide con un contacto del CRM se enlaza (leadId).
+model Customer {
+  id                 String    @id @default(cuid())
+  organizationId     String
+  // E.164 (+52...) y su llave de últimos 10 dígitos (ver src/lib/phone.ts).
+  phone              String
+  phoneKey           String
+  name               String?
+  // Consentimiento de contacto que dio al cobrar: versión del texto aceptado y cuándo.
+  consentAccepted    Boolean   @default(false)
+  consentTextVersion String?
+  consentAt          DateTime?
+  // Estadísticas de compra, actualizadas con cada venta del POS.
+  visitCount         Int       @default(0)
+  totalSpent         Decimal   @default(0) @db.Decimal(12, 2)
+  firstVisitAt       DateTime?
+  lastVisitAt        DateTime?
+  leadId             String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  sales        FoodSale[]
+
+  @@unique([organizationId, phoneKey])
+  @@index([leadId])
 }
 
 enum FoodSaleSource {

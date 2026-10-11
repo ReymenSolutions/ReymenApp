@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { hasModule } from "./modules";
 import { consumeRecipes } from "./food-inventory";
+import { parsePosCustomer, upsertCustomer, applySaleToCustomer } from "./customers";
 
 // ─── FOOD OPS — agregados de Ventas ──────────────────────────────────
 // Compartido entre /portal/food (resumen) y /portal/food/sales
@@ -1032,6 +1033,10 @@ export interface FoodPosOrderPayload {
   grossAmount: number; // puede ser negativo para una cancelación -- ver items.quantity
   netAmount: number; // monto SIN IVA -- nunca "bruto menos descuentos"
   items: FoodPosOrderItem[];
+  // Todo lo siguiente es opcional: un POS viejo que no lo manda se comporta igual que antes.
+  orderId?: string; // id de la orden en el POS; en una cancelación, el de la orden original
+  customer?: { phone: string; name?: string; consent?: { accepted: boolean; textVersion?: string; at?: string } };
+  discount?: { amount: number; reason?: string };
 }
 
 export async function processFoodPosOrder(payload: unknown, organizationId: string): Promise<void> {
@@ -1101,7 +1106,19 @@ export async function processFoodPosOrder(payload: unknown, organizationId: stri
   const recognizedModifierEntries = modifierEntries.filter((m) => optionNameById.has(m.optionId));
 
   const items = body.items;
+  const externalOrderId = typeof body.orderId === "string" && body.orderId.trim() ? body.orderId.trim().slice(0, 120) : null;
+  const customerInput = parsePosCustomer(body.customer);
+  const discountAmount =
+    body.discount && typeof body.discount.amount === "number" && Number.isFinite(body.discount.amount) && body.discount.amount > 0 ? body.discount.amount : null;
+  const discountReason = discountAmount !== null && typeof body.discount?.reason === "string" ? body.discount.reason.trim().slice(0, 200) || null : null;
   await prisma.$transaction(async (tx) => {
+    // Una cancelación hereda el cliente de la orden original si el POS no lo repite.
+    const isCancel = body.grossAmount! < 0;
+    const original =
+      isCancel && externalOrderId
+        ? await tx.foodSale.findFirst({ where: { organizationId, externalOrderId, grossAmount: { gt: 0 } }, orderBy: { createdAt: "desc" }, select: { id: true, customerId: true } })
+        : null;
+    const customerId = customerInput ? (await upsertCustomer(tx, organizationId, customerInput)).id : (original?.customerId ?? null);
     const sale = await tx.foodSale.create({
       data: {
         organizationId,
@@ -1110,8 +1127,14 @@ export async function processFoodPosOrder(payload: unknown, organizationId: stri
         grossAmount: body.grossAmount!,
         netAmount: body.netAmount!,
         source: "POS",
+        externalOrderId,
+        customerId,
+        cancelsSaleId: original?.id ?? null,
+        discountAmount,
+        discountReason,
       },
     });
+    if (customerId) await applySaleToCustomer(tx, customerId, { grossAmount: body.grossAmount!, occurredAt });
     for (const item of items) {
       await tx.foodDishSale.upsert({
         where: { variantId_occurredAt: { variantId: item.variantId, occurredAt: businessDay } },
