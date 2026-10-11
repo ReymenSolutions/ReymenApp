@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
-  AlertTriangle, Bike, ChefHat, Clock, Flame, MonitorSmartphone, Printer, Receipt, Store, Users, Workflow, Ban, Package,
+  AlertTriangle, Bike, ChefHat, Clock, Flame, MonitorSmartphone, Printer, Receipt, Store, Users, Workflow, Ban, Package, Timer, Wallet,
 } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { requireModule } from "@/lib/modules";
@@ -11,6 +11,7 @@ import { foodStrings } from "@/lib/i18n-food";
 import { pickDict, type DictOf } from "@/lib/i18n-dict";
 import { getOperationsData } from "@/lib/food-operations";
 import { listBranches, parseBranchParam } from "@/lib/branches";
+import { getKitchenTimes, getRecentShiftCloses } from "@/lib/pos-events";
 import { BranchFilter } from "@/components/portal/BranchFilter";
 import type { DeviceRow, PosStation } from "@/lib/pos-operations-summary";
 import { cn, formatMoney } from "@/lib/utils";
@@ -69,6 +70,18 @@ function Kpi({ icon: Icon, label, value, hint, tone = "brand" }: { icon: React.E
       </CardContent>
     </Card>
   );
+}
+
+const STATION_NAME: Record<string, { es: string; en: string }> = {
+  kitchen: { es: "Cocina", en: "Kitchen" },
+  bar: { es: "Barra", en: "Bar" },
+  desserts: { es: "Postres", en: "Desserts" },
+};
+
+function formatMinutes(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m > 0 ? `${m}:${String(s).padStart(2, "0")} min` : `${s} s`;
 }
 
 function Section({ icon: Icon, title, right, children, className }: { icon: React.ElementType; title: string; right?: React.ReactNode; children: React.ReactNode; className?: string }) {
@@ -160,11 +173,13 @@ export default async function FoodOperationsPage({ searchParams }: { searchParam
   const branches = await listBranches(orgId, { activeOnly: true });
   const branch = parseBranchParam(branchParam, branches);
 
-  const [t, lang, data, org] = await Promise.all([
+  const [t, lang, data, org, kitchenTimes, shiftCloses] = await Promise.all([
     getServerT(),
     getServerLang(),
     getOperationsData(orgId, branch),
     prisma.organization.findUniqueOrThrow({ where: { id: orgId }, select: { timezone: true } }),
+    getKitchenTimes(orgId, 24, branch),
+    getRecentShiftCloses(orgId, 5, branch),
   ]);
   const f = pickDict(foodStrings, lang);
   const timeFmt = new Intl.DateTimeFormat(f.dateLocale, { hour: "2-digit", minute: "2-digit", timeZone: org.timezone });
@@ -418,6 +433,53 @@ export default async function FoodOperationsPage({ searchParams }: { searchParam
             </ul>
           )}
         </Section>
+
+        {(kitchenTimes.length > 0 || shiftCloses.length > 0) && (
+          <>
+            <Section icon={Timer} title={lang === "es" ? "Tiempos de preparación (24 h)" : "Preparation times (24 h)"}>
+              {kitchenTimes.length === 0 ? (
+                <p className="text-sm text-slate-500">{lang === "es" ? "Aún no hay productos marcados como listos." : "No items marked ready yet."}</p>
+              ) : (
+                <ul className="space-y-2 text-sm">
+                  {kitchenTimes.map((k) => (
+                    <li key={k.station} className="flex items-center justify-between gap-3">
+                      <span className="font-medium text-slate-900">{STATION_NAME[k.station]?.[lang === "es" ? "es" : "en"] ?? k.station}</span>
+                      <span className="text-right text-slate-600">
+                        <span className="font-semibold tabular-nums text-slate-900">{formatMinutes(k.avgSeconds)}</span> {lang === "es" ? "promedio" : "avg"} · {lang === "es" ? "máx." : "max"} {formatMinutes(k.maxSeconds)} · {k.items} {lang === "es" ? "productos" : "items"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Section>
+
+            <Section icon={Wallet} title={lang === "es" ? "Cierres de turno" : "Shift closes"}>
+              {shiftCloses.length === 0 ? (
+                <p className="text-sm text-slate-500">{lang === "es" ? "Aún no hay cortes de caja reportados." : "No cash cuts reported yet."}</p>
+              ) : (
+                <ul className="space-y-2 text-sm">
+                  {shiftCloses.map((s) => {
+                    const diff = Number(s.difference);
+                    return (
+                      <li key={s.id} className="flex flex-wrap items-center justify-between gap-x-3">
+                        <span className="text-slate-700">
+                          <span className="font-medium text-slate-900">{lang === "es" ? "Turno" : "Shift"} {s.shiftNumber}{s.deviceCode ? ` · ${s.deviceCode}` : ""}</span>
+                          <span className="ml-1 text-xs text-slate-500">{timeFmt.format(s.closedAt)} · {s.closedByName}</span>
+                        </span>
+                        <span className="text-right">
+                          <span className="tabular-nums text-slate-900">{formatMoney(Number(s.salesTotal))}</span>
+                          <span className={cn("ml-2 text-xs font-semibold tabular-nums", diff === 0 ? "text-emerald-700" : "text-red-600")}>
+                            {diff === 0 ? (lang === "es" ? "cuadra" : "balanced") : `${diff > 0 ? "+" : "−"}${formatMoney(Math.abs(diff))}`}
+                          </span>
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Section>
+          </>
+        )}
       </div>
     </div>
   );

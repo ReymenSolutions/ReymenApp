@@ -363,3 +363,12 @@ Con eso, cada automatización nueva es un archivo de blueprint más sus pruebas,
   - sin cliente, el comportamiento es idéntico al de hoy;
   - las estadísticas se actualizan en la misma transacción de la venta;
   - la cancelación (`order.cancelled`) resta la visita y el gasto del cliente.
+
+
+## L. Eventos del POS implementados: cocina y cierres de turno (PR 4)
+
+Mismo esquema de firma e idempotencia que `/api/webhooks/pos/orders` (HMAC con el secreto de la organización, `x-reymen-event-id`); sin el módulo Reymen POS responden 403 `pos_module_disabled` (el POS los deja pendientes).
+
+- `POST /api/webhooks/pos/kitchen` — `kitchen.ticket_ready`: `{ orderId, orderNumber, tableName, branchId?, deviceCode?, items: [{ itemId, name, quantity, station, sentAt, readyAt }] }`. Guarda un `FoodKitchenTicket` por producto (idempotente por `itemId`); descarta tiempos imposibles (listo antes de enviarse o más de 24 h).
+- `POST /api/webhooks/pos/shifts` — `shift.closed`: `{ sessionId, number, deviceCode?, branchId?, openedAt, closedAt, openedByName, closedByName, openingFloat, expected, counted, difference, salesTotal, salesCount, tips, cancelledTotal, cancelledCount, notes? }`. Guarda un `FoodShiftClose` por turno (la diferencia se recalcula como contado − esperado).
+- Se ven en Foods → Operación (tiempos de preparación por estación y últimos cortes). Habilitan `kitchen.sla_exceeded` y `shift.closed` en el motor de eventos (PR 5).
