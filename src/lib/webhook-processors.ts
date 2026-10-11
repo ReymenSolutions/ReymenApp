@@ -9,6 +9,7 @@ import { phoneKey } from "./phone";
 import { findLeadByPhone, linkOrphanConversations, linkOrphanCustomers } from "./crm-link";
 import { findPotentialDuplicateLeads } from "./duplicate-detection";
 import { hasModule } from "./modules";
+import { processKitchenTicketReady, processShiftClosed } from "./pos-events";
 import { UserError } from "./user-error";
 import { sanitizeCustomFields } from "./custom-fields";
 import { getActiveCustomFields } from "./custom-fields-db";
@@ -345,7 +346,9 @@ export type WebhookEventType =
   | "automation.event"
   | "message.status"
   | "appointment_reminder.sent"
-  | "followup.sent";
+  | "followup.sent"
+  | "kitchen.ticket_ready"
+  | "shift.closed";
 
 /** Dispatches a stored WebhookEvent's payload to the processor matching its eventType. */
 export async function processWebhookEventPayload(
@@ -369,6 +372,11 @@ export async function processWebhookEventPayload(
       return processAppointmentReminderSentEvent(payload, orgId);
     case "followup.sent":
       return processFollowUpSentEvent(payload, orgId);
+    case "kitchen.ticket_ready":
+      await processKitchenTicketReady(payload, orgId);
+      return;
+    case "shift.closed":
+      return processShiftClosed(payload, orgId);
     default:
       throw new Error(`Unknown webhook event type: ${eventType}`);
   }

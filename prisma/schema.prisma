@@ -85,6 +85,8 @@ model Organization {
   branchDishes            BranchDish[]
   branchVariantPrices     BranchVariantPrice[]
   branchStocks            BranchStock[]
+  kitchenTickets          FoodKitchenTicket[]
+  shiftCloses             FoodShiftClose[]
   foodInventoryItems      FoodInventoryItem[]
   foodSuppliers           FoodSupplier[]
   foodDishes              FoodDish[]
@@ -1794,4 +1796,63 @@ model DeliveryOrder {
   @@unique([organizationId, platform, externalId])
   @@index([organizationId, placedAt])
   @@index([organizationId, status])
+}
+
+// ─── Eventos del POS: tiempos de cocina y cierres de turno ───────────
+// Los manda el POS por su outbox (ver docs/automations/ARQUITECTURA.md §K). Un renglón por producto
+// que cocina marcó como listo: de ahí salen los tiempos de preparación y, después, "cocina lenta".
+model FoodKitchenTicket {
+  id              String   @id @default(cuid())
+  organizationId  String
+  // Sucursal de Reymen donde se preparó (null = Principal).
+  branchId        String?
+  externalOrderId String
+  // Id del producto en la cuenta del POS: hace idempotente el reenvío.
+  externalItemId  String
+  orderNumber     Int
+  tableName       String
+  itemName        String
+  quantity        Int
+  station         String
+  sentAt          DateTime
+  readyAt         DateTime
+  prepSeconds     Int
+  deviceCode      String?
+  createdAt       DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, externalItemId])
+  @@index([organizationId, readyAt])
+  @@index([organizationId, branchId, readyAt])
+}
+
+// Corte Z de un turno de caja del POS: lo esperado, lo contado y la diferencia.
+model FoodShiftClose {
+  id                String   @id @default(cuid())
+  organizationId    String
+  branchId          String?
+  externalSessionId String
+  shiftNumber       Int
+  deviceCode        String?
+  openedAt          DateTime
+  closedAt          DateTime
+  openedByName      String
+  closedByName      String
+  openingFloat      Decimal  @db.Decimal(12, 2)
+  expected          Decimal  @db.Decimal(12, 2)
+  counted           Decimal  @db.Decimal(12, 2)
+  difference        Decimal  @db.Decimal(12, 2)
+  salesTotal        Decimal  @db.Decimal(12, 2)
+  salesCount        Int
+  tips              Decimal  @db.Decimal(12, 2)
+  cancelledTotal    Decimal  @db.Decimal(12, 2)
+  cancelledCount    Int
+  notes             String?  @db.Text
+  createdAt         DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, externalSessionId])
+  @@index([organizationId, closedAt])
 }
