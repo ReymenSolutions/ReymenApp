@@ -235,7 +235,7 @@ export default async function FoodOverviewPage({ searchParams }: { searchParams:
                 {f.noSalesToday}
               </p>
             ) : (
-              <div className="flex items-end gap-0.5 border-b border-slate-100 pb-0">
+              <div className="flex min-h-[260px] items-end gap-0.5 border-b border-slate-100 pb-0">
                 {chartHours.map((h) => {
                   // Altura en px directa, no porcentaje: un % de altura solo
                   // funciona si el contenedor inmediato tiene una altura
@@ -243,7 +243,7 @@ export default async function FoodOverviewPage({ searchParams }: { searchParams:
                   // automática (se alinean por abajo vía items-end en el
                   // padre) -- un % ahí siempre resuelve a 0. Con px fijos se
                   // evita el problema por completo.
-                  const barPx = maxHourlyGross > 0 ? Math.max(4, Math.round((h.gross / maxHourlyGross) * 140)) : 0;
+                  const barPx = maxHourlyGross > 0 ? Math.max(4, Math.round((h.gross / maxHourlyGross) * 220)) : 0;
                   const isPeak = h.gross === maxHourlyGross && h.gross > 0;
                   return (
                     <div key={h.hour} className="group flex min-w-0 flex-1 flex-col items-center gap-1">
