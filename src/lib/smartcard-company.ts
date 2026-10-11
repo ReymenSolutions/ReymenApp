@@ -43,6 +43,21 @@ export async function getSmartcardCompanyIdForOrg(organizationId: string): Promi
 }
 
 /**
+ * Organización de la plataforma ligada a una company de SmartCard (companies.external_org_id), o null
+ * si no existe o aún no está vinculada. Lo usa el webhook de contactos capturados en la tarjeta.
+ */
+export async function getOrgIdForSmartcardCompany(companyId: string): Promise<string | null> {
+  const supabase = getSmartcardAdminClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase.from("companies").select("external_org_id").eq("id", companyId).maybeSingle();
+  if (error) {
+    console.error("[smartcard-company] Error buscando organización (getOrgIdForSmartcardCompany):", error.message);
+    return null;
+  }
+  return (data?.external_org_id as string | null | undefined) ?? null;
+}
+
+/**
  * Ported from reymen-smartcard's apps/ops/lib/current-company-user.ts +
  * packages/entitlements/src/index.ts (resolveEntitlements/hasModule) —
  * that package lives in a separate monorepo and isn't published, so it
