@@ -2,7 +2,8 @@ import { prisma } from "./prisma";
 import { hasModule } from "./modules";
 import { getFoodLowStockItems, getFoodSalesSummary, type FoodLowStockEntry } from "./food";
 import { fetchPosSnapshot } from "./pos-operations";
-import { summarizeOperations, type OperationsSummary } from "./pos-operations-summary";
+import { filterSnapshotByBranch, summarizeOperations, type OperationsSummary } from "./pos-operations-summary";
+import type { BranchFilter } from "./branches";
 import { FINISHED_STATUSES, isDeliveryLate } from "./delivery";
 
 // Datos del centro de operaciones (Food → Operación): lo que pasa ahora en
@@ -36,12 +37,12 @@ export interface OperationsData {
 
 const DAY_MS = 24 * 3600_000;
 
-export async function getOperationsData(organizationId: string): Promise<OperationsData> {
+export async function getOperationsData(organizationId: string, branch?: BranchFilter): Promise<OperationsData> {
   const since = new Date(Date.now() - DAY_MS);
   const [org, posEnabled, summary, lowStock, automationGroups, failed24h, recentFailures, posRejected24h, deliveryActive] = await Promise.all([
     prisma.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { n8nWebhookSecret: true } }),
     hasModule(organizationId, "REYMEN_POS"),
-    getFoodSalesSummary(organizationId),
+    getFoodSalesSummary(organizationId, branch),
     getFoodLowStockItems(organizationId, 8),
     prisma.automation.groupBy({ by: ["status"], where: { organizationId }, _count: { _all: true } }),
     prisma.automationEvent.count({ where: { organizationId, status: "FAILED", createdAt: { gte: since } } }),
@@ -63,7 +64,7 @@ export async function getOperationsData(organizationId: string): Promise<Operati
     const result = await fetchPosSnapshot(organizationId, org.n8nWebhookSecret);
     pos =
       result.kind === "ok"
-        ? { kind: "ok", summary: summarizeOperations(result.snapshot), serverTime: result.snapshot.serverTime }
+        ? { kind: "ok", summary: summarizeOperations(filterSnapshotByBranch(result.snapshot, branch)), serverTime: result.snapshot.serverTime }
         : { kind: result.kind };
     if (result.kind === "unreachable") console.warn("Centro de operaciones: POS no disponible", result.detail);
   }

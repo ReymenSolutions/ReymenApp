@@ -10,6 +10,8 @@ import { getServerLang, getServerT } from "@/lib/i18n-server";
 import { foodStrings } from "@/lib/i18n-food";
 import { pickDict, type DictOf } from "@/lib/i18n-dict";
 import { getOperationsData } from "@/lib/food-operations";
+import { listBranches, parseBranchParam } from "@/lib/branches";
+import { BranchFilter } from "@/components/portal/BranchFilter";
 import type { DeviceRow, PosStation } from "@/lib/pos-operations-summary";
 import { cn, formatMoney } from "@/lib/utils";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -148,16 +150,20 @@ function DeviceCard({ d, now, f, timeFmt }: { d: DeviceRow; now: number; f: F; t
   );
 }
 
-export default async function FoodOperationsPage() {
+export default async function FoodOperationsPage({ searchParams }: { searchParams: Promise<{ branch?: string }> }) {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
   const orgId = session.user.organizationId;
   await requireModule(orgId, "FOOD_OPS");
 
+  const { branch: branchParam } = await searchParams;
+  const branches = await listBranches(orgId, { activeOnly: true });
+  const branch = parseBranchParam(branchParam, branches);
+
   const [t, lang, data, org] = await Promise.all([
     getServerT(),
     getServerLang(),
-    getOperationsData(orgId),
+    getOperationsData(orgId, branch),
     prisma.organization.findUniqueOrThrow({ where: { id: orgId }, select: { timezone: true } }),
   ]);
   const f = pickDict(foodStrings, lang);
@@ -171,6 +177,7 @@ export default async function FoodOperationsPage() {
     <div className="space-y-4">
       <AutoRefresh intervalMs={REFRESH_MS} />
       <PageHeader title={t.foodOperations} description={f.operationsDesc} />
+      <BranchFilter branches={branches} current={branch} es={lang === "es"} basePath="/portal/food/operations" />
       <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
           <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
