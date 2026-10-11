@@ -20,12 +20,14 @@ import { isStripeConfigured } from "@/lib/stripe";
 import type { UserRole } from "@prisma/client";
 import { CustomFieldsPanel } from "@/components/portal/CustomFieldsPanel";
 import { MAX_CUSTOM_FIELDS } from "@/lib/custom-fields";
+import { BranchesPanel } from "@/components/portal/BranchesPanel";
+import { MAX_BRANCHES } from "@/lib/branches";
 
 export default async function PortalSettingsPage() {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
 
-  const [t, lang, org, crmEnabled, pipelineStages, customFields] = await Promise.all([
+  const [t, lang, org, crmEnabled, pipelineStages, customFields, foodEnabled, branches] = await Promise.all([
     getServerT(),
     getServerLang(),
     prisma.organization.findUnique({
@@ -45,6 +47,8 @@ export default async function PortalSettingsPage() {
       include: { _count: { select: { opportunities: true } } },
     }),
     prisma.customField.findMany({ where: { organizationId: session.user.organizationId }, orderBy: [{ order: "asc" }, { createdAt: "asc" }] }),
+    hasModule(session.user.organizationId, "FOOD_OPS"),
+    prisma.branch.findMany({ where: { organizationId: session.user.organizationId }, orderBy: [{ isActive: "desc" }, { createdAt: "asc" }] }),
   ]);
 
   if (!org) return redirect("/login");
@@ -159,6 +163,18 @@ export default async function PortalSettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Sucursales (Foods module only) */}
+        {foodEnabled && (
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>{lang === "es" ? "Sucursales" : "Branches"}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <BranchesPanel branches={branches.map((b) => ({ id: b.id, name: b.name, isActive: b.isActive }))} canManage={canManageBilling} max={MAX_BRANCHES} />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Campos personalizados de los contactos (CRM module only) */}
         {crmEnabled && (
