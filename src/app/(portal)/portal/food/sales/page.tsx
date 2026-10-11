@@ -41,7 +41,9 @@ export default async function FoodSalesPage({ searchParams }: { searchParams: Pr
   const branch = parseBranchParam(branchParam, branches);
   const branchName = new Map(branches.map((b) => [b.id, b.name]));
 
-  const [t, lang, summary, byChannel, recentSales, usesPos] = await Promise.all([
+  const since30 = new Date();
+  since30.setDate(since30.getDate() - 30);
+  const [t, lang, summary, byChannel, recentSales, usesPos, discounts] = await Promise.all([
     getServerT(),
     getServerLang(),
     getFoodSalesSummary(orgId, branch),
@@ -52,6 +54,12 @@ export default async function FoodSalesPage({ searchParams }: { searchParams: Pr
       take: 25,
     }),
     hasModule(orgId, "REYMEN_POS"),
+    // Descuentos que el POS aplicó en el cobro (últimos 30 días, de la sucursal elegida o de todas).
+    prisma.foodSale.aggregate({
+      where: { organizationId: orgId, ...branchWhere(branch), occurredAt: { gte: since30 }, discountAmount: { not: null } },
+      _sum: { discountAmount: true },
+      _count: { _all: true },
+    }),
   ]);
 
   const f = pickDict(foodStrings, lang);
@@ -74,6 +82,14 @@ export default async function FoodSalesPage({ searchParams }: { searchParams: Pr
           trend={summary.monthOverMonthGrossPct !== null ? { value: summary.monthOverMonthGrossPct, label: f.vsPrev30Days } : undefined}
         />
         <MetricCard title={f.salesCount30} value={summary.last30Days.count} icon={BarChart3} />
+        {discounts._count._all > 0 && (
+          <MetricCard
+            title={lang === "es" ? "Descuentos (30 días)" : "Discounts (30 days)"}
+            value={formatMoney(Number(discounts._sum.discountAmount ?? 0))}
+            description={lang === "es" ? `${discounts._count._all} venta(s) con descuento` : `${discounts._count._all} sale(s) with a discount`}
+            icon={DollarSign}
+          />
+        )}
       </div>
 
       {/* Antes en /portal/food/analytics: desglose por canal de los últimos 30 días. */}
@@ -131,6 +147,12 @@ export default async function FoodSalesPage({ searchParams }: { searchParams: Pr
                           {sale.channel ?? f.noChannel}
                           {branches.length > 0 && ` · ${sale.branchId ? (branchName.get(sale.branchId) ?? "—") : lang === "es" ? "Principal" : "Main"}`}
                         </p>
+                        {sale.discountAmount !== null && (
+                          <p className="truncate text-xs text-emerald-700">
+                            {lang === "es" ? "Descuento" : "Discount"} {formatMoney(Number(sale.discountAmount))}
+                            {sale.discountReason && ` · ${sale.discountReason}`}
+                          </p>
+                        )}
                         {sale.notes && <p className="truncate text-xs text-slate-400">{sale.notes}</p>}
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
