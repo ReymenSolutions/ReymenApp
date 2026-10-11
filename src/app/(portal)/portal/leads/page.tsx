@@ -13,6 +13,8 @@ import { ExportLeadsButton } from "@/components/portal/ExportLeadsButton";
 import { LeadTableClient } from "@/components/portal/LeadTableClient";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Users, Settings, Copy } from "lucide-react";
+import { getActiveCustomFields } from "@/lib/custom-fields-db";
+import { sanitizeLeadColumns } from "@/lib/lead-columns";
 import { countDuplicateGroups } from "@/lib/duplicate-detection";
 import type { LeadStatus, Prisma, UserRole } from "@prisma/client";
 
@@ -70,12 +72,15 @@ export default async function PortalLeadsPage({
   const page = Math.max(1, Number(pageParam) || 1);
   const status = parseStatus(statusParam);
 
-  const [t, lang, { leads, total, totalUnfiltered }, duplicateGroups] = await Promise.all([
+  const [t, lang, { leads, total, totalUnfiltered }, duplicateGroups, customFields, me] = await Promise.all([
     getServerT(),
     getServerLang(),
     getLeads(session.user.organizationId, { query: q, status, page }),
     countDuplicateGroups(session.user.organizationId),
+    getActiveCustomFields(session.user.organizationId),
+    prisma.user.findUnique({ where: { id: session.user.id }, select: { leadColumns: true } }),
   ]);
+  const columns = sanitizeLeadColumns(me?.leadColumns, customFields.map((f) => f.key));
 
   const canManageSettings = can(session.user.role as UserRole, "settings:manage");
 
@@ -120,7 +125,11 @@ export default async function PortalLeadsPage({
           </CardContent>
         </Card>
       ) : (
-        <LeadTableClient leads={leads} total={total} page={page} pageSize={PAGE_SIZE} query={q ?? ""} status={status} />
+        <LeadTableClient leads={leads} total={total} page={page} pageSize={PAGE_SIZE} query={q ?? ""} status={status}
+          columns={columns}
+          customFields={customFields.map((f) => ({ key: f.key, label: f.label, type: f.type, options: f.options }))}
+          canCreateField={canManageSettings}
+        />
       )}
     </div>
   );

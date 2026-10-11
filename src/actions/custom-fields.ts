@@ -48,7 +48,7 @@ export async function createCustomField(data: z.infer<typeof createSchema>) {
   await logAudit({ organizationId: orgId, userId: session.user.id, action: "custom_field.create", resource: "CustomField", resourceId: field.id, metadata: { label, type: parsed.type } });
   revalidatePath("/portal/settings");
   revalidatePath("/portal/leads");
-  return { success: true, fieldId: field.id };
+  return { success: true, fieldId: field.id, key: field.key };
 }
 
 const updateSchema = z.object({
