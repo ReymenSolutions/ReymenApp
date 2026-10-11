@@ -87,6 +87,24 @@ describe("leads actions", () => {
     expect(stillThere?.deletedAt).toBeNull();
   });
 
+  it("records a status change in the audit log (who, from, to) and ignores a no-op change", async () => {
+    authMock.mockResolvedValue(fakeSession({ id: userA.id, role: "OWNER", organizationId: orgA.id }));
+    const fd = new FormData();
+    fd.set("name", "Status History");
+    const { leadId } = await createLead(fd);
+
+    await updateLeadStatus(leadId, "CONTACTED");
+    await updateLeadStatus(leadId, "CONTACTED"); // mismo estado: no es un cambio
+    await updateLeadStatus(leadId, "QUALIFIED");
+
+    const logs = await prisma.auditLog.findMany({ where: { resource: "Lead", resourceId: leadId, action: "lead.status_change" }, orderBy: { createdAt: "asc" } });
+    expect(logs.map((l) => l.metadata)).toEqual([
+      { from: "NEW", to: "CONTACTED" },
+      { from: "CONTACTED", to: "QUALIFIED" },
+    ]);
+    expect(logs[0].userId).toBe(userA.id);
+  });
+
   it("soft-deletes a lead (deletedAt set, row not removed)", async () => {
     authMock.mockResolvedValue(fakeSession({ id: userA.id, role: "OWNER", organizationId: orgA.id }));
     const fd = new FormData();
