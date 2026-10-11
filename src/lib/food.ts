@@ -430,7 +430,33 @@ const STOCK_LINE_SELECT = {
   inventoryItem: { select: { currentStock: true, minStock: true } },
 } as const;
 
-export async function getFoodMenuForPos(organizationId: string): Promise<FoodMenuDish[]> {
+/**
+ * Menú que ve una caja del POS. Con "menú por sucursal" encendido y una sucursal activa de esta
+ * organización, esa sucursal puede ocultar platillos y tener sus propios precios; la Principal
+ * (branchId null) y las organizaciones con el interruptor apagado ven el menú base.
+ */
+export async function getFoodMenuForPos(organizationId: string, branchId: string | null = null): Promise<FoodMenuDish[]> {
+  const all = await getBaseFoodMenuForPos(organizationId);
+  if (!branchId) return all;
+  const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { menuPerBranch: true } });
+  if (!org?.menuPerBranch) return all;
+  const branch = await prisma.branch.findFirst({ where: { id: branchId, organizationId, isActive: true }, select: { id: true } });
+  if (!branch) return all;
+  const [hidden, prices] = await Promise.all([
+    prisma.branchDish.findMany({ where: { branchId, isActive: false }, select: { dishId: true } }),
+    prisma.branchVariantPrice.findMany({ where: { branchId }, select: { variantId: true, price: true } }),
+  ]);
+  return applyBranchMenu(all, new Set(hidden.map((h) => h.dishId)), new Map(prices.map((p) => [p.variantId, Number(p.price)])));
+}
+
+/** Quita los platillos ocultos y cambia el precio de las variantes que la sucursal fijó. Pura. */
+export function applyBranchMenu(dishes: FoodMenuDish[], hiddenDishIds: ReadonlySet<string>, priceByVariant: ReadonlyMap<string, number>): FoodMenuDish[] {
+  return dishes
+    .filter((d) => !hiddenDishIds.has(d.dishId))
+    .map((d) => ({ ...d, variants: d.variants.map((v) => (priceByVariant.has(v.variantId) ? { ...v, price: priceByVariant.get(v.variantId)! } : v)) }));
+}
+
+async function getBaseFoodMenuForPos(organizationId: string): Promise<FoodMenuDish[]> {
   const dishes = await prisma.foodDish.findMany({
     where: { organizationId, isActive: true },
     select: {

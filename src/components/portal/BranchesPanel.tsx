@@ -6,7 +6,9 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { usePreferences } from "@/context/preferences";
+import Link from "next/link";
 import { createBranch, renameBranch, setBranchActive } from "@/actions/branches";
+import { setMenuPerBranch } from "@/actions/branch-menu";
 import { getErrorMessage } from "@/lib/user-error";
 
 interface BranchRow {
@@ -16,7 +18,7 @@ interface BranchRow {
 }
 
 /** Sucursales del negocio. La "Principal" siempre existe; aquí se agregan las demás. */
-export function BranchesPanel({ branches, canManage, max }: { branches: BranchRow[]; canManage: boolean; max: number }) {
+export function BranchesPanel({ branches, canManage, max, menuPerBranch }: { branches: BranchRow[]; canManage: boolean; max: number; menuPerBranch: boolean }) {
   const { lang } = usePreferences();
   const es = lang === "es";
   const [pending, startTransition] = useTransition();
@@ -89,6 +91,30 @@ export function BranchesPanel({ branches, canManage, max }: { branches: BranchRo
             {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
             {es ? "Agregar" : "Add"}
           </Button>
+        </div>
+      )}
+      {active.length > 0 && (
+        <div className="space-y-3 rounded-lg border border-slate-200 p-3">
+          <label className="flex items-start justify-between gap-4">
+            <span className="text-sm text-slate-700">
+              <span className="block font-medium text-slate-900">{es ? "Menú por sucursal" : "Menu per branch"}</span>
+              {es
+                ? "Apagado: todas las sucursales venden el mismo menú y precios. Encendido: cada sucursal puede ocultar platillos y fijar sus precios."
+                : "Off: every branch sells the same menu and prices. On: each branch can hide dishes and set its own prices."}
+            </span>
+            <input
+              type="checkbox"
+              className="mt-1 h-5 w-5 shrink-0 accent-orange-500"
+              checked={menuPerBranch}
+              disabled={!canManage || pending}
+              onChange={(e) => run(() => setMenuPerBranch(e.target.checked), es ? "No se pudo guardar" : "Couldn't save")}
+            />
+          </label>
+          {menuPerBranch && (
+            <Link href="/portal/food/branch-menu" className="inline-block text-sm font-medium text-brand-700 hover:underline">
+              {es ? "Configurar el menú de cada sucursal →" : "Set up each branch's menu →"}
+            </Link>
+          )}
         </div>
       )}
       {archived.length > 0 && (

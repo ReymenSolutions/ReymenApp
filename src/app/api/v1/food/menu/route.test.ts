@@ -53,6 +53,20 @@ describe("GET /api/v1/food/menu", () => {
     expect(after.headers.get("etag")).not.toBe(before.headers.get("etag"));
   });
 
+  it("with menu-per-branch on, ?branchId= returns that branch's menu; without it (or with a foreign id) the base menu", async () => {
+    authMock.mockResolvedValue(null);
+    const dish = await prisma.foodDish.findFirstOrThrow({ where: { organizationId: orgA.id, name: "Org A Secret Dish" }, include: { variants: true } });
+    const branch = await prisma.branch.findFirstOrThrow({ where: { organizationId: orgA.id, name: "Centro" } });
+    await prisma.organization.update({ where: { id: orgA.id }, data: { menuPerBranch: true } });
+    await prisma.branchVariantPrice.create({ data: { organizationId: orgA.id, branchId: branch.id, variantId: dish.variants[0].id, price: 77 } });
+    const get = async (qs: string) => (await (await GET(makeRequest(`http://localhost/api/v1/food/menu?orgId=${orgA.id}${qs}`, { "x-api-key": orgA.n8nWebhookSecret }))).json()).data;
+    expect((await get(`&branchId=${branch.id}`)).find((d: { name: string }) => d.name === "Org A Secret Dish").variants[0].price).toBe(77);
+    expect((await get("")).find((d: { name: string }) => d.name === "Org A Secret Dish").variants[0].price).toBe(50);
+    expect((await get("&branchId=ajena")).find((d: { name: string }) => d.name === "Org A Secret Dish").variants[0].price).toBe(50);
+    await prisma.organization.update({ where: { id: orgA.id }, data: { menuPerBranch: false } });
+    expect((await get(`&branchId=${branch.id}`)).find((d: { name: string }) => d.name === "Org A Secret Dish").variants[0].price).toBe(50);
+  });
+
   it("CRITICAL: rejects org B's secret used to read org A's menu", async () => {
     authMock.mockResolvedValue(null);
     const res = await GET(makeRequest(`http://localhost/api/v1/food/menu?orgId=${orgA.id}`, { "x-api-key": orgB.n8nWebhookSecret }));

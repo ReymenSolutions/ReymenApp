@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   }
 
   const [dishes, categories, lowStock, branches] = await Promise.all([
-    getFoodMenuForPos(orgId),
+    getFoodMenuForPos(orgId, req.nextUrl.searchParams.get("branchId")),
     getFoodDishCategories(orgId),
     getFoodLowStockForPos(orgId),
     listBranches(orgId, { activeOnly: true }),
