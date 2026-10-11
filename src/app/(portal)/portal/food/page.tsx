@@ -228,7 +228,7 @@ export default async function FoodOverviewPage() {
                 {f.noSalesToday}
               </p>
             ) : (
-              <div className="flex items-end gap-1 border-b border-slate-100 pb-0">
+              <div className="flex items-end gap-0.5 border-b border-slate-100 pb-0">
                 {chartHours.map((h) => {
                   // Altura en px directa, no porcentaje: un % de altura solo
                   // funciona si el contenedor inmediato tiene una altura
@@ -239,8 +239,8 @@ export default async function FoodOverviewPage() {
                   const barPx = maxHourlyGross > 0 ? Math.max(4, Math.round((h.gross / maxHourlyGross) * 140)) : 0;
                   const isPeak = h.gross === maxHourlyGross && h.gross > 0;
                   return (
-                    <div key={h.hour} className="group flex flex-1 flex-col items-center gap-1">
-                      <span className="h-3 text-[10px] font-medium text-slate-600">
+                    <div key={h.hour} className="group flex min-w-0 flex-1 flex-col items-center gap-1">
+                      <span className="h-3 max-w-full whitespace-nowrap text-[10px] font-medium text-slate-600">
                         {isPeak ? formatMoney(h.gross, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : ""}
                       </span>
                       <div
@@ -251,7 +251,8 @@ export default async function FoodOverviewPage() {
                         style={{ height: `${barPx}px` }}
                         title={f.hourTooltip(h.hour, formatMoney(h.gross), h.count)}
                       />
-                      <span className="text-[10px] text-slate-400">{h.hour}h</span>
+                      {/* Con muchas horas no caben todas las etiquetas: se muestran las pares. */}
+                      <span className="h-3 text-[10px] leading-3 text-slate-400">{chartHours.length > 12 && h.hour % 2 !== 0 ? "" : `${h.hour}h`}</span>
                     </div>
                   );
                 })}
