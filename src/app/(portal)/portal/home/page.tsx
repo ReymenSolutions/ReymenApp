@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
-  AlertTriangle, ArrowRight, BarChart3, Bot, Calendar, CreditCard, HelpCircle, MessageSquare, PackageOpen, Rocket, Settings, Truck, UtensilsCrossed, Users, Zap,
+  AlertTriangle, ArrowRight, BarChart3, Bot, Calendar, CreditCard, HelpCircle, ListChecks, MessageSquare, PackageOpen, Rocket, Settings, Truck, UtensilsCrossed, Users, Zap,
 } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -26,6 +26,7 @@ const ICONS: Record<HomeShortcut["icon"], React.ElementType> = {
   help: HelpCircle,
   settings: Settings,
   truck: Truck,
+  list: ListChecks,
 };
 
 // Lenguaje de todos los días: nada de "leads", "pipeline" ni "módulos".
@@ -56,6 +57,7 @@ const COPY = {
       delivery: ["Pedidos a domicilio", "Uber Eats, Rappi y DiDi"],
       messages: ["Contestar mensajes", "Lo que escriben tus clientes"],
       appointments: ["Ver mis citas", "Agenda del día"],
+      today: ["Qué hago hoy", "Lo que necesita a tu equipo"],
       clients: ["Mis contactos", "Quién te ha buscado"],
       card: ["Mi tarjeta digital", "Escaneos y enlaces"],
       automations: ["Mis automatizaciones", "Lo que Reymen hace por ti"],
@@ -90,6 +92,7 @@ const COPY = {
       delivery: ["Delivery orders", "Uber Eats, Rappi and DiDi"],
       messages: ["Answer messages", "What your customers write"],
       appointments: ["See my appointments", "Today's schedule"],
+      today: ["What to do today", "What needs your team"],
       clients: ["My contacts", "Who has reached out"],
       card: ["My digital card", "Scans and links"],
       automations: ["My automations", "What Reymen does for you"],

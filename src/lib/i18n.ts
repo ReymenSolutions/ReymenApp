@@ -6,6 +6,7 @@ export const strings = {
   es: {
     // ── Navigation ───────────────────────────────────────────
     home: "Inicio",
+    today: "Qué hago hoy",
     dashboard: "Dashboard",
     leads: "Leads",
     pipeline: "Pipeline",
@@ -548,6 +549,7 @@ export const strings = {
   en: {
     // ── Navigation ───────────────────────────────────────────
     home: "Home",
+    today: "What to do today",
     dashboard: "Dashboard",
     leads: "Leads",
     pipeline: "Pipeline",
