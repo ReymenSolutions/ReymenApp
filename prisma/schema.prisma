@@ -105,6 +105,7 @@ model User {
   isActive             Boolean   @default(true)
   theme                String?   @default("light")
   language             String?   @default("es")
+  leadColumns          Json? // personal preference for the leads table: { hidden: base columns hidden, custom: custom-field keys shown }
   notificationsSeenAt  DateTime? // last time the user opened the notification bell — items newer than this still count as unread
   totpSecret           String? // base32 TOTP secret; set once enrollment begins
   totpEnabled          Boolean   @default(false)

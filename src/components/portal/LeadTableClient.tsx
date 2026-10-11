@@ -10,6 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { LeadActions } from "@/components/portal/LeadActions";
 import { Pagination } from "@/components/shared/Pagination";
 import { formatDate } from "@/lib/utils";
+import { LeadColumnsGear, type ColumnField } from "@/components/portal/LeadColumnsGear";
+import { displayValue, type CustomFieldDef } from "@/lib/custom-fields";
+import type { LeadColumnPrefs } from "@/lib/lead-columns";
 import { usePreferences } from "@/context/preferences";
 import type { Lead, LeadStatus } from "@prisma/client";
 
@@ -20,13 +23,18 @@ interface LeadTableClientProps {
   pageSize: number;
   query: string;
   status: LeadStatus | "ALL";
+  columns: LeadColumnPrefs;
+  customFields: (CustomFieldDef & ColumnField)[];
+  canCreateField: boolean;
 }
 
 // Search/filter/page state all live in the URL and drive a server refetch —
 // necessary so search actually covers every lead in the org, not just
 // whatever page happens to be loaded client-side.
-export function LeadTableClient({ leads, total, page, pageSize, query, status }: LeadTableClientProps) {
-  const { t } = usePreferences();
+export function LeadTableClient({ leads, total, page, pageSize, query, status, columns, customFields, canCreateField }: LeadTableClientProps) {
+  const { t, lang } = usePreferences();
+  const show = (c: LeadColumnPrefs["hidden"][number]) => !columns.hidden.includes(c);
+  const shownFields = columns.custom.map((k) => customFields.find((f) => f.key === k)).filter((f): f is (typeof customFields)[number] => !!f);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -86,7 +94,7 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status }:
             </button>
           )}
         </div>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           {statusOptions.map((opt) => (
             <button
               key={opt.value}
@@ -101,6 +109,9 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status }:
             </button>
           ))}
         </div>
+        <div className="sm:ml-auto">
+          <LeadColumnsGear prefs={columns} fields={customFields} canCreateField={canCreateField} />
+        </div>
       </div>
 
       {leads.length === 0 ? (
@@ -113,11 +124,14 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status }:
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t.colName}</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t.colContact}</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t.colSource}</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t.colStatus}</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t.colScore}</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t.colDate}</th>
+                {show("contact") && <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t.colContact}</th>}
+                {show("source") && <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t.colSource}</th>}
+                {show("status") && <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t.colStatus}</th>}
+                {show("score") && <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t.colScore}</th>}
+                {show("date") && <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t.colDate}</th>}
+                {shownFields.map((f) => (
+                  <th key={f.key} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{f.label}</th>
+                ))}
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -132,22 +146,37 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status }:
                       <p className="text-xs text-slate-400 truncate max-w-[180px]">{lead.notes}</p>
                     )}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="space-y-0.5">
-                      {lead.email && <p className="text-xs text-slate-600">{lead.email}</p>}
-                      {lead.phone && <p className="text-xs text-slate-600">{lead.phone}</p>}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge variant="secondary">{lead.source ?? "manual"}</Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={lead.status} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <LeadScoreBadge score={lead.score} reason={lead.scoreReason} showTooltip />
-                  </td>
-                  <td className="px-4 py-3 text-xs text-slate-500">{formatDate(lead.createdAt)}</td>
+                  {show("contact") && (
+                    <td className="px-4 py-3">
+                      <div className="space-y-0.5">
+                        {lead.email && <p className="text-xs text-slate-600">{lead.email}</p>}
+                        {lead.phone && <p className="text-xs text-slate-600">{lead.phone}</p>}
+                      </div>
+                    </td>
+                  )}
+                  {show("source") && (
+                    <td className="px-4 py-3">
+                      <Badge variant="secondary">{lead.source ?? "manual"}</Badge>
+                    </td>
+                  )}
+                  {show("status") && (
+                    <td className="px-4 py-3">
+                      <StatusBadge status={lead.status} />
+                    </td>
+                  )}
+                  {show("score") && (
+                    <td className="px-4 py-3">
+                      <LeadScoreBadge score={lead.score} reason={lead.scoreReason} showTooltip />
+                    </td>
+                  )}
+                  {show("date") && (
+                    <td className="px-4 py-3 text-xs text-slate-500">{formatDate(lead.createdAt)}</td>
+                  )}
+                  {shownFields.map((f) => (
+                    <td key={f.key} className="px-4 py-3 text-xs text-slate-600">
+                      {displayValue(f, (lead.customFields as Record<string, unknown> | null)?.[f.key], lang) || <span className="text-slate-300">—</span>}
+                    </td>
+                  ))}
                   <td className="px-4 py-3">
                     <LeadActions leadId={lead.id} currentStatus={lead.status} />
                   </td>
