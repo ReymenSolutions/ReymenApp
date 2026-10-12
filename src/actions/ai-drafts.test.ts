@@ -24,6 +24,8 @@ describe("borradores de IA (acciones)", () => {
   const newOrg = async () => {
     const org = await createTestOrg("AI Draft Actions");
     orgs.push(org.id);
+    // Esta org usa los 6 canales con el modo por defecto: un tope pactado alto evita que el tope del plan estorbe a estas pruebas.
+    await prisma.organization.update({ where: { id: org.id }, data: { aiAgentsCapOverride: 6 } });
     await prisma.organizationModule.upsert({ where: { organizationId_module: { organizationId: org.id, module: "AI_WHATSAPP" } }, create: { organizationId: org.id, module: "AI_WHATSAPP", status: "ACTIVE", source: "SUBSCRIBED" }, update: { status: "ACTIVE" } });
     return org;
   };

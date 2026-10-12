@@ -8,6 +8,7 @@ import { logAudit } from "@/lib/audit";
 import { requireAdmin } from "@/lib/guards";
 import { UserError } from "@/lib/user-error";
 import { getPlans, invalidatePlanCache, toPlanDef, type PlanDef } from "@/lib/plans";
+import { listOrgsOverAgentCap, type OverCapRow } from "@/lib/agent-cap";
 import { PLAN_ACCENTS } from "@/lib/plan-accent";
 
 // ─── Admin → Planes: el catálogo comercial se edita aquí y se actualiza en todo lo conectado ───────────────────────
@@ -143,4 +144,10 @@ export async function listCustomPlanClients(): Promise<CustomPlanClient[]> {
     const plan = plans.find((p) => p.key === o.plan);
     return { id: o.id, name: o.name, plan: o.plan, planName: plan?.name ?? o.plan, priceMxn: Number(o.customMonthlyPriceMxn), listPriceMxn: plan?.priceMxn ?? 0 };
   });
+}
+
+/** Clientes con más agentes IA activos que su tope (conservan lo que tienen pero no pueden activar más). */
+export async function listClientsOverAgentCap(): Promise<OverCapRow[]> {
+  await requireAdmin();
+  return listOrgsOverAgentCap();
 }

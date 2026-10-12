@@ -25,6 +25,9 @@ const COPY = {
     cancel: "Cancelar",
     noKey: "Falta la clave de Claude en el servidor (ANTHROPIC_API_KEY): mientras tanto no se generan borradores.",
     readOnly: "Solo quien gestiona la base de conocimiento puede cambiar esto.",
+    capLine: (active: number, cap: number) => `Agentes activos: ${active} de ${cap} incluidos en tu plan`,
+    capReached: "Llegaste al tope de agentes de tu plan: apaga un canal o mejora tu plan para activar otro.",
+    capOver: (active: number, cap: number) => `Tienes ${active} agentes activos y tu plan incluye ${cap}. Conservas los que ya tienes, pero no puedes activar más hasta apagar alguno o mejorar tu plan.`,
     saved: "Guardado",
     error: "No se pudo cambiar el modo",
   },
@@ -43,6 +46,9 @@ const COPY = {
     cancel: "Cancel",
     noKey: "The server has no Claude key (ANTHROPIC_API_KEY): no drafts are generated meanwhile.",
     readOnly: "Only people who manage the knowledge base can change this.",
+    capLine: (active: number, cap: number) => `Active agents: ${active} of ${cap} included in your plan`,
+    capReached: "You reached your plan's agent cap: turn a channel off or upgrade your plan to turn another on.",
+    capOver: (active: number, cap: number) => `You have ${active} active agents and your plan includes ${cap}. You keep the ones you have, but you can't turn more on until you turn one off or upgrade your plan.`,
     saved: "Saved",
     error: "Couldn't change the mode",
   },
@@ -51,16 +57,22 @@ const COPY = {
 const ICON = { OFF: Power, SUGGEST: Lightbulb, AUTO: Zap } as const;
 const ORDER: AgentMode[] = ["OFF", "SUGGEST", "AUTO"];
 
-export function AgentModesPanel({ initial, canEdit, aiConfigured }: { initial: Record<string, AgentMode>; canEdit: boolean; aiConfigured: boolean }) {
+export function AgentModesPanel({ initial, cap, canEdit, aiConfigured }: { initial: Record<string, AgentMode>; cap: { cap: number | null; overBy: number }; canEdit: boolean; aiConfigured: boolean }) {
   const { lang } = usePreferences();
   const t = COPY[lang === "en" ? "en" : "es"];
   const [modes, setModes] = useState(initial);
   const [pending, start] = useTransition();
 
   const [confirming, setConfirming] = useState<string | null>(null);
+  const activeCount = Object.values(modes).filter((m) => m !== "OFF").length;
+  const atCap = cap.cap !== null && activeCount >= cap.cap;
 
   function choose(channel: string, mode: AgentMode, confirmed = false) {
     if (!canEdit || pending || modes[channel] === mode) return;
+    if (atCap && modes[channel] === "OFF") {
+      toast.error(t.capReached);
+      return;
+    }
     if (mode === "AUTO" && !confirmed) {
       setConfirming(channel);
       return;
@@ -87,6 +99,12 @@ export function AgentModesPanel({ initial, canEdit, aiConfigured }: { initial: R
       </CardHeader>
       <CardContent className="space-y-3">
         {!aiConfigured && <p className="rounded-card border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">{t.noKey}</p>}
+        {cap.cap !== null && (
+          <p role={atCap ? "status" : undefined} className={`rounded-card border p-2 text-xs ${activeCount > cap.cap ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 bg-slate-50 text-slate-600"}`}>
+            {activeCount > cap.cap ? t.capOver(activeCount, cap.cap) : t.capLine(activeCount, cap.cap)}
+            {activeCount === cap.cap && ` · ${t.capReached}`}
+          </p>
+        )}
         {!canEdit && <p className="text-xs text-slate-500">{t.readOnly}</p>}
         {Object.keys(initial).map((channel) => (
           <div key={channel} className="flex flex-col gap-2 rounded-card border border-slate-200 p-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">

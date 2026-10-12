@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { getServerLang } from "@/lib/i18n-server";
-import { listCustomPlanClients, listPlansForAdmin } from "@/actions/admin/plans";
+import { listClientsOverAgentCap, listCustomPlanClients, listPlansForAdmin } from "@/actions/admin/plans";
 import { accentTone } from "@/lib/plan-accent";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +28,7 @@ function spanClass(index: number, total: number): string {
 export default async function AdminPlansPage() {
   const es = (await getServerLang()) === "es";
   const lang = es ? "es" : "en";
-  const [plans, customClients] = await Promise.all([listPlansForAdmin(), listCustomPlanClients()]);
+  const [plans, customClients, overCap] = await Promise.all([listPlansForAdmin(), listCustomPlanClients(), listClientsOverAgentCap()]);
   const moduleLabel = getModuleLabel(lang);
   const wideCustom = spanClass(plans.length, plans.length + 1).includes("lg:col-span-6");
   const limit = (n: number | null, one: string, many: string, unlimited: string) => (n === null ? unlimited : `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`);
@@ -40,6 +40,25 @@ export default async function AdminPlansPage() {
         description={es ? "Nombre, precio, límites, presupuesto de IA y qué incluye cada plan. Al guardar, el cambio se aplica de inmediato en Configuración del cliente, Cambiar plan, ROI, límites, presupuesto de IA, módulos y métricas." : "Name, price, limits, AI budget and what each plan includes. On save, the change applies immediately in client Settings, Change plan, ROI, limits, AI budget, modules and metrics."}
         actions={<PlanEditorDialog />}
       />
+
+      {overCap.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50/60">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">{es ? "Clientes por encima de su tope de agentes IA" : "Clients over their AI agents cap"} ({overCap.length})</CardTitle>
+            <p className="text-xs text-slate-600">{es ? "Conservan los agentes que ya tenían, pero no pueden activar más. Ajusta su tope en Cliente → Presupuesto de IA o cambia su plan." : "They keep the agents they already had but cannot turn more on. Adjust their cap in Client → AI budget or change their plan."}</p>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y divide-amber-100 rounded-lg border border-amber-100 bg-white/70">
+              {overCap.map((c) => (
+                <li key={c.orgId} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                  <Link href={`/admin/clients/${c.orgId}#ia-presupuesto`} className="min-w-0 truncate font-medium text-slate-900 hover:underline">{c.name}</Link>
+                  <span className="flex-shrink-0 text-xs text-slate-600">{c.active} / {c.cap} · {c.source === "override" ? (es ? "tope pactado" : "agreed cap") : c.plan}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
         {plans.map((p, index) => (

@@ -8,6 +8,7 @@ import { logAudit } from "@/lib/audit";
 import { UserError } from "@/lib/user-error";
 import { INBOX_CHANNELS } from "@/lib/channels";
 import { isAgentMode, setChannelMode } from "@/lib/agent-mode";
+import { assertAgentCapacity } from "@/lib/agent-cap";
 import { getRulebook, rulebookProgress } from "@/lib/rulebook";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { isDraftProviderConfigured } from "@/lib/ai-draft";
@@ -33,6 +34,7 @@ export async function setAgentChannelMode(channel: string, mode: string, opts: {
     if (rulebookProgress(await getRulebook(organizationId)).filled === 0) throw new UserError("Escribe tu Rulebook antes de activar el modo automático");
   }
 
+  await assertAgentCapacity(organizationId, channel, mode);
   await setChannelMode(organizationId, channel, mode, session.user.id);
   await logAudit({ organizationId, userId: session.user.id, action: "agent.mode", resource: "AgentChannelSetting", resourceId: channel, metadata: { channel, mode } });
   revalidatePath("/portal/whatsapp");

@@ -8,6 +8,7 @@ import { requireAdmin } from "@/lib/guards";
 import { UserError } from "@/lib/user-error";
 import { AiBudgetError, creditBudget, extendBudget, getBudgetState, resetBudget, setBudgetPolicy, setMonthlyBudget, type BudgetState } from "@/lib/ai/budget";
 import { evaluateBudgetAlerts } from "@/lib/ai/budget-alerts";
+import { getAgentCap, type AgentCap } from "@/lib/agent-cap";
 import { getAgentStatuses, type AgentStatusRow } from "@/lib/ai/agent-status";
 
 // ─── Presupuesto de IA por tenant: consultar, ampliar, restablecer, fijar y política (todo auditado, solo admin) ──────
@@ -17,7 +18,7 @@ const reasonSchema = z.string().trim().min(5, "Escribe el motivo").max(300);
 const amount = z.coerce.number().positive().max(1_000_000);
 
 export type AdjustmentRow = { id: string; type: string; amountMxn: number; reason: string; createdAt: Date; createdBy: string | null; externalRef: string | null };
-export type OrgAiBudgetView = { state: BudgetState; agents: AgentStatusRow[]; blocked: boolean; adjustments: AdjustmentRow[]; alerts: { threshold: number; createdAt: Date }[] };
+export type OrgAiBudgetView = { state: BudgetState; agents: AgentStatusRow[]; agentCap: AgentCap; blocked: boolean; adjustments: AdjustmentRow[]; alerts: { threshold: number; createdAt: Date }[] };
 
 async function assertOrg(orgId: string) {
   const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { id: true } });
@@ -30,14 +31,15 @@ export async function getOrgAiBudget(data: z.infer<typeof idSchema>): Promise<Or
   const { orgId } = idSchema.parse(data);
   await assertOrg(orgId);
   const state = await getBudgetState(orgId);
-  const [status, adjustments, alerts] = await Promise.all([
+  const [status, agentCap, adjustments, alerts] = await Promise.all([
     getAgentStatuses(orgId),
+    getAgentCap(orgId),
     prisma.aiBudgetAdjustment.findMany({ where: { organizationId: orgId }, orderBy: { createdAt: "desc" }, take: 30 }),
     prisma.aiBudgetAlert.findMany({ where: { organizationId: orgId, cycleStart: state.cycleStart }, orderBy: { threshold: "asc" }, select: { threshold: true, createdAt: true } }),
   ]);
   const users = await prisma.user.findMany({ where: { id: { in: adjustments.map((a) => a.createdById).filter((x): x is string => !!x) } }, select: { id: true, name: true, email: true } });
   const who = new Map(users.map((u) => [u.id, u.name ?? u.email]));
-  return { state, agents: status.agents, blocked: status.blocked, alerts, adjustments: adjustments.map((a) => ({ id: a.id, type: a.type, amountMxn: Number(a.amountMxn), reason: a.reason, createdAt: a.createdAt, createdBy: a.createdById ? (who.get(a.createdById) ?? null) : null, externalRef: a.externalRef })) };
+  return { state, agents: status.agents, agentCap, blocked: status.blocked, alerts, adjustments: adjustments.map((a) => ({ id: a.id, type: a.type, amountMxn: Number(a.amountMxn), reason: a.reason, createdAt: a.createdAt, createdBy: a.createdById ? (who.get(a.createdById) ?? null) : null, externalRef: a.externalRef })) };
 }
 
 async function audited(orgId: string, adminId: string, action: string, metadata: Record<string, unknown>) {
@@ -117,4 +119,25 @@ export async function setOrgAiBudgetPolicy(data: { orgId: string; policy: "BLOCK
   }
   await audited(orgId, session.user.id, "ai.budget_policy", { policy: data.policy, provider: data.provider ?? null, model: data.model ?? null, capMxn: data.capMxn ?? null });
   return { success: true, state: await getBudgetState(orgId) };
+}
+
+/**
+ * Fija el tope de agentes IA activos de un cliente (plan Custom), en lugar del de su plan; vacío vuelve al del plan.
+ * Nunca apaga agentes: si el nuevo tope queda por debajo de los activos, el cliente conserva lo que tiene y no puede encender más.
+ */
+export async function setOrgAgentsCap(data: { orgId: string; cap: number | null; reason: string }) {
+  const session = await requireAdmin();
+  const { orgId } = idSchema.parse(data);
+  const reason = reasonSchema.safeParse(data.reason);
+  const cap = data.cap === null ? null : z.coerce.number().int().min(0).max(100).safeParse(data.cap);
+  if (!reason.success || (cap && !cap.success)) throw new UserError("Revisa el monto y el motivo");
+  await assertOrg(orgId);
+  const before = await getAgentCap(orgId);
+  const value = cap ? cap.data : null;
+  await prisma.organization.update({ where: { id: orgId }, data: { aiAgentsCapOverride: value } });
+  await logAudit({ organizationId: orgId, userId: session.user.id, action: "ai.agents_cap", resource: "Organization", resourceId: orgId, metadata: { fromCap: before.cap, fromSource: before.source, toOverride: value, reason: reason.data } });
+  revalidatePath(`/admin/clients/${orgId}`);
+  revalidatePath("/admin/plans");
+  revalidatePath("/portal/whatsapp");
+  return { success: true, agentCap: await getAgentCap(orgId) };
 }

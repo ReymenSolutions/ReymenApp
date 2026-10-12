@@ -295,6 +295,7 @@ const EN_PATTERNS: [RegExp, (...groups: string[]) => string][] = [
   [/^Alcanzaste el máximo de (\d+) campos personalizados$/, (max) => `You reached the maximum of ${max} custom fields`],
   [/^El valor de «(.+)» no es válido$/, (label) => `The value of "${label}" isn't valid`],
   [/^Parámetros del template no válidos: (.+)$/, (details) => `Invalid template parameters: ${details}`],
+  [/^Tu plan incluye (\d+) agentes? IA activos?; apaga uno o mejora tu plan$/, (n) => `Your plan includes ${n} active AI ${n === "1" ? "agent" : "agents"}; turn one off or upgrade your plan`],
   [/^La versión (.+) ya existe$/, (version) => `Version ${version} already exists`],
   [/^No hay un precio de Stripe configurado para el plan (.+)$/, (plan) => `There's no Stripe price configured for the ${plan} plan`],
   [/^Tu organización no tiene el módulo "(.+)" habilitado\.$/, (module) => `Your organization doesn't have the "${module}" module enabled.`],

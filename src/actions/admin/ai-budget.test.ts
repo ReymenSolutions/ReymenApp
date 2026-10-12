@@ -9,7 +9,7 @@ vi.mock("@/lib/email", () => ({ sendEmail: vi.fn().mockResolvedValue({ sent: tru
 const authMock = vi.fn();
 vi.mock("@/lib/auth", () => ({ auth: () => authMock(), isAdmin: (role: string) => role === "SUPER_ADMIN" || role === "ADMIN" }));
 
-const { getOrgAiBudget, extendOrgAiBudget, resetOrgAiBudget, creditOrgAiBudget, setOrgAiBudget, setOrgAiBudgetPolicy } = await import("./ai-budget");
+const { getOrgAiBudget, extendOrgAiBudget, resetOrgAiBudget, creditOrgAiBudget, setOrgAiBudget, setOrgAiBudgetPolicy, setOrgAgentsCap } = await import("./ai-budget");
 
 describe("presupuesto de IA por cliente (acciones de admin, auditadas)", () => {
   let org: { id: string };
@@ -68,5 +68,18 @@ describe("presupuesto de IA por cliente (acciones de admin, auditadas)", () => {
     expect(out.state).toMatchObject({ policy: "DEGRADE", degradeCapMxn: 10, fallback: { provider: "anthropic", model: "eco-model" } });
     expect(await prisma.aiBudgetSetting.findUnique({ where: { organizationId: org.id } })).toMatchObject({ policyAuthorizedById: "admin1" });
     expect((await setOrgAiBudgetPolicy({ orgId: org.id, policy: "BLOCK" })).state.policy).toBe("BLOCK");
+  });
+
+  it("el tope de agentes IA pactado: solo admin, auditado, y nunca apaga canales", async () => {
+    authMock.mockResolvedValue(fakeSession({ id: "u1", role: "OWNER", organizationId: org.id }));
+    await expect(setOrgAgentsCap({ orgId: org.id, cap: 9, reason: "quiero más" })).rejects.toThrow(/autorizado/i);
+    admin();
+    await prisma.agentChannelSetting.createMany({ data: [{ organizationId: org.id, channel: "whatsapp", mode: "SUGGEST" }, { organizationId: org.id, channel: "instagram", mode: "SUGGEST" }] });
+    await expect(setOrgAgentsCap({ orgId: org.id, cap: 1, reason: "x" })).rejects.toThrow();
+    const out = await setOrgAgentsCap({ orgId: org.id, cap: 1, reason: "pacto Custom" });
+    expect(out.agentCap).toMatchObject({ cap: 1, source: "override", overBy: expect.any(Number) });
+    expect(await prisma.agentChannelSetting.count({ where: { organizationId: org.id, mode: { not: "OFF" } } })).toBeGreaterThanOrEqual(2);
+    expect(await prisma.auditLog.count({ where: { organizationId: org.id, action: "ai.agents_cap" } })).toBe(1);
+    expect((await setOrgAgentsCap({ orgId: org.id, cap: null, reason: "vuelve al plan" })).agentCap.source).toBe("plan");
   });
 });

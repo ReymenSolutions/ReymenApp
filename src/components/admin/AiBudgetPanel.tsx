@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { creditOrgAiBudget, extendOrgAiBudget, resetOrgAiBudget, setOrgAiBudget, setOrgAiBudgetPolicy, type OrgAiBudgetView } from "@/actions/admin/ai-budget";
+import { creditOrgAiBudget, extendOrgAiBudget, resetOrgAiBudget, setOrgAiBudget, setOrgAiBudgetPolicy, setOrgAgentsCap, type OrgAiBudgetView } from "@/actions/admin/ai-budget";
 import { usePreferences } from "@/context/preferences";
 import { getErrorMessage } from "@/lib/user-error";
 import { formatDateTime, formatMoney } from "@/lib/utils";
@@ -26,7 +26,9 @@ export function AiBudgetPanel({ orgId, view, providers }: { orgId: string; view:
   const [reason, setReason] = useState("");
   const [monthly, setMonthly] = useState(view.state.source === "setting" ? String(view.state.baseMxn) : "");
   const [policy, setPolicy] = useState({ policy: view.state.policy as "BLOCK" | "DEGRADE", provider: view.state.fallback?.provider ?? providers[0] ?? "anthropic", model: view.state.fallback?.model ?? "", cap: view.state.degradeCapMxn ? String(view.state.degradeCapMxn) : "" });
+  const [capText, setCapText] = useState(view.agentCap.source === "override" && view.agentCap.cap !== null ? String(view.agentCap.cap) : "");
   const s = view.state;
+  const ac = view.agentCap;
 
   const run = (fn: () => Promise<unknown>, ok: string) =>
     start(async () => {
@@ -73,6 +75,10 @@ export function AiBudgetPanel({ orgId, view, providers }: { orgId: string; view:
 
         <div>
           <h4 className="mb-2 text-sm font-semibold text-slate-900">{es ? "Agentes" : "Agents"}</h4>
+          <p className={`mb-2 text-xs ${ac.overBy > 0 ? "font-medium text-amber-700" : "text-slate-500"}`}>
+            {es ? "Agentes IA activos" : "Active AI agents"}: {ac.active} / {ac.cap === null ? (es ? "sin tope" : "no cap") : ac.cap} ({ac.source === "override" ? (es ? "tope pactado con el cliente" : "cap agreed with the client") : es ? "tope de su plan" : "its plan's cap"})
+            {ac.overBy > 0 && ` · ${es ? `por encima del tope (+${ac.overBy}); conserva lo que tiene pero no puede activar más` : `over the cap (+${ac.overBy}); keeps what it has but cannot turn more on`}`}
+          </p>
           <ul className="divide-y divide-slate-100 rounded-lg border border-slate-100">
             {view.agents.map((a) => (
               <li key={a.agentKey} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
@@ -83,6 +89,16 @@ export function AiBudgetPanel({ orgId, view, providers }: { orgId: string; view:
               </li>
             ))}
           </ul>
+        </div>
+
+        <div className="space-y-2 rounded-lg border border-slate-100 p-3">
+          <h4 className="text-sm font-semibold text-slate-900">{es ? "Tope de agentes IA (excepción para este cliente)" : "AI agents cap (exception for this client)"}</h4>
+          <div className="flex flex-wrap gap-2">
+            <Input type="number" min="0" max="100" step="1" className="w-40" placeholder={es ? "Vacío = el de su plan" : "Empty = its plan's"} value={capText} onChange={(e) => setCapText(e.target.value)} aria-label={es ? "Tope de agentes IA" : "AI agents cap"} />
+            <Input className="min-w-[12rem] flex-1" placeholder={es ? "Motivo (queda en la bitácora)" : "Reason (goes to the audit log)"} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} aria-label={es ? "Motivo" : "Reason"} />
+            <Button size="sm" disabled={pending || reason.trim().length < 5} onClick={() => run(() => setOrgAgentsCap({ orgId, cap: capText.trim() === "" ? null : Number(capText), reason }), es ? "Tope guardado" : "Cap saved")}>{es ? "Guardar tope" : "Save cap"}</Button>
+          </div>
+          <p className="text-xs text-slate-500">{es ? "Reemplaza el tope del plan solo para este cliente. Nunca apaga agentes: si queda por debajo de los activos, conserva lo que tiene pero no puede activar más." : "Replaces the plan's cap for this client only. It never turns agents off: if it ends below the active ones, the client keeps what it has but cannot turn more on."}</p>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
