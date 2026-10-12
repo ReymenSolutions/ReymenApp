@@ -105,7 +105,7 @@ export async function getOrganizationExecutions(input: ExecutionFilters): Promis
 
   const rows: ExecutionRow[] = list.map((e) => {
     const customer = e.subjectType === "customer" ? customerById.get(e.subjectId) ?? null : null;
-    const subjectLabel = e.subjectType === "customer" ? (customer ? `${customer.name ?? "Cliente sin nombre"} · ${customer.phone}` : "Cliente eliminado") : e.subjectType === "inventory_item" ? itemById.get(e.subjectId) ?? "Insumo" : e.subjectType === "report" ? `Reporte ${e.subjectId}` : e.subjectId;
+    const subjectLabel = e.subjectType === "customer" ? (customer ? `${customer.name ?? "Cliente sin nombre"} · ${customer.phone}` : "Cliente eliminado") : e.subjectType === "inventory_item" ? itemById.get(e.subjectId) ?? "Insumo" : e.subjectType === "report" ? `Reporte ${e.subjectId}` : e.subjectType === "feedback" ? "Opinión de un cliente" : e.subjectId;
     const conv = rowConversions.find((c) => c.executionId === e.id);
     return {
       id: e.id,

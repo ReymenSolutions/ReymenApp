@@ -3,6 +3,7 @@ import type { ZodType, ZodTypeDef } from "zod";
 import type { StoredDomainEvent } from "@/lib/domain-events";
 import type { DailyReport } from "./report";
 import type { ConfigUi } from "./config-ui";
+import type { NotifyContent, NotifyRecipient } from "./notify";
 
 export type MessageChannel = "whatsapp" | "sms";
 
@@ -10,9 +11,9 @@ export type MessageChannel = "whatsapp" | "sms";
 export type ActionSpec =
   | { type: "message"; channel: MessageChannel; templateKey: string; variables: Record<string, string> }
   /** Aviso interno para el equipo (campana del portal): no contacta a ningún cliente. */
-  | { type: "alert"; severity: "warning" | "critical"; title: string; body: string; href: string }
+  | { type: "alert"; severity: "warning" | "critical"; title: string; body: string; href: string; recipients?: NotifyRecipient[]; content?: NotifyContent }
   /** Reporte periódico para dueños y gerentes (correo + actividad del portal). */
-  | { type: "report"; title: string; date: string; report: DailyReport };
+  | { type: "report"; title: string; date: string; report: DailyReport; recipients?: NotifyRecipient[]; content?: NotifyContent };
 
 export type BlueprintContext = {
   organization: { id: string; name: string; timezone: string };
@@ -49,7 +50,7 @@ export type Blueprint<C = Record<string, unknown>> = {
   configSchema: ZodType<C, ZodTypeDef, unknown>;
   defaultConfig: C;
   /** Coherencia entre parámetros (p. ej. "desde" < "hasta"): devuelve la llave con el problema, o null si está bien. */
-  crossCheck?: (config: C) => { key: string; code: "must_be_less"; other: string } | null;
+  crossCheck?: (config: C) => { key: string; code: "must_be_less"; other: string } | { key: string; code: "required" } | null;
   /** Cómo se presenta cada parámetro en el Admin (título, ayuda, sección, unidad). Uno por cada llave de `configSchema`. */
   configUi: ConfigUi<C>;
   /** Función pura: decide, a partir del evento y el contexto, si actuar y con qué. */

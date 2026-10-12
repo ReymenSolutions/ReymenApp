@@ -36,6 +36,7 @@ const COPY = {
       too_small: (min?: number) => `Mínimo ${min}`,
       too_big: (max?: number) => `Máximo ${max}`,
       must_be_less: (other: string) => `Debe ser menor que «${other}»`,
+      required: "Obligatorio con este canal",
     },
     none: "Sin definir",
   },
@@ -62,6 +63,7 @@ const COPY = {
       too_small: (min?: number) => `Minimum ${min}`,
       too_big: (max?: number) => `Maximum ${max}`,
       must_be_less: (other: string) => `Must be less than “${other}”`,
+      required: "Required with this channel",
     },
     none: "Not set",
   },
@@ -140,6 +142,7 @@ export function BlueprintConfigDialog({ orgId, blueprintKey, onClose }: { orgId:
     if (!e) return null;
     if (e.code === "too_small") return t.errors.too_small(e.min);
     if (e.code === "too_big") return t.errors.too_big(e.max);
+    if (e.code === "required") return t.errors.required;
     if (e.code === "must_be_less") return t.errors.must_be_less(form?.fields.find((x) => x.key === e.other)?.label[lang] ?? e.other ?? "");
     return t.errors[e.code];
   };
@@ -215,6 +218,8 @@ export function BlueprintConfigDialog({ orgId, blueprintKey, onClose }: { orgId:
                                   </option>
                                 ))}
                               </select>
+                            ) : f.kind === "phone" ? (
+                              <Input id={id} type="tel" inputMode="tel" placeholder="+5215512345678" value={String(value ?? "")} onChange={(e) => set(f.key, e.target.value)} aria-invalid={!!err} />
                             ) : f.kind === "url" ? (
                               <Input id={id} type="url" inputMode="url" placeholder="https://…" value={String(value ?? "")} onChange={(e) => set(f.key, e.target.value)} aria-invalid={!!err} />
                             ) : (

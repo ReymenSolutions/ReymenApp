@@ -1,9 +1,14 @@
 import { z } from "zod";
 import type { Blueprint } from "../types";
-import { COMMON, UNIT } from "../config-ui";
+import { COMMON, UNIT, NOTIFY_FIELDS } from "../config-ui";
+import { E164, NOTIFY_MODES } from "../notify";
 import type { StockLevel } from "@/lib/food-inventory";
 
 const configSchema = z.object({
+  /** Además de la campana del portal: correo y/o WhatsApp (vía n8n). */
+  notify: z.enum(NOTIFY_MODES).default("app"),
+  /** WhatsApp del responsable (+código de país). */
+  whatsappTo: z.string().regex(E164).optional().or(z.literal("")),
   /** "low" avisa desde que baja del mínimo; "critical" solo cuando está agotado o casi. */
   minLevel: z.enum(["low", "critical"]).default("low"),
 });
@@ -26,7 +31,10 @@ export const inventoryLowAlert: Blueprint<Config> = {
   status: "active",
   configSchema,
   defaultConfig: configSchema.parse({}),
+  crossCheck: (c) => (c.notify.includes("whatsapp") && !c.whatsappTo ? { key: "whatsappTo", code: "required" as const } : null),
   configUi: {
+    notify: NOTIFY_FIELDS.notify,
+    whatsappTo: NOTIFY_FIELDS.whatsappTo,
     minLevel: { group: "when", kind: "select", label: { es: "Avisar desde el nivel", en: "Alert from level" }, help: { es: "\"Bajo\" avisa en cuanto un insumo baja de su mínimo; \"Crítico\" solo cuando está agotado o casi.", en: "\"Low\" alerts as soon as a supply drops below its minimum; \"Critical\" only when it is out or nearly out." }, options: { low: { es: "Bajo (por debajo del mínimo)", en: "Low (below minimum)" }, critical: { es: "Crítico (agotado o casi)", en: "Critical (out or nearly out)" } } },
   },
   decide: (event, _ctx, config) => {

@@ -38,7 +38,7 @@ export async function GET() {
     // Avisos internos de las automatizaciones (p. ej. insumo bajo el mínimo). Las pruebas (dry-run) no avisan.
     isPortal
       ? prisma.automationExecution.findMany({
-          where: { organizationId: session.user.organizationId!, status: "SUCCEEDED", createdAt: { gte: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) }, OR: [{ action: { path: ["type"], equals: "alert" } }, { action: { path: ["type"], equals: "report" } }] },
+          where: { organizationId: session.user.organizationId!, status: { in: ["SUCCEEDED", "PENDING", "DISPATCHED", "FAILED"] }, createdAt: { gte: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) }, OR: [{ action: { path: ["type"], equals: "alert" } }, { action: { path: ["type"], equals: "report" } }] },
           take: 5,
           orderBy: { createdAt: "desc" },
           select: { action: true, createdAt: true },
