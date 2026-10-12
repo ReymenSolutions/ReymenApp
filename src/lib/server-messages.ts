@@ -27,6 +27,7 @@ const EN: Record<string, string> = {
   "Categoría no encontrada": "Category not found",
   "Cita no encontrada": "Appointment not found",
   "Cliente no encontrado": "Client not found",
+  "Revisa los datos de la tarifa": "Check the rate details",
   "Esta automatización no tiene parámetros configurables": "This automation has no configurable parameters",
   "Los parámetros del template no son válidos": "The template parameters are not valid",
   "Fecha de cumpleaños no válida": "Invalid birthday date",

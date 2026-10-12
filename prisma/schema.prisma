@@ -95,6 +95,7 @@ model Organization {
   automationTouches       AutomationTouch[]
   automationConversions   AutomationConversion[]
   replyDrafts             ReplyDraft[]
+  aiUsages                AiUsage[]
   branches                Branch[]
   branchDishes            BranchDish[]
   branchVariantPrices     BranchVariantPrice[]
@@ -2212,4 +2213,96 @@ model AutomationConversion {
   @@unique([organizationId, saleId])
   @@index([automationId, saleAt])
   @@index([organizationId, saleAt])
+}
+
+// ─── IA y CONSUMO: tarifas y ledger de uso ───────────────────────────────────
+
+enum AiUsageStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUSED
+}
+
+/// Con qué certeza se conoce el costo: NO_RATE = no había tarifa vigente (no se inventa un costo);
+/// ESTIMATED = tokens reportados por el proveedor × tarifa vigente; CONFIRMED = conciliado contra la factura del proveedor (P2).
+enum AiCostBasis {
+  NO_RATE
+  ESTIMATED
+  CONFIRMED
+}
+
+/// Tarifa de un modelo (global, no es de ningún tenant). Inmutable: un cambio de precio es una fila nueva con otra
+/// vigencia, así los registros de uso viejos siguen apuntando a la tarifa con la que se calcularon.
+model AiRate {
+  id                String   @id @default(cuid())
+  provider          String
+  model             String
+  currency          String   @default("USD")
+  // Precio por millón de tokens. Caché y razonamiento son opcionales: null = se cobra como entrada / salida.
+  inputPerMTok      Decimal  @db.Decimal(14, 6)
+  outputPerMTok     Decimal  @db.Decimal(14, 6)
+  cacheReadPerMTok  Decimal? @db.Decimal(14, 6)
+  cacheWritePerMTok Decimal? @db.Decimal(14, 6)
+  reasoningPerMTok  Decimal? @db.Decimal(14, 6)
+  effectiveFrom     DateTime
+  // De dónde sale la tarifa (p. ej. la página de precios del proveedor y la fecha en que se consultó).
+  source            String
+  createdById       String?
+  createdAt         DateTime @default(now())
+
+  usages AiUsage[]
+
+  @@index([provider, model, effectiveFrom])
+}
+
+/// Contabilidad de uso de IA: una fila por llamada lógica al modelo, siempre de UN tenant. No guarda prompts, respuestas
+/// ni datos personales: solo quién, para qué, qué modelo, cuántos tokens y cuánto costó. `requestId` hace idempotente el registro.
+model AiUsage {
+  id               String        @id @default(cuid())
+  organizationId   String
+  agentKey         String? // inbox:<canal> | pipeline | probador
+  conversationId   String?
+  automationId     String?
+  executionId      String?
+  operation        String // draft | auto_reply | pipeline | probe
+  origin           String // whatsapp | instagram | crm | pipeline | web | automation | admin …
+  provider         String
+  model            String
+  modelServed      String? // el que reporta la respuesta (puede traer fecha de versión)
+  requestId        String
+  traceId          String?
+  correlationId    String?
+  externalId       String? // id de la respuesta del proveedor
+  status           AiUsageStatus @default(PENDING)
+  attempts         Int           @default(1)
+  inputTokens      Int           @default(0)
+  outputTokens     Int           @default(0)
+  cacheReadTokens  Int           @default(0)
+  cacheWriteTokens Int           @default(0)
+  reasoningTokens  Int           @default(0)
+  costBasis        AiCostBasis   @default(NO_RATE)
+  rateId           String?
+  costOriginal     Decimal?      @db.Decimal(18, 8)
+  currencyOriginal String?
+  costMxn          Decimal?      @db.Decimal(18, 8)
+  fxRate           Decimal?      @db.Decimal(12, 6)
+  fxDate           String?
+  fxSource         String?
+  // Credenciales propias del cliente (BYOK) o de Reymen.
+  byok             Boolean       @default(false)
+  errorCode        String?
+  latencyMs        Int?
+  createdAt        DateTime      @default(now())
+  completedAt      DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  rate         AiRate?      @relation(fields: [rateId], references: [id])
+
+  @@unique([organizationId, requestId])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, agentKey, createdAt])
+  @@index([organizationId, conversationId])
+  @@index([createdAt])
+  @@index([provider, model, createdAt])
 }

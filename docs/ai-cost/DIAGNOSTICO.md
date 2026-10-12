@@ -1,5 +1,7 @@
 # IA y Consumo — diagnóstico de arquitectura y plan P0/P1/P2
 
+> **Estado:** P0 implementado (ledger, tarifas, gateway que mide, Admin → IA y Consumo). Decisiones de §5 confirmadas por el usuario. Ver §6.
+
 Estado al 2026-10-12. Solo lectura del repositorio; nada de esto está implementado todavía.
 
 ## 1. Qué existe hoy (y se reutiliza)
@@ -35,7 +37,7 @@ Estado al 2026-10-12. Solo lectura del repositorio; nada de esto está implement
 Dependencias en orden:
 1. **Modelo de datos y migraciones** (incrementales): `AiRate` (tarifas), `AiUsage` (ledger), `AiBudgetReservation`. Sin tocar tablas existentes salvo ancla de ciclo.
 2. **Cálculo de costos** (puro, con `Decimal`): tokens de entrada, salida, caché lectura/escritura, razonamiento → costo en moneda original → MXN con tipo de cambio y fecha guardados; costo **estimado** vs **confirmado**.
-3. **Gateway v0** sobre `generateText`: registra cada llamada (idempotente por `requestId`, reintentos sin duplicar, errores y llamadas parciales); agrupa por conversación/automatización/agente. Todavía **no bloquea**: solo mide y reserva.
+3. **Gateway v0** sobre `generateText`: registra cada llamada (idempotente por `requestId`, reintentos sin duplicar, errores y llamadas parciales); agrupa por conversación/automatización/agente. Todavía **no bloquea ni reserva**: solo mide (las reservas de presupuesto llegan con los presupuestos, en P1).
 4. **Instrumentación** de los 4 llamadores (borradores, automático, pipeline, probador) para pasar `tenantId`, `agentKey`, `conversationId`, origen.
 5. **Admin → IA y Consumo (básico)**: resumen global, por tenant, por agente/modelo, historial, filtros, CSV; solo datos reales.
 6. **Pruebas**: exactitud decimal, aislamiento entre tenants, idempotencia, concurrencia, reintentos.
@@ -66,3 +68,13 @@ BYOK empresarial (credenciales aisladas y cifradas), routing de modelos, optimiz
 2. Nombres: usamos `starter` / `professional` / `enterprise` con los precios 999 / 1,999 / 3,999 (ya aplicado).
 3. Comportamiento por defecto al 100 %: propuesta = el agente pasa de Automático a **Sugerir** (la persona sigue respondiendo), se bloquean llamadas no esenciales del pipeline y se avisa al admin; CRM/POS siguen normales.
 4. Ciclo de facturación: ¿mensual desde la fecha de alta del cliente (propuesta) o desde la fecha de suscripción de Stripe cuando exista?
+
+## 6. Implementación del P0 (hecho)
+
+- **Datos:** `AiRate` (tarifas inmutables y versionadas), `AiUsage` (ledger por tenant, único por `organizationId + requestId`). Migración `20261104090000_ai_usage_ledger`.
+- **Gateway** (`src/lib/ai/gateway.ts`): `runAiCall` registra PENDING → SUCCEEDED/FAILED/REFUSED con tokens (entrada, salida, caché lectura/escritura, razonamiento), tarifa usada, tipo de cambio y fecha, costo original y en MXN. Sin tarifa vigente el costo queda **"sin tarifa"** (nunca inventado). Misma llamada lógica = no se vuelve a llamar ni a cobrar. No guarda prompts ni respuestas.
+- **Proveedores** (`src/lib/ai/providers`): Anthropic (el existente, movido) y OpenAI (por `fetch`; **probado solo con respuestas simuladas, no contra la API real**). `AI_PROVIDER` elige; `AI_OPENAI_MODEL` y `OPENAI_API_KEY` para OpenAI.
+- **Instrumentación:** borradores, modo Automático, pipeline con IA y Probador pasan por el gateway con tenant, agente (`inbox:<canal>` | `pipeline` | `probador`), conversación y origen.
+- **Admin → IA y Consumo** (`/admin/ai`): costo MXN/USD, llamadas, costo por conversación, tokens, evolución diaria/semanal/mensual, consumo por cliente/agente/modelo, historial, carga de tarifas, CSV; filtros por cliente, agente, modelo, proveedor, periodo y operación. Solo admin.
+- **Pendiente de P0:** cargar las tarifas reales desde Admin (con su fuente y vigencia) para que aparezcan costos; sin ellas se ven tokens y "sin tarifa".
+- **Aún NO hecho (P1):** presupuestos por plan, alertas 50/75/90/100 %, reservas, políticas de uso justo, portal "Mi consumo de IA", detalle de costos en el tenant, recargas, gateway para n8n/POS.
