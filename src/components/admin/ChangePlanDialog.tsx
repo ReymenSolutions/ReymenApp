@@ -8,7 +8,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
 import { changePlan } from "@/actions/admin/clients";
-import { PLAN_LIMITS, PLAN_MODULES, PLAN_PRICES, hasCustomPrice, isUnlimited } from "@/lib/permissions";
+import { PLAN_LIMITS, PLAN_MODULES, PLAN_PRICES_MXN, isUnlimited } from "@/lib/permissions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getModuleLabel } from "@/lib/modules";
@@ -18,7 +18,7 @@ import { getErrorMessage } from "@/lib/user-error";
 interface ChangePlanDialogProps {
   orgId: string;
   currentPlan: string;
-  /** Precio pactado actual (USD/mes) si el plan es personalizado. */
+  /** Precio pactado actual (MXN/mes), o null si paga el precio de lista del plan. */
   currentCustomPrice: number | null;
 }
 
@@ -46,17 +46,16 @@ export function ChangePlanDialog({ orgId, currentPlan, currentCustomPrice }: Cha
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(currentPlan);
   const [customPrice, setCustomPrice] = useState(currentCustomPrice !== null ? String(currentCustomPrice) : "");
-  const needsCustomPrice = hasCustomPrice(selected);
   const parsedCustomPrice = customPrice.trim() === "" ? null : Number(customPrice);
-  const customPriceInvalid = needsCustomPrice && parsedCustomPrice !== null && !(Number.isFinite(parsedCustomPrice) && parsedCustomPrice > 0);
-  const unchanged = selected === currentPlan && (!needsCustomPrice || parsedCustomPrice === currentCustomPrice);
+  const customPriceInvalid = parsedCustomPrice !== null && !(Number.isFinite(parsedCustomPrice) && parsedCustomPrice > 0);
+  const unchanged = selected === currentPlan && parsedCustomPrice === currentCustomPrice;
   const [loading, setLoading] = useState(false);
 
   async function handleSave() {
     if (unchanged) { setOpen(false); return; }
     setLoading(true);
     try {
-      await changePlan(orgId, selected, needsCustomPrice ? parsedCustomPrice : null);
+      await changePlan(orgId, selected, parsedCustomPrice);
       toast.success(lang === "es" ? `Plan actualizado a ${PLAN_LIMITS[selected]?.label ?? selected}` : `Plan updated to ${PLAN_LIMITS[selected]?.label ?? selected}`);
       setOpen(false);
     } catch (e) {
@@ -83,11 +82,8 @@ export function ChangePlanDialog({ orgId, currentPlan, currentCustomPrice }: Cha
           {PLANS.map((plan) => {
             const limits = PLAN_LIMITS[plan.key];
             const isSelected = selected === plan.key;
-            // Mismo precio que usa el ROI (PLAN_PRICES), no una copia propia.
-            const fixedPrice = PLAN_PRICES[plan.key];
-            const price = fixedPrice === null || fixedPrice === undefined
-              ? (lang === "es" ? "Precio personalizado" : "Custom price")
-              : `$${fixedPrice.toLocaleString("en-US")} USD/${lang === "es" ? "mes" : "mo"}`;
+            // Mismo precio que usa el ROI (PLAN_PRICES_MXN), no una copia propia.
+            const price = `$${PLAN_PRICES_MXN[plan.key].toLocaleString("en-US")} MXN/${lang === "es" ? "mes" : "mo"}`;
             return (
               <button
                 key={plan.key}
@@ -118,25 +114,23 @@ export function ChangePlanDialog({ orgId, currentPlan, currentCustomPrice }: Cha
           })}
         </div>
 
-        {needsCustomPrice && (
-          <div className="space-y-1.5">
-            <Label htmlFor="customPrice">{lang === "es" ? "Precio mensual pactado (USD)" : "Agreed monthly price (USD)"}</Label>
+        <div className="space-y-1.5">
+            <Label htmlFor="customPrice">{lang === "es" ? "Precio mensual pactado (MXN, opcional)" : "Agreed monthly price (MXN, optional)"}</Label>
             <Input
               id="customPrice"
               type="number"
               min="0"
               step="0.01"
-              placeholder={lang === "es" ? "Ej. 1500" : "E.g. 1500"}
+              placeholder={lang === "es" ? "Ej. 2500" : "E.g. 2500"}
               value={customPrice}
               onChange={(e) => setCustomPrice(e.target.value)}
             />
             <p className="text-xs text-slate-500">
               {customPriceInvalid
                 ? (lang === "es" ? "Debe ser un monto mayor a 0." : "Must be an amount greater than 0.")
-                : (lang === "es" ? "Se usa para el ROI del cliente. Puedes dejarlo vacío mientras se cierra la cotización." : "Used for the client's ROI. You can leave it empty while the quote is being closed.")}
+                : (lang === "es" ? "Plan personalizado de este cliente. Vacío = precio de lista del plan. Se usa para el ROI." : "This client's custom plan. Empty = the plan's list price. Used for the ROI.")}
             </p>
-          </div>
-        )}
+        </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>{lang === "es" ? "Cancelar" : "Cancel"}</Button>

@@ -12,6 +12,8 @@ describe("getRoiData", () => {
   // como respaldo, salvo en la prueba que simula la fuente automática.
   beforeEach(() => {
     resetExchangeRateCache();
+    // Los precios de plan son en MXN y el ROI los convierte a USD: tipo de cambio fijo para que las cuentas sean exactas.
+    vi.stubEnv("MXN_PER_USD", "20");
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
   });
 
@@ -101,14 +103,17 @@ describe("getRoiData", () => {
     });
 
     const data = await getRoiData(org.id, "professional");
-    expect(data.planCost).toBe(699);
-    expect(data.roi).toBe(Math.round(((1000 - 699) / 699) * 100));
+    // $1,999 MXN a 20 pesos por dólar.
+    expect(data.planCostMxn).toBe(1999);
+    expect(data.planCost).toBe(99.95);
+    expect(data.roi).toBe(Math.round(((1000 - 99.95) / 99.95) * 100));
   });
 
   it("falls back to the starter price for an unknown plan value", async () => {
     org = await createTestOrg("Roi Unknown Plan Org");
     const data = await getRoiData(org.id, "not-a-real-plan");
-    expect(data.planCost).toBe(299);
+    expect(data.planCostMxn).toBe(999);
+    expect(data.planCost).toBe(49.95);
   });
   it("converts MXN opportunities to USD with the MXN_PER_USD fallback when the automatic source is down", async () => {
     vi.stubEnv("MXN_PER_USD", "20");
@@ -130,7 +135,7 @@ describe("getRoiData", () => {
     expect(data.totalWonOpportunities).toBe(2);
     expect(data.mxnPerUsd).toBe(20);
     expect(data.unconvertedOpportunities).toBe(0);
-    expect(data.roi).toBe(Math.round(((1500 - 299) / 299) * 100));
+    expect(data.roi).toBe(Math.round(((1500 - 49.95) / 49.95) * 100));
   });
 
   it("leaves MXN opportunities out of the totals, and reports them, when no exchange rate is available", async () => {
@@ -184,12 +189,15 @@ describe("getRoiData", () => {
       data: { organizationId: org.id, leadId: lead.id, pipelineStageId: wonStage.id, title: "Win", amount: 3000, currency: "USD", closedAt: new Date() },
     });
 
+    // Sin precio pactado paga el de lista del plan ($3,999 MXN = $200 USD a 20 pesos por dólar).
     let data = await getRoiData(org.id, "enterprise");
-    expect(data.planCost).toBeNull();
-    expect(data.roi).toBeNull();
+    expect(data.planCostMxn).toBe(3999);
+    expect(data.planCost).toBe(199.95);
 
-    await prisma.organization.update({ where: { id: org.id }, data: { customMonthlyPriceUsd: 1500 } });
+    // Con precio pactado en MXN (plan personalizado de este cliente) se usa ese.
+    await prisma.organization.update({ where: { id: org.id }, data: { customMonthlyPriceMxn: 30000 } });
     data = await getRoiData(org.id, "enterprise");
+    expect(data.planCostMxn).toBe(30000);
     expect(data.planCost).toBe(1500);
     expect(data.roi).toBe(100);
   });

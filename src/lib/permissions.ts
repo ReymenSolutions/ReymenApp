@@ -102,25 +102,19 @@ export const PLAN_LIMITS: Record<string, { leads: number; users: number; automat
   enterprise:   { leads: UNLIMITED, users: UNLIMITED, automations: UNLIMITED, label: "Enterprise" },
 };
 
-// Monthly subscription cost per plan, in USD. The single source of truth for
-// what a client actually pays — used anywhere real cost needs to be compared
-// against real revenue (e.g. ROI reporting), instead of each caller hardcoding
-// its own price table. null = precio personalizado por cliente: el monto real
-// vive en Organization.customMonthlyPriceUsd (lo captura un admin).
-export const PLAN_PRICES: Record<string, number | null> = {
-  starter: 299,
-  professional: 699,
-  enterprise: null,
+// Precio mensual de lista por plan, en MXN: la fuente única de lo que paga un cliente (ROI y facturación lo leen de
+// aquí en lugar de repetir su propia tabla). Un cliente puede tener un precio pactado distinto
+// (Organization.customMonthlyPriceMxn), que reemplaza al de lista sin tocar el catálogo general.
+export const PLAN_PRICES_MXN: Record<string, number> = {
+  starter: 999,
+  professional: 1999,
+  enterprise: 3999,
 };
 
-export function hasCustomPrice(plan: string): boolean {
-  return PLAN_PRICES[plan] === null;
-}
-
-/** Precio mensual en USD de una organización, o null si su plan es personalizado y aún no tiene precio pactado. */
-export function getMonthlyPlanPrice(plan: string, customMonthlyPriceUsd: number | null): number | null {
-  if (!(plan in PLAN_PRICES)) return PLAN_PRICES.starter;
-  return hasCustomPrice(plan) ? customMonthlyPriceUsd : PLAN_PRICES[plan];
+/** Precio mensual en MXN de una organización: el pactado si lo hay, si no el de lista de su plan (plan desconocido = Starter). */
+export function getMonthlyPlanPriceMxn(plan: string, customMonthlyPriceMxn: number | null): number {
+  if (customMonthlyPriceMxn !== null && customMonthlyPriceMxn > 0) return customMonthlyPriceMxn;
+  return PLAN_PRICES_MXN[plan] ?? PLAN_PRICES_MXN.starter;
 }
 
 // Which PlatformModules each plan tier commercially includes — a catalog

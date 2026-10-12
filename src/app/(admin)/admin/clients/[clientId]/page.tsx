@@ -6,7 +6,7 @@ import { getRulebook, rulebookProgress } from "@/lib/rulebook";
 import { getServerT } from "@/lib/i18n-server";
 import { getEnabledModules } from "@/lib/modules";
 import { METRIC_KEYS, monthPeriod } from "@/lib/metrics";
-import { PLAN_LIMITS, PLAN_MODULES, isUnlimited } from "@/lib/permissions";
+import { PLAN_LIMITS, PLAN_MODULES, getMonthlyPlanPriceMxn, isUnlimited } from "@/lib/permissions";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -137,7 +137,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
 
       <PageHeader
         title={client.name}
-        description={`${client.slug} · ${client.industry ?? t.adminNoIndustry}`}
+        description={`${client.slug} · ${client.industry ?? t.adminNoIndustry} · ${planInfo.label} $${getMonthlyPlanPriceMxn(client.plan, client.customMonthlyPriceMxn !== null ? Number(client.customMonthlyPriceMxn) : null).toLocaleString("en-US")} MXN`}
         actions={
           <div className="flex items-center gap-2">
             <OrgWebhookInfoDialog
@@ -149,7 +149,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
             <ChangePlanDialog
               orgId={client.id}
               currentPlan={client.plan}
-              currentCustomPrice={client.customMonthlyPriceUsd !== null ? Number(client.customMonthlyPriceUsd) : null}
+              currentCustomPrice={client.customMonthlyPriceMxn !== null ? Number(client.customMonthlyPriceMxn) : null}
             />
             <ToggleClientStatusButton orgId={client.id} isActive={client.isActive} />
             <Badge variant={client.isActive ? "success" : "destructive"}>

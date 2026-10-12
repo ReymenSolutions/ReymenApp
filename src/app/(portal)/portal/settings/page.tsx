@@ -14,7 +14,7 @@ import { BillingActions } from "@/components/portal/BillingActions";
 import { PipelineStagesPanel } from "@/components/portal/PipelineStagesPanel";
 import { formatDate } from "@/lib/utils";
 import { can } from "@/lib/permissions";
-import { PLAN_LIMITS, PLAN_MODULES, isUnlimited } from "@/lib/permissions";
+import { PLAN_LIMITS, PLAN_MODULES, getMonthlyPlanPriceMxn, isUnlimited } from "@/lib/permissions";
 import { getModuleLabel } from "@/lib/modules";
 import { isStripeConfigured } from "@/lib/stripe";
 import type { UserRole } from "@prisma/client";
@@ -92,6 +92,12 @@ export default async function PortalSettingsPage() {
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-500">{t.plan}</span>
               <Badge variant="secondary" className="capitalize text-sm px-3">{plan.label}</Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-500">{lang === "es" ? "Mensualidad" : "Monthly price"}</span>
+              <span className="text-sm font-medium text-slate-900">
+                ${getMonthlyPlanPriceMxn(org.plan, org.customMonthlyPriceMxn !== null ? Number(org.customMonthlyPriceMxn) : null).toLocaleString("en-US")} MXN/{lang === "es" ? "mes" : "mo"}
+              </span>
             </div>
             <div className="space-y-2">
               {[

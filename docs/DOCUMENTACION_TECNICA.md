@@ -3287,7 +3287,7 @@ checklist moved from "0 de 4" to "2 de 4" against the live database, not a mock.
 
 `/portal/reports` had a "Simulador de ROI" (`RoiCalculator.tsx`) that was pure guesswork: a free-text
 "average deal value" number input (defaulting to a made-up $5,000) multiplied by the count of leads
-in `Lead.status = WON`, compared against a plan-price table (`starter: 299, professional: 699,
+in `Lead.status = WON`, compared against a plan-price table (`PLAN_PRICES_MXN`: starter 999, professional 1999, enterprise 3999 MXN, historical: was starter: 299, professional: 699,
 enterprise: 1499`) that was hardcoded inside that one client component and nowhere else — so the
 "ROI" a client saw was never actually derived from money they'd recorded anywhere in the platform.
 
