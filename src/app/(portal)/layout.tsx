@@ -25,14 +25,14 @@ export default async function PortalLayout({ children }: { children: React.React
   const org = currentUser.organization;
   const enabledModules = await getEnabledModules(org.id);
 
-  // Conversations a human needs to look at: escalated, or already taken out
-  // of AI's hands but still open. Only queried when the module is enabled,
-  // so this never runs an extra query for orgs without WhatsApp/CRM AI.
-  const pendingConversations = enabledModules.includes("AI_WHATSAPP")
-    ? await prisma.conversation.count({
-        where: { organizationId: org.id, aiHandled: false, status: { in: ["OPEN", "ESCALATED"] } },
-      })
-    : 0;
+  // Inbox: clientes esperando respuesta (lo último lo dijo el cliente y la conversación sigue abierta).
+  // Solo se consulta si el negocio tiene CRM o WhatsApp AI, para no hacer una consulta de más al resto.
+  const pendingConversations =
+    enabledModules.includes("CRM") || enabledModules.includes("AI_WHATSAPP")
+      ? await prisma.conversation.count({
+          where: { organizationId: org.id, archivedAt: null, lastMessageRole: "USER", status: { in: ["OPEN", "ESCALATED"] } },
+        })
+      : 0;
 
   return (
     <PortalShell

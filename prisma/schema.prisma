@@ -470,23 +470,34 @@ enum EventStatus {
 // ─── CONVERSATIONS ────────────────────────────────────────────────
 
 model Conversation {
-  id             String             @id @default(cuid())
-  organizationId String
-  channel        String
-  contactPhone   String?
+  id                 String             @id @default(cuid())
+  organizationId     String
+  channel            String
+  contactPhone       String?
   // Misma llave que Lead.phoneKey, para encontrar la conversación aunque el
   // número llegue con otro formato.
-  phoneKey       String?
+  phoneKey           String?
   // Contacto del CRM con el que está enlazada (null si aún no hay uno).
-  leadId         String?
-  contactName    String?
-  status         ConversationStatus @default(OPEN)
-  aiHandled      Boolean            @default(true)
-  assignedToId   String?
-  escalatedAt    DateTime?
-  resolvedAt     DateTime?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  leadId             String?
+  contactName        String?
+  status             ConversationStatus @default(OPEN)
+  aiHandled          Boolean            @default(true)
+  assignedToId       String?
+  escalatedAt        DateTime?
+  resolvedAt         DateTime?
+  // Inbox unificado: identidad del contacto en canales sin teléfono (usuario de Instagram, id de
+  // Messenger, visitante del chat web) o con correo, y datos para listar sin abrir el hilo.
+  contactHandle      String?
+  contactEmail       String?
+  subject            String?
+  unreadCount        Int                @default(0)
+  lastMessageAt      DateTime           @default(now())
+  lastMessagePreview String?
+  lastMessageRole    MessageRole?
+  archivedAt         DateTime?
+  important          Boolean            @default(false)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id])
   assignedTo   User?        @relation("ConversationAssignee", fields: [assignedToId], references: [id])
@@ -498,6 +509,9 @@ model Conversation {
   @@index([leadId])
   @@index([organizationId, status])
   @@index([organizationId, assignedToId])
+  @@index([organizationId, channel, lastMessageAt])
+  @@index([organizationId, contactHandle])
+  @@index([organizationId, contactEmail])
 }
 
 enum ConversationStatus {

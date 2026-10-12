@@ -33,6 +33,7 @@ function useNavItems() {
     automations: t.automations,
     whatsapp: t.whatsapp,
     conversations: t.conversations,
+    inbox: t.inbox,
     knowledgeBase: t.knowledgeBase,
     prompts: t.prompts,
     aiLab: t.aiLab,
@@ -57,7 +58,7 @@ function useNavItems() {
 // sección sin entradas visibles (módulos no contratados) no se dibuja.
 type NavSectionKey = "main" | "business" | "customers" | "communication" | "results" | "account";
 
-const NAV_ITEMS: { href: string; key: keyof ReturnType<typeof useNavItems>; icon: React.ElementType; section: NavSectionKey; module?: PlatformModule; alsoActiveFor?: string[] }[] = [
+const NAV_ITEMS: { href: string; key: keyof ReturnType<typeof useNavItems>; icon: React.ElementType; section: NavSectionKey; module?: PlatformModule; /** Se muestra si está activo cualquiera de estos módulos. */ anyModule?: PlatformModule[]; alsoActiveFor?: string[] }[] = [
   { href: "/portal/home", key: "home", icon: Home, section: "main" },
 
   { href: "/portal/food", key: "food", icon: UtensilsCrossed, section: "business", module: "FOOD_OPS" },
@@ -69,7 +70,7 @@ const NAV_ITEMS: { href: string; key: keyof ReturnType<typeof useNavItems>; icon
   { href: "/portal/pipeline", key: "pipeline", icon: GitBranch, section: "customers", module: "CRM" },
   { href: "/portal/appointments", key: "appointments", icon: Calendar, section: "customers" },
 
-  { href: "/portal/conversations", key: "conversations", icon: MessageSquare, section: "communication", module: "AI_WHATSAPP" },
+  { href: "/portal/inbox", key: "inbox", icon: MessageSquare, section: "communication", anyModule: ["CRM", "AI_WHATSAPP"], alsoActiveFor: ["/portal/conversations"] },
   { href: "/portal/whatsapp", key: "whatsapp", icon: Bot, section: "communication", module: "AI_WHATSAPP", alsoActiveFor: ["/portal/knowledge-base", "/portal/prompts", "/portal/ai-lab"] },
   { href: "/portal/automations", key: "automations", icon: Zap, section: "communication", module: "AUTOMATIONS", alsoActiveFor: ["/portal/templates"] },
 
@@ -107,7 +108,7 @@ export function PortalSidebar({ orgName, orgLogoUrl: initialLogoUrl, enabledModu
   const pathname = usePathname();
   const { t, lang } = usePreferences();
   const labels = useNavItems();
-  const visibleNavItems = NAV_ITEMS.filter((item) => !item.module || enabledModules.includes(item.module));
+  const visibleNavItems = NAV_ITEMS.filter((item) => (!item.module || enabledModules.includes(item.module)) && (!item.anyModule || item.anyModule.some((m) => enabledModules.includes(m))));
 
   // Secciones cerradas por el usuario; se recuerdan en este navegador. Al
   // entrar a una pantalla, su sección se abre sola.
@@ -239,7 +240,7 @@ export function PortalSidebar({ orgName, orgLogoUrl: initialLogoUrl, enabledModu
                     >
                       <Icon className="h-4 w-4 flex-shrink-0" />
                       <span className="flex-1">{labels[item.key]}</span>
-                      {item.key === "conversations" && pendingConversations > 0 && (
+                      {item.key === "inbox" && pendingConversations > 0 && (
                         <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-semibold text-amber-950">
                           {pendingConversations > 99 ? "99+" : pendingConversations}
                         </span>
