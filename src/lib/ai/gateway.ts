@@ -4,12 +4,14 @@ import { prisma } from "@/lib/prisma";
 import { getMxnPerUsdRate } from "@/lib/exchange-rate";
 import { computeCost, toMxn } from "./cost";
 import { activeProviderName, getProvider } from "./providers";
+import { AiBudgetError, estimateCallCostMxn, getBudgetState, releaseReservation, reserveBudget, type Estimate } from "./budget";
+import { evaluateBudgetAlerts } from "./budget-alerts";
 import type { AiUsageContext, ChatTurn, NormalizedUsage, ProviderResult } from "./types";
 
 // ── Gateway de IA ────────────────────────────────────────────────────────────────────────────────────────────────
 // Toda llamada a un modelo pasa por aquí: se identifica el tenant, se elige proveedor/modelo, se llama y se registra el
-// uso (tokens, costo con la tarifa vigente, tipo de cambio) en el ledger por tenant. Fase P0: MIDE, no bloquea.
-// (Presupuestos, reservas y políticas de uso justo llegan en la fase P1, sobre este mismo punto.)
+// uso (tokens, costo con la tarifa vigente, tipo de cambio) en el ledger por tenant. Antes de llamar RESERVA presupuesto del
+// tenant (budget.ts): sin presupuesto (o sin forma de calcular el costo) la llamada NO se hace y queda registrada como BLOCKED.
 //
 // El ledger NO guarda prompts, respuestas ni datos personales.
 
@@ -103,16 +105,54 @@ export async function runAiCall(ctx: AiUsageContext, input: AiCallInput): Promis
     throw err;
   }
 
+  // Presupuesto: el peor costo posible de esta llamada se reserva ANTES de hacerla (con candado por tenant).
+  const now = new Date();
+  const block = async (code: "BUDGET_EXHAUSTED" | "NO_RATE" | "NO_FX"): Promise<never> => {
+    await prisma.aiUsage.update({ where: { id: usageId }, data: { status: "BLOCKED", errorCode: code, completedAt: new Date(), costBasis: "NO_RATE" } });
+    if (code === "BUDGET_EXHAUSTED") await evaluateBudgetAlerts(ctx.organizationId, new Date(), { forceExhausted: true }).catch(() => undefined);
+    throw new AiBudgetError(code);
+  };
+  const estimateFor = (p: string, m: string) => estimateCallCostMxn(p, m, { system: input.system, messages: input.messages, maxOutputTokens: input.maxOutputTokens }, now);
+  const primary = await estimateFor(providerName, model);
+  if ("code" in primary) return block(primary.code);
+  const state = await getBudgetState(ctx.organizationId, now);
+  let fallbackEstimate: Estimate | null = null;
+  if (state.fallback) {
+    const f = await estimateFor(state.fallback.provider, state.fallback.model);
+    if (!("code" in f)) fallbackEstimate = { provider: state.fallback.provider, model: state.fallback.model, costMxn: f.costMxn };
+  }
+  const reservation = await reserveBudget(ctx.organizationId, usageId, { provider: providerName, model, costMxn: primary.costMxn }, fallbackEstimate, now);
+  if (!reservation.ok) return block(reservation.code);
+  let activeProvider = provider;
+  let activeModel = model;
+  let usedProviderName = providerName;
+  if (reservation.degradeTo) {
+    // Política DEGRADE autorizada: se usa el modelo económico configurado (queda registrado qué modelo se usó de verdad).
+    const alt = getProvider(reservation.degradeTo.provider);
+    if (!alt) {
+      await releaseReservation(usageId);
+      return block("BUDGET_EXHAUSTED");
+    }
+    activeProvider = alt;
+    activeModel = reservation.degradeTo.model;
+    usedProviderName = reservation.degradeTo.provider;
+    await prisma.aiUsage.update({ where: { id: usageId }, data: { provider: usedProviderName, model: activeModel } });
+  }
+
   const started = Date.now();
   let result: ProviderResult;
   try {
-    result = await provider.call({ system: input.system, messages: input.messages, model, maxOutputTokens: input.maxOutputTokens });
+    result = await activeProvider.call({ system: input.system, messages: input.messages, model: activeModel, maxOutputTokens: input.maxOutputTokens });
   } catch (err) {
     // Un error del proveedor puede haber consumido tokens que no conocemos: queda FAILED con 0 y el código del error.
-    await finish(usageId, providerName, model, { status: "FAILED", usage: ZERO, errorCode: (err instanceof Error ? err.message : String(err)).slice(0, 120), latencyMs: Date.now() - started });
+    await finish(usageId, usedProviderName, activeModel, { status: "FAILED", usage: ZERO, errorCode: (err instanceof Error ? err.message : String(err)).slice(0, 120), latencyMs: Date.now() - started });
+    await releaseReservation(usageId);
     throw err;
   }
-  await finish(usageId, providerName, model, { status: result.refused ? "REFUSED" : "SUCCEEDED", usage: result.usage, modelServed: result.modelServed, externalId: result.externalId, latencyMs: Date.now() - started });
+  await finish(usageId, usedProviderName, activeModel, { status: result.refused ? "REFUSED" : "SUCCEEDED", usage: result.usage, modelServed: result.modelServed, externalId: result.externalId, latencyMs: Date.now() - started });
+  // El costo real ya está en el ledger: la reserva se libera y se revisan las alertas de consumo.
+  await releaseReservation(usageId);
+  await evaluateBudgetAlerts(ctx.organizationId).catch(() => undefined);
   if (result.refused) return { refused: true, model: result.modelServed };
   return { text: result.text, model: result.modelServed, inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens };
 }

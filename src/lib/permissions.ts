@@ -117,6 +117,14 @@ export function getMonthlyPlanPriceMxn(plan: string, customMonthlyPriceMxn: numb
   return PLAN_PRICES_MXN[plan] ?? PLAN_PRICES_MXN.starter;
 }
 
+// Presupuesto interno de IA por plan (MXN al mes): el costo máximo que Reymen asume por ese cliente. Valor de partida hasta que
+// el catálogo de planes viva en la base de datos (se lee solo desde src/lib/ai/budget.ts). Un admin puede fijar otro por cliente.
+export const PLAN_AI_BUDGET_MXN: Record<string, number> = {
+  starter: 75,
+  professional: 200,
+  enterprise: 500,
+};
+
 // Which PlatformModules each plan tier commercially includes — a catalog
 // reference only. It does NOT drive OrganizationModule automatically: the
 // module axis stays a separate, explicit entitlement (see modules.ts) that

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, afterAll, beforeEach, vi } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { createTestOrg, cleanupOrg } from "@/test/helpers";
+import { createTestOrg, cleanupOrg, seedTestAiRate } from "@/test/helpers";
 
 vi.mock("next/server", () => ({ after: () => { throw new Error("outside request"); } }));
 const trigger = vi.fn();
@@ -9,6 +9,8 @@ vi.mock("@/lib/n8n", () => ({ triggerN8nWorkflow: (...a: unknown[]) => trigger(.
 
 const { runAutoReply, customerNeedsHuman, unsafeReason, parseDecision, AUTO_REPLIES_PER_HOUR } = await import("./ai-auto-reply");
 const { setDraftClientForTests } = await import("./ai-draft");
+
+await seedTestAiRate();
 
 describe("reglas del modo Automático (puras)", () => {
   it("pasa a una persona ante quejas, reembolsos o si la piden", () => {

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { createTestOrg, cleanupOrg, fakeSession } from "@/test/helpers";
+import { createTestOrg, cleanupOrg, fakeSession, seedTestAiRate } from "@/test/helpers";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 const trigger = vi.fn();
@@ -13,6 +13,8 @@ const { requestReplyDraft, regenerateReplyDraft, dismissReplyDraft } = await imp
 const { setAgentChannelMode, testAgentReply } = await import("./agent");
 const { sendManualMessage } = await import("./conversations");
 const { setDraftClientForTests, draftsAvailable } = await import("@/lib/ai-draft");
+
+await seedTestAiRate();
 
 describe("borradores de IA (acciones)", () => {
   const orgs: string[] = [];

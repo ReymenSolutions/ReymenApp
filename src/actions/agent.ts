@@ -12,6 +12,7 @@ import { getRulebook, rulebookProgress } from "@/lib/rulebook";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { isDraftProviderConfigured } from "@/lib/ai-draft";
 import { previewAgentReply, type AgentPreview } from "@/lib/ai-auto-reply";
+import { AiBudgetError } from "@/lib/ai/budget";
 import type { UserRole } from "@prisma/client";
 
 /**
@@ -63,5 +64,10 @@ export async function testAgentReply(messages: { role: "USER" | "ASSISTANT"; con
   const limit = await checkRateLimit(`agent-test:${session.user.id}`, { limit: 20, windowMs: 60_000 });
   if (!limit.allowed) throw new UserError("Demasiadas pruebas seguidas, espera un momento");
 
-  return previewAgentReply(organizationId, clean, (INBOX_CHANNELS as readonly string[]).includes(channel) ? channel : "whatsapp");
+  try {
+    return await previewAgentReply(organizationId, clean, (INBOX_CHANNELS as readonly string[]).includes(channel) ? channel : "whatsapp");
+  } catch (err) {
+    if (err instanceof AiBudgetError) throw new UserError("El Agente IA está en pausa: se agotó la capacidad de IA de este periodo");
+    throw err;
+  }
 }

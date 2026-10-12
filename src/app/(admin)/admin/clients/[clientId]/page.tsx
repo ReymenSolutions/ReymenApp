@@ -24,6 +24,9 @@ import { AdminClientUsersPanel } from "@/components/admin/AdminClientUsersPanel"
 import { ConsumptionChart } from "@/components/charts/ConsumptionChart";
 import { getOrganizationModules } from "@/actions/admin/modules";
 import { TemplateConfigButton } from "@/components/admin/TemplateConfigButton";
+import { AiBudgetPanel } from "@/components/admin/AiBudgetPanel";
+import { getOrgAiBudget } from "@/actions/admin/ai-budget";
+import { listProviders } from "@/lib/ai/providers";
 import { formatDate } from "@/lib/utils";
 import type { PlatformModule } from "@prisma/client";
 
@@ -103,6 +106,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
     getOrganizationBlueprints(clientId),
   ]);
   if (!client) notFound();
+  const aiBudget = await getOrgAiBudget({ orgId: clientId });
 
   const { filled: rulebookFilled, total: rulebookTotal } = rulebookProgress(await getRulebook(clientId));
   const planInfo = PLAN_LIMITS[client.plan] ?? PLAN_LIMITS.starter;
@@ -367,6 +371,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
             <ConsumptionChart data={consumption} />
           </CardContent>
         </Card>
+
+        {hasModule("AI_WHATSAPP") && <AiBudgetPanel orgId={client.id} view={aiBudget} providers={listProviders().map((p) => p.name)} />}
 
         {hasModule("AUTOMATIONS") && (
           <Card className="lg:col-span-2">

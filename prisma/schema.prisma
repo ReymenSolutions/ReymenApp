@@ -96,6 +96,9 @@ model Organization {
   automationConversions   AutomationConversion[]
   replyDrafts             ReplyDraft[]
   aiUsages                AiUsage[]
+  aiBudgetSetting         AiBudgetSetting?
+  aiBudgetAdjustments     AiBudgetAdjustment[]
+  aiBudgetAlerts          AiBudgetAlert[]
   branches                Branch[]
   branchDishes            BranchDish[]
   branchVariantPrices     BranchVariantPrice[]
@@ -2222,6 +2225,8 @@ enum AiUsageStatus {
   SUCCEEDED
   FAILED
   REFUSED
+  // Bloqueada antes de llamar al modelo (presupuesto agotado, sin tarifa…): no cuesta, pero queda registrada.
+  BLOCKED
 }
 
 /// Con qué certeza se conoce el costo: NO_RATE = no había tarifa vigente (no se inventa un costo);
@@ -2305,4 +2310,90 @@ model AiUsage {
   @@index([organizationId, conversationId])
   @@index([createdAt])
   @@index([provider, model, createdAt])
+}
+
+// ─── IA y CONSUMO: presupuesto por tenant (Hard Budget Limit) ───────────────
+
+/// Qué pasa al llegar al 100 % del presupuesto. BLOCK es la política por defecto; DEGRADE (modelo económico, con un
+/// tope extra) solo existe con configuración explícita y autorizada por un admin.
+enum AiBudgetPolicy {
+  BLOCK
+  DEGRADE
+}
+
+/// Presupuesto mensual de IA de un tenant. Sin fila, rige el del plan. Es el costo máximo que Reymen asume por ese cliente
+/// en el ciclo, NO un crédito del cliente.
+model AiBudgetSetting {
+  id                   String         @id @default(cuid())
+  organizationId       String         @unique
+  // Presupuesto del ciclo en MXN. Null = el predeterminado de su plan.
+  monthlyBudgetMxn     Decimal?       @db.Decimal(14, 2)
+  policy               AiBudgetPolicy @default(BLOCK)
+  // Solo con policy DEGRADE: modelo económico autorizado y tope de gasto extra sobre el presupuesto (ambos obligatorios).
+  fallbackProvider     String?
+  fallbackModel        String?
+  degradeCapMxn        Decimal?       @db.Decimal(14, 2)
+  policyAuthorizedById String?
+  policyAuthorizedAt   DateTime?
+  // Inicio del ciclo de facturación (su día de cada mes ancla los ciclos). Null = la fecha de alta del cliente.
+  cycleAnchorAt        DateTime?
+  updatedById          String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+enum AiBudgetAdjustmentType {
+  EXTEND // ampliación autorizada por un admin
+  RESET // restablecimiento: compensa lo gastado en el ciclo para devolver el presupuesto completo
+  TOPUP // recarga pagada y confirmada
+  CREDIT // ajuste o crédito administrativo
+}
+
+/// Cambios de capacidad del ciclo. Inmutables: un error se corrige con otro asiento compensatorio (monto negativo), nunca editando.
+model AiBudgetAdjustment {
+  id             String                 @id @default(cuid())
+  organizationId String
+  // Ciclo al que aplica (su inicio); al renovarse el ciclo, los ajustes del anterior ya no cuentan, pero el historial se conserva.
+  cycleStart     DateTime
+  type           AiBudgetAdjustmentType
+  amountMxn      Decimal                @db.Decimal(14, 2)
+  reason         String
+  // Para recargas: la referencia del pago confirmado (hace idempotente el webhook).
+  externalRef    String?
+  createdById    String?
+  createdAt      DateTime               @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, externalRef])
+  @@index([organizationId, cycleStart])
+}
+
+/// Reserva de presupuesto de una llamada en curso: evita que varias solicitudes simultáneas del mismo tenant sumen más
+/// de lo disponible. Se libera al registrar el costo real; si algo falla a medias, vence sola.
+model AiBudgetReservation {
+  id             String   @id @default(cuid())
+  organizationId String
+  usageId        String   @unique
+  amountMxn      Decimal  @db.Decimal(14, 6)
+  released       Boolean  @default(false)
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, released, expiresAt])
+}
+
+/// Alertas de consumo ya emitidas (50/75/90/100 %): la llave única impide avisar dos veces el mismo umbral en un ciclo.
+model AiBudgetAlert {
+  id             String   @id @default(cuid())
+  organizationId String
+  cycleStart     DateTime
+  threshold      Int
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, cycleStart, threshold])
 }
