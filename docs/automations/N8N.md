@@ -49,3 +49,19 @@ Diferencias del cuerpo (en lugar de `recipient` y `content.templateKey`):
 - **Modo por automatización** (Admin → Configurar → "Avisar además por"): `Solo la campana` (sin n8n), `Correo`, `WhatsApp` o `Correo y WhatsApp`. La campana del portal siempre avisa. Se aplica a: `inventory_low_alert`, `daily_executive_report` y las calificaciones bajas de `post_visit_feedback`.
 - Workflow: `n8n/workflows/reymen-action-notify.json` (importar y activar). **Proveedores ficticios**: reemplaza los bloques CORREO y WHATSAPP; las credenciales viven en n8n.
 - La app **ya no manda correos por su cuenta** para estos avisos (se retiró el envío directo): una sola ruta de entrega.
+
+## Configuración de cada cliente en workflows genéricos
+Un workflow genérico **no lleva datos de ningún cliente dentro** (horarios, plantillas, teléfonos, enlaces): sirve a todos. La configuración vive en Reymen (`Automation.config`, editable en Admin → Cliente → Configurar) y llega a n8n por dos vías con el **mismo contenido**:
+
+```json
+{
+  "organizationId": "…", "automationId": "…", "status": "ACTIVE",
+  "template": { "id": "…", "version": "1.0.0" },
+  "configuration": { "openHour": 9, "channel": "sms", "contact": "+5215512345678" },
+  "missingRequired": []
+}
+```
+- `configuration` = valores de fábrica + lo guardado para ese cliente. `missingRequired` = parámetros obligatorios sin valor (el workflow debe tratar la automatización como incompleta). Nunca incluye secretos.
+- **Por evento:** cuando Reymen le avisa a n8n de algo para una automatización, el cuerpo firmado (mismas firmas de Reymen → n8n) trae `organizationId`, `event`, `data` y `automation` (el contenido de arriba).
+- **Por consulta** (flujos que empiezan en un canal, p. ej. un WhatsApp entrante): `POST /api/webhooks/n8n/automation-config`, con la misma firma de plataforma (`X-Reymen-Timestamp`, `X-Reymen-Signature` = `sha256=` + HMAC-SHA256 hex de `"<timestamp>.<cuerpo>"` con `N8N_WEBHOOK_SECRET`) y el cuerpo `{ "organizationId": "…", "automationId": "…" }` o `{ "organizationId": "…", "templateId": "…" }`.
+  - **Siempre se valida la organización**: si la automatización no existe, es de otro cliente o está pausada, responde `404` igual (no revela qué ids existen). Otros códigos: `400` cuerpo inválido, `401` firma/hora inválidas, `429`, `503` sin `N8N_WEBHOOK_SECRET`.
