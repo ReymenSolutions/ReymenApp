@@ -42,25 +42,3 @@ export async function upsertWhatsAppAssistant(
   revalidatePath("/portal/whatsapp");
   return { success: true };
 }
-
-export async function toggleAssistant(isActive: boolean) {
-  const session = await auth();
-  if (!session?.user.organizationId) throw new UserError("No autorizado");
-
-  await assertModuleEnabled(session.user.organizationId, "AI_WHATSAPP");
-
-  await prisma.whatsAppAssistant.upsert({
-    where: { organizationId: session.user.organizationId },
-    create: {
-      organizationId: session.user.organizationId,
-      name: "Asistente AI",
-      greeting: "¡Hola! Soy el asistente virtual. ¿En qué puedo ayudarte?",
-      isActive,
-      capabilities: [],
-    },
-    update: { isActive },
-  });
-
-  revalidatePath("/portal/whatsapp");
-  return { success: true };
-}

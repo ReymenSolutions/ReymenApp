@@ -63,7 +63,7 @@ export default async function ConversationDetailPage({
   const role = session.user.role as UserRole;
   const canReply = can(role, "conversations:reply");
   const canAssign = can(role, "conversations:assign");
-  const aiDrafts = await draftsAvailable(session.user.organizationId);
+  const aiDrafts = await draftsAvailable(session.user.organizationId, conv.channel);
 
   return (
     <div>

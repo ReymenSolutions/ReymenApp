@@ -9,7 +9,8 @@ vi.mock("@/lib/n8n", () => ({ triggerN8nWorkflow: (...a: unknown[]) => trigger(.
 const authMock = vi.fn();
 vi.mock("@/lib/auth", () => ({ auth: () => authMock(), isAdmin: (r: string) => r === "SUPER_ADMIN" || r === "ADMIN" }));
 
-const { requestReplyDraft, regenerateReplyDraft, dismissReplyDraft, setDraftsEnabled } = await import("./ai-drafts");
+const { requestReplyDraft, regenerateReplyDraft, dismissReplyDraft } = await import("./ai-drafts");
+const { setAgentChannelMode } = await import("./agent");
 const { sendManualMessage } = await import("./conversations");
 const { setDraftClientForTests, draftsAvailable } = await import("@/lib/ai-draft");
 
@@ -102,16 +103,34 @@ describe("borradores de IA (acciones)", () => {
     expect(trigger).toHaveBeenCalledWith("webchat-outbound", expect.objectContaining({ data: expect.objectContaining({ channel: "webchat", contactHandle: "v1" }) }));
   });
 
-  it("el interruptor del negocio apaga y enciende los borradores; solo quien gestiona la base de conocimiento", async () => {
+  it("el modo por canal apaga y enciende los borradores solo en ese canal; solo quien gestiona la base de conocimiento", async () => {
     const org = await newOrg();
     as(org.id, "VIEWER");
-    await expect(setDraftsEnabled(false)).rejects.toThrow(/autorizado/i);
+    await expect(setAgentChannelMode("webchat", "OFF")).rejects.toThrow(/autorizado/i);
     as(org.id);
-    expect(await draftsAvailable(org.id)).toBe(true);
-    await setDraftsEnabled(false);
-    expect(await draftsAvailable(org.id)).toBe(false);
-    await setDraftsEnabled(true);
-    expect(await draftsAvailable(org.id)).toBe(true);
-    expect(await prisma.auditLog.count({ where: { organizationId: org.id, action: "ai_draft.toggle" } })).toBe(2);
+    expect(await draftsAvailable(org.id, "webchat")).toBe(true);
+    await setAgentChannelMode("webchat", "OFF");
+    expect(await draftsAvailable(org.id, "webchat")).toBe(false);
+    expect(await draftsAvailable(org.id, "whatsapp")).toBe(true);
+    await setAgentChannelMode("webchat", "SUGGEST");
+    expect(await draftsAvailable(org.id, "webchat")).toBe(true);
+    expect(await prisma.auditLog.count({ where: { organizationId: org.id, action: "agent.mode" } })).toBe(2);
+  });
+
+  it("rechaza canales y modos que no existen, y Automático mientras no esté disponible", async () => {
+    const org = await newOrg();
+    as(org.id);
+    await expect(setAgentChannelMode("telegrama", "OFF")).rejects.toThrow(/Canal no válido/);
+    await expect(setAgentChannelMode("webchat", "TURBO")).rejects.toThrow(/Modo no válido/);
+    await expect(setAgentChannelMode("webchat", "AUTO")).rejects.toThrow(/Modo no válido/);
+  });
+
+  it("con el canal apagado, abrir la conversación no genera borrador ni llama a Claude", async () => {
+    const org = await newOrg();
+    as(org.id);
+    const c = await conv(org.id);
+    await setAgentChannelMode("webchat", "OFF");
+    expect(await requestReplyDraft(c.id)).toEqual({ state: "off" });
+    expect(create).not.toHaveBeenCalled();
   });
 });

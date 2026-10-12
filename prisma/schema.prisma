@@ -84,6 +84,7 @@ model Organization {
   domainEvents            DomainEvent[]
   automationExecutions    AutomationExecution[]
   rulebook                BusinessRulebook?
+  agentChannelSettings    AgentChannelSetting[]
   replyDrafts             ReplyDraft[]
   branches                Branch[]
   branchDishes            BranchDish[]
@@ -862,13 +863,33 @@ model BusinessRulebook {
   greeting       String   @default("") @db.Text
   rules          String   @default("") @db.Text
   pricing        String   @default("") @db.Text
-  // Si la IA sugiere un borrador de respuesta al abrir cada conversación.
-  draftsEnabled  Boolean  @default(true)
   updatedById    String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+/// Qué hace el Agente IA en un canal: nada (OFF), redacta un borrador que una persona envía (SUGGEST) o responde
+/// solo dentro de las reglas del negocio (AUTO). Sin fila para un canal = SUGGEST.
+enum AgentMode {
+  OFF
+  SUGGEST
+  AUTO
+}
+
+model AgentChannelSetting {
+  id             String    @id @default(cuid())
+  organizationId String
+  channel        String
+  mode           AgentMode @default(SUGGEST)
+  updatedById    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, channel])
 }
 
 enum ReplyDraftStatus {

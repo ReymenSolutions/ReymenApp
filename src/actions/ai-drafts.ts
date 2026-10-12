@@ -1,11 +1,9 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { assertInboxAccess } from "@/lib/inbox";
 import { dismissReplyDraft as dismiss, getOrCreateReplyDraft, type DraftState } from "@/lib/ai-draft";
-import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
 import { UserError } from "@/lib/user-error";
 import type { UserRole } from "@prisma/client";
@@ -40,17 +38,5 @@ export async function dismissReplyDraft(draftId: string) {
   const session = await requireReplier();
   const ok = await dismiss(session.user.organizationId, draftId);
   if (!ok) throw new UserError("Borrador no encontrado");
-  return { success: true };
-}
-
-/** Enciende o apaga los borradores de IA del negocio. Requiere gestionar la base de conocimiento. */
-export async function setDraftsEnabled(enabled: boolean) {
-  const session = await auth();
-  if (!session?.user.organizationId) throw new UserError("No autorizado");
-  if (!can(session.user.role as UserRole, "knowledge_base:manage")) throw new UserError("No autorizado");
-  const organizationId = session.user.organizationId;
-  await prisma.businessRulebook.upsert({ where: { organizationId }, create: { organizationId, draftsEnabled: !!enabled, updatedById: session.user.id }, update: { draftsEnabled: !!enabled, updatedById: session.user.id } });
-  await logAudit({ organizationId, userId: session.user.id, action: "ai_draft.toggle", resource: "BusinessRulebook", metadata: { enabled: !!enabled } });
-  revalidatePath("/portal/knowledge-base");
   return { success: true };
 }

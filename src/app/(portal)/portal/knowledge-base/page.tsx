@@ -33,7 +33,6 @@ export default async function KnowledgeBasePage() {
 
   const [articles, lang, t, rulebook] = await Promise.all([getArticles(session.user.organizationId), getServerLang(), getServerT(), getRulebook(session.user.organizationId)]);
   const canEditRulebook = can(session.user.role as UserRole, "knowledge_base:manage");
-  const draftSettings = await prisma.businessRulebook.findUnique({ where: { organizationId: session.user.organizationId }, select: { draftsEnabled: true } });
   const activeCount = articles.filter((a) => a.isActive).length;
 
   // Group by category
@@ -54,7 +53,7 @@ export default async function KnowledgeBasePage() {
 
       <PortalSectionTabs tabs={getAiWhatsappTabs(t, session.user.role as UserRole)} />
 
-      <RulebookEditor initial={rulebook} canEdit={canEditRulebook} draftsEnabled={draftSettings?.draftsEnabled ?? true} aiConfigured={isDraftProviderConfigured()} />
+      <RulebookEditor initial={rulebook} canEdit={canEditRulebook} aiConfigured={isDraftProviderConfigured()} />
 
       <h2 className="mb-3 text-base font-semibold text-slate-900">{lang === "es" ? "Conocimiento adicional" : "Additional knowledge"}</h2>
       <div className="mb-4 rounded-lg bg-blue-50 border border-blue-100 p-3">

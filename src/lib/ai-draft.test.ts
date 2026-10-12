@@ -37,7 +37,7 @@ describe("borradores de IA (con base de datos y cliente simulado)", () => {
   const create = vi.fn();
   const text = (t: string, extra: Record<string, unknown> = {}) => ({ stop_reason: "end_turn", model: "claude-opus-5-5", content: [{ type: "thinking", thinking: "" }, { type: "text", text: t }], usage: { input_tokens: 120, output_tokens: 40 }, ...extra });
 
-  const newOrg = async (opts: { module?: boolean; draftsEnabled?: boolean } = {}) => {
+  const newOrg = async (opts: { module?: boolean; agentOff?: boolean } = {}) => {
     const org = await createTestOrg("AI Draft");
     orgs.push(org.id);
     // createTestOrg ya concede los módulos base; aquí solo se quita el de IA cuando la prueba lo pide.
@@ -46,7 +46,7 @@ describe("borradores de IA (con base de datos y cliente simulado)", () => {
       create: { organizationId: org.id, module: "AI_WHATSAPP", status: opts.module === false ? "CANCELLED" : "ACTIVE", source: "SUBSCRIBED" },
       update: { status: opts.module === false ? "CANCELLED" : "ACTIVE" },
     });
-    if (opts.draftsEnabled === false) await prisma.businessRulebook.create({ data: { organizationId: org.id, draftsEnabled: false } });
+    if (opts.agentOff) await prisma.agentChannelSetting.create({ data: { organizationId: org.id, channel: "instagram", mode: "OFF" } });
     return org;
   };
   const conversation = async (orgId: string, roles: ("USER" | "AGENT" | "ASSISTANT")[]) => {
@@ -127,17 +127,17 @@ describe("borradores de IA (con base de datos y cliente simulado)", () => {
     expect(await prisma.replyDraft.count({ where: { conversationId: conv.id } })).toBe(1);
   });
 
-  it("está apagado sin clave, sin el módulo de IA o con el interruptor del negocio en off", async () => {
+  it("está apagado sin clave, sin el módulo de IA o con el agente apagado en el canal", async () => {
     const org = await newOrg();
     const conv = await conversation(org.id, ["USER"]);
     vi.stubEnv("ANTHROPIC_API_KEY", "");
-    expect(await draftsAvailable(org.id)).toBe(false);
+    expect(await draftsAvailable(org.id, "instagram")).toBe(false);
     expect(await getOrCreateReplyDraft(org.id, conv.id)).toEqual({ state: "off" });
     vi.stubEnv("ANTHROPIC_API_KEY", "k");
     const noModule = await newOrg({ module: false });
     const c2 = await conversation(noModule.id, ["USER"]);
     expect(await getOrCreateReplyDraft(noModule.id, c2.id)).toEqual({ state: "off" });
-    const disabled = await newOrg({ draftsEnabled: false });
+    const disabled = await newOrg({ agentOff: true });
     const c3 = await conversation(disabled.id, ["USER"]);
     expect(await getOrCreateReplyDraft(disabled.id, c3.id)).toEqual({ state: "off" });
     expect(create).not.toHaveBeenCalled();
