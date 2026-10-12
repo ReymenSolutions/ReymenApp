@@ -5,12 +5,10 @@ import type { StoredDomainEvent } from "@/lib/domain-events";
 export type MessageChannel = "whatsapp" | "sms";
 
 /** Lo que una automatización quiere hacer (aún no se ha hecho: el despachador/dry-run lo trata). */
-export type ActionSpec = {
-  type: "message";
-  channel: MessageChannel;
-  templateKey: string;
-  variables: Record<string, string>;
-};
+export type ActionSpec =
+  | { type: "message"; channel: MessageChannel; templateKey: string; variables: Record<string, string> }
+  /** Aviso interno para el equipo (campana del portal): no contacta a ningún cliente. */
+  | { type: "alert"; severity: "warning" | "critical"; title: string; body: string; href: string };
 
 export type BlueprintContext = {
   organization: { id: string; name: string; timezone: string };
@@ -36,6 +34,8 @@ export type Blueprint<C = Record<string, unknown>> = {
   description: string;
   /** Tipo de DomainEvent que lo dispara. */
   trigger: string;
+  /** A quién va dirigida: un cliente (por defecto; pasa por la política de contacto) o el equipo (aviso interno). */
+  audience?: "customer" | "internal";
   requiredModules: PlatformModule[];
   status: "active" | "deprecated";
   configSchema: ZodType<C, ZodTypeDef, unknown>;
@@ -43,5 +43,6 @@ export type Blueprint<C = Record<string, unknown>> = {
   /** Función pura: decide, a partir del evento y el contexto, si actuar y con qué. */
   decide: (event: StoredDomainEvent, ctx: BlueprintContext, config: C) => BlueprintDecision;
   /** Cómo se contacta (canal, enfriamiento, horario) según la configuración. */
+  /** Solo para audiencia de clientes. */
   contactRules: (config: C) => ContactRules;
 };

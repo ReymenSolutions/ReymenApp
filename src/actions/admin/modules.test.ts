@@ -11,7 +11,7 @@ vi.mock("@/lib/auth", () => ({
   isAdmin: (role: string) => role === "SUPER_ADMIN" || role === "ADMIN",
 }));
 
-const { syncModulesToPlan, getOrganizationModules } = await import("./modules");
+const { syncModulesToPlan, getOrganizationModules, setOrganizationModule } = await import("./modules");
 
 describe("getOrganizationModules", () => {
   it("CRITICAL: refuses a non-admin caller (it is a public server action)", async () => {
@@ -103,5 +103,35 @@ describe("syncModulesToPlan", () => {
     });
     expect(automations?.status).toBe("ACTIVE");
     expect(automations?.source).toBe("SUBSCRIBED");
+  });
+});
+
+describe("setOrganizationModule — Sin habilitar", () => {
+  let org: { id: string };
+  afterEach(async () => {
+    if (org) await cleanupOrg(org.id);
+  });
+
+  it("NOT_ENABLED quita el módulo por completo (vuelve a 'sin habilitar'), lo deja en la bitácora y se puede volver a activar", async () => {
+    authMock.mockResolvedValue(fakeSession({ id: "admin1", role: "SUPER_ADMIN", organizationId: null }));
+    org = await createTestOrg("Not Enabled Org");
+    await setOrganizationModule({ orgId: org.id, module: "NFC_QR", status: "ACTIVE", source: "ADMIN_GRANTED" });
+    expect((await getOrganizationModules(org.id)).find((m) => m.module === "NFC_QR")?.status).toBe("ACTIVE");
+
+    await setOrganizationModule({ orgId: org.id, module: "NFC_QR", status: "NOT_ENABLED", source: "ADMIN_GRANTED" });
+    expect((await getOrganizationModules(org.id)).find((m) => m.module === "NFC_QR")).toMatchObject({ status: null, source: null });
+    expect(await prisma.organizationModule.count({ where: { organizationId: org.id, module: "NFC_QR" } })).toBe(0);
+    expect(await prisma.auditLog.count({ where: { organizationId: org.id, action: "client.module_change", resource: "OrganizationModule" } })).toBe(2);
+
+    // Quitar un módulo que nunca estuvo habilitado no falla.
+    await setOrganizationModule({ orgId: org.id, module: "MARKETING_ADS", status: "NOT_ENABLED", source: "ADMIN_GRANTED" });
+    await setOrganizationModule({ orgId: org.id, module: "NFC_QR", status: "ACTIVE", source: "ADMIN_GRANTED" });
+    expect((await getOrganizationModules(org.id)).find((m) => m.module === "NFC_QR")?.status).toBe("ACTIVE");
+  });
+
+  it("solo un admin puede quitarlo", async () => {
+    authMock.mockResolvedValue(fakeSession({ id: "u1", role: "OWNER", organizationId: null }));
+    org = await createTestOrg("Not Enabled Denied Org");
+    await expect(setOrganizationModule({ orgId: org.id, module: "NFC_QR", status: "NOT_ENABLED", source: "ADMIN_GRANTED" })).rejects.toThrow(/autorizado/i);
   });
 });

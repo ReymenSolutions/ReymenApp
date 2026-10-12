@@ -66,6 +66,12 @@ async function evaluate(
   const decision = blueprint.decide(event, ctx, config);
   if (decision.kind === "skip") return { status: "SKIPPED", skipReason: decision.reason };
 
+  // Aviso interno para el equipo: no hay cliente ni política de contacto. Con dry-run solo se registra lo que se habría
+  // avisado; sin dry-run el aviso queda como hecho (SUCCEEDED) y la campana del portal lo muestra.
+  if (blueprint.audience === "internal") {
+    return { status: automation.dryRun ? "DRY_RUN" : "SUCCEEDED", action: decision.action as unknown as Prisma.InputJsonValue };
+  }
+
   const rules = blueprint.contactRules(config);
   const last = ctx.customer
     ? await prisma.automationExecution.findFirst({

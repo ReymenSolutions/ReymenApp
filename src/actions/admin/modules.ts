@@ -13,12 +13,13 @@ import { UserError } from "@/lib/user-error";
 const setModuleSchema = z.object({
   orgId: z.string(),
   module: z.enum(ALL_MODULES as [PlatformModule, ...PlatformModule[]]),
-  status: z.enum(["ACTIVE", "SUSPENDED", "CANCELLED"]),
+  /** NOT_ENABLED = quitar el derecho por completo (el módulo vuelve a "sin habilitar", sin fila). */
+  status: z.enum(["ACTIVE", "SUSPENDED", "CANCELLED", "NOT_ENABLED"]),
   source: z.enum(["SUBSCRIBED", "ADMIN_GRANTED"]),
   notes: z.string().optional(),
 });
 
-/** Grants, suspends, or cancels a single module for an organization. Upserts — a module with no row yet is treated as not-enabled by every guard, so this both creates a new entitlement and updates an existing one. */
+/** Grants, suspends, cancels, or removes (NOT_ENABLED) a single module for an organization. Upserts — a module with no row yet is treated as not-enabled by every guard, so this both creates a new entitlement and updates an existing one. */
 export async function setOrganizationModule(
   data: z.infer<typeof setModuleSchema>
 ) {
@@ -29,6 +30,21 @@ export async function setOrganizationModule(
   // Reymen POS manda sus ventas al módulo Food: sin Food no tendría dónde caer.
   if (module === "REYMEN_POS" && status === "ACTIVE" && !(await hasModule(orgId, "FOOD_OPS"))) {
     throw new UserError("Para activar Reymen POS primero activa Reymen Foods");
+  }
+
+  if (status === "NOT_ENABLED") {
+    const existing = await prisma.organizationModule.findUnique({ where: { organizationId_module: { organizationId: orgId, module } } });
+    if (existing) await prisma.organizationModule.delete({ where: { id: existing.id } });
+    await logAudit({
+      userId: session.user.id,
+      organizationId: orgId,
+      action: "client.module_change",
+      resource: "OrganizationModule",
+      resourceId: existing?.id ?? null,
+      metadata: { module, status, previousStatus: existing?.status ?? null },
+    });
+    revalidatePath(`/admin/clients/${orgId}`);
+    return { success: true };
   }
 
   const timestamps: { suspendedAt?: Date | null; cancelledAt?: Date | null } = {};

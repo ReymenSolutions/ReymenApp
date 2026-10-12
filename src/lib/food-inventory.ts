@@ -1,5 +1,6 @@
 import type { FoodInventoryMovementType, Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
+import { emitDomainEvent } from "./domain-events";
 
 // ─── FOOD OPS — Existencias de insumos ───────────────────────────────
 // Único lugar que cambia FoodInventoryItem.currentStock: cada cambio deja un
@@ -178,6 +179,42 @@ export async function recalculateRecipeUsage(
   return { usages: changed, items };
 }
 
+export type StockLevel = "ok" | "low" | "critical";
+const LEVEL_RANK: Record<StockLevel, number> = { ok: 0, low: 1, critical: 2 };
+/** Por debajo de este porcentaje del mínimo (o en cero o negativo) el insumo está en nivel crítico. */
+export const CRITICAL_STOCK_FRACTION = 0.25;
+
+/** Nivel de una existencia frente a su mínimo: bajo (≤ mínimo), crítico (≤ 0 o ≤ 25 % del mínimo). Sin mínimo, solo ≤ 0 alerta. */
+export function stockLevel(stock: number, min: number): StockLevel {
+  if (stock <= 0 || (min > 0 && stock <= min * CRITICAL_STOCK_FRACTION)) return "critical";
+  if (min > 0 && stock <= min) return "low";
+  return "ok";
+}
+
+/**
+ * Si un movimiento empeora el nivel del insumo (ok → bajo, bajo → crítico, ok → crítico), deja el hecho en la
+ * bandeja de eventos: un aviso por nivel hasta que se recupere (mejorar o quedarse igual no avisa).
+ * Nunca bloquea nada: es un INSERT dentro de la misma transacción del movimiento.
+ */
+async function emitLevelChange(tx: Tx, organizationId: string, inventoryItemId: string, branchId: string | null, stockAfter: number, delta: number, type: string) {
+  const item = await tx.foodInventoryItem.findFirst({ where: { id: inventoryItemId, organizationId, isActive: true }, select: { name: true, unit: true, minStock: true } });
+  if (!item) return;
+  const min = Number(item.minStock);
+  const from = stockLevel(stockAfter - delta, min);
+  const to = stockLevel(stockAfter, min);
+  if (LEVEL_RANK[to] <= LEVEL_RANK[from]) return;
+  const occurredAt = new Date();
+  await emitDomainEvent(tx, {
+    organizationId,
+    type: "inventory.level_changed",
+    subjectType: "inventory_item",
+    subjectId: inventoryItemId,
+    occurredAt,
+    payload: { inventoryItemId, name: item.name, unit: item.unit, level: to, previousLevel: from, currentStock: stockAfter, minStock: min, branchId, movementType: type },
+    dedupeKey: `inventory.level_changed:${inventoryItemId}:${branchId ?? "main"}:${to}:${occurredAt.getTime()}`,
+  });
+}
+
 /** Aplica los cambios de existencia y registra un movimiento por insumo. */
 export async function applyStockMovements(
   tx: Tx,
@@ -225,6 +262,7 @@ export async function applyStockMovements(
           userId: meta.userId ?? null,
         },
       });
+      await emitLevelChange(tx, organizationId, inventoryItemId, branchId, Number(stock.currentStock), rounded, meta.type);
       continue;
     }
     // La existencia puede quedar negativa: nunca se bloquea una venta por
@@ -249,6 +287,7 @@ export async function applyStockMovements(
         userId: meta.userId ?? null,
       },
     });
+    await emitLevelChange(tx, organizationId, inventoryItemId, null, Number(updated.currentStock), rounded, meta.type);
   }
 }
 
