@@ -13,11 +13,13 @@ import { recordMetric, METRIC_KEYS } from "@/lib/metrics";
 import type { UserRole } from "@prisma/client";
 import { appUrl } from "@/lib/app-url";
 import { UserError } from "@/lib/user-error";
+import { assertInboxAccess } from "@/lib/inbox";
+import { outboundWorkflowPath, messagePreview } from "@/lib/channels";
 
 async function requireOrgAndWhatsapp() {
   const session = await auth();
   if (!session?.user.organizationId) throw new UserError("No autorizado");
-  await assertModuleEnabled(session.user.organizationId, "AI_WHATSAPP");
+  await assertInboxAccess(session.user.organizationId);
   return session;
 }
 
@@ -154,17 +156,27 @@ export async function sendManualMessage(data: {
 
   await prisma.conversation.update({
     where: { id: conv.id },
-    data: { aiHandled: false, assignedToId: conv.assignedToId ?? session.user.id },
+    data: {
+      aiHandled: false,
+      assignedToId: conv.assignedToId ?? session.user.id,
+      lastMessageAt: new Date(),
+      lastMessagePreview: messagePreview(content || "(adjunto)"),
+      lastMessageRole: "AGENT",
+      unreadCount: 0,
+    },
   });
   await recordMetric(session.user.organizationId!, METRIC_KEYS.MESSAGES_SENT);
 
-  const trigger = await triggerN8nWorkflow("whatsapp-outbound", {
+  const trigger = await triggerN8nWorkflow(outboundWorkflowPath(conv.channel), {
     organizationId: session.user.organizationId!,
     event: "message.send",
     data: {
       conversationId: conv.id,
       messageId: message.id,
       contactPhone: conv.contactPhone,
+      contactHandle: conv.contactHandle,
+      contactEmail: conv.contactEmail,
+      subject: conv.subject,
       channel: conv.channel,
       content,
       attachmentUrl: data.attachmentUrl,

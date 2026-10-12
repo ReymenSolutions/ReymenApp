@@ -6,6 +6,7 @@ import { assertPlanCapacity } from "./plan-limits";
 import { recordMetric, METRIC_KEYS } from "./metrics";
 import { appUrl } from "./app-url";
 import { phoneKey } from "./phone";
+import { messagePreview, normalizeChannel, normalizeEmail } from "./channels";
 import { findLeadByPhone, linkOrphanConversations, linkOrphanCustomers } from "./crm-link";
 import { findPotentialDuplicateLeads } from "./duplicate-detection";
 import { hasModule } from "./modules";
@@ -112,31 +113,52 @@ export async function processLeadEvent(payload: unknown, orgId: string): Promise
 export async function processConversationEvent(payload: unknown, orgId: string): Promise<{ conversationId: string }> {
   const body = payload as {
     conversationId?: string;
-    contactPhone: string;
+    /** Canales con teléfono (WhatsApp, SMS). */
+    contactPhone?: string;
+    /** Canales con usuario propio: Instagram, Messenger, chat web (id o @usuario). */
+    contactHandle?: string;
+    contactEmail?: string;
     contactName?: string;
+    subject?: string;
     channel: string;
     message: { role: "USER" | "ASSISTANT" | "SYSTEM"; content: string; externalId?: string };
   };
 
+  const channel = normalizeChannel(body.channel);
   const key = phoneKey(body.contactPhone);
+  const handle = typeof body.contactHandle === "string" && body.contactHandle.trim() ? body.contactHandle.trim().slice(0, 200) : null;
+  const email = normalizeEmail(body.contactEmail);
+  const subject = typeof body.subject === "string" && body.subject.trim() ? body.subject.trim().slice(0, 200) : null;
+  if (!body.conversationId && !body.contactPhone && !handle && !email) {
+    throw new Error("La conversación necesita el teléfono, el usuario o el correo del contacto");
+  }
+
   let conversation = body.conversationId
     ? await prisma.conversation.findFirst({
         where: { id: body.conversationId, organizationId: orgId },
       })
     : await prisma.conversation.findFirst({
         // Por llave de teléfono: el mismo número con otro formato sigue siendo la misma conversación.
-        where: key
-          ? { organizationId: orgId, phoneKey: key, status: "OPEN" }
-          : { organizationId: orgId, contactPhone: body.contactPhone, status: "OPEN" },
+        // Sin teléfono, por usuario del canal o por correo.
+        where: body.contactPhone
+          ? key
+            ? { organizationId: orgId, phoneKey: key, status: "OPEN" }
+            : { organizationId: orgId, contactPhone: body.contactPhone, status: "OPEN" }
+          : handle
+            ? { organizationId: orgId, channel, contactHandle: handle, status: "OPEN" }
+            : { organizationId: orgId, contactEmail: email, status: "OPEN" },
       });
 
   if (!conversation) {
     conversation = await prisma.conversation.create({
       data: {
         organizationId: orgId,
-        channel: body.channel,
-        contactPhone: body.contactPhone,
+        channel,
+        contactPhone: body.contactPhone || null,
         phoneKey: key,
+        contactHandle: handle,
+        contactEmail: email,
+        subject,
         contactName: body.contactName,
       },
     });
@@ -146,7 +168,7 @@ export async function processConversationEvent(payload: unknown, orgId: string):
   // lead; si el cliente llegó al límite de su plan o no tiene CRM, el mensaje
   // se guarda igual y simplemente no hay contacto.
   if (!conversation.leadId) {
-    const leadId = await resolveLeadForConversation(orgId, body, body.message.role === "USER");
+    const leadId = await resolveLeadForConversation(orgId, { contactPhone: body.contactPhone, contactEmail: email, contactHandle: handle, contactName: body.contactName, channel }, body.message.role === "USER");
     if (leadId) conversation = await prisma.conversation.update({ where: { id: conversation.id }, data: { leadId } });
   }
 
@@ -174,6 +196,21 @@ export async function processConversationEvent(payload: unknown, orgId: string):
     return { conversationId: conversation.id };
   }
 
+  // Datos para listar el inbox sin abrir cada hilo. Un mensaje del cliente suma un no leído y saca la
+  // conversación de "Archivadas" (vuelve a la bandeja de entrada).
+  if (body.message.role !== "SYSTEM") {
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: {
+        lastMessageAt: new Date(),
+        lastMessagePreview: messagePreview(body.message.content),
+        lastMessageRole: body.message.role,
+        ...(subject && !conversation.subject ? { subject } : {}),
+        ...(body.message.role === "USER" ? { unreadCount: { increment: 1 }, archivedAt: null } : {}),
+      },
+    });
+  }
+
   if (body.message.role === "USER") {
     await recordMetric(orgId, METRIC_KEYS.MESSAGES_RECEIVED);
   } else if (body.message.role === "ASSISTANT") {
@@ -184,20 +221,29 @@ export async function processConversationEvent(payload: unknown, orgId: string):
 }
 
 /**
- * Contacto del CRM para una conversación de WhatsApp: el lead existente con
- * ese teléfono o, si escribe alguien nuevo (mensaje entrante), uno creado al
- * momento. Devuelve null si no se puede (sin CRM, sin teléfono, plan lleno).
+ * Contacto del CRM para una conversación: el lead existente con ese teléfono o correo (o el que ya tenía una
+ * conversación previa del mismo usuario del canal) o, si escribe alguien nuevo (mensaje entrante), uno creado
+ * al momento. Devuelve null si no se puede (sin CRM, sin datos de contacto, plan lleno).
  */
 async function resolveLeadForConversation(
   orgId: string,
-  body: { contactPhone: string; contactName?: string; channel: string },
+  body: { contactPhone?: string; contactEmail?: string | null; contactHandle?: string | null; contactName?: string; channel: string },
   isInbound: boolean
 ): Promise<string | null> {
   const existing = await findLeadByPhone(orgId, body.contactPhone);
   if (existing) return existing.id;
+  if (body.contactEmail) {
+    const byEmail = await prisma.lead.findFirst({ where: { organizationId: orgId, email: { equals: body.contactEmail, mode: "insensitive" }, deletedAt: null }, orderBy: { createdAt: "asc" }, select: { id: true } });
+    if (byEmail) return byEmail.id;
+  }
+  if (body.contactHandle) {
+    const prev = await prisma.conversation.findFirst({ where: { organizationId: orgId, channel: body.channel, contactHandle: body.contactHandle, leadId: { not: null } }, select: { leadId: true } });
+    if (prev?.leadId) return prev.leadId;
+  }
 
   const key = phoneKey(body.contactPhone);
-  if (!isInbound || !key) return null;
+  const label = body.contactName?.trim() || body.contactEmail || body.contactPhone || body.contactHandle;
+  if (!isInbound || !label) return null;
   if (!(await hasModule(orgId, "CRM"))) return null;
 
   try {
@@ -210,13 +256,14 @@ async function resolveLeadForConversation(
   const lead = await prisma.lead.create({
     data: {
       organizationId: orgId,
-      name: body.contactName?.trim() || body.contactPhone,
-      phone: body.contactPhone,
+      name: label,
+      phone: key ? body.contactPhone : null,
       phoneKey: key,
+      email: body.contactEmail ?? null,
       source: body.channel,
     },
   });
-  await linkOrphanCustomers(orgId, lead.id, body.contactPhone);
+  if (key) await linkOrphanCustomers(orgId, lead.id, body.contactPhone);
   await recordMetric(orgId, METRIC_KEYS.LEADS_CAPTURED);
   return lead.id;
 }
