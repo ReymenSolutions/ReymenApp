@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { dispatchPendingExecutions, type DispatchResult } from "@/lib/automation/dispatcher";
 import { runAutomationsForEvent } from "@/lib/automation/engine";
+import { runClockDetectors } from "@/lib/automation/detectors";
 import { processDomainEvents, purgeProcessedDomainEvents, type OutboxResult } from "@/lib/domain-events";
 
 // Llave del candado del reloj de automatizaciones (cualquier entero fijo; solo debe ser única en la base).
@@ -18,6 +19,8 @@ export async function runAutomationTick(now: Date = new Date(), opts: { organiza
     async (tx) => {
       const [{ locked }] = await tx.$queryRaw<{ locked: boolean }[]>`SELECT pg_try_advisory_xact_lock(${TICK_LOCK_KEY}) AS locked`;
       if (!locked) return { ran: false as const, reason: "locked" as const };
+      // Lo que lo dispara la hora (no un hecho) se convierte en eventos antes de procesar la bandeja.
+      await runClockDetectors(now, { organizationId: opts.organizationId });
       const outbox = await processDomainEvents({ now, organizationId: opts.organizationId, consumers: [(event) => runAutomationsForEvent(event, now)] });
       const dispatch = await dispatchPendingExecutions({ now, organizationId: opts.organizationId });
       const purged = await purgeProcessedDomainEvents(now);

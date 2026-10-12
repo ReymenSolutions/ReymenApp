@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { PortalSectionTabs } from "@/components/portal/PortalSectionTabs";
 import { getAutomationsTabs } from "@/lib/portal-nav-tabs";
-import { formatDate, formatDateTime } from "@/lib/utils";
+import { formatDate, formatDateTime, formatMoney } from "@/lib/utils";
 import { Zap, ArrowRight, Activity } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -62,7 +62,12 @@ async function getSmartActivity(orgId: string) {
 }
 
 function describeAction(action: unknown): string | null {
-  const a = (action ?? {}) as { type?: string; title?: string; body?: string; templateKey?: string; recipient?: { name?: string | null } };
+  const a = (action ?? {}) as { type?: string;  title?: string; body?: string; templateKey?: string; recipient?: { name?: string | null } };
+  if (a.type === "report") {
+    const r = action as { report?: { today?: { gross?: number; tickets?: number }; vsPreviousDayPct?: number | null } };
+    const t = r.report?.today;
+    return `${a.title ?? "Reporte"} — ventas ${formatMoney(t?.gross ?? 0)}, ${t?.tickets ?? 0} tickets${r.report?.vsPreviousDayPct != null ? `, ${r.report.vsPreviousDayPct > 0 ? "+" : ""}${r.report.vsPreviousDayPct}% vs. ayer` : ""}`;
+  }
   if (a.type === "alert") return `${a.title ?? ""}${a.body ? ` — ${a.body}` : ""}`;
   if (a.type === "message") return `Mensaje a ${a.recipient?.name ?? "un cliente"}`;
   return null;
