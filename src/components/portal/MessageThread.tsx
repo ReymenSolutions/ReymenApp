@@ -179,7 +179,7 @@ export function MessageThread({ conversationId, contactName, initialMessages, ha
                       {msg.role === "USER"
                         ? contactName ?? (lang === "es" ? "Usuario" : "User")
                         : msg.role === "ASSISTANT"
-                        ? (lang === "es" ? "Asistente AI" : "AI Assistant")
+                        ? (lang === "es" ? "Agente IA" : "AI Agent")
                         : msg.role === "AGENT"
                         ? msg.sender?.name ?? msg.sender?.email ?? (lang === "es" ? "Agente" : "Agent")
                         : (lang === "es" ? "Sistema" : "System")}

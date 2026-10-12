@@ -117,12 +117,21 @@ describe("borradores de IA (acciones)", () => {
     expect(await prisma.auditLog.count({ where: { organizationId: org.id, action: "agent.mode" } })).toBe(2);
   });
 
-  it("rechaza canales y modos que no existen, y Automático mientras no esté disponible", async () => {
+  it("rechaza canales y modos que no existen", async () => {
     const org = await newOrg();
     as(org.id);
     await expect(setAgentChannelMode("telegrama", "OFF")).rejects.toThrow(/Canal no válido/);
     await expect(setAgentChannelMode("webchat", "TURBO")).rejects.toThrow(/Modo no válido/);
-    await expect(setAgentChannelMode("webchat", "AUTO")).rejects.toThrow(/Modo no válido/);
+  });
+
+  it("Automático exige confirmación explícita y un Rulebook escrito", async () => {
+    const org = await newOrg();
+    as(org.id);
+    await expect(setAgentChannelMode("webchat", "AUTO")).rejects.toThrow(/Confirma/);
+    await expect(setAgentChannelMode("webchat", "AUTO", { confirmed: true })).rejects.toThrow(/Rulebook/);
+    await prisma.businessRulebook.create({ data: { organizationId: org.id, rules: "Nunca inventes precios." } });
+    await setAgentChannelMode("webchat", "AUTO", { confirmed: true });
+    expect(await prisma.agentChannelSetting.findFirst({ where: { organizationId: org.id, channel: "webchat" } })).toMatchObject({ mode: "AUTO" });
   });
 
   it("con el canal apagado, abrir la conversación no genera borrador ni llama a Claude", async () => {

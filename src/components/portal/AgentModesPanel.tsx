@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePreferences } from "@/context/preferences";
 import { setAgentChannelMode } from "@/actions/agent";
 import { getErrorMessage } from "@/lib/user-error";
-import { SELECTABLE_AGENT_MODES } from "@/lib/agent-mode";
 import type { AgentMode } from "@prisma/client";
 
 const COPY = {
@@ -18,9 +17,12 @@ const COPY = {
     modes: {
       OFF: { label: "Apagado", hint: "No hace nada: ni borradores ni respuestas." },
       SUGGEST: { label: "Sugerir", hint: "Redacta un borrador; tú lo editas y lo envías." },
-      AUTO: { label: "Automático", hint: "Responde solo dentro de tus reglas. Próximamente." },
+      AUTO: { label: "Automático", hint: "Responde solo lo que tu Rulebook cubre; lo demás lo pasa a una persona." },
     } as Record<AgentMode, { label: string; hint: string }>,
-    soon: "Próximamente",
+    confirmTitle: "¿Que el agente responda solo en este canal?",
+    confirmBody: "Enviará respuestas a tus clientes sin que nadie las revise. Solo contesta lo que tu Rulebook cubre; si el cliente se queja, pide a una persona o el agente duda, pasa la conversación a tu equipo. Nunca manda enlaces ni pide pagos. Puedes apagarlo cuando quieras.",
+    confirm: "Sí, activar",
+    cancel: "Cancelar",
     noKey: "Falta la clave de Claude en el servidor (ANTHROPIC_API_KEY): mientras tanto no se generan borradores.",
     readOnly: "Solo quien gestiona la base de conocimiento puede cambiar esto.",
     saved: "Guardado",
@@ -33,9 +35,12 @@ const COPY = {
     modes: {
       OFF: { label: "Off", hint: "Does nothing: no drafts and no replies." },
       SUGGEST: { label: "Suggest", hint: "Writes a draft; you edit it and send it." },
-      AUTO: { label: "Automatic", hint: "Replies on its own within your rules. Coming soon." },
+      AUTO: { label: "Automatic", hint: "Replies on its own only what your Rulebook covers; hands the rest to a person." },
     } as Record<AgentMode, { label: string; hint: string }>,
-    soon: "Coming soon",
+    confirmTitle: "Let the agent reply on its own on this channel?",
+    confirmBody: "It will send replies to your customers without anyone reviewing them. It only answers what your Rulebook covers; if the customer complains, asks for a person or the agent is unsure, the conversation goes to your team. It never sends links or asks for payments. You can turn it off any time.",
+    confirm: "Yes, turn on",
+    cancel: "Cancel",
     noKey: "The server has no Claude key (ANTHROPIC_API_KEY): no drafts are generated meanwhile.",
     readOnly: "Only people who manage the knowledge base can change this.",
     saved: "Saved",
@@ -52,13 +57,20 @@ export function AgentModesPanel({ initial, canEdit, aiConfigured }: { initial: R
   const [modes, setModes] = useState(initial);
   const [pending, start] = useTransition();
 
-  function choose(channel: string, mode: AgentMode) {
+  const [confirming, setConfirming] = useState<string | null>(null);
+
+  function choose(channel: string, mode: AgentMode, confirmed = false) {
     if (!canEdit || pending || modes[channel] === mode) return;
+    if (mode === "AUTO" && !confirmed) {
+      setConfirming(channel);
+      return;
+    }
+    setConfirming(null);
     const previous = modes[channel];
     setModes((m) => ({ ...m, [channel]: mode }));
     start(async () => {
       try {
-        await setAgentChannelMode(channel, mode);
+        await setAgentChannelMode(channel, mode, { confirmed });
         toast.success(t.saved);
       } catch (e) {
         setModes((m) => ({ ...m, [channel]: previous }));
@@ -77,7 +89,7 @@ export function AgentModesPanel({ initial, canEdit, aiConfigured }: { initial: R
         {!aiConfigured && <p className="rounded-card border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">{t.noKey}</p>}
         {!canEdit && <p className="text-xs text-slate-500">{t.readOnly}</p>}
         {Object.keys(initial).map((channel) => (
-          <div key={channel} className="flex flex-col gap-2 rounded-card border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div key={channel} className="flex flex-col gap-2 rounded-card border border-slate-200 p-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="text-sm font-medium text-slate-900">{t.channels[channel] ?? channel}</p>
               <p className="text-xs text-slate-500">{t.modes[modes[channel]].hint}</p>
@@ -85,7 +97,6 @@ export function AgentModesPanel({ initial, canEdit, aiConfigured }: { initial: R
             <div role="radiogroup" aria-label={t.channels[channel] ?? channel} className="inline-flex flex-shrink-0 rounded-lg bg-slate-100 p-0.5">
               {ORDER.map((mode) => {
                 const Icon = ICON[mode];
-                const selectable = SELECTABLE_AGENT_MODES.includes(mode);
                 const active = modes[channel] === mode;
                 return (
                   <button
@@ -93,8 +104,8 @@ export function AgentModesPanel({ initial, canEdit, aiConfigured }: { initial: R
                     type="button"
                     role="radio"
                     aria-checked={active}
-                    disabled={!canEdit || pending || !selectable}
-                    title={selectable ? t.modes[mode].hint : t.soon}
+                    disabled={!canEdit || pending}
+                    title={t.modes[mode].hint}
                     onClick={() => choose(channel, mode)}
                     className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium motion-micro transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50 ${active ? "bg-[rgb(255_255_255)] text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
                   >
@@ -104,6 +115,16 @@ export function AgentModesPanel({ initial, canEdit, aiConfigured }: { initial: R
                 );
               })}
             </div>
+            {confirming === channel && (
+              <div role="alertdialog" aria-label={t.confirmTitle} className="w-full rounded-card border border-amber-200 bg-amber-50 p-3 sm:order-last">
+                <p className="text-sm font-medium text-amber-900">{t.confirmTitle}</p>
+                <p className="mt-1 text-xs text-amber-800">{t.confirmBody}</p>
+                <div className="mt-2 flex gap-2">
+                  <button type="button" onClick={() => choose(channel, "AUTO", true)} className="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-[rgb(255_255_255)] hover:bg-brand-700">{t.confirm}</button>
+                  <button type="button" onClick={() => setConfirming(null)} className="rounded-md px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100">{t.cancel}</button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </CardContent>

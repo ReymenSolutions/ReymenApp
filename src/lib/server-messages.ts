@@ -174,6 +174,8 @@ const EN: Record<string, string> = {
   "Borrador no encontrado": "Draft not found",
   "Canal no válido": "Invalid channel",
   "Modo no válido": "Invalid mode",
+  "Confirma que el agente responda solo en este canal": "Confirm that the agent should reply on its own on this channel",
+  "Escribe tu Rulebook antes de activar el modo automático": "Write your Rulebook before turning on automatic mode",
   "Activa primero los módulos que necesita esta automatización": "First enable the modules this automation needs",
   "Para activar un perfil digital en esta tarjeta, usa el botón Activar perfil digital en vez de este formulario.":
     "To activate a digital profile on this card, use the Activate digital profile button instead of this form.",
