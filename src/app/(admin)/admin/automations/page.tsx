@@ -92,7 +92,10 @@ export default async function AdminAutomationsPage() {
                         <div className="flex flex-shrink-0 items-center gap-2">
                           <Badge variant={item.kind === "blueprint" ? "info" : "secondary"}>{item.kind === "blueprint" ? (es ? "Blueprint · app" : "Blueprint · app") : es ? "Plantilla · n8n" : "Template · n8n"}</Badge>
                           <Badge variant="secondary">
-                            {item.kind === "blueprint" ? item.instances.length : item.installs} {es ? "clientes" : "clients"}
+                            {(() => {
+                              const n = item.kind === "blueprint" ? item.instances.length : item.installs;
+                              return `${n} ${es ? (n === 1 ? "cliente" : "clientes") : n === 1 ? "client" : "clients"}`;
+                            })()}
                           </Badge>
                         </div>
                       </div>

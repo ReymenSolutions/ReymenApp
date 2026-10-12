@@ -466,3 +466,11 @@ Ambas usan los detectores del reloj (`detectors.ts`): el `tick` busca candidatos
 - **Cancelaciones:** `sale.cancelled` resta su monto neto a la conversión de la venta original; si llega a cero queda `revertedAt`/`revertedBySaleId` (la fila **no se borra**).
 - **Pantalla:** "Ingresos asociados a automatizaciones" en `/portal/automations` (30 días: mensajes enviados, ventas e ingresos asociados por automatización, sin revertidos), con el aviso de que son ingresos **asociados** y no prueba de que la automatización los provocó.
 - **Pendiente (recomendado):** grupo de control aleatorio por automatización (p. ej. 10 % sin mensaje) para medir la diferencia de tasa de regreso, que es la prueba real de causalidad; `couponId` cuando existan cupones.
+
+## V. Configuración de blueprints por cliente en el Admin
+
+- **Formulario generado desde el esquema:** cada blueprint declara `configUi` (presentación de cada parámetro: título, ayuda, sección, unidad y etiquetas de opciones); límites, valores por defecto y opciones salen de su `configSchema` (Zod). Una prueba exige que **ningún parámetro quede sin presentación**, así nada configurable se queda fuera de la pantalla.
+- **Secciones:** Cuándo actúa · A quién · Canal y horario · Límites · Opcionales (`CONFIG_GROUPS`). Cada campo muestra su valor de fábrica, marca "Modificado" y permite restaurarlo (por campo o todo).
+- **Admin → Cliente → Automatizaciones (blueprints) → Configurar** (`BlueprintConfigDialog`). Muestra la zona horaria del negocio (de ella dependen las horas) y avisa si la automatización está en envío real (los cambios aplican de inmediato).
+- **Servidor** (`getBlueprintConfigForm`, `saveBlueprintConfig`): solo admin, aislado por organización; ignora llaves desconocidas; valida con el esquema (límites) y con `crossCheck` (coherencia, p. ej. "mínimo sin venir" < "darlo por perdido"); devuelve errores por campo (sin guardar nada si hay alguno); guarda solo lo que cambió y lo deja en la bitácora (`automation.blueprint_config`, antes y después).
+- El panel de blueprints del cliente ahora ocupa todo el ancho, tiene ancla `#blueprints` y un enlace desde la tarjeta "Automatizaciones".

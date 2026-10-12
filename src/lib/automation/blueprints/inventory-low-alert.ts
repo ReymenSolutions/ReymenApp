@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Blueprint } from "../types";
+import { COMMON, UNIT } from "../config-ui";
 import type { StockLevel } from "@/lib/food-inventory";
 
 const configSchema = z.object({
@@ -25,6 +26,9 @@ export const inventoryLowAlert: Blueprint<Config> = {
   status: "active",
   configSchema,
   defaultConfig: configSchema.parse({}),
+  configUi: {
+    minLevel: { group: "when", kind: "select", label: { es: "Avisar desde el nivel", en: "Alert from level" }, help: { es: "\"Bajo\" avisa en cuanto un insumo baja de su mínimo; \"Crítico\" solo cuando está agotado o casi.", en: "\"Low\" alerts as soon as a supply drops below its minimum; \"Critical\" only when it is out or nearly out." }, options: { low: { es: "Bajo (por debajo del mínimo)", en: "Low (below minimum)" }, critical: { es: "Crítico (agotado o casi)", en: "Critical (out or nearly out)" } } },
+  },
   decide: (event, _ctx, config) => {
     const p = (event.payload ?? {}) as LevelPayload;
     if (!p.level || p.level === "ok") return { kind: "skip", reason: "not_low" };

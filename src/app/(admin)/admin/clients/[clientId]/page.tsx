@@ -216,7 +216,11 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
           <Card>
             <CardHeader className="flex-row items-center justify-between">
               <CardTitle>{t.automations}</CardTitle>
-              <Zap className="h-4 w-4 text-slate-400" />
+              <div className="flex items-center gap-3">
+                {/* Los blueprints (automatizaciones inteligentes) se configuran más abajo, en su propio panel. */}
+                <a href="#blueprints" className="text-xs font-medium text-brand-700 hover:underline">Configurar automatizaciones inteligentes ↓</a>
+                <Zap className="h-4 w-4 text-slate-400" />
+              </div>
             </CardHeader>
             <CardContent>
               {client.automations.length === 0 ? (

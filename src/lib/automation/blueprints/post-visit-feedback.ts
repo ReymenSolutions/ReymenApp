@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ActionSpec, Blueprint } from "../types";
+import { COMMON, UNIT } from "../config-ui";
 import { createFeedbackRequest, feedbackUrl } from "@/lib/feedback";
 
 const configSchema = z.object({
@@ -27,6 +28,13 @@ export const postVisitFeedback: Blueprint<Config> = {
   status: "active",
   configSchema,
   defaultConfig: configSchema.parse({}),
+  configUi: {
+    channel: COMMON.channel,
+    delayMinutes: { group: "when", kind: "number", label: { es: "Pedir la opinión después de", en: "Ask for feedback after" }, help: { es: "Tiempo entre la compra y el mensaje. Si cae en horas de silencio, sale a la mañana siguiente.", en: "Time between the purchase and the message. If it falls in quiet hours it goes out the next morning." }, unit: UNIT.minutes },
+    cooldownDays: { group: "limits", kind: "number", label: { es: "A lo más una solicitud cada", en: "At most one request every" }, help: { es: "Un cliente que compra seguido no recibe una solicitud por cada compra.", en: "A customer who buys often does not get a request for every purchase." }, unit: UNIT.days },
+    quietStart: COMMON.quietStart, quietEnd: COMMON.quietEnd,
+    reviewUrl: { group: "extras", kind: "url", label: { es: "Enlace para reseña pública", en: "Public review link" }, help: { es: "Opcional (https, p. ej. Google). Se ofrece a TODOS los que responden, sin importar su calificación.", en: "Optional (https, e.g. Google). Offered to EVERYONE who answers, regardless of their rating." } },
+  },
   decide: (_event, ctx) => {
     if (!ctx.customer) return { kind: "skip", reason: "no_customer" };
     return { kind: "act", action: { type: "message", channel: "whatsapp", templateKey: "post_visit_feedback_v1", variables: { name: ctx.customer.name ?? "", businessName: ctx.organization.name, feedbackUrl: "" } } };

@@ -2,6 +2,7 @@ import type { Customer, PlatformModule } from "@prisma/client";
 import type { ZodType, ZodTypeDef } from "zod";
 import type { StoredDomainEvent } from "@/lib/domain-events";
 import type { DailyReport } from "./report";
+import type { ConfigUi } from "./config-ui";
 
 export type MessageChannel = "whatsapp" | "sms";
 
@@ -47,6 +48,10 @@ export type Blueprint<C = Record<string, unknown>> = {
   status: "active" | "deprecated";
   configSchema: ZodType<C, ZodTypeDef, unknown>;
   defaultConfig: C;
+  /** Coherencia entre parámetros (p. ej. "desde" < "hasta"): devuelve la llave con el problema, o null si está bien. */
+  crossCheck?: (config: C) => { key: string; code: "must_be_less"; other: string } | null;
+  /** Cómo se presenta cada parámetro en el Admin (título, ayuda, sección, unidad). Uno por cada llave de `configSchema`. */
+  configUi: ConfigUi<C>;
   /** Función pura: decide, a partir del evento y el contexto, si actuar y con qué. */
   decide: (event: StoredDomainEvent, ctx: BlueprintContext, config: C) => BlueprintDecision;
   /** Cómo se contacta (canal, enfriamiento, horario) según la configuración. */

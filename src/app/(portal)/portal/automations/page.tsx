@@ -141,15 +141,23 @@ export default async function PortalAutomationsPage() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between text-xs text-slate-500 mb-3">
-                  <span>{auto._count.events} {t.totalEvents}</span>
+                  {auto.blueprintKey ? (
+                    <span>
+                      {auto.dryRun ? "En simulación" : "Envío real"} · {auto.lastRunAt ? `última ejecución ${formatDateTime(auto.lastRunAt)}` : "aún sin ejecuciones"}
+                    </span>
+                  ) : (
+                    <span>{auto._count.events} {t.totalEvents}</span>
+                  )}
                   <div className="flex items-center gap-3">
                     <span>{t.createdOn} {formatDate(auto.createdAt)}</span>
-                    <Link
-                      href={`/portal/automations/${auto.id}`}
-                      className="flex items-center gap-1 text-brand-600 hover:text-brand-700 font-medium"
-                    >
-                      {t.viewDetail} <ArrowRight className="h-3 w-3" />
-                    </Link>
+                    {!auto.blueprintKey && (
+                      <Link
+                        href={`/portal/automations/${auto.id}`}
+                        className="flex items-center gap-1 text-brand-600 hover:text-brand-700 font-medium"
+                      >
+                        {t.viewDetail} <ArrowRight className="h-3 w-3" />
+                      </Link>
+                    )}
                   </div>
                 </div>
 

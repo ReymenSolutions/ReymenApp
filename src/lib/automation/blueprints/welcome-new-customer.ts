@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Blueprint } from "../types";
+import { COMMON, UNIT } from "../config-ui";
 
 const configSchema = z.object({
   channel: z.enum(["whatsapp", "sms"]).default("whatsapp"),
@@ -22,6 +23,11 @@ export const welcomeNewCustomer: Blueprint<Config> = {
   status: "active",
   configSchema,
   defaultConfig: configSchema.parse({}),
+  configUi: {
+    channel: COMMON.channel,
+    cooldownDays: { group: "limits", kind: "number", label: { es: "Una bienvenida cada", en: "One welcome every" }, help: { es: "Un cliente recibe la bienvenida una sola vez en este lapso.", en: "A customer gets the welcome only once in this period." }, unit: UNIT.days },
+    quietStart: COMMON.quietStart, quietEnd: COMMON.quietEnd,
+  },
   decide: (_event, ctx) => {
     const customer = ctx.customer;
     if (!customer) return { kind: "skip", reason: "no_customer" };

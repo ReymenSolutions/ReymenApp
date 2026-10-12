@@ -10,7 +10,7 @@ vi.mock("@/lib/auth", () => ({
   isAdmin: (role: string) => role === "SUPER_ADMIN" || role === "ADMIN",
 }));
 
-const { enableBlueprint, setBlueprintDryRun, disableBlueprint, getOrganizationBlueprints } = await import("./blueprints");
+const { enableBlueprint, setBlueprintDryRun, disableBlueprint, getOrganizationBlueprints, getBlueprintConfigForm, saveBlueprintConfig } = await import("./blueprints");
 
 describe("blueprints (admin): solapamiento con plantillas de n8n", () => {
   let org: { id: string };
@@ -108,5 +108,75 @@ describe("blueprints (admin)", () => {
     } finally {
       await cleanupOrg(other.id);
     }
+  });
+});
+
+describe("blueprints (admin): configuración por cliente", () => {
+  let org: { id: string };
+  let other: { id: string };
+  afterEach(async () => {
+    if (org) await cleanupOrg(org.id);
+    if (other) await cleanupOrg(other.id);
+  });
+  const admin = () => authMock.mockResolvedValue(fakeSession({ id: "admin1", role: "SUPER_ADMIN", organizationId: null }));
+  const setup = async () => {
+    admin();
+    org = await createTestOrg("Blueprint Config Org");
+    other = await createTestOrg("Blueprint Config Other");
+    for (const o of [org, other]) {
+      for (const mod of ["FOOD_OPS", "REYMEN_POS"] as const) await prisma.organizationModule.create({ data: { organizationId: o.id, module: mod, status: "ACTIVE", source: "ADMIN_GRANTED" } });
+      await enableBlueprint({ orgId: o.id, key: "customer_recovery" });
+    }
+  };
+  const stored = (orgId: string) => prisma.automation.findFirstOrThrow({ where: { organizationId: orgId, blueprintKey: "customer_recovery" } });
+
+  it("solo un admin puede ver o cambiar la configuración", async () => {
+    authMock.mockResolvedValue(fakeSession({ id: "u1", role: "OWNER", organizationId: null }));
+    await expect(getBlueprintConfigForm({ orgId: "x", key: "customer_recovery" })).rejects.toThrow(/autorizado/i);
+    await expect(saveBlueprintConfig({ orgId: "x", key: "customer_recovery", config: {} })).rejects.toThrow(/autorizado/i);
+  });
+
+  it("el formulario trae los campos, los valores actuales y la zona horaria del negocio", async () => {
+    await setup();
+    const form = await getBlueprintConfigForm({ orgId: org.id, key: "customer_recovery" });
+    expect(form).toMatchObject({ key: "customer_recovery", timezone: "America/Mexico_City", live: false, enabled: true });
+    expect(form.values).toMatchObject({ minVisits: 3, factor: 2.5, channel: "whatsapp" });
+    expect(form.fields.length).toBe(8);
+  });
+
+  it("guarda solo lo válido, deja en la bitácora qué cambió y no toca a otro cliente", async () => {
+    await setup();
+    const res = await saveBlueprintConfig({ orgId: org.id, key: "customer_recovery", config: { minVisits: 5, cooldownDays: 45, inventado: "x" } });
+    expect(res).toEqual({ success: true, changed: ["minVisits", "cooldownDays"] });
+    expect((await stored(org.id)).config).toMatchObject({ minVisits: 5, cooldownDays: 45, factor: 2.5 });
+    expect((await stored(org.id)).config).not.toHaveProperty("inventado");
+    expect((await stored(other.id)).config).toMatchObject({ minVisits: 3, cooldownDays: 60 }); // otro cliente intacto
+    const audit = await prisma.auditLog.findFirstOrThrow({ where: { organizationId: org.id, action: "automation.blueprint_config" } });
+    expect(audit.metadata).toMatchObject({ key: "customer_recovery", changes: { minVisits: { from: 3, to: 5 }, cooldownDays: { from: 60, to: 45 } } });
+    // Guardar lo mismo no cambia ni audita de nuevo.
+    expect(await saveBlueprintConfig({ orgId: org.id, key: "customer_recovery", config: { minVisits: 5 } })).toEqual({ success: true, changed: [] });
+    expect(await prisma.auditLog.count({ where: { organizationId: org.id, action: "automation.blueprint_config" } })).toBe(1);
+  });
+
+  it("rechaza fuera de límites, no enteros, opciones inexistentes e incoherencias, sin guardar nada", async () => {
+    await setup();
+    const res = await saveBlueprintConfig({ orgId: org.id, key: "customer_recovery", config: { minVisits: 1, factor: 99, channel: "fax", quietStart: 30 } });
+    expect(res.success).toBe(false);
+    if (!res.success) {
+      expect(res.errors.minVisits).toMatchObject({ code: "too_small", min: 2 });
+      expect(res.errors.factor).toMatchObject({ code: "too_big", max: 10 });
+      expect(res.errors.channel).toMatchObject({ code: "invalid" });
+      expect(res.errors.quietStart).toMatchObject({ code: "too_big", max: 23 });
+    }
+    const incoherent = await saveBlueprintConfig({ orgId: org.id, key: "customer_recovery", config: { minDays: 200, maxDays: 100 } });
+    expect(incoherent).toEqual({ success: false, errors: { minDays: { code: "must_be_less", other: "maxDays" } } });
+    expect((await stored(org.id)).config).toMatchObject({ minVisits: 3, factor: 2.5, minDays: 21, maxDays: 180 });
+  });
+
+  it("exige que la automatización esté habilitada para el cliente", async () => {
+    admin();
+    org = await createTestOrg("Blueprint Config No Instance");
+    await expect(saveBlueprintConfig({ orgId: org.id, key: "customer_recovery", config: { minVisits: 5 } })).rejects.toThrow(/habilita/i);
+    await expect(saveBlueprintConfig({ orgId: org.id, key: "no-existe", config: {} })).rejects.toThrow(/no encontrada/i);
   });
 });
