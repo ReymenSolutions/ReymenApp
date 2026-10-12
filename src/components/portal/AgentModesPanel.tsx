@@ -107,7 +107,7 @@ export function AgentModesPanel({ initial, canEdit, aiConfigured }: { initial: R
                     disabled={!canEdit || pending}
                     title={t.modes[mode].hint}
                     onClick={() => choose(channel, mode)}
-                    className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium motion-micro transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50 ${active ? "bg-[rgb(255_255_255)] text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+                    className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium motion-micro transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50 ${active ? "bg-brand-600 text-[rgb(255_255_255)] shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
                   >
                     <Icon className="h-3.5 w-3.5" />
                     {t.modes[mode].label}
