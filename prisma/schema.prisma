@@ -103,6 +103,10 @@ model Organization {
   foodRecipeUsages        FoodRecipeUsage[]
   deliveryChannels        DeliveryChannel[]
   deliveryOrders          DeliveryOrder[]
+  loyaltyPrograms         LoyaltyProgram[]
+  loyaltyMembers          LoyaltyMember[]
+  loyaltyVisits           LoyaltyVisit[]
+  loyaltyRewards          LoyaltyReward[]
 
   @@index([slug])
 }
@@ -135,6 +139,8 @@ model User {
   authoredNotes         Note[]
   assignedConversations Conversation[] @relation("ConversationAssignee")
   sentMessages          Message[]      @relation("MessageSender")
+  loyaltyVisitsRecorded LoyaltyVisit[]  @relation("LoyaltyVisitEmployee")
+  loyaltyRedemptions    LoyaltyReward[] @relation("LoyaltyRewardRedeemedBy")
 
   @@index([organizationId])
   @@index([email])
@@ -1216,6 +1222,7 @@ model FoodSale {
   organization Organization @relation(fields: [organizationId], references: [id])
   customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
   branch       Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  loyaltyVisits LoyaltyVisit[]
 
   @@index([organizationId])
   @@index([organizationId, occurredAt])
@@ -1239,6 +1246,10 @@ model Branch {
   dishes        BranchDish[]
   variantPrices BranchVariantPrice[]
   stocks        BranchStock[]
+  loyaltyPrograms       LoyaltyProgram[]
+  loyaltyMembers        LoyaltyMember[] @relation("LoyaltyMemberEnrollmentBranch")
+  loyaltyVisits         LoyaltyVisit[]  @relation("LoyaltyVisitBranch")
+  loyaltyRedemptions    LoyaltyReward[] @relation("LoyaltyRewardRedeemedBranch")
 
   @@index([organizationId])
 }
@@ -1323,6 +1334,7 @@ model Customer {
   organization Organization @relation(fields: [organizationId], references: [id])
   lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
   sales        FoodSale[]
+  loyaltyMembers LoyaltyMember[]
 
   @@unique([organizationId, phoneKey])
   @@index([leadId])
@@ -1943,4 +1955,214 @@ model FoodShiftClose {
 
   @@unique([organizationId, externalSessionId])
   @@index([organizationId, closedAt])
+}
+
+// ─── LEALTAD (REYMEN Loyalty, parte de FOOD_OPS) ───────────────────
+// Programa de lealtad por visitas: el cliente se inscribe en una página
+// pública, recibe una tarjeta con un QR opaco (publicToken) y el negocio
+// registra sus visitas desde una sesión autorizada. La fuente de verdad son
+// estas tablas; Apple/Google Wallet (si se conectan) solo reflejan su estado.
+//
+// Historial nunca destructivo: cambiar la regla (meta/recompensa) crea una
+// LoyaltyProgramVersion nueva y las recompensas guardan un snapshot de la
+// regla con la que se ganaron; las visitas no se borran (status). Sucursal
+// null = la sucursal principal implícita, igual que FoodSale.branchId.
+
+enum LoyaltyProgramStatus {
+  ACTIVE
+  PAUSED
+}
+
+/// Alcance del programa: toda la organización (todas sus sucursales) o una sola sucursal.
+enum LoyaltyProgramScope {
+  ORGANIZATION
+  BRANCH
+}
+
+/// Mecánica de la regla. Por ahora solo VISITS está activa en UI y lógica;
+/// el enum existe para no cerrar el modelo a recompensas por gasto o puntos.
+enum LoyaltyRuleType {
+  VISITS
+}
+
+enum LoyaltyRewardType {
+  FREE_ITEM
+  DISCOUNT_PERCENT
+  DISCOUNT_AMOUNT
+  CUSTOM
+}
+
+enum LoyaltyVisitStatus {
+  CONFIRMED
+  VOIDED
+}
+
+/// En progreso no es una fila: es el ciclo actual del miembro (LoyaltyMember.cycleVisits).
+enum LoyaltyRewardStatus {
+  AVAILABLE
+  REDEEMED
+}
+
+model LoyaltyProgram {
+  id             String               @id @default(cuid())
+  organizationId String
+  scope          LoyaltyProgramScope  @default(ORGANIZATION)
+  // Solo con scope = BRANCH.
+  branchId       String?
+  name           String
+  description    String?              @db.Text
+  status         LoyaltyProgramStatus @default(ACTIVE)
+  // Versión vigente de la regla (ver LoyaltyProgramVersion).
+  currentVersion Int                  @default(1)
+  // Punto de referencia del mapa (la sucursal / el local). Aproximado; nunca domicilios de clientes.
+  referenceLabel String?
+  referenceLat   Float?
+  referenceLng   Float?
+  // Programa creado por el seed de demostración: las pantallas lo marcan como "datos demo".
+  isDemo         Boolean              @default(false)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branch       Branch?                 @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  versions     LoyaltyProgramVersion[]
+  members      LoyaltyMember[]
+  visits       LoyaltyVisit[]
+  rewards      LoyaltyReward[]
+
+  @@index([organizationId, status])
+}
+
+/// Regla del programa en el tiempo. Nunca se edita una versión: se crea la siguiente.
+model LoyaltyProgramVersion {
+  id                String            @id @default(cuid())
+  organizationId    String
+  programId         String
+  version           Int
+  ruleType          LoyaltyRuleType   @default(VISITS)
+  visitGoal         Int
+  rewardType        LoyaltyRewardType @default(FREE_ITEM)
+  rewardName        String
+  rewardDescription String?           @db.Text
+  // Frase visible para el cliente ("Tu décima visita corre por nuestra cuenta").
+  rewardHeadline    String?
+  effectiveFrom     DateTime          @default(now())
+  createdById       String?
+  createdAt         DateTime          @default(now())
+
+  program LoyaltyProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@unique([programId, version])
+  @@index([organizationId])
+}
+
+model LoyaltyMember {
+  id                 String    @id @default(cuid())
+  organizationId     String
+  programId          String
+  // Cliente del negocio (misma entidad que captura el POS), enlazado por teléfono.
+  customerId         String?
+  name               String
+  // E.164 (+52…) y su llave de últimos 10 dígitos (src/lib/phone.ts).
+  whatsapp           String
+  whatsappKey        String
+  postalCode         String
+  email              String?
+  enrollmentBranchId String?
+  // Token opaco que va en el QR y en el enlace de la tarjeta. No contiene datos personales.
+  publicToken        String    @unique
+  consentTextVersion String
+  consentAt          DateTime
+  // Ciclo en curso: visitas contadas hacia la siguiente recompensa.
+  cycleNumber        Int       @default(1)
+  cycleVisits        Int       @default(0)
+  // Totales desnormalizados para listas rápidas (la fuente son LoyaltyVisit / LoyaltyReward).
+  totalVisits        Int       @default(0)
+  visitsWithAmount   Int       @default(0)
+  totalSpent         Decimal   @default(0) @db.Decimal(12, 2)
+  firstVisitAt       DateTime?
+  lastVisitAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  organization     Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  program          LoyaltyProgram  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  customer         Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  enrollmentBranch Branch?         @relation("LoyaltyMemberEnrollmentBranch", fields: [enrollmentBranchId], references: [id], onDelete: SetNull)
+  visits           LoyaltyVisit[]
+  rewards          LoyaltyReward[]
+
+  @@unique([programId, whatsappKey])
+  @@index([organizationId, postalCode])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, lastVisitAt])
+  @@index([customerId])
+}
+
+/// Visita confirmada por el negocio (nunca por el cliente). idempotencyKey evita duplicados por doble clic o reintento.
+model LoyaltyVisit {
+  id             String             @id @default(cuid())
+  organizationId String
+  programId      String
+  memberId       String
+  branchId       String?
+  employeeUserId String?
+  // Venta de Reymen Food relacionada, si existe; si no, solo el monto capturado en caja.
+  saleId         String?
+  saleAmount     Decimal?           @db.Decimal(12, 2)
+  occurredAt     DateTime           @default(now())
+  idempotencyKey String
+  status         LoyaltyVisitStatus @default(CONFIRMED)
+  // Regla y ciclo con los que contó esta visita.
+  programVersion Int
+  cycleNumber    Int
+  createdAt      DateTime           @default(now())
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  program      LoyaltyProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  member       LoyaltyMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  branch       Branch?        @relation("LoyaltyVisitBranch", fields: [branchId], references: [id], onDelete: SetNull)
+  employee     User?          @relation("LoyaltyVisitEmployee", fields: [employeeUserId], references: [id], onDelete: SetNull)
+  sale         FoodSale?      @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  earnedReward LoyaltyReward?
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, occurredAt])
+  @@index([organizationId, branchId, occurredAt])
+  @@index([memberId, occurredAt])
+  @@index([programId, occurredAt])
+}
+
+/// Recompensa ganada al completar un ciclo. Snapshot de la regla con la que se ganó; el canje no borra nada.
+model LoyaltyReward {
+  id                String              @id @default(cuid())
+  organizationId    String
+  programId         String
+  memberId          String
+  programVersion    Int
+  cycleNumber       Int
+  visitGoal         Int
+  rewardType        LoyaltyRewardType
+  rewardName        String
+  rewardDescription String?             @db.Text
+  status            LoyaltyRewardStatus @default(AVAILABLE)
+  earnedAt          DateTime            @default(now())
+  earnedVisitId     String?             @unique
+  redeemedAt        DateTime?
+  redeemedBranchId  String?
+  redeemedById      String?
+  createdAt         DateTime            @default(now())
+
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  program        LoyaltyProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  member         LoyaltyMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  earnedVisit    LoyaltyVisit?  @relation(fields: [earnedVisitId], references: [id], onDelete: SetNull)
+  redeemedBranch Branch?        @relation("LoyaltyRewardRedeemedBranch", fields: [redeemedBranchId], references: [id], onDelete: SetNull)
+  redeemedBy     User?          @relation("LoyaltyRewardRedeemedBy", fields: [redeemedById], references: [id], onDelete: SetNull)
+
+  // Un ciclo produce a lo más una recompensa: protege contra recompensas duplicadas.
+  @@unique([memberId, cycleNumber])
+  @@index([organizationId, status])
+  @@index([organizationId, earnedAt])
+  @@index([organizationId, redeemedAt])
 }
