@@ -7,6 +7,7 @@ import { applyTemplateInstall } from "@/lib/template-install";
 import type { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/guards";
 import { UserError } from "@/lib/user-error";
+import { validateConfigSpec } from "@/lib/automation/config-spec";
 
 const templateSchema = z.object({
   name: z.string().min(2),
@@ -22,7 +23,8 @@ const versionSchema = z.object({
   version: z.string().regex(/^\d+\.\d+\.\d+$/, "Usa formato semver: 1.0.0"),
   changelog: z.string().optional(),
   n8nWorkflowJson: z.record(z.unknown()),
-  defaultConfig: z.record(z.unknown()).optional(),
+  /** Parámetros configurables por cliente (formato de src/lib/automation/config-spec.ts). */
+  configSpec: z.record(z.unknown()).optional(),
 });
 
 export async function createTemplate(data: z.infer<typeof templateSchema>) {
@@ -72,6 +74,10 @@ export async function addTemplateVersion(
   await requireAdmin();
 
   const parsed = versionSchema.parse(data);
+  if (parsed.configSpec) {
+    const spec = validateConfigSpec(parsed.configSpec);
+    if (!spec.ok) throw new UserError(`Parámetros del template no válidos: ${spec.errors.join("; ")}`);
+  }
 
   const template = await prisma.automationTemplate.findUnique({
     where: { id: templateId },
@@ -97,9 +103,7 @@ export async function addTemplateVersion(
         version: parsed.version,
         changelog: parsed.changelog,
         n8nWorkflowJson: parsed.n8nWorkflowJson as Prisma.InputJsonValue,
-        defaultConfig: parsed.defaultConfig
-          ? (parsed.defaultConfig as Prisma.InputJsonValue)
-          : undefined,
+        configSpec: parsed.configSpec ? (parsed.configSpec as Prisma.InputJsonValue) : undefined,
         isLatest: true,
       },
     }),
@@ -150,7 +154,7 @@ export async function installTemplateForClient(
       description: version.template.description,
       category: version.template.category,
     },
-    version: { id: version.id, version: version.version, n8nWorkflowId: version.n8nWorkflowId },
+    version: { id: version.id, version: version.version, n8nWorkflowId: version.n8nWorkflowId, configSpec: version.configSpec },
     config,
   });
 

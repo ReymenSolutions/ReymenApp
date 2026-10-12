@@ -23,6 +23,7 @@ import { getSmartcardLinkState, planMemberLimit } from "@/lib/smartcard-link";
 import { AdminClientUsersPanel } from "@/components/admin/AdminClientUsersPanel";
 import { ConsumptionChart } from "@/components/charts/ConsumptionChart";
 import { getOrganizationModules } from "@/actions/admin/modules";
+import { TemplateConfigButton } from "@/components/admin/TemplateConfigButton";
 import { formatDate } from "@/lib/utils";
 import type { PlatformModule } from "@prisma/client";
 
@@ -76,7 +77,7 @@ async function getClientDetail(clientId: string) {
         templateInstallations: {
           include: {
             template: { select: { id: true, name: true, iconEmoji: true, industry: true } },
-            version: { select: { version: true } },
+            version: { select: { version: true, configSpec: true } },
           },
           orderBy: { installedAt: "desc" },
         },
@@ -392,6 +393,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
                           v{inst.version.version} · {formatDate(inst.installedAt)}
                         </p>
                       </div>
+                      {inst.status === "ACTIVE" && inst.automationId && inst.version.configSpec && <TemplateConfigButton orgId={client.id} automationId={inst.automationId} />}
                       <Badge
                         variant={inst.status === "ACTIVE" ? "success" : "secondary"}
                         className="text-xs flex-shrink-0"

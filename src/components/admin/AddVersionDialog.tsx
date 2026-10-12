@@ -21,7 +21,7 @@ const schema = z.object({
   version: z.string().regex(/^\d+\.\d+\.\d+$/, "Formato: 1.0.0"),
   changelog: z.string().optional(),
   n8nWorkflowJsonRaw: z.string().min(2, "Pega el JSON del workflow"),
-  defaultConfigRaw: z.string().optional(),
+  configSpecRaw: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -82,7 +82,7 @@ export function AddVersionDialog({ templateId, templateName, currentVersion }: A
     setLoading(true);
     try {
       let n8nWorkflowJson: Record<string, unknown>;
-      let defaultConfig: Record<string, unknown> | undefined;
+      let configSpec: Record<string, unknown> | undefined;
 
       try {
         n8nWorkflowJson = JSON.parse(data.n8nWorkflowJsonRaw);
@@ -91,11 +91,11 @@ export function AddVersionDialog({ templateId, templateName, currentVersion }: A
         return;
       }
 
-      if (data.defaultConfigRaw?.trim()) {
+      if (data.configSpecRaw?.trim()) {
         try {
-          defaultConfig = JSON.parse(data.defaultConfigRaw);
+          configSpec = JSON.parse(data.configSpecRaw);
         } catch {
-          toast.error(lang === "es" ? "El JSON de configuración no es válido" : "The config JSON is not valid");
+          toast.error(lang === "es" ? "El JSON de parámetros no es válido" : "The parameters JSON is not valid");
           return;
         }
       }
@@ -104,7 +104,7 @@ export function AddVersionDialog({ templateId, templateName, currentVersion }: A
         version: data.version,
         changelog: data.changelog,
         n8nWorkflowJson,
-        defaultConfig,
+        configSpec,
       });
 
       toast.success(lang === "es" ? `Versión ${data.version} añadida` : `Version ${data.version} added`);
@@ -173,15 +173,17 @@ export function AddVersionDialog({ templateId, templateName, currentVersion }: A
           </div>
 
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Config por defecto (JSON, opcional)" : "Default config (JSON, optional)"}</Label>
+            <Label>{lang === "es" ? "Parámetros configurables (JSON, opcional)" : "Configurable parameters (JSON, optional)"}</Label>
             <Textarea
-              placeholder='{"company_name": "", "webhook_url": "", "follow_up_days": 3}'
+              placeholder='{"reviewUrl": {"kind": "url", "group": "extras", "label": {"es": "Enlace de reseñas", "en": "Review link"}, "help": {"es": "…", "en": "…"}, "ownerEditable": true}}'
               rows={3}
               className="font-mono text-xs"
-              {...register("defaultConfigRaw")}
+              {...register("configSpecRaw")}
             />
             <p className="text-xs text-slate-400">
-              {lang === "es" ? "Variables que el cliente puede personalizar al instalar." : "Variables the client can customize when installing."}
+              {lang === "es"
+                ? "Un workflow genérico no lleva datos del cliente dentro: declara aquí sus parámetros (mismo formato que los blueprints) y el Admin genera la pantalla de configuración de cada cliente."
+                : "A generic workflow holds no client data: declare its parameters here (same format as blueprints) and the Admin generates each client's configuration screen."}
             </p>
           </div>
 

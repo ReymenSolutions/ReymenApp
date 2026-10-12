@@ -1181,7 +1181,10 @@ model TemplateVersion {
   changelog       String?  @db.Text
   n8nWorkflowJson Json // full n8n workflow export JSON
   n8nWorkflowId   String? // ID of deployed workflow in n8n instance
-  defaultConfig   Json? // default variable values for this version
+  defaultConfig   Json? // default variable values for this version (versiones sin configSpec)
+  // Parámetros que el cliente puede configurar, en el formato de presentación de los blueprints
+  // (src/lib/automation/config-spec.ts): el Admin genera la misma pantalla de configuración desde aquí.
+  configSpec      Json?
   isLatest        Boolean  @default(true)
   createdAt       DateTime @default(now())
 
@@ -1200,7 +1203,6 @@ model TemplateInstallation {
   versionId      String
   automationId   String? // FK to Automation created on install
   status         InstallationStatus @default(PENDING)
-  config         Json? // org-specific config overrides
   installedAt    DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 

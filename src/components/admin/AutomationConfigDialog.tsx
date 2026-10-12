@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { getBlueprintConfigForm, saveBlueprintConfig, type BlueprintConfigForm, type ConfigFieldError } from "@/actions/admin/blueprints";
+import { getAutomationConfigForm, saveAutomationConfig, type AutomationConfigForm } from "@/actions/admin/automation-config";
+import type { ConfigFieldError } from "@/lib/automation/config-form";
 import { usePreferences } from "@/context/preferences";
 import { getErrorMessage } from "@/lib/user-error";
 import { CONFIG_GROUPS, GROUP_COPY, type ConfigFieldView } from "@/lib/automation/config-ui";
@@ -36,7 +37,7 @@ const COPY = {
       too_small: (min?: number) => `Mínimo ${min}`,
       too_big: (max?: number) => `Máximo ${max}`,
       must_be_less: (other: string) => `Debe ser menor que «${other}»`,
-      required: "Obligatorio con este canal",
+      required: "Obligatorio",
     },
     none: "Sin definir",
   },
@@ -63,7 +64,7 @@ const COPY = {
       too_small: (min?: number) => `Minimum ${min}`,
       too_big: (max?: number) => `Maximum ${max}`,
       must_be_less: (other: string) => `Must be less than “${other}”`,
-      required: "Required with this channel",
+      required: "Required",
     },
     none: "Not set",
   },
@@ -79,21 +80,22 @@ function formatValue(f: ConfigFieldView, value: string | number | null | undefin
   return `${value}${f.unit ? ` ${f.unit[lang]}` : ""}`;
 }
 
-export function BlueprintConfigDialog({ orgId, blueprintKey, onClose }: { orgId: string; blueprintKey: string | null; onClose: () => void }) {
+/** Pantalla de parámetros de una automatización (blueprint o plantilla n8n): se genera desde su declaración. */
+export function AutomationConfigDialog({ orgId, automationId, onClose }: { orgId: string; automationId: string | null; onClose: () => void }) {
   const { lang: rawLang } = usePreferences();
   const lang = rawLang === "en" ? "en" : "es";
   const t = COPY[lang];
-  const [form, setForm] = useState<BlueprintConfigForm | null>(null);
+  const [form, setForm] = useState<AutomationConfigForm | null>(null);
   const [values, setValues] = useState<Values>({});
   const [errors, setErrors] = useState<Record<string, ConfigFieldError>>({});
   const [pending, start] = useTransition();
 
   useEffect(() => {
-    if (!blueprintKey) return;
+    if (!automationId) return;
     let cancelled = false;
     setForm(null);
     setErrors({});
-    getBlueprintConfigForm({ orgId, key: blueprintKey })
+    getAutomationConfigForm({ orgId, automationId })
       .then((f) => {
         if (cancelled) return;
         setForm(f);
@@ -108,7 +110,7 @@ export function BlueprintConfigDialog({ orgId, blueprintKey, onClose }: { orgId:
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orgId, blueprintKey]);
+  }, [orgId, automationId]);
 
   const dirty = !!form && form.fields.some((f) => (values[f.key] ?? null) !== (form.values[f.key] ?? null));
 
@@ -124,7 +126,7 @@ export function BlueprintConfigDialog({ orgId, blueprintKey, onClose }: { orgId:
     if (!form || !dirty || pending) return;
     start(async () => {
       try {
-        const res = await saveBlueprintConfig({ orgId, key: form.key, config: values });
+        const res = await saveAutomationConfig({ orgId, automationId: form.automationId, config: values });
         if (!res.success) {
           setErrors(res.errors);
           return;
@@ -148,7 +150,7 @@ export function BlueprintConfigDialog({ orgId, blueprintKey, onClose }: { orgId:
   };
 
   return (
-    <Dialog open={blueprintKey !== null} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={automationId !== null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t.title(form?.name ?? "")}</DialogTitle>
@@ -220,6 +222,8 @@ export function BlueprintConfigDialog({ orgId, blueprintKey, onClose }: { orgId:
                               </select>
                             ) : f.kind === "phone" ? (
                               <Input id={id} type="tel" inputMode="tel" placeholder="+5215512345678" value={String(value ?? "")} onChange={(e) => set(f.key, e.target.value)} aria-invalid={!!err} />
+                            ) : f.kind === "text" ? (
+                              <Input id={id} type="text" maxLength={f.maxLength} value={String(value ?? "")} onChange={(e) => set(f.key, e.target.value)} aria-invalid={!!err} />
                             ) : f.kind === "url" ? (
                               <Input id={id} type="url" inputMode="url" placeholder="https://…" value={String(value ?? "")} onChange={(e) => set(f.key, e.target.value)} aria-invalid={!!err} />
                             ) : (

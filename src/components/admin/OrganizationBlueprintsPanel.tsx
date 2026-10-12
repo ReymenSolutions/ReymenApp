@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BlueprintConfigDialog } from "@/components/admin/BlueprintConfigDialog";
+import { AutomationConfigDialog } from "@/components/admin/AutomationConfigDialog";
 import { enableBlueprint, setBlueprintDryRun, disableBlueprint, type BlueprintRow } from "@/actions/admin/blueprints";
 import { usePreferences } from "@/context/preferences";
 import { getErrorMessage } from "@/lib/user-error";
@@ -142,7 +142,7 @@ export function OrganizationBlueprintsPanel({ orgId, blueprints }: { orgId: stri
                     >
                       {inst.dryRun ? t.toLive : t.toDry}
                     </Button>
-                    <Button size="sm" variant="outline" disabled={pending} onClick={() => setConfiguring(b.key)}>
+                    <Button size="sm" variant="outline" disabled={pending} onClick={() => setConfiguring(inst.id)}>
                       <Settings2 className="mr-1 h-3 w-3" /> {t.configure}
                     </Button>
                     <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(b.key, () => disableBlueprint({ orgId, automationId: inst.id }))}>
@@ -152,7 +152,7 @@ export function OrganizationBlueprintsPanel({ orgId, blueprints }: { orgId: stri
                 )}
                 {inst && !active && (
                   <>
-                    <Button size="sm" variant="outline" disabled={pending} onClick={() => setConfiguring(b.key)}>
+                    <Button size="sm" variant="outline" disabled={pending} onClick={() => setConfiguring(inst.id)}>
                       <Settings2 className="mr-1 h-3 w-3" /> {t.configure}
                     </Button>
                     <Button size="sm" variant="outline" disabled={pending} onClick={() => run(b.key, () => enableBlueprint({ orgId, key: b.key }))}>
@@ -165,7 +165,7 @@ export function OrganizationBlueprintsPanel({ orgId, blueprints }: { orgId: stri
           );
         })}
       </CardContent>
-      <BlueprintConfigDialog orgId={orgId} blueprintKey={configuring} onClose={() => setConfiguring(null)} />
+      <AutomationConfigDialog orgId={orgId} automationId={configuring} onClose={() => setConfiguring(null)} />
     </Card>
   );
 }
