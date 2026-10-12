@@ -748,6 +748,8 @@ model KnowledgeBase {
 
 ---
 
+> **Nota (obsoleto):** el gestor de Prompts y el AI Lab (versionado, A/B, casos) se retiraron de la app: el Agente IA usa solo `BusinessRulebook` + `KnowledgeBase` (`buildBusinessInstructions`). La migración `prompts_into_rulebook` copió los prompts activos al Rulebook; las tablas siguientes se conservan sin uso hasta revisar el resultado. El probador (`testAgentReply` → `previewAgentReply`) reemplaza al AI Lab.
+
 ### Model: Prompt
 
 AI instruction templates. Multiple prompts per type are allowed, but only one can be `isActive: true` per type per organization (enforced by the `activatePrompt` server action using `$transaction`).

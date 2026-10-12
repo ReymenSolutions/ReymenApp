@@ -150,3 +150,31 @@ export function scheduleAutoReply(organizationId: string, conversationId: string
     void job();
   }
 }
+
+// ── Probador ─────────────────────────────────────────────────────────────────
+
+export type AgentPreview =
+  | { action: "reply"; reply: string }
+  /** `kind`: "human" = el cliente pide a una persona; "model" = el agente duda; "guardrail" = la respuesta no pasó la revisión. */
+  | { action: "escalate"; reason: string; kind: "human" | "model" | "guardrail"; draftedReply?: string };
+
+/**
+ * Qué haría el Agente IA con una conversación de prueba, con las mismas reglas del modo Automático (rulebook,
+ * conocimiento y guardarraíles) pero sin enviar nada ni guardar nada. `messages` termina con el mensaje del cliente.
+ */
+export async function previewAgentReply(organizationId: string, messages: { role: "USER" | "ASSISTANT"; content: string }[], channel = "whatsapp"): Promise<AgentPreview> {
+  const last = messages[messages.length - 1];
+  if (!last || last.role !== "USER" || !last.content.trim()) throw new Error("empty_conversation");
+  if (customerNeedsHuman(last.content)) return { action: "escalate", kind: "human", reason: "el cliente pidió a una persona o trae un tema delicado" };
+
+  const instructions = await buildBusinessInstructions(organizationId);
+  const system = [AUTO_PREAMBLE, `BUSINESS RULEBOOK\n${instructions.trim() || "(empty: the business has not written a rulebook, so escalate everything)"}`, `CUSTOMER CONTEXT\nChannel: ${channel}`].join("\n\n");
+  const turns = buildDraftMessages(messages as { role: MessageRole; content: string }[]);
+  const result = await generateText(system, turns, { json: true });
+  if ("refused" in result) return { action: "escalate", kind: "model", reason: "el modelo no pudo responder este mensaje" };
+  const decision = parseDecision(result.text);
+  if (decision.action === "escalate") return { action: "escalate", kind: "model", reason: decision.reason };
+  const unsafe = unsafeReason(decision.reply);
+  if (unsafe) return { action: "escalate", kind: "guardrail", reason: `la respuesta redactada no pasó la revisión (${unsafe})`, draftedReply: decision.reply };
+  return { action: "reply", reply: decision.reply };
+}

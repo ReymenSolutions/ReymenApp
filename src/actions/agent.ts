@@ -9,6 +9,9 @@ import { UserError } from "@/lib/user-error";
 import { INBOX_CHANNELS } from "@/lib/channels";
 import { isAgentMode, setChannelMode } from "@/lib/agent-mode";
 import { getRulebook, rulebookProgress } from "@/lib/rulebook";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { isDraftProviderConfigured } from "@/lib/ai-draft";
+import { previewAgentReply, type AgentPreview } from "@/lib/ai-auto-reply";
 import type { UserRole } from "@prisma/client";
 
 /**
@@ -34,4 +37,31 @@ export async function setAgentChannelMode(channel: string, mode: string, opts: {
   revalidatePath("/portal/whatsapp");
   revalidatePath("/portal/knowledge-base");
   return { success: true };
+}
+
+const TEST_MESSAGES_LIMIT = 20;
+const TEST_CHARS = 1000;
+
+/**
+ * Probador del Agente IA: qué respondería (o a quién pasaría) con el Rulebook y la base de conocimiento actuales.
+ * No envía ni guarda nada. Cuesta una llamada a Claude, así que tiene límite por persona.
+ */
+export async function testAgentReply(messages: { role: "USER" | "ASSISTANT"; content: string }[], channel = "whatsapp"): Promise<AgentPreview> {
+  const session = await auth();
+  if (!session?.user.organizationId) throw new UserError("No autorizado");
+  if (!can(session.user.role as UserRole, "knowledge_base:manage")) throw new UserError("No autorizado");
+  const organizationId = session.user.organizationId;
+  await assertModuleEnabled(organizationId, "AI_WHATSAPP");
+  if (!isDraftProviderConfigured()) throw new UserError("La IA no está configurada en el servidor");
+
+  const clean = (Array.isArray(messages) ? messages : [])
+    .filter((m) => (m?.role === "USER" || m?.role === "ASSISTANT") && typeof m.content === "string" && m.content.trim())
+    .slice(-TEST_MESSAGES_LIMIT)
+    .map((m) => ({ role: m.role, content: m.content.trim().slice(0, TEST_CHARS) }));
+  if (clean.length === 0 || clean[clean.length - 1].role !== "USER") throw new UserError("Escribe un mensaje del cliente");
+
+  const limit = await checkRateLimit(`agent-test:${session.user.id}`, { limit: 20, windowMs: 60_000 });
+  if (!limit.allowed) throw new UserError("Demasiadas pruebas seguidas, espera un momento");
+
+  return previewAgentReply(organizationId, clean, (INBOX_CHANNELS as readonly string[]).includes(channel) ? channel : "whatsapp");
 }

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Zap, Users, FileText, Layers, AlertTriangle, CheckCircle2, Bot, MessageSquare, SlidersHorizontal, BookOpen, BarChart3 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { getRulebook, rulebookProgress } from "@/lib/rulebook";
 import { getServerT } from "@/lib/i18n-server";
 import { getEnabledModules } from "@/lib/modules";
 import { METRIC_KEYS, monthPeriod } from "@/lib/metrics";
@@ -80,7 +81,7 @@ async function getClientDetail(clientId: string) {
           orderBy: { installedAt: "desc" },
         },
         whatsappAssistant: true,
-        _count: { select: { leads: true, automations: true, conversations: true, prompts: true, knowledgeBase: true } },
+        _count: { select: { leads: true, automations: true, conversations: true, knowledgeBase: true } },
       },
     }),
     prisma.conversation.count({ where: { organizationId: clientId, status: "ESCALATED" } }),
@@ -102,6 +103,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
   ]);
   if (!client) notFound();
 
+  const { filled: rulebookFilled, total: rulebookTotal } = rulebookProgress(await getRulebook(clientId));
   const planInfo = PLAN_LIMITS[client.plan] ?? PLAN_LIMITS.starter;
   const leadsLimit = planInfo.leads;
   const planModules = PLAN_MODULES[client.plan] ?? PLAN_MODULES.starter;
@@ -292,7 +294,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
                   <SlidersHorizontal className="h-3.5 w-3.5 text-slate-400" />
                   {t.adminPromptsConfigured}
                 </span>
-                <span className="text-sm text-slate-500">{client._count.prompts}</span>
+                <span className="text-sm text-slate-500">{rulebookFilled}/{rulebookTotal}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 text-sm text-slate-700">

@@ -14,11 +14,9 @@ export function getAiWhatsappTabs(t: Strings, role: UserRole): PortalTab[] {
   const tabs: PortalTab[] = [
     { href: "/portal/whatsapp", label: t.whatsapp },
     { href: "/portal/knowledge-base", label: t.knowledgeBase },
-    { href: "/portal/prompts", label: t.prompts },
   ];
-  // AI Lab requires prompts:manage — AGENT/VIEWER would just bounce back to
-  // the dashboard if they followed this tab, so it's left out for them.
-  if (can(role, "prompts:manage")) {
+  // El probador gasta una llamada a Claude y es de quien configura el agente.
+  if (can(role, "knowledge_base:manage")) {
     tabs.push({ href: "/portal/ai-lab", label: t.aiLab });
   }
   return tabs;

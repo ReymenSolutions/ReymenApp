@@ -3,7 +3,7 @@
 Pedido del usuario (2026-10-12): un inbox con todos los canales; al abrir un chat la respuesta ya viene escrita pero editable, con botón "Usar respuesta" ("Use response" en inglés); un pipeline que trabaje solo (el CRM no debe ser trabajo extra); y un rulebook por negocio que la IA use. Decisiones: **Claude API desde la app** y **autonomía "aplica lo seguro y avisa, con deshacer"**. Los mensajes al cliente **nunca** salen sin que la persona presione Enviar.
 
 ## Lo que ya existe y se reutiliza
-`Conversation` / `Message` (WhatsApp vía n8n), `KnowledgeBase` (artículos), `Prompt` (versiones), `sendManualMessage` (envío por n8n), `Lead`/`Opportunity`/`PipelineStage`, `DomainEvent` + motor de blueprints, bitácora de auditoría.
+`Conversation` / `Message` (WhatsApp vía n8n), `KnowledgeBase` (artículos), `sendManualMessage` (envío por n8n), `Lead`/`Opportunity`/`PipelineStage`, `DomainEvent` + motor de blueprints, bitácora de auditoría.
 
 ## Fases (un PR por fase)
 1. **Rulebook** del negocio: secciones fijas (cómo habla, saludo, nunca, precios) + artículos de conocimiento; es lo que la IA lee.
@@ -22,5 +22,5 @@ Instagram, Messenger y correo requieren credenciales/aprobación de cada platafo
 - **Encendido:** requiere `ANTHROPIC_API_KEY`, el módulo WhatsApp AI y el modo del canal distinto de **Apagado** (Agente IA → "Qué hace el Agente IA en cada canal"; por defecto **Sugerir**). Modos por canal: *Apagado* (no hace nada), *Sugerir* (borrador que una persona envía) y *Automático* (próximamente). El webhook `conversation.message` responde `aiMode` (`off|suggest|auto`) para que los flujos de n8n respeten el Apagado. Una sola fuente de conocimiento: Rulebook + artículos activos de la base de conocimiento (`buildBusinessInstructions`).
 
 ## Menú: un solo "CRM" con pestañas y módulo "Agente IA"
-- El módulo `AI_WHATSAPP` se muestra como **Agente IA** / **AI Agent** (el código interno y la base de datos no cambian): cubre el asistente, el rulebook, los prompts, el laboratorio y los borradores en todos los canales, no solo WhatsApp.
+- El módulo `AI_WHATSAPP` se muestra como **Agente IA** / **AI Agent** (el código interno y la base de datos no cambian): cubre el asistente, el rulebook y la base de conocimiento (única fuente de instrucciones; los antiguos Prompts se migraron al Rulebook), el probador y los borradores en todos los canales, no solo WhatsApp.
 - Con el módulo CRM, el menú tiene **una sola entrada "CRM"** (con el contador de clientes esperando respuesta) y las pantallas viven como pestañas: **Hoy, Inbox, Leads, Pipeline** y, con Reymen Foods, **Clientes del negocio** (`src/lib/crm-tabs.ts`, `CrmTabs`). Citas queda como entrada propia del menú, fuera del CRM. Las direcciones de siempre se conservan. Sin CRM, el menú mantiene las entradas sueltas que aplican (Citas, Clientes del negocio con Foods, Inbox con el Agente IA).

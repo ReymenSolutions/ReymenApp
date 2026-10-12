@@ -10,7 +10,7 @@ const authMock = vi.fn();
 vi.mock("@/lib/auth", () => ({ auth: () => authMock(), isAdmin: (r: string) => r === "SUPER_ADMIN" || r === "ADMIN" }));
 
 const { requestReplyDraft, regenerateReplyDraft, dismissReplyDraft } = await import("./ai-drafts");
-const { setAgentChannelMode } = await import("./agent");
+const { setAgentChannelMode, testAgentReply } = await import("./agent");
 const { sendManualMessage } = await import("./conversations");
 const { setDraftClientForTests, draftsAvailable } = await import("@/lib/ai-draft");
 
@@ -141,5 +141,30 @@ describe("borradores de IA (acciones)", () => {
     await setAgentChannelMode("webchat", "OFF");
     expect(await requestReplyDraft(c.id)).toEqual({ state: "off" });
     expect(create).not.toHaveBeenCalled();
+  });
+
+  it("el probador responde con el Rulebook y no envía ni guarda nada; solo quien gestiona la base de conocimiento", async () => {
+    const org = await newOrg();
+    await prisma.businessRulebook.create({ data: { organizationId: org.id, pricing: "Revisión inicial: $500" } });
+    create.mockResolvedValue(reply(JSON.stringify({ action: "reply", reply: "La revisión inicial cuesta $500." })));
+    as(org.id, "VIEWER");
+    await expect(testAgentReply([{ role: "USER", content: "¿Cuánto cuesta?" }])).rejects.toThrow(/autorizado/i);
+    as(org.id);
+    expect(await testAgentReply([{ role: "USER", content: "¿Cuánto cuesta?" }])).toEqual({ action: "reply", reply: "La revisión inicial cuesta $500." });
+    expect(create.mock.calls[0][0].system[0].text).toContain("Revisión inicial: $500");
+    expect(await prisma.message.count({ where: { conversation: { organizationId: org.id } } })).toBe(0);
+    expect(trigger).not.toHaveBeenCalled();
+  });
+
+  it("el probador exige que lo último sea del cliente y muestra cuándo pasaría a una persona", async () => {
+    const org = await newOrg();
+    as(org.id);
+    await expect(testAgentReply([])).rejects.toThrow(/mensaje del cliente/);
+    await expect(testAgentReply([{ role: "ASSISTANT", content: "Hola" }])).rejects.toThrow(/mensaje del cliente/);
+    const out = await testAgentReply([{ role: "USER", content: "Quiero un reembolso ya" }]);
+    expect(out).toMatchObject({ action: "escalate", kind: "human" });
+    expect(create).not.toHaveBeenCalled();
+    create.mockResolvedValue(reply(JSON.stringify({ action: "reply", reply: "Paga en https://x.example" })));
+    expect(await testAgentReply([{ role: "USER", content: "¿Cómo pago?" }])).toMatchObject({ action: "escalate", kind: "guardrail", draftedReply: "Paga en https://x.example" });
   });
 });
