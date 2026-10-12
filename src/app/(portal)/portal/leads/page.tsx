@@ -1,3 +1,4 @@
+import { CrmTabs } from "@/components/portal/CrmTabs";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
@@ -112,6 +113,7 @@ export default async function PortalLeadsPage({
           </div>
         }
       />
+      <CrmTabs />
 
       {totalUnfiltered === 0 ? (
         <Card>

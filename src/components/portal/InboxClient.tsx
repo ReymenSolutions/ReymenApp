@@ -7,6 +7,7 @@ import { Archive, ArchiveRestore, ArrowLeft, ClipboardList, Globe, Inbox, Instag
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CrmTabs } from "@/components/portal/CrmTabs";
 import { ConversationActions } from "@/components/portal/ConversationActions";
 import { MessageThread } from "@/components/portal/MessageThread";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -146,6 +147,7 @@ export function InboxClient({ items, tab, folder, query, pending, initialId }: {
 
   return (
     <div>
+      <CrmTabs />
       <div className="mb-4 flex flex-col gap-1">
         <h1 className="flex items-center gap-2 text-xl font-semibold text-slate-900">
           <Inbox className="h-5 w-5 text-brand-600" /> {t.title}

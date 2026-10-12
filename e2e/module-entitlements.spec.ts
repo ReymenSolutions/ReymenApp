@@ -53,9 +53,11 @@ test.describe("module entitlements gate navigation and direct URL access", () =>
     await login(page);
     await page.goto("/portal/dashboard");
 
-    await expect(page.getByRole("link", { name: /leads/i })).toBeVisible();
+    // Con CRM, Leads/Pipeline/Citas/Inbox viven dentro de una sola entrada "CRM" con pestañas.
+    await expect(page.getByRole("link", { name: /^CRM/ })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "CRM" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: /conversaciones/i })).not.toBeVisible();
-    await expect(page.getByRole("link", { name: /whatsapp/i })).not.toBeVisible();
+    await expect(page.getByRole("link", { name: /asistente ia/i })).not.toBeVisible();
     await expect(page.getByRole("link", { name: /automatizaciones/i })).not.toBeVisible();
   });
 

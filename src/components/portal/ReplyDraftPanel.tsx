@@ -54,7 +54,7 @@ export function ReplyDraftPanel({ draft, busy, onUse, onRegenerate, onDismiss }:
       )}
       {draft.status === "ready" && (
         <>
-          <p className="max-h-28 overflow-y-auto whitespace-pre-wrap text-sm text-slate-800">{draft.content}</p>
+          <div className="max-h-28 overflow-y-auto whitespace-pre-wrap text-sm text-slate-800">{draft.content}</div>
           <p className="mt-1.5 text-[11px] text-slate-500">{t.hint}</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Button size="sm" onClick={() => onUse(draft.content)} disabled={busy}>

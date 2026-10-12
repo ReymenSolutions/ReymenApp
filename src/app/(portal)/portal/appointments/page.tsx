@@ -1,3 +1,4 @@
+import { CrmTabs } from "@/components/portal/CrmTabs";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Settings, Calendar } from "lucide-react";
@@ -60,6 +61,7 @@ export default async function PortalAppointmentsPage() {
           </div>
         }
       />
+      <CrmTabs />
 
       {appointments.length === 0 ? (
         <Card>

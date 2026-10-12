@@ -1,3 +1,4 @@
+import { CrmTabs } from "@/components/portal/CrmTabs";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AlertTriangle, ArrowRight, Calendar, CheckCircle2, MessageSquare, Send, TrendingUp, UserPlus } from "lucide-react";
@@ -125,6 +126,7 @@ export default async function TodayPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title={t.title} description={t.desc} />
+      <CrmTabs />
 
       {total === 0 ? (
         <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-900">
