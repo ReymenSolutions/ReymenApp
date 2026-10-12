@@ -13,3 +13,10 @@ Pedido del usuario (2026-10-12): un inbox con todos los canales; al abrir un cha
 
 ## Conectores de canal (fuera de este repo)
 Instagram, Messenger y correo requieren credenciales/aprobación de cada plataforma; la app expone la entrada y la salida genéricas por canal y los conectores viven en n8n (como WhatsApp hoy).
+
+## Estado de la fase 3 (borrador de IA) — implementada
+- **Dónde corre:** Claude desde la app (`@anthropic-ai/sdk`), modelo `claude-opus-5-5` por defecto (`AI_DRAFT_MODEL` lo cambia), esfuerzo bajo, instrucciones del negocio con caché y respaldo automático de la API ante rechazos de seguridad.
+- **Cuándo se redacta:** al abrir una conversación cuyo último mensaje es del cliente (no antes: no se paga por borradores que nadie abre). Uno por mensaje del cliente (`ReplyDraft`, idempotente aunque se pida a la vez), con uso de tokens guardado.
+- **Qué lee:** rulebook y artículos activos del negocio (`buildBusinessInstructions`), la conversación y datos reales del contacto (estado en el CRM y tratos abiertos). Nunca inventa precios: solo cita los del rulebook.
+- **Cómo se usa:** la respuesta llega escrita en el cuadro (editable); "Usar respuesta" / "Use response" la vuelve a poner si se editó; "Otra versión" y "Descartar". Con un borrador activo, Enter agrega un renglón y se envía con Ctrl/Cmd + Enter. Al enviar se registra el texto final (para medir cuánto se edita). **Nada sale sin presionar Enviar.**
+- **Encendido:** requiere `ANTHROPIC_API_KEY`, el módulo WhatsApp AI y el interruptor "Sugerir una respuesta con IA" (Base de conocimiento → Rulebook, activo por defecto).

@@ -13,6 +13,7 @@ import { PortalSectionTabs } from "@/components/portal/PortalSectionTabs";
 import { getAiWhatsappTabs } from "@/lib/portal-nav-tabs";
 import { RulebookEditor } from "@/components/portal/RulebookEditor";
 import { getRulebook } from "@/lib/rulebook";
+import { isDraftProviderConfigured } from "@/lib/ai-draft";
 import { can } from "@/lib/permissions";
 import { formatDate } from "@/lib/utils";
 import { getServerT, getServerLang } from "@/lib/i18n-server";
@@ -32,6 +33,7 @@ export default async function KnowledgeBasePage() {
 
   const [articles, lang, t, rulebook] = await Promise.all([getArticles(session.user.organizationId), getServerLang(), getServerT(), getRulebook(session.user.organizationId)]);
   const canEditRulebook = can(session.user.role as UserRole, "knowledge_base:manage");
+  const draftSettings = await prisma.businessRulebook.findUnique({ where: { organizationId: session.user.organizationId }, select: { draftsEnabled: true } });
   const activeCount = articles.filter((a) => a.isActive).length;
 
   // Group by category
@@ -52,7 +54,7 @@ export default async function KnowledgeBasePage() {
 
       <PortalSectionTabs tabs={getAiWhatsappTabs(t, session.user.role as UserRole)} />
 
-      <RulebookEditor initial={rulebook} canEdit={canEditRulebook} />
+      <RulebookEditor initial={rulebook} canEdit={canEditRulebook} draftsEnabled={draftSettings?.draftsEnabled ?? true} aiConfigured={isDraftProviderConfigured()} />
 
       <h2 className="mb-3 text-base font-semibold text-slate-900">{lang === "es" ? "Conocimiento adicional" : "Additional knowledge"}</h2>
       <div className="mb-4 rounded-lg bg-blue-50 border border-blue-100 p-3">

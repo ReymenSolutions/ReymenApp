@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requireModule } from "@/lib/modules";
 import { can } from "@/lib/permissions";
+import { draftsAvailable } from "@/lib/ai-draft";
 import { getServerLang } from "@/lib/i18n-server";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -62,6 +63,7 @@ export default async function ConversationDetailPage({
   const role = session.user.role as UserRole;
   const canReply = can(role, "conversations:reply");
   const canAssign = can(role, "conversations:assign");
+  const aiDrafts = await draftsAvailable(session.user.organizationId);
 
   return (
     <div>
@@ -122,6 +124,7 @@ export default async function ConversationDetailPage({
         initialMessages={conv.messages}
         hasMoreInitially={conv.hasMoreMessages}
         canReply={canReply && conv.status !== "RESOLVED" && conv.status !== "CLOSED"}
+        aiDrafts={aiDrafts}
       />
     </div>
   );

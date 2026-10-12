@@ -84,6 +84,7 @@ model Organization {
   domainEvents            DomainEvent[]
   automationExecutions    AutomationExecution[]
   rulebook                BusinessRulebook?
+  replyDrafts             ReplyDraft[]
   branches                Branch[]
   branchDishes            BranchDish[]
   branchVariantPrices     BranchVariantPrice[]
@@ -503,6 +504,7 @@ model Conversation {
   assignedTo   User?        @relation("ConversationAssignee", fields: [assignedToId], references: [id])
   lead         Lead?        @relation(fields: [leadId], references: [id])
   messages     Message[]
+  drafts       ReplyDraft[]
 
   @@index([organizationId])
   @@index([organizationId, phoneKey])
@@ -860,11 +862,48 @@ model BusinessRulebook {
   greeting       String   @default("") @db.Text
   rules          String   @default("") @db.Text
   pricing        String   @default("") @db.Text
+  // Si la IA sugiere un borrador de respuesta al abrir cada conversación.
+  draftsEnabled  Boolean  @default(true)
   updatedById    String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+enum ReplyDraftStatus {
+  GENERATING
+  READY
+  USED
+  DISMISSED
+  FAILED
+}
+
+/// Borrador de respuesta que la IA redacta para el último mensaje del cliente. Nunca se envía solo: una persona
+/// lo edita y presiona Enviar ("Usar respuesta"). Uno por mensaje del cliente.
+model ReplyDraft {
+  id               String           @id @default(cuid())
+  organizationId   String
+  conversationId   String
+  basedOnMessageId String
+  content          String           @default("") @db.Text
+  status           ReplyDraftStatus @default(GENERATING)
+  model            String?
+  inputTokens      Int?
+  outputTokens     Int?
+  error            String?
+  // Lo que realmente se envió (puede diferir del borrador si la persona lo editó).
+  finalContent     String?          @db.Text
+  usedById         String?
+  usedAt           DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, basedOnMessageId])
+  @@index([organizationId, status])
 }
 
 // ─── PROMPT MANAGER ───────────────────────────────────────────────

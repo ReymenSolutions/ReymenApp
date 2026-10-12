@@ -14,6 +14,7 @@ import type { UserRole } from "@prisma/client";
 import { appUrl } from "@/lib/app-url";
 import { UserError } from "@/lib/user-error";
 import { assertInboxAccess } from "@/lib/inbox";
+import { markReplyDraftUsed } from "@/lib/ai-draft";
 import { outboundWorkflowPath, messagePreview } from "@/lib/channels";
 
 async function requireOrgAndWhatsapp() {
@@ -127,6 +128,8 @@ export async function sendManualMessage(data: {
   content: string;
   attachmentUrl?: string;
   attachmentType?: string;
+  /** Borrador de IA del que parte esta respuesta (se registra qué se envió finalmente). */
+  draftId?: string;
 }) {
   const session = await requireOrgAndWhatsapp();
   if (!can(session.user.role as UserRole, "conversations:reply")) throw new UserError("No autorizado");
@@ -187,6 +190,8 @@ export async function sendManualMessage(data: {
   const finalMessage = trigger.success
     ? message
     : await prisma.message.update({ where: { id: message.id }, data: { deliveryStatus: "FAILED" } });
+
+  if (data.draftId) await markReplyDraftUsed(session.user.organizationId!, data.draftId, session.user.id, content);
 
   await logAudit({
     organizationId: session.user.organizationId,

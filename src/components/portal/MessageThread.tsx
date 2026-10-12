@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Bot, User, Settings, Headset, Loader2, ChevronUp, Clock, Check, CheckCheck, AlertCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { getOlderMessages } from "@/actions/conversations";
 import { MessageComposer } from "@/components/portal/MessageComposer";
+import { ReplyDraftPanel, type DraftUi } from "@/components/portal/ReplyDraftPanel";
+import { regenerateReplyDraft, requestReplyDraft, dismissReplyDraft } from "@/actions/ai-drafts";
 import { formatDateTime } from "@/lib/utils";
 import { usePreferences } from "@/context/preferences";
 import type { Message, MessageDeliveryStatus } from "@prisma/client";
@@ -18,6 +20,8 @@ interface MessageThreadProps {
   initialMessages: MessageWithSender[];
   hasMoreInitially: boolean;
   canReply: boolean;
+  /** La IA puede sugerir un borrador para el último mensaje del cliente. */
+  aiDrafts?: boolean;
 }
 
 function DeliveryStatusIcon({ status }: { status: MessageDeliveryStatus | null }) {
@@ -41,12 +45,66 @@ function Attachment({ url, type, lang }: { url: string; type: string | null; lan
   );
 }
 
-export function MessageThread({ conversationId, contactName, initialMessages, hasMoreInitially, canReply }: MessageThreadProps) {
+export function MessageThread({ conversationId, contactName, initialMessages, hasMoreInitially, canReply, aiDrafts = false }: MessageThreadProps) {
   const { lang } = usePreferences();
   const [messages, setMessages] = useState(initialMessages);
   const [hasMore, setHasMore] = useState(hasMoreInitially);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  // Borrador de la IA: solo si lo último lo dijo el cliente. Se pide al abrir; si otra petición lo está
+  // redactando se vuelve a preguntar unos segundos después.
+  const lastIsCustomer = messages[messages.length - 1]?.role === "USER";
+  const wantsDraft = aiDrafts && canReply && lastIsCustomer;
+  const [draft, setDraft] = useState<DraftUi>(wantsDraft ? { status: "loading" } : null);
+  const [draftBusy, setDraftBusy] = useState(false);
+  const [prefill, setPrefill] = useState<{ key: string; text: string; force?: boolean } | null>(null);
+
+  useEffect(() => {
+    if (!wantsDraft) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const ask = (attempt: number) => {
+      requestReplyDraft(conversationId)
+        .then((r) => {
+          if (cancelled) return;
+          if (r.state === "ready") {
+            setDraft({ status: "ready", id: r.draft.id, content: r.draft.content });
+            setPrefill({ key: r.draft.id, text: r.draft.content });
+          } else if (r.state === "generating" && attempt < 6) {
+            timer = setTimeout(() => ask(attempt + 1), 3000);
+          } else if (r.state === "failed") setDraft({ status: "failed" });
+          else setDraft(null);
+        })
+        .catch(() => !cancelled && setDraft({ status: "failed" }));
+    };
+    ask(0);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [conversationId, wantsDraft]);
+
+  async function regenerate() {
+    setDraftBusy(true);
+    try {
+      const r = await regenerateReplyDraft(conversationId);
+      if (r.state === "ready") {
+        setDraft({ status: "ready", id: r.draft.id, content: r.draft.content });
+        setPrefill({ key: r.draft.id, text: r.draft.content, force: true });
+      } else setDraft(r.state === "failed" ? { status: "failed" } : null);
+    } catch {
+      setDraft({ status: "failed" });
+    } finally {
+      setDraftBusy(false);
+    }
+  }
+
+  async function dismissDraft() {
+    const id = draft?.status === "ready" ? draft.id : null;
+    setDraft(null);
+    if (id) await dismissReplyDraft(id).catch(() => {});
+  }
 
   function loadOlder() {
     if (messages.length === 0) return;
@@ -141,7 +199,26 @@ export function MessageThread({ conversationId, contactName, initialMessages, ha
           </div>
         )}
       </CardContent>
-      {canReply && <MessageComposer conversationId={conversationId} onSent={(msg) => setMessages((prev) => [...prev, msg])} />}
+      {canReply && (
+        <MessageComposer
+          conversationId={conversationId}
+          onSent={(msg) => {
+            setMessages((prev) => [...prev, msg]);
+            setDraft(null);
+          }}
+          prefill={prefill}
+          draftId={draft?.status === "ready" ? draft.id : null}
+          slot={
+            <ReplyDraftPanel
+              draft={draft}
+              busy={draftBusy}
+              onUse={(text) => setPrefill({ key: `use-${Date.now()}`, text, force: true })}
+              onRegenerate={regenerate}
+              onDismiss={dismissDraft}
+            />
+          }
+        />
+      )}
     </Card>
   );
 }

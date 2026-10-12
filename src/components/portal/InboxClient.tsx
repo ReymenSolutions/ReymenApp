@@ -439,7 +439,7 @@ function ThreadContent({ data, onBack, onChanged }: { data: InboxThread; onBack:
         <ConversationActions conversationId={c.id} status={c.status} aiHandled={c.aiHandled} assignedTo={c.assignedTo} teamUsers={data.teamUsers} canReply={data.canReply} canAssign={data.canAssign} />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        <MessageThread conversationId={c.id} contactName={c.contactName} initialMessages={data.messages} hasMoreInitially={data.hasMore} canReply={data.canReply} />
+        <MessageThread conversationId={c.id} contactName={c.contactName} initialMessages={data.messages} hasMoreInitially={data.hasMore} canReply={data.canReply} aiDrafts={data.aiDrafts} />
       </div>
     </div>
   );

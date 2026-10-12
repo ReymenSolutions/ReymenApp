@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { usePreferences } from "@/context/preferences";
 import { saveRulebook } from "@/actions/rulebook";
+import { setDraftsEnabled } from "@/actions/ai-drafts";
 import { RULEBOOK_MAX_CHARS, RULEBOOK_SECTIONS, rulebookProgress, type RulebookInput, type RulebookSection } from "@/lib/rulebook";
 import { getErrorMessage } from "@/lib/user-error";
 
@@ -24,6 +25,10 @@ const COPY = {
     error: "No se pudo guardar. Tus cambios siguen aquí.",
     example: "Usar ejemplo",
     readOnly: "Solo quien administra la base de conocimiento puede editar el rulebook.",
+    drafts: "Sugerir una respuesta con IA al abrir cada conversación",
+    draftsHint: "La IA redacta un borrador con este rulebook; tú lo editas y lo envías.",
+    draftsOff: "Los borradores de IA se activan cuando el servidor tiene la clave de Claude (ANTHROPIC_API_KEY).",
+    draftsError: "No se pudo cambiar la opción",
     chars: (n: number, max: number) => `${n}/${max}`,
     sections: {
       voice: { title: "Cómo hablas", hint: "Tono y estilo: cercano, formal, directo… y cómo cierras cada respuesta.", example: "Dueño de taller, directo y amable.\nSin rodeos ni lenguaje corporativo.\nResponde la pregunta y luego propone el siguiente paso: un precio o una llamada." },
@@ -44,6 +49,10 @@ const COPY = {
     error: "Couldn't save. Your changes are still here.",
     example: "Use example",
     readOnly: "Only people who manage the knowledge base can edit the rulebook.",
+    drafts: "Suggest an AI reply when each conversation is opened",
+    draftsHint: "The AI drafts a reply using this rulebook; you edit it and send it.",
+    draftsOff: "AI drafts turn on once the server has the Claude key (ANTHROPIC_API_KEY).",
+    draftsError: "Couldn't change the option",
     chars: (n: number, max: number) => `${n}/${max}`,
     sections: {
       voice: { title: "How you talk", hint: "Tone and style: friendly, formal, direct… and how you close each reply.", example: "Straight-talking workshop owner. Warm, friendly and helpful.\nNo fluff, no hype, no corporate speak.\nAnswer the actual question, then move toward the next step: a price or a call." },
@@ -54,12 +63,14 @@ const COPY = {
   },
 };
 
-export function RulebookEditor({ initial, canEdit }: { initial: RulebookInput; canEdit: boolean }) {
+export function RulebookEditor({ initial, canEdit, draftsEnabled = true, aiConfigured = true }: { initial: RulebookInput; canEdit: boolean; draftsEnabled?: boolean; aiConfigured?: boolean }) {
   const { lang } = usePreferences();
   const t = COPY[lang === "en" ? "en" : "es"];
   const [saved, setSaved] = useState(initial);
   const [draft, setDraft] = useState(initial);
   const [pending, startTransition] = useTransition();
+  const [drafts, setDrafts] = useState(draftsEnabled);
+  const [draftsBusy, startDrafts] = useTransition();
   const dirty = RULEBOOK_SECTIONS.some((k) => draft[k] !== saved[k]);
   const progress = rulebookProgress(draft);
 
@@ -107,6 +118,35 @@ export function RulebookEditor({ initial, canEdit }: { initial: RulebookInput; c
         <strong>{t.how}</strong> {t.howText}
       </div>
       {!canEdit && <p className="mb-3 text-xs text-slate-500">{t.readOnly}</p>}
+
+      <div className="mb-4 flex items-start justify-between gap-3 rounded-card border border-slate-200 bg-white p-3">
+        <div>
+          <p className="text-sm font-medium text-slate-900">{t.drafts}</p>
+          <p className="text-xs text-slate-500">{aiConfigured ? t.draftsHint : t.draftsOff}</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={drafts}
+          aria-label={t.drafts}
+          disabled={!canEdit || draftsBusy}
+          onClick={() => {
+            const next = !drafts;
+            setDrafts(next);
+            startDrafts(async () => {
+              try {
+                await setDraftsEnabled(next);
+              } catch (e) {
+                setDrafts(!next);
+                toast.error(t.draftsError, { description: getErrorMessage(e, "") || undefined });
+              }
+            });
+          }}
+          className={`relative h-6 w-11 flex-shrink-0 rounded-full motion-micro transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 ${drafts ? "bg-brand-600" : "bg-slate-300"}`}
+        >
+          <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-[rgb(255_255_255)] shadow motion-micro transition-transform ${drafts ? "translate-x-5" : ""}`} />
+        </button>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {RULEBOOK_SECTIONS.map((key) => {
