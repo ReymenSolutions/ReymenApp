@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/audit";
 import { requireAdmin } from "@/lib/guards";
 import { hasModule, getModuleLabel } from "@/lib/modules";
 import { getBlueprint, listBlueprints } from "@/lib/automation/blueprints";
+import { findTemplateOverlaps, type TemplateOverlap } from "@/lib/automation/overlap";
 import { UserError } from "@/lib/user-error";
 
 export type BlueprintRow = {
@@ -18,6 +19,8 @@ export type BlueprintRow = {
   version: number;
   trigger: string;
   requiredModules: string[];
+  /** Plantillas n8n activas del cliente que hacen un trabajo parecido (riesgo de mensajes duplicados). */
+  overlaps: TemplateOverlap[];
   /** null = aún no se habilita para esta organización. */
   instance: { id: string; status: string; dryRun: boolean; lastRunAt: string | null; lastStatus: AutomationExecutionStatus | null; counts: Partial<Record<AutomationExecutionStatus, number>> } | null;
 };
@@ -27,7 +30,8 @@ export async function getOrganizationBlueprints(orgId: string): Promise<Blueprin
   await requireAdmin();
   const instances = await prisma.automation.findMany({ where: { organizationId: orgId, blueprintKey: { not: null } } });
   const counts = await prisma.automationExecution.groupBy({ by: ["automationId", "status"], where: { organizationId: orgId }, _count: { _all: true } });
-  return listBlueprints().map((b) => {
+  const overlaps = await Promise.all(listBlueprints().map((b) => findTemplateOverlaps(orgId, b)));
+  return listBlueprints().map((b, idx) => {
     const inst = instances.find((i) => i.blueprintKey === b.key);
     return {
       key: b.key,
@@ -36,6 +40,7 @@ export async function getOrganizationBlueprints(orgId: string): Promise<Blueprin
       version: b.version,
       trigger: b.trigger,
       requiredModules: b.requiredModules.map((m) => getModuleLabel("es")[m]),
+      overlaps: overlaps[idx],
       instance: inst
         ? {
             id: inst.id,
@@ -93,10 +98,16 @@ async function ownedBlueprintInstance(orgId: string, automationId: string) {
 }
 
 /** Apaga o prende el dry-run. Apagarlo hace que las ejecuciones queden PENDING para enviarse de verdad. */
-export async function setBlueprintDryRun(data: z.infer<typeof toggleSchema> & { dryRun: boolean }) {
+export async function setBlueprintDryRun(data: z.infer<typeof toggleSchema> & { dryRun: boolean; acknowledgeOverlap?: boolean }) {
   const session = await requireAdmin();
   const { orgId, automationId } = toggleSchema.parse(data);
   const automation = await ownedBlueprintInstance(orgId, automationId);
+  // Pasar a envío real con una plantilla n8n parecida activa puede duplicar mensajes: exige confirmarlo.
+  if (!data.dryRun) {
+    const blueprint = automation.blueprintKey ? getBlueprint(automation.blueprintKey, automation.blueprintVersion) : null;
+    const overlaps = blueprint ? await findTemplateOverlaps(orgId, blueprint) : [];
+    if (overlaps.length > 0 && !data.acknowledgeOverlap) throw new UserError("Este cliente ya tiene una plantilla de n8n parecida activa; confirma que no se duplicarán los mensajes");
+  }
   await prisma.automation.update({ where: { id: automation.id }, data: { dryRun: !!data.dryRun } });
   await logAudit({ userId: session.user.id, organizationId: orgId, action: "automation.blueprint_dry_run", resource: "Automation", resourceId: automation.id, metadata: { dryRun: !!data.dryRun } });
   revalidatePath(`/admin/clients/${orgId}`);

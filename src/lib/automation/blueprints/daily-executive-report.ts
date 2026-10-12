@@ -17,6 +17,7 @@ export const dailyExecutiveReport: Blueprint<Config> = {
   trigger: "report.daily_due",
   audience: "internal",
   requiredModules: ["FOOD_OPS"],
+  overlapCategories: ["notifications"],
   status: "active",
   configSchema,
   defaultConfig: configSchema.parse({}),

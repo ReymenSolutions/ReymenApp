@@ -25,6 +25,7 @@ export const customerRecovery: Blueprint<Config> = {
   description: "Si un cliente habitual lleva mucho más de lo normal sin venir (más de 2.5 veces su intervalo típico), le escribe para que regrese. Solo con su consentimiento, un mensaje por ausencia.",
   trigger: "customer.at_risk",
   requiredModules: ["REYMEN_POS"],
+  overlapCategories: ["retention"],
   status: "active",
   configSchema,
   defaultConfig: configSchema.parse({}),

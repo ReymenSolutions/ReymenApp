@@ -42,6 +42,8 @@ export type Blueprint<C = Record<string, unknown>> = {
   /** A quién va dirigida: un cliente (por defecto; pasa por la política de contacto) o el equipo (aviso interno). */
   audience?: "customer" | "internal";
   requiredModules: PlatformModule[];
+  /** Categorías de plantillas n8n (`AutomationTemplate.category`) que hacen un trabajo parecido: avisan al activar ambas. */
+  overlapCategories?: string[];
   status: "active" | "deprecated";
   configSchema: ZodType<C, ZodTypeDef, unknown>;
   defaultConfig: C;
