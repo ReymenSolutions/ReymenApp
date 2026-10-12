@@ -28,6 +28,9 @@ describe("rulebook (puro)", () => {
   });
   it("sin nada devuelve texto vacío", () => {
     expect(renderRulebookPrompt(emptyRulebook(), [])).toBe("");
+    expect(renderRulebookPrompt(emptyRulebook(), [], "Ana")).toBe(""); // el nombre solo no cuenta como instrucciones
+    expect(renderRulebookPrompt({ ...emptyRulebook(), rules: "R" }, [], "Ana")).toContain("you are Ana");
+    expect(renderRulebookPrompt({ ...emptyRulebook(), rules: "R" }, [], "Asistente AI")).not.toContain("YOUR NAME");
   });
 });
 

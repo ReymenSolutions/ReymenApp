@@ -6,6 +6,8 @@ export type RulebookSection = (typeof RULEBOOK_SECTIONS)[number];
 export type RulebookInput = Record<RulebookSection, string>;
 
 export const RULEBOOK_MAX_CHARS = 4000;
+/** Nombres de fábrica del asistente: no son una decisión del negocio, no se mencionan. */
+const DEFAULT_AGENT_NAMES = ["Asistente AI", "AI Assistant"];
 const KB_ARTICLES_LIMIT = 8;
 const KB_ARTICLE_CHARS = 1200;
 
@@ -47,22 +49,26 @@ type PromptArticle = { title: string; content: string; category?: string | null 
  * Texto de instrucciones para la IA de un negocio: el rulebook (secciones con contenido) y, debajo, el
  * conocimiento adicional activo. Las secciones vacías no se mencionan. Devuelve "" si no hay nada.
  */
-export function renderRulebookPrompt(rulebook: RulebookInput, articles: PromptArticle[] = []): string {
+export function renderRulebookPrompt(rulebook: RulebookInput, articles: PromptArticle[] = [], agentName?: string | null): string {
   const parts: string[] = [];
+  const name = agentName?.trim();
   for (const key of RULEBOOK_SECTIONS) {
     const text = rulebook[key].trim();
     if (text) parts.push(`${PROMPT_HEADING[key]}\n${text}`);
   }
   const knowledge = articles.slice(0, KB_ARTICLES_LIMIT).map((a) => `- ${a.title}${a.category ? ` (${a.category})` : ""}: ${a.content.trim().slice(0, KB_ARTICLE_CHARS)}`);
   if (knowledge.length > 0) parts.push(`BUSINESS KNOWLEDGE\n${knowledge.join("\n")}`);
+  // El nombre solo acompaña a instrucciones reales: un negocio sin Rulebook sigue contando como "sin instrucciones".
+  if (parts.length > 0 && name && !DEFAULT_AGENT_NAMES.includes(name)) parts.unshift(`YOUR NAME\nWhen you introduce yourself, you are ${name}.`);
   return parts.join("\n\n");
 }
 
 /** Rulebook + artículos activos del negocio, ya armados como texto para el prompt. */
 export async function buildBusinessInstructions(organizationId: string): Promise<string> {
-  const [rulebook, articles] = await Promise.all([
+  const [rulebook, assistant, articles] = await Promise.all([
     getRulebook(organizationId),
+    prisma.whatsAppAssistant.findUnique({ where: { organizationId }, select: { name: true } }),
     prisma.knowledgeBase.findMany({ where: { organizationId, isActive: true }, orderBy: { updatedAt: "desc" }, take: KB_ARTICLES_LIMIT, select: { title: true, content: true, category: true } }),
   ]);
-  return renderRulebookPrompt(rulebook, articles);
+  return renderRulebookPrompt(rulebook, articles, assistant?.name);
 }

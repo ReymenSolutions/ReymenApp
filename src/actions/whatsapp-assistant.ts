@@ -9,11 +9,7 @@ import { UserError } from "@/lib/user-error";
 
 const upsertSchema = z.object({
   name: z.string().min(1),
-  greeting: z.string().min(10),
-  personality: z.string().optional(),
   phoneNumber: z.string().optional(),
-  isActive: z.boolean().optional(),
-  capabilities: z.array(z.string()).optional(),
 });
 
 export async function upsertWhatsAppAssistant(
@@ -28,15 +24,8 @@ export async function upsertWhatsAppAssistant(
 
   await prisma.whatsAppAssistant.upsert({
     where: { organizationId: session.user.organizationId },
-    create: {
-      organizationId: session.user.organizationId,
-      ...parsed,
-      capabilities: parsed.capabilities ?? [],
-    },
-    update: {
-      ...parsed,
-      capabilities: parsed.capabilities ?? [],
-    },
+    create: { organizationId: session.user.organizationId, ...parsed, capabilities: [] },
+    update: parsed,
   });
 
   revalidatePath("/portal/whatsapp");
