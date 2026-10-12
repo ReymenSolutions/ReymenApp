@@ -83,6 +83,7 @@ model Organization {
   customers               Customer[]
   domainEvents            DomainEvent[]
   automationExecutions    AutomationExecution[]
+  rulebook                BusinessRulebook?
   branches                Branch[]
   branchDishes            BranchDish[]
   branchVariantPrices     BranchVariantPrice[]
@@ -834,6 +835,22 @@ model KnowledgeBase {
   @@index([organizationId])
   @@index([organizationId, category])
   @@index([organizationId, isActive])
+}
+
+/// Rulebook del negocio: las reglas de voz, saludo, límites y precios que la IA sigue en cada respuesta.
+/// Una fila por organización; el conocimiento adicional (servicios, horarios, FAQ) sigue en KnowledgeBase.
+model BusinessRulebook {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+  voice          String   @default("") @db.Text
+  greeting       String   @default("") @db.Text
+  rules          String   @default("") @db.Text
+  pricing        String   @default("") @db.Text
+  updatedById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
 
 // ─── PROMPT MANAGER ───────────────────────────────────────────────
