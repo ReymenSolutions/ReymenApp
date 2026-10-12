@@ -176,7 +176,7 @@ model Organization {
   industry  String?                    // clinic | real_estate | gym | legal | workshop | ecommerce
   logoUrl   String?
   isActive  Boolean  @default(true)   // soft-disable entire tenant
-  plan      String   @default("starter") // starter | professional | enterprise
+  plan      String   @default("starter") // starter | professional | business
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -1361,7 +1361,7 @@ type Action =
 export const PLAN_LIMITS = {
   starter:      { leads: 500,   users: 2,  automations: 3,  label: "Starter" },
   professional: { leads: 5000,  users: 10, automations: 15, label: "Professional" },
-  enterprise:   { leads: 99999, users: 99, automations: 99, label: "Enterprise" },
+  business:     { leads: 99999, users: 99, automations: 99, label: "Business" },
 };
 ```
 
@@ -2653,7 +2653,7 @@ immediately.
 | Variable | Gates | What happens without it |
 |----------|-------|--------------------------|
 | `RESEND_API_KEY` / `EMAIL_FROM` | Transactional email (password reset, notifications) | Without `RESEND_API_KEY`, emails are logged to the console instead of sent — password reset and notification flows still "succeed" but no email arrives. Set both before relying on email in production. |
-| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_PROFESSIONAL` / `STRIPE_PRICE_ENTERPRISE` | Billing (upgrade/manage-billing UI, Stripe webhook route) | Without `STRIPE_SECRET_KEY`, the upgrade/manage-billing UI stays hidden. `STRIPE_WEBHOOK_SECRET` gates `/api/webhooks/stripe`; without it that route rejects incoming Stripe events. |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_PROFESSIONAL` / `STRIPE_PRICE_BUSINESS` | Billing (upgrade/manage-billing UI, Stripe webhook route) | Without `STRIPE_SECRET_KEY`, the upgrade/manage-billing UI stays hidden. `STRIPE_WEBHOOK_SECRET` gates `/api/webhooks/stripe`; without it that route rejects incoming Stripe events. |
 | `SENTRY_DSN` (server) / `NEXT_PUBLIC_SENTRY_DSN` (client) | Error tracking | Without these, `sentry.server.config.ts` / `sentry.edge.config.ts` / `instrumentation-client.ts` initialize Sentry with no DSN, so error capture is a no-op — errors are only visible in server logs, not in Sentry. Not knowing about this in production means silently losing visibility into crashes. |
 | `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | Source map upload at build time | Build-time only, unrelated to runtime error capture. Without them, Sentry still receives errors (if `SENTRY_DSN` is set) but stack traces point at minified code instead of original source. |
 | `BANXICO_TOKEN` / `MXN_PER_USD` | ROI in Reports (`src/lib/exchange-rate.ts`, `src/lib/roi.ts`) | The MXN/USD rate is fetched automatically (cached 6 h): Banxico's official FIX rate when `BANXICO_TOKEN` is set, otherwise Frankfurter (European Central Bank data, no key). `MXN_PER_USD` is only a manual fallback when the source doesn't respond. With none available, MXN opportunities are left out of the ROI and the card shows a warning — there is deliberately no hardcoded default rate. |
@@ -3287,7 +3287,7 @@ checklist moved from "0 de 4" to "2 de 4" against the live database, not a mock.
 
 `/portal/reports` had a "Simulador de ROI" (`RoiCalculator.tsx`) that was pure guesswork: a free-text
 "average deal value" number input (defaulting to a made-up $5,000) multiplied by the count of leads
-in `Lead.status = WON`, compared against a plan-price table (`PLAN_PRICES_MXN`: starter 999, professional 1999, enterprise 3999 MXN, historical: was starter: 299, professional: 699,
+in `Lead.status = WON`, compared against a plan-price table (`PLAN_PRICES_MXN`: starter 999, professional 1999, business 3999 MXN, historical: was starter: 299, professional: 699,
 enterprise: 1499`) that was hardcoded inside that one client component and nowhere else — so the
 "ROI" a client saw was never actually derived from money they'd recorded anywhere in the platform.
 
@@ -3402,7 +3402,7 @@ updates `Organization.plan`, exactly as before.
 export const PLAN_MODULES: Record<string, PlatformModule[]> = {
   starter: ["CRM"],
   professional: ["CRM", "AUTOMATIONS"],
-  enterprise: ["CRM", "AUTOMATIONS", "AI_WHATSAPP"],
+  business: ["CRM", "AUTOMATIONS", "AI_WHATSAPP"],
 };
 ```
 

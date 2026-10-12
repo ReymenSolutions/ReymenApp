@@ -84,7 +84,7 @@ export async function createClient(formData: FormData) {
 export async function changePlan(orgId: string, plan: string, customMonthlyPriceMxn: number | null = null) {
   const session = await requireAdmin();
 
-  const validPlans = ["starter", "professional", "enterprise"];
+  const validPlans = ["starter", "professional", "business"];
   if (!validPlans.includes(plan)) throw new UserError("Plan inválido");
 
   // Precio pactado opcional (plan personalizado de un cliente): vacío = precio de lista del plan.

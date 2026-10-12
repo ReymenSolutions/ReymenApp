@@ -15,7 +15,9 @@ const MOBILE_QUERY = "(max-width: 1023px)";
 export function useDrawerSwipe({ open, setOpen }: { open: boolean; setOpen: (open: boolean) => void }) {
   const openedAt = useRef(0);
   const openRef = useRef(open);
-  openRef.current = open;
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
 
   const doOpen = useCallback(() => {
     openedAt.current = Date.now();

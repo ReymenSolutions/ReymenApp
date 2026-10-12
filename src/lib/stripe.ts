@@ -18,7 +18,7 @@ export function isStripeConfigured(): boolean {
 /** Paid plans only — "starter" has no Stripe price, it's the default free/unbilled tier. */
 export const PLAN_PRICE_ENV: Record<string, string | undefined> = {
   professional: process.env.STRIPE_PRICE_PROFESSIONAL,
-  enterprise: process.env.STRIPE_PRICE_ENTERPRISE,
+  business: process.env.STRIPE_PRICE_BUSINESS,
 };
 
 export function planForPriceId(priceId: string | null | undefined): string | null {

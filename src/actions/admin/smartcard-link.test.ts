@@ -16,7 +16,7 @@ const lib = vi.hoisted(() => ({
   linkSmartcardCompany: vi.fn(async () => ({ id: "c1", name: "Villa", slug: "villa" })),
   removeSmartcardMember: vi.fn(async () => {}),
   unlinkSmartcardCompany: vi.fn(async () => {}),
-  planMemberLimit: (plan: string) => (plan === "enterprise" ? null : plan === "professional" ? 10 : 2),
+  planMemberLimit: (plan: string) => (plan === "business" ? null : plan === "professional" ? 10 : 2),
   syncSmartcardMemberLimit: vi.fn(async () => "updated" as const),
   syncSmartcardMemberLimitForPlan: vi.fn(async () => "updated" as const),
 }));

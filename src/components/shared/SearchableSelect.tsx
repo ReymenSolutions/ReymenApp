@@ -55,6 +55,7 @@ export function SearchableSelect({ options, value, onChange, name, label, placeh
     onChange?.(v);
     setOpen(false);
     setQuery("");
+    setActive(0);
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -71,6 +72,7 @@ export function SearchableSelect({ options, value, onChange, name, label, placeh
     } else if (e.key === "Escape") {
       setOpen(false);
       setQuery("");
+      setActive(0);
     }
   }
 
@@ -93,6 +95,7 @@ export function SearchableSelect({ options, value, onChange, name, label, placeh
           value={open ? query : (selected?.label ?? "")}
           placeholder={open ? (selected?.label ?? placeholder) : placeholder}
           onFocus={() => { setOpen(true); setActive(0); }}
+          onClick={() => setOpen(true)}
           onChange={(e) => { setQuery(e.target.value); setOpen(true); setActive(0); }}
           onKeyDown={onKeyDown}
           className="h-9 w-full rounded-md border border-slate-200 bg-transparent pl-8 pr-14 text-sm outline-none focus:border-brand-500"

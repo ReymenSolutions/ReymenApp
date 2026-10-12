@@ -60,12 +60,12 @@ export function BillingActions({ hasActiveSubscription }: BillingActionsProps) {
         {loadingPlan === "professional" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
         {lang === "es" ? "Actualizar a Professional" : "Upgrade to Professional"}
       </Button>
-      {/* Enterprise tiene precio pactado por cliente: no hay un precio fijo que
+      {/* Business puede tener precio pactado por cliente: no hay un precio fijo que
           cobrar en Stripe, se pide una cotización por Solicitudes. */}
       <Button asChild variant="outline" size="sm" className="flex-1">
         <Link href="/portal/requests">
           <MessageSquare className="h-4 w-4" />
-          {lang === "es" ? "Cotizar Enterprise" : "Get an Enterprise quote"}
+          {lang === "es" ? "Cotizar plan Business" : "Get a Business plan quote"}
         </Link>
       </Button>
     </div>

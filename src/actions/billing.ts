@@ -35,7 +35,7 @@ async function getOrCreateStripeCustomer(orgId: string): Promise<string> {
 
 /** Starts a Stripe Checkout session to subscribe the org to a paid plan. Returns the URL to redirect to. */
 /**
- * Solo Professional: Enterprise tiene precio pactado por cliente
+ * Solo Professional: Business tiene precio pactado por cliente
  * (Organization.customMonthlyPriceUsd), no un precio fijo de Stripe.
  */
 export async function createCheckoutSession(plan: "professional"): Promise<{ url: string }> {

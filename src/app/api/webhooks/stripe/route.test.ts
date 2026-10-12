@@ -7,7 +7,7 @@ import { createTestOrg, cleanupOrg } from "@/test/helpers";
 vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_dummy");
 vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_dummy");
 vi.stubEnv("STRIPE_PRICE_PROFESSIONAL", "price_pro_123");
-vi.stubEnv("STRIPE_PRICE_ENTERPRISE", "price_ent_456");
+vi.stubEnv("STRIPE_PRICE_BUSINESS", "price_ent_456");
 
 const constructEvent = vi.fn();
 const subscriptionsRetrieve = vi.fn();
@@ -107,8 +107,8 @@ describe("POST /api/webhooks/stripe", () => {
     expect(res.status).toBe(200);
 
     const updated = await prisma.organization.findUniqueOrThrow({ where: { id: org.id } });
-    expect(updated.plan).toBe("enterprise");
-    expect(syncSmartcard).toHaveBeenCalledWith(org.id, "enterprise");
+    expect(updated.plan).toBe("business");
+    expect(syncSmartcard).toHaveBeenCalledWith(org.id, "business");
   });
 
   it("customer.subscription.deleted reverts the org to the starter plan", async () => {

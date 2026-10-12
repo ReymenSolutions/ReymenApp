@@ -34,7 +34,7 @@ const PLANS = [
     badge: "bg-brand-100 text-brand-700",
   },
   {
-    key: "enterprise",
+    key: "business",
     color: "border-amber-300",
     badge: "bg-amber-100 text-amber-700",
   },
