@@ -57,7 +57,7 @@ test.describe("module entitlements gate navigation and direct URL access", () =>
     await expect(page.getByRole("link", { name: /^CRM/ })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "CRM" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: /conversaciones/i })).not.toBeVisible();
-    await expect(page.getByRole("link", { name: /asistente ia/i })).not.toBeVisible();
+    await expect(page.getByRole("link", { name: /agente ia/i })).not.toBeVisible();
     await expect(page.getByRole("link", { name: /automatizaciones/i })).not.toBeVisible();
   });
 

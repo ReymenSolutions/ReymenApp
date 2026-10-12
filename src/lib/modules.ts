@@ -15,7 +15,7 @@ import { UserError } from "./user-error";
 // displays module names to the user should use getModuleLabel(lang) instead.
 export const MODULE_LABEL: Record<PlatformModule, string> = {
   CRM: "CRM",
-  AI_WHATSAPP: "Asistente IA",
+  AI_WHATSAPP: "Agente IA",
   AUTOMATIONS: "Automatizaciones",
   NFC_QR: "Smart Cards NFC/QR",
   MARKETING_ADS: "Marketing / Ads",
@@ -25,7 +25,7 @@ export const MODULE_LABEL: Record<PlatformModule, string> = {
 
 const MODULE_LABEL_EN: Record<PlatformModule, string> = {
   CRM: "CRM",
-  AI_WHATSAPP: "AI Assistant",
+  AI_WHATSAPP: "AI Agent",
   AUTOMATIONS: "Automations",
   NFC_QR: "Smart Cards NFC/QR",
   MARKETING_ADS: "Marketing / Ads",

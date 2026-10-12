@@ -7,5 +7,5 @@ export async function hasInboxAccess(organizationId: string): Promise<boolean> {
 }
 
 export async function assertInboxAccess(organizationId: string): Promise<void> {
-  if (!(await hasInboxAccess(organizationId))) throw new UserError(`Tu organización no tiene el módulo "Inbox (CRM o Asistente IA)" habilitado.`);
+  if (!(await hasInboxAccess(organizationId))) throw new UserError(`Tu organización no tiene el módulo "Inbox (CRM o Agente IA)" habilitado.`);
 }

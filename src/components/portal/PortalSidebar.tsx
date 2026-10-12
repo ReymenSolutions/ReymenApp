@@ -66,11 +66,12 @@ const NAV_ITEMS: { href: string; key: keyof ReturnType<typeof useNavItems>; icon
   { href: "/portal/food", key: "food", icon: UtensilsCrossed, section: "business", module: "FOOD_OPS" },
   { href: "/portal/smartcard", key: "smartcard", icon: CreditCard, section: "business", module: "NFC_QR" },
 
-  // Con el módulo CRM, todo lo de clientes vive en UNA entrada "CRM" con pestañas (Hoy, Contactos, Pipeline,
-  // Inbox, Citas, Clientes del negocio). Sin CRM se conservan las entradas sueltas que sí aplican.
+  // Con el módulo CRM, lo de clientes vive en UNA entrada "CRM" con pestañas (Hoy, Inbox, Leads, Pipeline,
+  // Clientes del negocio). Sin CRM se conservan las entradas sueltas que sí aplican.
   { href: "/portal/today", key: "crm", icon: Users, section: "customers", module: "CRM", alsoActiveFor: CRM_PATHS },
   { href: "/portal/customers", key: "customersNav", icon: Contact, section: "customers", module: "FOOD_OPS", hiddenWithModule: "CRM" },
-  { href: "/portal/appointments", key: "appointments", icon: Calendar, section: "customers", hiddenWithModule: "CRM" },
+  // Citas es su propia entrada, visible siempre y separada del CRM.
+  { href: "/portal/appointments", key: "appointments", icon: Calendar, section: "customers" },
 
   { href: "/portal/inbox", key: "inbox", icon: MessageSquare, section: "communication", anyModule: ["CRM", "AI_WHATSAPP"], hiddenWithModule: "CRM", alsoActiveFor: ["/portal/conversations"] },
   { href: "/portal/whatsapp", key: "whatsapp", icon: Bot, section: "communication", module: "AI_WHATSAPP", alsoActiveFor: ["/portal/knowledge-base", "/portal/prompts", "/portal/ai-lab"] },
