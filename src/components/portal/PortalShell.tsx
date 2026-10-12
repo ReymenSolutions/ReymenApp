@@ -5,6 +5,7 @@ import { NavigationProgress } from "@/components/shared/NavigationProgress";
 import { ScrollMemory } from "@/components/shared/ScrollMemory";
 import { PullToRefresh } from "@/components/shared/PullToRefresh";
 import { useState } from "react";
+import { useDrawerSwipe } from "@/components/shared/useDrawerSwipe";
 import { PortalSidebar } from "@/components/portal/PortalSidebar";
 import { TopBar } from "@/components/shared/TopBar";
 import { EnabledModulesProvider } from "@/context/modules";
@@ -25,6 +26,8 @@ interface PortalShellProps {
 // one boolean neither sidebar nor topbar can own on its own.
 export function PortalShell({ orgName, orgLogoUrl, enabledModules, pendingConversations, children }: PortalShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Deslizar desde el borde izquierdo abre el menú y deslizarlo hacia la izquierda lo cierra (en pantallas chicas).
+  const drawer = useDrawerSwipe({ open: mobileOpen, setOpen: setMobileOpen });
 
   return (
     <EnabledModulesProvider modules={enabledModules}>
@@ -35,10 +38,10 @@ export function PortalShell({ orgName, orgLogoUrl, enabledModules, pendingConver
         enabledModules={enabledModules}
         pendingConversations={pendingConversations}
         mobileOpen={mobileOpen}
-        onMobileClose={() => setMobileOpen(false)}
+        onMobileClose={drawer.close}
       />
       <div className="flex flex-1 flex-col min-h-0 min-w-0">
-        <TopBar onMenuClick={() => setMobileOpen(true)} />
+        <TopBar onMenuClick={drawer.open} />
         <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto overscroll-y-contain p-4 sm:p-6">
           <ScrollMemory />
           <Suspense fallback={null}>

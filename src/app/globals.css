@@ -112,6 +112,12 @@ body {
   margin: 0;
 }
 
+/* El gesto de deslizar desde el borde abre el menú lateral; sin esto, el navegador lo toma como "atrás". */
+html,
+body {
+  overscroll-behavior-x: none;
+}
+
 /* ── Dark mode: remap Tailwind CSS color variables ───────────────
    Tailwind v4 exposes every color as a CSS custom property.
    Overriding them here automatically affects all utility classes

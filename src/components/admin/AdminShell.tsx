@@ -5,6 +5,7 @@ import { NavigationProgress } from "@/components/shared/NavigationProgress";
 import { ScrollMemory } from "@/components/shared/ScrollMemory";
 import { PullToRefresh } from "@/components/shared/PullToRefresh";
 import { useState } from "react";
+import { useDrawerSwipe } from "@/components/shared/useDrawerSwipe";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { TopBar } from "@/components/shared/TopBar";
 
@@ -25,6 +26,8 @@ interface AdminShellProps {
 // sidebars themselves being intentionally parallel, not shared).
 export function AdminShell({ adminName, orgLogoUrl, personalImageUrl, hasOrganization, children }: AdminShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Deslizar desde el borde izquierdo abre el menú y deslizarlo hacia la izquierda lo cierra (en pantallas chicas).
+  const drawer = useDrawerSwipe({ open: mobileOpen, setOpen: setMobileOpen });
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
@@ -34,10 +37,10 @@ export function AdminShell({ adminName, orgLogoUrl, personalImageUrl, hasOrganiz
         personalImageUrl={personalImageUrl}
         hasOrganization={hasOrganization}
         mobileOpen={mobileOpen}
-        onMobileClose={() => setMobileOpen(false)}
+        onMobileClose={drawer.close}
       />
       <div className="flex flex-1 flex-col min-h-0 min-w-0">
-        <TopBar onMenuClick={() => setMobileOpen(true)} />
+        <TopBar onMenuClick={drawer.open} />
         <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto overscroll-y-contain p-4 sm:p-6">
           <ScrollMemory />
           <Suspense fallback={null}>

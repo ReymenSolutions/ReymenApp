@@ -36,7 +36,8 @@ describe("RulebookEditor", () => {
     await userEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Rulebook guardado"));
     expect(saveRulebook).toHaveBeenCalledWith({ ...empty, rules: "No inventes precios" });
-    expect(screen.getByRole("button", { name: "Guardado" })).toBeDisabled();
+    // El botón vuelve a "Guardado" cuando React termina de actualizar: se espera en lugar de leerlo al instante (bajo carga fallaba a veces).
+    expect(await screen.findByRole("button", { name: "Guardado" })).toBeDisabled();
   });
 
   it("si falla el guardado conserva el texto y deja reintentar", async () => {
