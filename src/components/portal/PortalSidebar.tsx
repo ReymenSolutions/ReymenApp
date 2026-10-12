@@ -37,7 +37,6 @@ function useNavItems() {
     inbox: t.inbox,
     crm: t.crm,
     knowledgeBase: t.knowledgeBase,
-    prompts: t.prompts,
     aiLab: t.aiLab,
     appointments: t.appointments,
     reports: t.reports,
@@ -53,7 +52,7 @@ function useNavItems() {
 // `module: undefined` means the section isn't gated by any commercial module
 // (always shown regardless of what the org has contracted). `alsoActiveFor`
 // covers sibling routes folded into this item's own PortalSectionTabs (see
-// src/lib/portal-nav-tabs.ts) — e.g. visiting /portal/prompts should still
+// src/lib/portal-nav-tabs.ts) — e.g. visiting /portal/ai-lab should still
 // highlight the "WhatsApp AI" sidebar entry, not leave nothing active.
 // Menú por secciones, en el orden en que un negocio piensa su día: lo suyo
 // (negocio), sus clientes, cómo se comunica, cómo le va y su cuenta. Una
@@ -74,7 +73,7 @@ const NAV_ITEMS: { href: string; key: keyof ReturnType<typeof useNavItems>; icon
   { href: "/portal/appointments", key: "appointments", icon: Calendar, section: "customers" },
 
   { href: "/portal/inbox", key: "inbox", icon: MessageSquare, section: "communication", anyModule: ["CRM", "AI_WHATSAPP"], hiddenWithModule: "CRM", alsoActiveFor: ["/portal/conversations"] },
-  { href: "/portal/whatsapp", key: "whatsapp", icon: Bot, section: "communication", module: "AI_WHATSAPP", alsoActiveFor: ["/portal/knowledge-base", "/portal/prompts", "/portal/ai-lab"] },
+  { href: "/portal/whatsapp", key: "whatsapp", icon: Bot, section: "communication", module: "AI_WHATSAPP", alsoActiveFor: ["/portal/knowledge-base", "/portal/ai-lab"] },
   { href: "/portal/automations", key: "automations", icon: Zap, section: "communication", module: "AUTOMATIONS", alsoActiveFor: ["/portal/templates"] },
 
   { href: "/portal/dashboard", key: "dashboard", icon: LayoutDashboard, section: "results" },

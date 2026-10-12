@@ -15,7 +15,6 @@ export type Action =
   | "conversations:reply"
   | "conversations:assign"
   | "knowledge_base:manage"
-  | "prompts:manage"
   | "team:manage"
   | "requests:create"
   | "reports:view"
@@ -31,7 +30,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
     "opportunities:create", "opportunities:manage", "pipeline:manage",
     "automations:view", "automations:manage",
     "conversations:view", "conversations:escalate", "conversations:resolve", "conversations:reply", "conversations:assign",
-    "knowledge_base:manage", "prompts:manage", "team:manage",
+    "knowledge_base:manage", "team:manage",
     "requests:create", "reports:view", "settings:view", "settings:manage",
     "food:manage",
   ],
@@ -40,7 +39,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
     "opportunities:create", "opportunities:manage", "pipeline:manage",
     "automations:view", "automations:manage",
     "conversations:view", "conversations:escalate", "conversations:resolve", "conversations:reply", "conversations:assign",
-    "knowledge_base:manage", "prompts:manage", "team:manage",
+    "knowledge_base:manage", "team:manage",
     "requests:create", "reports:view", "settings:view", "settings:manage",
     "food:manage",
   ],
@@ -49,7 +48,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
     "opportunities:create", "opportunities:manage", "pipeline:manage",
     "automations:view", "automations:manage",
     "conversations:view", "conversations:escalate", "conversations:resolve", "conversations:reply", "conversations:assign",
-    "knowledge_base:manage", "prompts:manage", "team:manage",
+    "knowledge_base:manage", "team:manage",
     "requests:create", "reports:view", "settings:view", "settings:manage",
     "food:manage",
   ],
@@ -58,7 +57,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
     "opportunities:create", "opportunities:manage",
     "automations:view",
     "conversations:view", "conversations:escalate", "conversations:resolve", "conversations:reply", "conversations:assign",
-    "knowledge_base:manage", "prompts:manage",
+    "knowledge_base:manage",
     "requests:create", "reports:view", "settings:view",
     "food:manage",
   ],

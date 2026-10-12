@@ -16,7 +16,7 @@
 6. [Automatizaciones](#6-automatizaciones)
 7. [WhatsApp AI](#7-whatsapp-ai)
 8. [Base de Conocimiento](#8-base-de-conocimiento)
-9. [Prompts](#9-prompts)
+9. [Instrucciones del Agente IA](#9-instrucciones-del-agente-ia-antes-prompts)
 10. [Conversaciones](#10-conversaciones)
 11. [Templates](#11-templates)
 12. [Citas](#12-citas)
@@ -441,76 +441,13 @@ Puedes reactivarlo en cualquier momento siguiendo el mismo proceso.
 
 ---
 
-## 9. Prompts
+## 9. Instrucciones del Agente IA (antes "Prompts")
 
-Los Prompts (`/portal/prompts`) son las instrucciones que le das a la IA para que se comporte de cierta manera. Puedes tener múltiples prompts por tipo, pero **solo uno puede estar activo a la vez**.
+Los prompts se unificaron: el Agente IA tiene **una sola fuente de instrucciones**, el **Rulebook** y los artículos de la **Base de Conocimiento** (sección 8). Ya no hay pantalla de Prompts; `/portal/prompts` lleva a la Base de Conocimiento.
 
-### ¿Qué es un Prompt?
-
-Un prompt es un texto de instrucciones que configura el comportamiento del asistente de IA. Son como las "reglas de trabajo" que le das al bot.
-
-### Tipos de Prompts
-
-| Tipo | Descripción |
-|------|-------------|
-| **SYSTEM** | El prompt principal. Define la identidad, nombre, objetivo y reglas generales del asistente |
-| **GREETING** | El mensaje de bienvenida estructurado del bot |
-| **LEAD_QUALIFICATION** | Instrucciones para calificar prospectos (qué preguntas hacer, cómo registrar datos) |
-| **APPOINTMENT_BOOKING** | Instrucciones para agendar citas (qué datos recopilar, cómo confirmar) |
-| **FAQ** | Cómo manejar preguntas frecuentes usando la Base de Conocimiento |
-| **ESCALATION** | Cuándo y cómo transferir una conversación a un agente humano |
-
-### Ver los Prompts
-
-La página muestra todos tus prompts agrupados por tipo. Cada uno muestra:
-- Nombre del prompt
-- Tipo
-- Indicador de si está activo o inactivo
-
-### Crear un Prompt
-
-1. Haz clic en **"Nuevo Prompt"**.
-2. Completa:
-   - **Nombre:** identifica la versión del prompt (ej. "Sistema v2 — Tono más casual").
-   - **Tipo:** selecciona el tipo del menú desplegable.
-   - **Contenido:** escribe las instrucciones para la IA.
-3. Haz clic en **"Guardar"**.
-
-El prompt se crea como **inactivo** por defecto. Debes activarlo explícitamente.
-
-### Activar un Prompt
-
-1. Localiza el prompt que deseas activar.
-2. Haz clic en el botón **"Activar"**.
-3. El sistema desactivará automáticamente cualquier otro prompt del mismo tipo y activará el seleccionado.
-
-> **Regla clave:** Solo puede haber un prompt activo por tipo en tu organización. Al activar uno nuevo, el anterior se desactiva automáticamente de forma atómica (sin riesgo de que queden dos activos al mismo tiempo).
-
-### Editar un Prompt
-
-1. Haz clic en el ícono de edición junto al prompt.
-2. Modifica el contenido.
-3. Guarda los cambios.
-
-> Si el prompt está activo, los cambios aplican inmediatamente.
-
-### Ejemplo de Prompt SYSTEM bien escrito
-
-```
-Eres el asistente virtual de [Nombre de tu negocio].
-
-Tu nombre es [Nombre del bot] y tus objetivos son:
-1. [Objetivo 1]
-2. [Objetivo 2]
-3. [Objetivo 3]
-
-REGLAS IMPORTANTES:
-- Siempre sé amable y profesional
-- Responde siempre en español
-- Si el usuario solicita hablar con una persona, escala la conversación
-- Nunca [restricción específica de tu industria]
-- Cuando no sepas algo, ofrece escalar con un agente
-```
+- Lo que antes era el prompt de **sistema** pasó a "Cómo hablas" y el de **saludo** a "Saludo". Los de calificación, citas, preguntas frecuentes y escalación se copiaron a "Reglas" (solo si esa sección estaba vacía o añadiéndolos al final).
+- En **Agente IA → Probador** escribes un mensaje de cliente y ves qué respondería el agente (o por qué pasaría la conversación a una persona), sin enviar nada.
+- En **Agente IA** eliges por canal si el agente está **Apagado**, **Sugiere** o responde en **Automático**.
 
 ---
 
