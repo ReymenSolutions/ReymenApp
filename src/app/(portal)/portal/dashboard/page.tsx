@@ -1,12 +1,16 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Users, Zap, MessageSquare, FileText, AlertTriangle, CheckCircle2, Rocket, ArrowRight, UtensilsCrossed, CreditCard } from "lucide-react";
+import { Users, Zap, MessageSquare, FileText, AlertTriangle, CheckCircle2, Rocket, ArrowRight, UtensilsCrossed, CreditCard, Wallet } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { getServerT, getServerLang } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { getOnboardingStatus } from "@/lib/onboarding";
 import { getEnabledModules } from "@/lib/modules";
 import { getFoodSalesSummary } from "@/lib/food";
+import { getCrmDashboard } from "@/lib/crm-dashboard";
+import { Reveal } from "@/components/motion/Reveal";
+import { AnimatedBar } from "@/components/motion/AnimatedBar";
+import { formatNumber } from "@/lib/format-number";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { MetricCard } from "@/components/shared/MetricCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,6 +81,8 @@ export default async function PortalDashboardPage() {
   // scan over every active member to match the caller's email) that this
   // page — the one every login lands on — shouldn't have to wait on or
   // degrade for. Its card below is a plain link, not a live widget.
+  const crm = hasModule("CRM") ? await getCrmDashboard(session.user.organizationId) : null;
+  const pipeline = crm?.pipeline ?? null;
   const foodSummary = hasModule("FOOD_OPS")
     ? await getFoodSalesSummary(session.user.organizationId)
     : null;
@@ -149,13 +155,51 @@ export default async function PortalDashboardPage() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-2 gap-4 mb-6 lg:grid-cols-3 xl:grid-cols-6">
-        <MetricCard title={t.totalLeads} value={metrics.totalLeads} icon={Users} />
-        <MetricCard title={t.leadsToday} value={metrics.newLeadsToday} icon={Users} iconClassName="bg-emerald-50" />
-        <MetricCard title={t.automations} value={metrics.activeAutomations} icon={Zap} />
-        <MetricCard title={t.errors} value={metrics.automationErrors} icon={AlertTriangle} iconClassName="bg-red-50" />
-        <MetricCard title={t.conversations} value={metrics.openConversations} icon={MessageSquare} />
-        <MetricCard title={t.requests} value={metrics.openRequests} icon={FileText} />
+      {pipeline && (
+        <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <MetricCard
+            variant="hero"
+            index={0}
+            className="lg:col-span-2"
+            title={lang === "es" ? "Valor en pipeline" : "Pipeline value"}
+            value={pipeline.total}
+            format={{ style: "currency", currency: pipeline.currency }}
+            icon={Wallet}
+            description={`${pipeline.count} ${lang === "es" ? (pipeline.count === 1 ? "oportunidad abierta" : "oportunidades abiertas") : pipeline.count === 1 ? "open opportunity" : "open opportunities"}${pipeline.otherCurrencies.length > 0 ? ` · ${lang === "es" ? "también en" : "also in"} ${pipeline.otherCurrencies.map((o) => `${formatNumber(o.total, { style: "currency", currency: o.currency })}`).join(", ")}` : ""}`}
+          >
+            {pipeline.total > 0 && (
+              <ul className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+                {pipeline.byStage.map((st) => (
+                  <li key={st.id}>
+                    <div className="mb-1 flex items-center justify-between text-[11px] text-brand-100">
+                      <span className="truncate">{st.name}</span>
+                      <span className="tabular-nums">{formatNumber(st.total, { style: "currency", currency: pipeline.currency })}</span>
+                    </div>
+                    <AnimatedBar value={st.share} label={st.name} trackClassName="bg-[rgb(255_255_255/0.15)]" className="bg-[rgb(255_255_255)]" />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </MetricCard>
+          <MetricCard
+            index={1}
+            title={lang === "es" ? "Leads nuevos (7 días)" : "New leads (7 days)"}
+            value={crm?.leads.last7 ?? 0}
+            icon={Users}
+            iconClassName="bg-emerald-50"
+            trend={crm && crm.leads.change !== null ? { value: crm.leads.change, label: lang === "es" ? "vs 7 días previos" : "vs previous 7 days" } : undefined}
+            description={`${metrics.newLeadsToday} ${lang === "es" ? "hoy" : "today"}`}
+          />
+        </div>
+      )}
+
+      <div className={`grid grid-cols-2 gap-4 mb-6 lg:grid-cols-3 ${pipeline ? "xl:grid-cols-5" : "xl:grid-cols-6"}`}>
+        <MetricCard index={2} title={t.totalLeads} value={metrics.totalLeads} icon={Users} />
+        {!pipeline && <MetricCard index={3} title={t.leadsToday} value={metrics.newLeadsToday} icon={Users} iconClassName="bg-emerald-50" />}
+        <MetricCard index={4} title={t.automations} value={metrics.activeAutomations} icon={Zap} />
+        <MetricCard index={5} title={t.errors} value={metrics.automationErrors} icon={AlertTriangle} iconClassName="bg-red-50" />
+        <MetricCard index={6} title={t.conversations} value={metrics.openConversations} icon={MessageSquare} />
+        <MetricCard index={7} title={t.requests} value={metrics.openRequests} icon={FileText} />
       </div>
 
       {(hasModule("FOOD_OPS") || hasModule("NFC_QR")) && (
@@ -163,7 +207,7 @@ export default async function PortalDashboardPage() {
           {hasModule("FOOD_OPS") && foodSummary && (
             <Link
               href="/portal/food"
-              className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50/40"
+              className="flex items-center justify-between rounded-card border border-slate-200 bg-white p-4 shadow-card motion-micro transition-[border-color,box-shadow,background-color] hover:border-brand-300 hover:bg-brand-50/40 hover:shadow-card-hover"
             >
               <div className="flex items-center gap-3">
                 <div className="rounded-lg bg-amber-50 p-2">
@@ -186,7 +230,7 @@ export default async function PortalDashboardPage() {
           {hasModule("NFC_QR") && (
             <Link
               href="/portal/smartcard"
-              className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50/40"
+              className="flex items-center justify-between rounded-card border border-slate-200 bg-white p-4 shadow-card motion-micro transition-[border-color,box-shadow,background-color] hover:border-brand-300 hover:bg-brand-50/40 hover:shadow-card-hover"
             >
               <div className="flex items-center gap-3">
                 <div className="rounded-lg bg-brand-50 p-2">
@@ -206,7 +250,7 @@ export default async function PortalDashboardPage() {
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
+        <Reveal index={8}><Card className="h-full">
           <CardHeader><CardTitle>{t.recentLeads}</CardTitle></CardHeader>
           <CardContent>
             {metrics.recentLeads.length === 0 ? (
@@ -214,7 +258,7 @@ export default async function PortalDashboardPage() {
             ) : (
               <div className="space-y-3">
                 {metrics.recentLeads.map((lead) => (
-                  <div key={lead.id} className="flex items-center justify-between">
+                  <div key={lead.id} className="-mx-2 flex items-center justify-between rounded-md px-2 py-1.5 motion-micro hover:bg-slate-50">
                     <div>
                       <p className="text-sm font-medium text-slate-900">{lead.name}</p>
                       <p className="text-xs text-slate-400">
@@ -227,9 +271,9 @@ export default async function PortalDashboardPage() {
               </div>
             )}
           </CardContent>
-        </Card>
+        </Card></Reveal>
 
-        <Card>
+        <Reveal index={9}><Card className="h-full">
           <CardHeader><CardTitle>{t.automationActivity}</CardTitle></CardHeader>
           <CardContent>
             {metrics.recentEvents.length === 0 ? (
@@ -237,7 +281,7 @@ export default async function PortalDashboardPage() {
             ) : (
               <div className="space-y-3">
                 {metrics.recentEvents.map((event) => (
-                  <div key={event.id} className="flex items-center justify-between">
+                  <div key={event.id} className="-mx-2 flex items-center justify-between rounded-md px-2 py-1.5 motion-micro hover:bg-slate-50">
                     <div>
                       <p className="text-sm font-medium text-slate-900">{event.automation.name}</p>
                       <p className="text-xs text-slate-400">{formatDate(event.createdAt)}</p>
@@ -248,7 +292,7 @@ export default async function PortalDashboardPage() {
               </div>
             )}
           </CardContent>
-        </Card>
+        </Card></Reveal>
       </div>
     </div>
   );

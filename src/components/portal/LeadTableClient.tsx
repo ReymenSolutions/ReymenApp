@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Search, X } from "lucide-react";
@@ -11,6 +11,7 @@ import { LeadActions } from "@/components/portal/LeadActions";
 import { Pagination } from "@/components/shared/Pagination";
 import { formatDate } from "@/lib/utils";
 import { LeadColumnsGear, type ColumnField } from "@/components/portal/LeadColumnsGear";
+import { LeadDetailPanel } from "@/components/portal/LeadDetailPanel";
 import { displayValue, type CustomFieldDef } from "@/lib/custom-fields";
 import type { LeadColumnPrefs } from "@/lib/lead-columns";
 import { usePreferences } from "@/context/preferences";
@@ -39,7 +40,9 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status, c
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [inputValue, setInputValue] = useState(query);
-  const [, startTransition] = useTransition();
+  const [isFiltering, startTransition] = useTransition();
+  const [panelLeadId, setPanelLeadId] = useState<string | null>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
 
   // Debounce the search box before pushing a URL update (and re-fetching server-side).
   useEffect(() => {
@@ -83,7 +86,7 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status, c
             placeholder={t.searchLeads}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            className="w-full rounded-md border border-slate-200 bg-white py-2 pl-9 pr-8 text-sm focus:border-brand-500 focus:outline-none text-slate-900"
+            className="w-full rounded-md border border-slate-200 bg-white py-2 pl-9 pr-8 text-sm text-slate-900 shadow-sm motion-micro transition-[border-color,box-shadow] placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
           />
           {inputValue && (
             <button
@@ -99,9 +102,10 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status, c
             <button
               key={opt.value}
               onClick={() => updateParams({ status: opt.value === "ALL" ? undefined : opt.value, page: undefined })}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              aria-pressed={status === opt.value}
+              className={`rounded-full px-3 py-1 text-xs font-medium motion-micro transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
                 status === opt.value
-                  ? "bg-brand-600 text-white"
+                  ? "bg-brand-600 text-white shadow-sm"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
@@ -119,7 +123,7 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status, c
           <p className="text-sm text-slate-400">{t.noLeadsFiltered}</p>
         </div>
       ) : (
-        <div className="rounded-lg border border-slate-200 bg-white overflow-x-auto">
+        <div className={`overflow-x-auto rounded-card border border-slate-200 bg-white shadow-card motion-micro transition-opacity ${isFiltering ? "opacity-60" : ""}`} aria-busy={isFiltering}>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
@@ -137,9 +141,19 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status, c
             </thead>
             <tbody className="divide-y divide-slate-100">
               {leads.map((lead) => (
-                <tr key={lead.id} className="hover:bg-slate-50 transition-colors">
+                <tr key={lead.id} className="motion-micro transition-colors hover:bg-slate-50 focus-within:bg-slate-50">
                   <td className="px-4 py-3">
-                    <Link href={`/portal/leads/${lead.id}`} className="font-medium text-slate-900 hover:text-brand-600 hover:underline">
+                    <Link
+                      href={`/portal/leads/${lead.id}`}
+                      onClick={(e) => {
+                        // Clic normal: panel lateral. Con Ctrl/Cmd/Shift o clic medio se conserva el enlace a la ficha completa.
+                        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                        e.preventDefault();
+                        openerRef.current = e.currentTarget;
+                        setPanelLeadId(lead.id);
+                      }}
+                      className="font-medium text-slate-900 hover:text-brand-600 hover:underline"
+                    >
                       {lead.name}
                     </Link>
                     {lead.notes && (
@@ -192,6 +206,7 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status, c
           />
         </div>
       )}
+      <LeadDetailPanel leadId={panelLeadId} onClose={() => setPanelLeadId(null)} returnFocusRef={openerRef} />
     </div>
   );
 }
