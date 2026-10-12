@@ -5,6 +5,7 @@ import { createTestOrg, cleanupOrg } from "@/test/helpers";
 import { addDays, buildDailyReport, localDateString, pctChange, zonedDayStart } from "./report";
 import { runClockDetectors } from "./detectors";
 import { runAutomationTick } from "@/lib/automation-tick";
+import { dispatchPendingExecutions } from "./dispatcher";
 import { getBlueprint } from "./blueprints";
 
 const sendEmail = vi.fn();
@@ -103,35 +104,64 @@ describe("reporte ejecutivo diario", () => {
     expect((await runClockDetectors(new Date("2030-10-08T15:00:00Z"), { organizationId: org.id })).reports).toBe(1);
   });
 
-  it("con la automatización activa lo manda por correo SOLO a dueños y gerentes y queda en la actividad", async () => {
+  it("con la automatización activa deja el aviso listo para n8n: correo SOLO a dueños y gerentes, con el mensaje ya armado", async () => {
     const auto = await enable();
     await runAutomationTick(SEND_TIME, { organizationId: org.id });
     const [ex] = await prisma.automationExecution.findMany({ where: { automationId: auto.id } });
-    expect(ex).toMatchObject({ status: "SUCCEEDED", subjectType: "report" });
-    expect(ex.action).toMatchObject({ type: "report", title: `Reporte del ${DAY}` });
-    expect(sendEmail).toHaveBeenCalledTimes(1);
-    const mail = sendEmail.mock.calls[0][0] as { to: string; subject: string; html: string };
-    expect(mail.to).toBe(`owner-${org.id}@t.mx`);
-    expect(mail.subject).toContain("La Taquería");
-    expect(mail.html).toContain("Taco — 12");
-    expect(mail.html).toContain("Tomate");
-    // Otro tick el mismo día no vuelve a mandar nada.
+    expect(ex).toMatchObject({ status: "PENDING", subjectType: "report" });
+    const action = ex.action as { type: string; title: string; recipients: { channel: string; email?: string }[]; content: { subject: string; html: string; text: string } };
+    expect(action).toMatchObject({ type: "report", title: `Reporte del ${DAY}` });
+    expect(action.recipients).toEqual([{ channel: "email", email: `owner-${org.id}@t.mx`, name: "Dueña" }]); // el agente no recibe el reporte
+    expect(action.content.subject).toContain("La Taquería");
+    expect(action.content.html).toContain("Taco — 12");
+    expect(action.content.text).toContain("Tomate");
+    // La app ya NO manda correos por su cuenta: la entrega es del despachador (n8n).
+    expect(sendEmail).not.toHaveBeenCalled();
+    // Otro tick el mismo día no vuelve a crear nada.
     await runAutomationTick(new Date(SEND_TIME.getTime() + 600_000), { organizationId: org.id });
-    expect(sendEmail).toHaveBeenCalledTimes(1);
+    expect(await prisma.automationExecution.count({ where: { automationId: auto.id } })).toBe(1);
   });
 
-  it("en dry-run se registra pero no se manda ningún correo", async () => {
+  it("el despachador lo entrega con el workflow genérico de avisos (destinatarios y mensaje, sin datos de clientes)", async () => {
+    await enable();
+    await runAutomationTick(SEND_TIME, { organizationId: org.id });
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => "" });
+    vi.stubEnv("N8N_WEBHOOK_SECRET", "secret");
+    vi.stubEnv("N8N_BASE_URL", "http://n8n.test");
+    const res = await dispatchPendingExecutions({ now: new Date(), organizationId: org.id, fetchImpl: fetchImpl as never });
+    expect(res.dispatched).toBe(1);
+    const [url, init] = fetchImpl.mock.calls[0] as [string, { body: string; headers: Record<string, string> }];
+    expect(url).toBe("http://n8n.test/webhook/reymen-action-notify");
+    const body = JSON.parse(init.body);
+    expect(body.type).toBe("action.notify.send");
+    expect(body.recipients).toEqual([{ channel: "email", email: `owner-${org.id}@t.mx`, name: "Dueña" }]);
+    expect(body.content).toMatchObject({ kind: "report", title: `Reporte del ${DAY}` });
+    expect(body.recipient).toBeUndefined();
+    expect(body.callback.token).toBeTruthy();
+    vi.unstubAllEnvs();
+  });
+
+  it("modos de aviso: solo campana (sin n8n), WhatsApp al responsable, o correo y WhatsApp", async () => {
+    const bell = await enable({ config: { notify: "app" } });
+    await runAutomationTick(SEND_TIME, { organizationId: org.id });
+    expect(await prisma.automationExecution.findFirstOrThrow({ where: { automationId: bell.id } })).toMatchObject({ status: "SUCCEEDED", action: expect.objectContaining({ recipients: [] }) });
+
+    await prisma.automationExecution.deleteMany({ where: { organizationId: org.id } });
+    await prisma.domainEvent.deleteMany({ where: { organizationId: org.id } });
+    await prisma.automation.update({ where: { id: bell.id }, data: { config: { notify: "email_whatsapp", whatsappTo: "+5215512345678", sendHour: 8 } } });
+    await runAutomationTick(SEND_TIME, { organizationId: org.id });
+    const ex = await prisma.automationExecution.findFirstOrThrow({ where: { automationId: bell.id } });
+    expect(ex.skipReason).toBeNull();
+    expect(ex.status).toBe("PENDING");
+    expect((ex.action as { recipients: { channel: string; phone?: string }[] }).recipients.map((r) => r.channel)).toEqual(["email", "whatsapp"]);
+    expect((ex.action as { recipients: { phone?: string }[] }).recipients[1].phone).toBe("+5215512345678");
+  });
+
+  it("en dry-run se registra a quién se habría avisado, sin avisar a nadie", async () => {
     const auto = await enable({ dryRun: true });
     await runAutomationTick(SEND_TIME, { organizationId: org.id });
     expect((await prisma.automationExecution.findFirstOrThrow({ where: { automationId: auto.id } })).status).toBe("DRY_RUN");
     expect(sendEmail).not.toHaveBeenCalled();
-  });
-
-  it("si el correo falla, el reporte igual queda registrado", async () => {
-    sendEmail.mockRejectedValue(new Error("smtp caído"));
-    const auto = await enable();
-    await runAutomationTick(SEND_TIME, { organizationId: org.id });
-    expect((await prisma.automationExecution.findFirstOrThrow({ where: { automationId: auto.id } })).status).toBe("SUCCEEDED");
   });
 
   it("sin la automatización habilitada, o pausada, no se arma nada", async () => {

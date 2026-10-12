@@ -1,9 +1,14 @@
 import { z } from "zod";
 import type { Blueprint } from "../types";
-import { COMMON, UNIT } from "../config-ui";
+import { COMMON, UNIT, NOTIFY_FIELDS } from "../config-ui";
+import { E164, NOTIFY_MODES } from "../notify";
 import type { DailyReport } from "../report";
 
 const configSchema = z.object({
+  /** Además de la campana del portal: correo y/o WhatsApp (vía n8n). */
+  notify: z.enum(NOTIFY_MODES).default("email"),
+  /** WhatsApp del responsable (+código de país). */
+  whatsappTo: z.string().regex(E164).optional().or(z.literal("")),
   /** Hora local (0–23) a partir de la cual se manda el reporte del día anterior. */
   sendHour: z.number().int().min(0).max(23).default(8),
 });
@@ -22,7 +27,10 @@ export const dailyExecutiveReport: Blueprint<Config> = {
   status: "active",
   configSchema,
   defaultConfig: configSchema.parse({}),
+  crossCheck: (c) => (c.notify.includes("whatsapp") && !c.whatsappTo ? { key: "whatsappTo", code: "required" as const } : null),
   configUi: {
+    notify: NOTIFY_FIELDS.notify,
+    whatsappTo: NOTIFY_FIELDS.whatsappTo,
     sendHour: { group: "when", kind: "hour", label: { es: "Enviar a partir de las", en: "Send from" }, help: { es: "Hora local del negocio. Se manda el resumen del día anterior, una vez al día.", en: "Local business time. The previous day's summary is sent once a day." } },
   },
   decide: (event) => {

@@ -33,3 +33,19 @@ El cuerpo trae organización, automatización, ejecución (`id`, `attempt`), dis
 
 ## Workflows
 `n8n/workflows/reymen-action-message.json` (importar en n8n y activar). **El proveedor es ficticio**: el nodo "Verificar, enviar (ficticio) y firmar" marca todo como enviado sin mandar nada. Cuando exista el número de WhatsApp y el aviso de privacidad, se cambia solo el bloque `PROVEEDOR` (las credenciales viven en n8n, nunca en Reymen).
+
+## Avisos internos (alertas y reportes) — `reymen-action-notify`
+Mismo despachador, otro workflow genérico: `POST {N8N_BASE_URL}/webhook/reymen-action-notify` (tipo `action.notify.send`), con las **mismas firmas, headers, idempotencia (`<executionId>:<intento>`) y callback** que el de mensajes. Sirve a **todos** los clientes: no lleva nombres, teléfonos, plantillas ni horarios dentro.
+
+Diferencias del cuerpo (en lugar de `recipient` y `content.templateKey`):
+```json
+{
+  "recipients": [ { "channel": "email", "email": "dueña@negocio.mx", "name": "Dueña" }, { "channel": "whatsapp", "phone": "+5215512345678", "name": null } ],
+  "content": { "kind": "alert | report", "title": "…", "subject": "…", "text": "…", "html": "…" }
+}
+```
+- **Reymen decide A QUIÉN** (dueños y gerentes activos para correo, y el WhatsApp del responsable configurado) **y QUÉ dice** (asunto, texto y HTML ya armados). n8n solo entrega por el canal de cada destinatario; no consulta nada ni decide nada.
+- **Callback:** `sent` si todos salieron; `failed` (con `error`) si alguno falló; `skipped` si no hay destinatarios. **n8n no reintenta**: los reintentos los controla Reymen (con espera creciente, y el reintento manual del Admin solo si no hay id de proveedor), para no duplicar avisos.
+- **Modo por automatización** (Admin → Configurar → "Avisar además por"): `Solo la campana` (sin n8n), `Correo`, `WhatsApp` o `Correo y WhatsApp`. La campana del portal siempre avisa. Se aplica a: `inventory_low_alert`, `daily_executive_report` y las calificaciones bajas de `post_visit_feedback`.
+- Workflow: `n8n/workflows/reymen-action-notify.json` (importar y activar). **Proveedores ficticios**: reemplaza los bloques CORREO y WHATSAPP; las credenciales viven en n8n.
+- La app **ya no manda correos por su cuenta** para estos avisos (se retiró el envío directo): una sola ruta de entrega.

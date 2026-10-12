@@ -160,7 +160,7 @@ export async function getBlueprintConfigForm(data: z.infer<typeof keySchema>): P
   return { key, name: blueprint.name, version: blueprint.version, fields: describeConfig(blueprint), values: current, timezone: org.timezone, live: !!instance && instance.status === "ACTIVE" && !instance.dryRun, enabled: !!instance };
 }
 
-export type ConfigFieldError = { code: "invalid" | "too_small" | "too_big" | "not_integer" | "must_be_less"; min?: number; max?: number; other?: string };
+export type ConfigFieldError = { code: "invalid" | "too_small" | "too_big" | "not_integer" | "must_be_less" | "required"; min?: number; max?: number; other?: string };
 export type SaveBlueprintConfigResult = { success: true; changed: string[] } | { success: false; errors: Record<string, ConfigFieldError> };
 
 /**
@@ -190,7 +190,7 @@ export async function saveBlueprintConfig(data: z.infer<typeof keySchema> & { co
     return { success: false, errors };
   }
   const cross = blueprint.crossCheck?.(result.data);
-  if (cross) return { success: false, errors: { [cross.key]: { code: cross.code, other: cross.other } } };
+  if (cross) return { success: false, errors: { [cross.key]: cross.code === "required" ? { code: "required" } : { code: cross.code, other: cross.other } } };
 
   const after = result.data as Record<string, unknown>;
   const changed = Object.keys(after).filter((k) => JSON.stringify(after[k] ?? null) !== JSON.stringify(beforeValues[k] ?? null));

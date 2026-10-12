@@ -149,19 +149,3 @@ export function dailyReportEmail(
     ${brandFooter}`,
   };
 }
-
-/** Aviso interno de una calificación baja de un cliente (para dar seguimiento). */
-export function feedbackAlertEmail(orgName: string, f: { score: number; comment: string | null; customerName: string | null; customerPhone: string | null }, portalUrl: string) {
-  return {
-    subject: `Un cliente calificó ${f.score}/5 — ${orgName}`,
-    html: `${brandHeader}
-      <h1 style="font-size:20px;color:#0f172a;">Un cliente calificó ${f.score} de 5</h1>
-      <p style="font-size:14px;color:#475569;line-height:1.6;">
-        <strong>Cliente:</strong> ${escapeHtml(f.customerName ?? "Sin nombre")}${f.customerPhone ? ` (${escapeHtml(f.customerPhone)})` : ""}<br/>
-        <strong>Comentario:</strong> ${f.comment ? escapeHtml(f.comment) : "—"}
-      </p>
-      <p style="font-size:14px;color:#475569;">Conviene contactarlo pronto y marcar el seguimiento como resuelto en Reymen.</p>
-      <p style="margin-top:24px;">${button(portalUrl, "Abrir Reymen")}</p>
-    ${brandFooter}`,
-  };
-}

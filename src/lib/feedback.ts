@@ -1,10 +1,8 @@
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { UserError } from "@/lib/user-error";
-import { sendEmail } from "@/lib/email";
-import { feedbackAlertEmail } from "@/lib/email-templates";
 import { getAppUrl } from "@/lib/app-url";
-import { reportRecipients } from "@/lib/automation/internal-delivery";
+import { withNotification, DEFAULT_FEEDBACK_NOTIFY, type NotifyMode } from "@/lib/automation/notify";
 
 // ── Opiniones post-visita ────────────────────────────────────────────────────
 // La respuesta llega directo a la base desde un formulario de Reymen (enlace único por venta); no se interpreta
@@ -64,16 +62,36 @@ export async function submitFeedback(token: string, input: { score: unknown; com
   return { lowScore: low };
 }
 
+/**
+ * Aviso interno de una calificación baja: por el mismo despachador que el resto de las automatizaciones (workflow
+ * genérico de n8n, a dueños/gerentes por correo y/o al WhatsApp del responsable según la configuración de
+ * "Opinión después de la visita"). La campana y "Opiniones por atender" muestran el caso aunque no haya envío externo.
+ */
 async function notifyLowScore(token: string) {
   try {
     const fb = await prisma.customerFeedback.findUnique({ where: { token }, include: { organization: { select: { name: true } } } });
     if (!fb) return;
+    const automation = await prisma.automation.findUnique({ where: { organizationId_blueprintKey: { organizationId: fb.organizationId, blueprintKey: "post_visit_feedback" } } });
+    if (!automation || automation.status !== "ACTIVE") return;
     const customer = await prisma.customer.findFirst({ where: { id: fb.customerId, organizationId: fb.organizationId }, select: { name: true, phone: true } });
-    const recipients = await reportRecipients(fb.organizationId);
-    const mail = feedbackAlertEmail(fb.organization.name, { score: fb.score ?? 0, comment: fb.comment, customerName: customer?.name ?? null, customerPhone: customer?.phone ?? null }, `${getAppUrl()}/portal/automations`);
-    await Promise.all(recipients.map((to) => sendEmail({ to, subject: mail.subject, html: mail.html }).catch(() => ({ sent: false }))));
+    const cfg = (automation.config ?? {}) as { notify?: NotifyMode; whatsappTo?: string };
+    const score = fb.score ?? 0;
+    const { action, external } = await withNotification(
+      fb.organizationId,
+      fb.organization.name,
+      { type: "alert", severity: score <= 2 ? "critical" : "warning", title: `Un cliente calificó ${score}/5`, body: `${customer?.name ?? "Cliente sin nombre"}${customer?.phone ? ` (${customer.phone})` : ""}: ${fb.comment ?? "sin comentario"}`, href: "/portal/automations" },
+      { notify: cfg.notify ?? DEFAULT_FEEDBACK_NOTIFY, whatsappTo: cfg.whatsappTo },
+    );
+    const event = await prisma.domainEvent.upsert({
+      where: { organizationId_dedupeKey: { organizationId: fb.organizationId, dedupeKey: `feedback.low_score:${fb.id}` } },
+      create: { organizationId: fb.organizationId, type: "feedback.low_score", subjectType: "feedback", subjectId: fb.id, occurredAt: new Date(), payload: { feedbackId: fb.id, score }, dedupeKey: `feedback.low_score:${fb.id}` },
+      update: {},
+    });
+    await prisma.automationExecution.create({
+      data: { organizationId: fb.organizationId, automationId: automation.id, domainEventId: event.id, subjectType: "feedback", subjectId: fb.id, status: automation.dryRun ? "DRY_RUN" : external ? "PENDING" : "SUCCEEDED", action: action as object },
+    });
   } catch (err) {
-    // Un correo que no sale no debe perder la opinión (ya quedó guardada y visible en el portal).
+    // Un aviso que no se pudo encolar no debe perder la opinión (ya quedó guardada y visible en el portal).
     console.error("[feedback] no se pudo avisar de la calificación baja", err);
   }
 }

@@ -16,7 +16,10 @@ describe("retryEligibility (puro)", () => {
   it("solo una fallida, de mensaje, sin id de proveedor, activa, en envío real y con consentimiento", () => {
     expect(retryEligibility(ok, auto, { consentAccepted: true })).toEqual({ allowed: true });
     expect(retryEligibility({ ...ok, status: "SUCCEEDED" as never }, auto, { consentAccepted: true })).toMatchObject({ allowed: false });
-    expect(retryEligibility({ ...ok, action: { type: "alert" } }, auto, { consentAccepted: true })).toMatchObject({ allowed: false });
+    expect(retryEligibility({ ...ok, action: { type: "mystery" } }, auto, { consentAccepted: true })).toMatchObject({ allowed: false });
+    // Un aviso interno no depende de ningún cliente.
+    expect(retryEligibility({ ...ok, action: { type: "alert" } }, auto, null)).toEqual({ allowed: true });
+    expect(retryEligibility({ ...ok, action: { type: "report" } }, auto, null)).toEqual({ allowed: true });
     expect(retryEligibility({ ...ok, providerMessageId: "wamid.1" }, auto, { consentAccepted: true })).toMatchObject({ allowed: false, reason: expect.stringMatching(/duplicar/) });
     expect(retryEligibility(ok, { status: "PAUSED", dryRun: false }, { consentAccepted: true })).toMatchObject({ allowed: false });
     expect(retryEligibility(ok, { status: "ACTIVE", dryRun: true }, { consentAccepted: true })).toMatchObject({ allowed: false });

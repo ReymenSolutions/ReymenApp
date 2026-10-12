@@ -1,9 +1,14 @@
 import { z } from "zod";
 import type { ActionSpec, Blueprint } from "../types";
-import { COMMON, UNIT } from "../config-ui";
+import { COMMON, UNIT, NOTIFY_FIELDS } from "../config-ui";
+import { DEFAULT_FEEDBACK_NOTIFY, E164, NOTIFY_MODES } from "../notify";
 import { createFeedbackRequest, feedbackUrl } from "@/lib/feedback";
 
 const configSchema = z.object({
+  /** Además de la campana del portal: correo y/o WhatsApp (vía n8n). */
+  notify: z.enum(NOTIFY_MODES).default(DEFAULT_FEEDBACK_NOTIFY),
+  /** WhatsApp del responsable (+código de país). */
+  whatsappTo: z.string().regex(E164).optional().or(z.literal("")),
   channel: z.enum(["whatsapp", "sms"]).default("whatsapp"),
   /** Minutos después de la compra en que se pide la opinión. */
   delayMinutes: z.number().int().min(15).max(1440).default(120),
@@ -28,7 +33,10 @@ export const postVisitFeedback: Blueprint<Config> = {
   status: "active",
   configSchema,
   defaultConfig: configSchema.parse({}),
+  crossCheck: (c) => (c.notify.includes("whatsapp") && !c.whatsappTo ? { key: "whatsappTo", code: "required" as const } : null),
   configUi: {
+    notify: NOTIFY_FIELDS.notify,
+    whatsappTo: NOTIFY_FIELDS.whatsappTo,
     channel: COMMON.channel,
     delayMinutes: { group: "when", kind: "number", label: { es: "Pedir la opinión después de", en: "Ask for feedback after" }, help: { es: "Tiempo entre la compra y el mensaje. Si cae en horas de silencio, sale a la mañana siguiente.", en: "Time between the purchase and the message. If it falls in quiet hours it goes out the next morning." }, unit: UNIT.minutes },
     cooldownDays: { group: "limits", kind: "number", label: { es: "A lo más una solicitud cada", en: "At most one request every" }, help: { es: "Un cliente que compra seguido no recibe una solicitud por cada compra.", en: "A customer who buys often does not get a request for every purchase." }, unit: UNIT.days },

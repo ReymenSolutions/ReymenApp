@@ -4,7 +4,7 @@ import { hasModule } from "@/lib/modules";
 import type { StoredDomainEvent } from "@/lib/domain-events";
 import { getBlueprint } from "./blueprints";
 import { evaluateContactPolicy, nextAllowedTime } from "./policy";
-import { deliverInternalAction } from "./internal-delivery";
+import { withNotification } from "./notify";
 import type { ActionSpec } from "./types";
 
 type Outcome = { status: AutomationExecutionStatus; skipReason?: string; action?: Prisma.InputJsonValue; subjectType?: string; subjectId?: string; nextAttemptAt?: Date };
@@ -48,8 +48,6 @@ export async function runAutomationsForEvent(event: StoredDomainEvent, now: Date
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") continue;
       throw err;
     }
-    // Acción interna real (no simulada): se entrega aquí, una sola vez (una ejecución duplicada ya salió por el `continue`).
-    if (outcome.status === "SUCCEEDED" && outcome.action) await deliverInternalAction(event.organizationId, organization.name, outcome.action as unknown as ActionSpec);
     await prisma.automation.update({ where: { id: automation.id }, data: { lastRunAt: now, lastStatus: outcome.status } });
   }
 }
@@ -71,10 +69,15 @@ async function evaluate(
   const decision = blueprint.decide(event, ctx, config);
   if (decision.kind === "skip") return { status: "SKIPPED", skipReason: decision.reason };
 
-  // Aviso interno para el equipo: no hay cliente ni política de contacto. Con dry-run solo se registra lo que se habría
-  // avisado; sin dry-run el aviso queda como hecho (SUCCEEDED) y la campana del portal lo muestra.
+  // Aviso interno para el equipo: no hay cliente ni política de contacto. La campana del portal siempre avisa; si el modo
+  // incluye correo y/o WhatsApp, la ejecución queda PENDING con sus destinatarios y mensaje, y el despachador la entrega
+  // por el workflow genérico de n8n (como los mensajes a clientes). Con dry-run solo se registra a quién se habría avisado.
   if (blueprint.audience === "internal") {
-    return { status: automation.dryRun ? "DRY_RUN" : "SUCCEEDED", action: decision.action as unknown as Prisma.InputJsonValue };
+    if (decision.action.type !== "alert" && decision.action.type !== "report") return { status: "SKIPPED", skipReason: "unsupported_action" };
+    const prepared = await withNotification(event.organizationId, ctx.organization.name, decision.action, config as { notify?: never; whatsappTo?: string });
+    const action = prepared.action as unknown as Prisma.InputJsonValue;
+    if (automation.dryRun) return { status: "DRY_RUN", action };
+    return prepared.external ? { status: "PENDING", action } : { status: "SUCCEEDED", action };
   }
 
   const rules = blueprint.contactRules(config);

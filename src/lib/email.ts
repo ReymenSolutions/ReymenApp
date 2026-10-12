@@ -49,6 +49,6 @@ export async function sendEmail(input: SendEmailInput): Promise<{ sent: boolean 
   return { sent: true };
 }
 
-function stripHtml(html: string): string {
+export function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }

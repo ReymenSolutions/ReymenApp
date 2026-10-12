@@ -32,12 +32,13 @@ export const SKIP_REASON: Record<string, string> = {
 
 /** Resumen en una línea de lo que hizo una ejecución (a partir de su acción). */
 export function describeAction(action: unknown, formatMoney: (n: number) => string): string | null {
-  const a = (action ?? {}) as { type?: string; title?: string; body?: string; templateKey?: string; recipient?: { name?: string | null }; report?: { today?: { gross?: number; tickets?: number }; vsPreviousDayPct?: number | null } };
+  const a = (action ?? {}) as { recipients?: { channel: string }[]; type?: string; title?: string; body?: string; templateKey?: string; recipient?: { name?: string | null }; report?: { today?: { gross?: number; tickets?: number }; vsPreviousDayPct?: number | null } };
+  const via = (a.recipients ?? []).length ? ` · por ${[...new Set((a.recipients ?? []).map((r) => (r.channel === "whatsapp" ? "WhatsApp" : "correo")))].join(" y ")} (${a.recipients!.length})` : "";
   if (a.type === "report") {
     const t = a.report?.today;
-    return `${a.title ?? "Reporte"} — ventas ${formatMoney(t?.gross ?? 0)}, ${t?.tickets ?? 0} tickets${a.report?.vsPreviousDayPct != null ? `, ${a.report.vsPreviousDayPct > 0 ? "+" : ""}${a.report.vsPreviousDayPct}% vs. ayer` : ""}`;
+    return `${a.title ?? "Reporte"} — ventas ${formatMoney(t?.gross ?? 0)}, ${t?.tickets ?? 0} tickets${a.report?.vsPreviousDayPct != null ? `, ${a.report.vsPreviousDayPct > 0 ? "+" : ""}${a.report.vsPreviousDayPct}% vs. ayer` : ""}${via}`;
   }
-  if (a.type === "alert") return `${a.title ?? ""}${a.body ? ` — ${a.body}` : ""}`;
+  if (a.type === "alert") return `${a.title ?? ""}${a.body ? ` — ${a.body}` : ""}${via}`;
   if (a.type === "message") return `Mensaje a ${a.recipient?.name ?? "un cliente"}${a.templateKey ? ` (${a.templateKey})` : ""}`;
   return null;
 }

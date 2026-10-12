@@ -20,7 +20,7 @@ export const GROUP_COPY: Record<ConfigGroup, { es: { title: string; hint: string
 
 export type ConfigFieldMeta = {
   group: ConfigGroup;
-  kind: "number" | "hour" | "select" | "url";
+  kind: "number" | "hour" | "select" | "url" | "phone";
   label: { es: string; en: string };
   help: { es: string; en: string };
   unit?: { es: string; en: string };
@@ -113,3 +113,20 @@ export function missingConfigUi(blueprint: Pick<Blueprint, "configSchema" | "con
   const ui = (blueprint.configUi ?? {}) as Record<string, unknown>;
   return Object.keys(shape).filter((k) => !ui[k]);
 }
+
+/** Aviso interno: por dónde llega además de la campana del portal (los destinatarios y el mensaje los arma Reymen; n8n solo entrega). */
+export const NOTIFY_FIELDS = {
+  notify: {
+    group: "channel",
+    kind: "select",
+    label: { es: "Avisar además por", en: "Also notify by" },
+    help: { es: "La campana del portal siempre avisa. Aquí eliges si además llega por correo (a dueños y gerentes activos) y/o por WhatsApp (al número de abajo).", en: "The portal bell always notifies. Here you choose whether it also arrives by email (to active owners and managers) and/or WhatsApp (to the number below)." },
+    options: { app: { es: "Solo la campana", en: "Bell only" }, email: { es: "Correo", en: "Email" }, whatsapp: { es: "WhatsApp", en: "WhatsApp" }, email_whatsapp: { es: "Correo y WhatsApp", en: "Email and WhatsApp" } },
+  },
+  whatsappTo: {
+    group: "channel",
+    kind: "phone",
+    label: { es: "WhatsApp del responsable", en: "Manager's WhatsApp" },
+    help: { es: "Número en formato internacional, p. ej. +5215512345678. Solo se usa si el aviso incluye WhatsApp.", en: "Number in international format, e.g. +5215512345678. Only used if the notice includes WhatsApp." },
+  },
+} satisfies Record<string, ConfigFieldMeta>;

@@ -15,6 +15,9 @@ const DEADLINE_HOURS = 24;
 /** Workflow genérico de n8n por tipo de acción (nunca por cliente). */
 const ACTION_WORKFLOW: Record<string, { path: string; type: string }> = {
   message: { path: "reymen-action-message", type: "action.message.send" },
+  // Avisos internos (alertas y reportes) a dueños/gerentes por correo o WhatsApp: mismo despachador, otro workflow genérico.
+  alert: { path: "reymen-action-notify", type: "action.notify.send" },
+  report: { path: "reymen-action-notify", type: "action.notify.send" },
 };
 
 function n8nConfig() {
@@ -73,7 +76,7 @@ export async function dispatchPendingExecutions(opts: { now?: Date; limit?: numb
       result.expired++;
       continue;
     }
-    const action = (ex.action ?? {}) as { type?: string; channel?: string; templateKey?: string; variables?: Record<string, string>; recipient?: { phone?: string; name?: string | null } };
+    const action = (ex.action ?? {}) as { type?: string; channel?: string; templateKey?: string; variables?: Record<string, string>; recipient?: { phone?: string; name?: string | null }; recipients?: unknown[]; content?: Record<string, string> };
     const workflow = action.type ? ACTION_WORKFLOW[action.type] : undefined;
     if (!workflow) {
       await prisma.automationExecution.update({ where: { id: ex.id }, data: { status: "FAILED", lastError: "unsupported_action", completedAt: now } });
@@ -92,8 +95,16 @@ export async function dispatchPendingExecutions(opts: { now?: Date; limit?: numb
       execution: { id: ex.id, attempt, dryRun: false },
       trigger: { eventId: ex.domainEvent.id, eventType: ex.domainEvent.type, correlationId: ex.domainEvent.correlationId },
       subject: { type: ex.subjectType, id: ex.subjectId },
-      recipient: { channel: action.channel, phone: action.recipient?.phone, name: action.recipient?.name ?? null, locale: "es-MX" },
-      content: { templateKey: action.templateKey, variables: action.variables ?? {} },
+      ...(action.type === "message"
+        ? {
+            recipient: { channel: action.channel, phone: action.recipient?.phone, name: action.recipient?.name ?? null, locale: "es-MX" },
+            content: { templateKey: action.templateKey, variables: action.variables ?? {} },
+          }
+        : {
+            // Aviso interno: Reymen ya armó a quién (correo/WhatsApp) y qué dice; n8n solo entrega.
+            recipients: action.recipients ?? [],
+            content: { kind: action.type, ...(action.content ?? {}) },
+          }),
       callback: { url: `${getAppUrl()}/api/webhooks/n8n/automation-executions`, token: callbackToken(ex.id, secret) },
       deadline: deadline.toISOString(),
     });

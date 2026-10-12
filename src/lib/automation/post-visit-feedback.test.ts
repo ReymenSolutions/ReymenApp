@@ -121,7 +121,7 @@ describe("post_visit_feedback", () => {
     const request = async () => {
       await processFoodPosOrder(order(`F-${Math.random()}`, AFTERNOON), org.id);
       await tick(AFTERNOON);
-      return prisma.customerFeedback.findFirstOrThrow({ where: { organizationId: org.id } });
+      return prisma.customerFeedback.findFirstOrThrow({ where: { organizationId: org.id }, orderBy: { createdAt: "desc" } });
     };
 
     it("la vista pública solo trae lo necesario y el enlace de reseña si se configuró", async () => {
@@ -139,16 +139,30 @@ describe("post_visit_feedback", () => {
       expect(await getPublicFeedback(fb.token)).toMatchObject({ state: "answered", reviewUrl: "https://g.page/r/taqueria" });
     });
 
-    it("calificación baja (≤ 3): abre el caso y avisa por correo a dueños y gerentes", async () => {
+    it("calificación baja (≤ 3): abre el caso y deja el aviso para n8n (correo a dueños y gerentes), sin que la app mande correos", async () => {
       const fb = await request();
       expect(await submitFeedback(fb.token, { score: 2, comment: "Tardaron mucho" })).toEqual({ lowScore: true });
       expect(await prisma.customerFeedback.findUniqueOrThrow({ where: { id: fb.id } })).toMatchObject({ status: "OPEN", score: 2 });
-      expect(sendEmail).toHaveBeenCalledTimes(1);
-      const mail = sendEmail.mock.calls[0][0] as { to: string; subject: string; html: string };
-      expect(mail.to).toBe(`owner-${org.id}@t.mx`);
-      expect(mail.subject).toContain("2/5");
-      expect(mail.html).toContain("Tardaron mucho");
-      // El límite es 3: un 3 también abre caso.
+      const ex = await prisma.automationExecution.findFirstOrThrow({ where: { automationId, subjectType: "feedback" } });
+      expect(ex.status).toBe("PENDING");
+      const action = ex.action as { type: string; severity: string; title: string; body: string; recipients: { email?: string }[]; content: { subject: string; text: string } };
+      expect(action).toMatchObject({ type: "alert", severity: "critical", title: "Un cliente calificó 2/5" });
+      expect(action.body).toContain("Tardaron mucho");
+      expect(action.recipients).toEqual([{ channel: "email", email: `owner-${org.id}@t.mx`, name: "Dueña" }]);
+      expect(action.content.subject).toContain("2/5");
+      expect(sendEmail).not.toHaveBeenCalled();
+    });
+
+    it("el aviso de calificación baja respeta el modo de la automatización: simulación o solo campana", async () => {
+      const dry = await request();
+      const bell = await request();
+      await prisma.automation.update({ where: { id: automationId }, data: { dryRun: true } });
+      await submitFeedback(dry.token, { score: 1 });
+      expect((await prisma.automationExecution.findFirstOrThrow({ where: { automationId, subjectId: dry.id } })).status).toBe("DRY_RUN");
+
+      await prisma.automation.update({ where: { id: automationId }, data: { dryRun: false, config: { notify: "app" } } });
+      await submitFeedback(bell.token, { score: 3 });
+      expect((await prisma.automationExecution.findFirstOrThrow({ where: { automationId, subjectId: bell.id } })).status).toBe("SUCCEEDED");
     });
 
     it("una calificación de 3 también abre caso; solo cuenta la primera respuesta; valida la calificación", async () => {
@@ -163,8 +177,7 @@ describe("post_visit_feedback", () => {
       expect((await prisma.customerFeedback.findUniqueOrThrow({ where: { id: fb.id } })).score).toBe(3);
     });
 
-    it("un comentario larguísimo se recorta; si el correo falla la opinión igual queda guardada", async () => {
-      sendEmail.mockRejectedValue(new Error("smtp caído"));
+    it("un comentario larguísimo se recorta y la opinión queda guardada", async () => {
       const fb = await request();
       await submitFeedback(fb.token, { score: 1, comment: "x".repeat(5000) });
       const saved = await prisma.customerFeedback.findUniqueOrThrow({ where: { id: fb.id } });

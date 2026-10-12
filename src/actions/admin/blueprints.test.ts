@@ -173,6 +173,20 @@ describe("blueprints (admin): configuración por cliente", () => {
     expect((await stored(org.id)).config).toMatchObject({ minVisits: 3, factor: 2.5, minDays: 21, maxDays: 180 });
   });
 
+  it("avisos por WhatsApp: exige un número internacional válido", async () => {
+    admin();
+    org = await createTestOrg("Blueprint Notify Org");
+    await prisma.organizationModule.create({ data: { organizationId: org.id, module: "FOOD_OPS", status: "ACTIVE", source: "ADMIN_GRANTED" } });
+    await enableBlueprint({ orgId: org.id, key: "inventory_low_alert" });
+    expect(await saveBlueprintConfig({ orgId: org.id, key: "inventory_low_alert", config: { notify: "whatsapp" } })).toEqual({ success: false, errors: { whatsappTo: { code: "required" } } });
+    const bad = await saveBlueprintConfig({ orgId: org.id, key: "inventory_low_alert", config: { notify: "email_whatsapp", whatsappTo: "5512345678" } });
+    expect(bad.success).toBe(false);
+    if (!bad.success) expect(bad.errors.whatsappTo).toMatchObject({ code: "invalid" });
+    expect(await saveBlueprintConfig({ orgId: org.id, key: "inventory_low_alert", config: { notify: "email_whatsapp", whatsappTo: "+5215512345678" } })).toMatchObject({ success: true, changed: ["notify", "whatsappTo"] });
+    // Solo la campana no necesita número.
+    expect(await saveBlueprintConfig({ orgId: org.id, key: "inventory_low_alert", config: { notify: "app" } })).toMatchObject({ success: true });
+  });
+
   it("exige que la automatización esté habilitada para el cliente", async () => {
     admin();
     org = await createTestOrg("Blueprint Config No Instance");
