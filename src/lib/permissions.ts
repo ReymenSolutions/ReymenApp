@@ -98,7 +98,7 @@ export function isUnlimited(limit: number): boolean {
 
 export const PLAN_LIMITS: Record<string, { leads: number; users: number; automations: number; label: string }> = {
   starter:      { leads: 500,       users: 2,         automations: 3,         label: "Starter" },
-  professional: { leads: 5000,      users: 10,        automations: 15,        label: "Professional" },
+  professional: { leads: 5000,      users: 10,        automations: 10,        label: "Professional" },
   business:   { leads: UNLIMITED, users: UNLIMITED, automations: UNLIMITED, label: "Business" },
 };
 

@@ -727,7 +727,7 @@ Verás el plan contratado y los límites de uso:
 | Plan | Leads | Usuarios | Automatizaciones |
 |------|-------|----------|------------------|
 | **Starter** | 500 | 2 | 3 |
-| **Professional** | 5,000 | 10 | 15 |
+| **Professional** | 5,000 | 10 | 10 |
 | **Business** | Ilimitado | 99 | 99 |
 
 Si necesitas más capacidad, crea una solicitud de tipo `change` para actualizar tu plan.
@@ -980,7 +980,7 @@ El cambio aplica inmediatamente y los nuevos límites entran en vigor de inmedia
 | Plan | Límite de Leads | Límite de Usuarios | Límite de Automatizaciones |
 |------|-----------------|---------------------|---------------------------|
 | Starter | 500 | 2 | 3 |
-| Professional | 5,000 | 10 | 15 |
+| Professional | 5,000 | 10 | 10 |
 | Business | 99,999 | 99 | 99 |
 
 ### Activar/Inactivar un Cliente

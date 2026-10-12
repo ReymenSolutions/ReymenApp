@@ -1360,7 +1360,7 @@ type Action =
 ```typescript
 export const PLAN_LIMITS = {
   starter:      { leads: 500,   users: 2,  automations: 3,  label: "Starter" },
-  professional: { leads: 5000,  users: 10, automations: 15, label: "Professional" },
+  professional: { leads: 5000,  users: 10, automations: 10, label: "Professional" },
   business:     { leads: 99999, users: 99, automations: 99, label: "Business" },
 };
 ```
