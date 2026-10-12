@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { AutomationExecutionStatus } from "@prisma/client";
 import { verifyCallbackToken } from "./dispatcher";
+import { recordTouchForExecution } from "./attribution";
 
 export type CallbackStatus = "sent" | "delivered" | "failed" | "skipped";
 export const CALLBACK_STATUSES: CallbackStatus[] = ["sent", "delivered", "failed", "skipped"];
@@ -34,5 +35,7 @@ export async function applyExecutionCallback(input: CallbackInput, now: Date = n
     },
   });
   await prisma.automation.update({ where: { id: ex.automationId }, data: { lastRunAt: now, lastStatus: status } });
+  // Solo un envío exitoso cuenta como contacto para la atribución (los fallidos y omitidos no).
+  if (input.status === "sent" || input.status === "delivered") await recordTouchForExecution(ex.id, now);
   return { ok: true, changed: true, status };
 }

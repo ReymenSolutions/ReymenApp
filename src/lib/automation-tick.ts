@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { dispatchPendingExecutions, type DispatchResult } from "@/lib/automation/dispatcher";
 import { runAutomationsForEvent } from "@/lib/automation/engine";
+import { attributeEvent } from "@/lib/automation/attribution";
 import { runClockDetectors } from "@/lib/automation/detectors";
 import { processDomainEvents, purgeProcessedDomainEvents, type OutboxResult } from "@/lib/domain-events";
 
@@ -21,7 +22,7 @@ export async function runAutomationTick(now: Date = new Date(), opts: { organiza
       if (!locked) return { ran: false as const, reason: "locked" as const };
       // Lo que lo dispara la hora (no un hecho) se convierte en eventos antes de procesar la bandeja.
       await runClockDetectors(now, { organizationId: opts.organizationId });
-      const outbox = await processDomainEvents({ now, organizationId: opts.organizationId, consumers: [(event) => runAutomationsForEvent(event, now)] });
+      const outbox = await processDomainEvents({ now, organizationId: opts.organizationId, consumers: [(event) => runAutomationsForEvent(event, now), attributeEvent] });
       const dispatch = await dispatchPendingExecutions({ now, organizationId: opts.organizationId });
       const purged = await purgeProcessedDomainEvents(now);
       return { ran: true as const, outbox, dispatch, purged };
