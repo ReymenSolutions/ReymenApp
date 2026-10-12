@@ -1,14 +1,18 @@
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 import { Prisma, type MessageRole, type ReplyDraft } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { hasModule } from "@/lib/modules";
 import { buildBusinessInstructions } from "@/lib/rulebook";
 import { getChannelMode } from "@/lib/agent-mode";
+import { runAiCall } from "@/lib/ai/gateway";
+import type { AiUsageContext } from "@/lib/ai/types";
+import { activeProviderName, getProvider } from "@/lib/ai/providers";
+import { DEFAULT_ANTHROPIC_MODEL, setAnthropicClientForTests } from "@/lib/ai/providers/anthropic";
 
 // ── Configuración ────────────────────────────────────────────────────────────
 
 /** Modelo que redacta los borradores. Se puede cambiar con AI_DRAFT_MODEL sin tocar código. */
-export const DEFAULT_DRAFT_MODEL = "claude-opus-5-5";
+export const DEFAULT_DRAFT_MODEL = DEFAULT_ANTHROPIC_MODEL;
 // Incluye el razonamiento del modelo (aunque sea poco con esfuerzo bajo), por eso es holgado.
 const MAX_OUTPUT_TOKENS = 4096;
 const TRANSCRIPT_LIMIT = 30;
@@ -16,14 +20,10 @@ const MESSAGE_CHARS = 2000;
 /** Un borrador que lleva más de esto "generando" se considera perdido y se reintenta. */
 const STALE_GENERATING_MS = 90_000;
 
-/** Proveedor del borrador: "claude" (por defecto) o "mock" (texto fijo, solo para pruebas y demos locales). */
-function provider(): "claude" | "mock" {
-  return process.env.AI_DRAFT_PROVIDER === "mock" ? "mock" : "claude";
-}
-
-/** ¿Hay con qué generar borradores? (clave de Claude configurada, o proveedor de prueba) */
+/** ¿Hay con qué generar borradores? (el proveedor activo está configurado, o es el de prueba) */
 export function isDraftProviderConfigured(): boolean {
-  return provider() === "mock" || !!process.env.ANTHROPIC_API_KEY;
+  const name = activeProviderName();
+  return name === "mock" || !!getProvider(name)?.isConfigured();
 }
 
 // ── Armado de la solicitud (puro) ────────────────────────────────────────────
@@ -76,46 +76,21 @@ export function buildDraftSystem(instructions: string, contact: DraftContact): s
 
 export type DraftResult = { text: string; model: string; inputTokens: number; outputTokens: number } | { refused: true; model: string };
 
-type DraftClient = Pick<Anthropic, "beta">;
-let injectedClient: DraftClient | null = null;
 /** Solo para pruebas: reemplaza el cliente de Claude. */
-export function setDraftClientForTests(client: DraftClient | null) {
-  injectedClient = client;
-}
+export const setDraftClientForTests = setAnthropicClientForTests;
 
-async function callClaude(system: string, messages: Anthropic.MessageParam[]): Promise<DraftResult> {
-  const model = process.env.AI_DRAFT_MODEL?.trim() || DEFAULT_DRAFT_MODEL;
-  const client = injectedClient ?? new Anthropic({ maxRetries: 1, timeout: 60_000 });
-  const response = await client.beta.messages.create({
-    model,
-    max_tokens: MAX_OUTPUT_TOKENS,
-    // Si un filtro de seguridad rechaza la solicitud, la API la reintenta sola con el modelo de respaldo.
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    // Un borrador corto no necesita razonar mucho: esfuerzo bajo = más rápido y barato.
-    output_config: { effort: "low" },
-    // Las instrucciones del negocio cambian poco: se cachean para las siguientes respuestas.
-    system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-    messages: messages as Anthropic.Beta.BetaMessageParam[],
-  });
-  if (response.stop_reason === "refusal") return { refused: true, model: response.model };
-  const text = response.content
-    .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n")
-    .trim();
-  return { text, model: response.model, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens };
-}
-
-/** Llamada al proveedor (Claude o el de prueba). Con `json` el de prueba responde con la decisión del modo automático. */
-export async function generateText(system: string, messages: Anthropic.MessageParam[], opts: { json?: boolean; mockText?: string } = {}): Promise<DraftResult> {
-  if (provider() === "mock") {
+/**
+ * Llamada al modelo (por el gateway, que registra el uso del tenant) o al proveedor de prueba. Con `json` el de prueba
+ * responde con la decisión del modo automático.
+ */
+export async function generateText(usage: AiUsageContext, system: string, messages: Anthropic.MessageParam[], opts: { json?: boolean; mockText?: string } = {}): Promise<DraftResult> {
+  if (activeProviderName() === "mock") {
     if (opts.json && opts.mockText) return { text: opts.mockText, model: "mock", inputTokens: 0, outputTokens: 0 };
     if (opts.json) return { text: JSON.stringify({ action: "reply", reply: "Hola, gracias por escribirnos. En un momento te ayudamos con tu consulta." }), model: "mock", inputTokens: 0, outputTokens: 0 };
     const last = (messages[messages.length - 1]?.content as string | undefined) ?? "";
     return { text: `Hola, gracias por escribirnos. Sobre "${last.slice(0, 60).trim()}": con gusto te ayudamos. ¿Te parece si agendamos una llamada para darte el detalle?`, model: "mock", inputTokens: 0, outputTokens: 0 };
   }
-  return callClaude(system, messages);
+  return runAiCall(usage, { system, messages: messages as { role: "user" | "assistant"; content: string }[], maxOutputTokens: MAX_OUTPUT_TOKENS });
 }
 
 // ── Borrador de una conversación ─────────────────────────────────────────────
@@ -192,7 +167,7 @@ export async function getOrCreateReplyDraft(organizationId: string, conversation
     const turns = buildDraftMessages(messages);
     if (turns.length === 0) throw new Error("no_messages");
 
-    const result = await generateText(system, turns);
+    const result = await generateText({ organizationId, agentKey: `inbox:${conversation.channel}`, operation: "draft", origin: conversation.channel, conversationId, requestId: `draft:${draft.id}:${draft.updatedAt.getTime()}` }, system, turns);
     if ("refused" in result) {
       draft = await prisma.replyDraft.update({ where: { id: draft.id }, data: { status: "FAILED", model: result.model, error: "refusal" } });
     } else if (!result.text) {

@@ -148,7 +148,7 @@ export async function runPipelineAgent(organizationId: string, conversationId: s
     if (turns.length === 0) return "skipped";
 
     const mockText = JSON.stringify({ intent: "pricing_inquiry", summary: "Pregunta por precios.", action: openOpp ? "none" : "create_opportunity", title: `Interés de ${lead.name}`, reason: "Preguntó por precios." });
-    const result = await generateText(system, turns, { json: true, mockText });
+    const result = await generateText({ organizationId, agentKey: "pipeline", operation: "pipeline", origin: "pipeline", conversationId, requestId: `pipeline:${conversationId}:${last.id}` }, system, turns, { json: true, mockText });
     if ("refused" in result) return "skipped";
     const analysis = parseAnalysis(result.text);
     if (!analysis) return "skipped";

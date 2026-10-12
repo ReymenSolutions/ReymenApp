@@ -114,7 +114,7 @@ export async function runAutoReply(organizationId: string, conversationId: strin
     const system = [AUTO_PREAMBLE, `BUSINESS RULEBOOK\n${instructions.trim() || "(empty: the business has not written a rulebook, so escalate everything)"}`, `CUSTOMER CONTEXT\n${customer.join("\n")}`].join("\n\n");
     const turns = buildDraftMessages(messages as { role: MessageRole; content: string }[]);
 
-    const result = await generateText(system, turns, { json: true });
+    const result = await generateText({ organizationId, agentKey: `inbox:${conv.channel}`, operation: "auto_reply", origin: conv.channel, conversationId, requestId: `auto:${draft.id}` }, system, turns, { json: true });
     if ("refused" in result) return escalate("el modelo no pudo responder este mensaje");
     const decision = parseDecision(result.text);
     if (decision.action === "escalate") return escalate(decision.reason);
@@ -170,7 +170,7 @@ export async function previewAgentReply(organizationId: string, messages: { role
   const instructions = await buildBusinessInstructions(organizationId);
   const system = [AUTO_PREAMBLE, `BUSINESS RULEBOOK\n${instructions.trim() || "(empty: the business has not written a rulebook, so escalate everything)"}`, `CUSTOMER CONTEXT\nChannel: ${channel}`].join("\n\n");
   const turns = buildDraftMessages(messages as { role: MessageRole; content: string }[]);
-  const result = await generateText(system, turns, { json: true });
+  const result = await generateText({ organizationId, agentKey: "probador", operation: "probe", origin: "admin" }, system, turns, { json: true });
   if ("refused" in result) return { action: "escalate", kind: "model", reason: "el modelo no pudo responder este mensaje" };
   const decision = parseDecision(result.text);
   if (decision.action === "escalate") return { action: "escalate", kind: "model", reason: decision.reason };
