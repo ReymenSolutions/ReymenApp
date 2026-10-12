@@ -2397,3 +2397,58 @@ model AiBudgetAlert {
 
   @@unique([organizationId, cycleStart, threshold])
 }
+
+// ─── CATÁLOGO DE PLANES ──────────────────────────────────────────────────────
+
+/// Catálogo comercial de planes, editable desde Admin → Planes. Es la ÚNICA fuente de nombre, precio, límites, presupuesto de IA,
+/// módulos y "qué incluye": de aquí lo leen la validación de límites, el ROI, el presupuesto de IA, la sincronización de módulos,
+/// SmartCard, Cambiar plan, Configuración del portal y las métricas. `Organization.plan` guarda la `key`.
+model Plan {
+  id             String           @id @default(cuid())
+  // Llave estable (starter, professional, business…): no se renombra, la usa Organization.plan. El nombre visible sí cambia.
+  key            String           @unique
+  name           String
+  nameEn         String
+  description    String           @default("")
+  descriptionEn  String           @default("")
+  priceMxn       Decimal          @db.Decimal(10, 2)
+  // Límites del plan. Null = ilimitado.
+  maxLeads       Int?
+  maxUsers       Int?
+  maxAutomations Int?
+  // Presupuesto interno de IA por ciclo (el costo máximo que Reymen asume) y tope de agentes IA activos (null = sin tope).
+  aiBudgetMxn    Decimal          @db.Decimal(10, 2)
+  maxAiAgents    Int?
+  // Módulos que el plan incluye comercialmente (referencia para sincronizar los del cliente).
+  modules        PlatformModule[]
+  // "Qué incluye": lista de textos [{ es, en }] que se muestra al cliente y al admin.
+  features       Json             @default("[]")
+  // Precio de Stripe de este plan (si se cobra en línea); vacío = se toma de la variable de entorno STRIPE_PRICE_<LLAVE>.
+  stripePriceId  String?
+  // Color de diferenciación (src/lib/plan-accent.ts): slate, blue, amber, emerald, violet o rose.
+  accent         String           @default("slate")
+  sortOrder      Int              @default(0)
+  // Un plan inactivo no se puede asignar a clientes nuevos; los que ya lo tienen lo conservan.
+  isActive       Boolean          @default(true)
+  // Sube con cada cambio; cada versión queda en PlanRevision.
+  version        Int              @default(1)
+  updatedById    String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  revisions PlanRevision[]
+}
+
+/// Historial de cambios de un plan (cada edición guarda cómo quedó), para saber quién cambió qué y cuándo.
+model PlanRevision {
+  id          String   @id @default(cuid())
+  planId      String
+  version     Int
+  snapshot    Json
+  changedById String?
+  createdAt   DateTime @default(now())
+
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, version])
+}

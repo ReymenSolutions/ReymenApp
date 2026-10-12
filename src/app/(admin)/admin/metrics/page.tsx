@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getServerT } from "@/lib/i18n-server";
+import { getServerT, getServerLang } from "@/lib/i18n-server";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricCard } from "@/components/shared/MetricCard";
@@ -7,7 +7,7 @@ import { AutomationHealthChart } from "@/components/charts/AutomationHealthChart
 import { LeadTrendChart } from "@/components/charts/LeadTrendChart";
 import { Users, Zap, TrendingUp, Activity, CreditCard } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { PLAN_LIMITS } from "@/lib/permissions";
+import { planLabels } from "@/lib/plans";
 import { buildLeadTrend } from "@/lib/lead-trend";
 
 
@@ -40,7 +40,8 @@ async function getGlobalMetrics() {
 }
 
 export default async function AdminMetricsPage() {
-  const [t, metrics] = await Promise.all([getServerT(), getGlobalMetrics()]);
+  const [t, metrics, lang] = await Promise.all([getServerT(), getGlobalMetrics(), getServerLang()]);
+  const labelOfPlan = await planLabels(lang);
 
   const successEvents = metrics.eventsByStatus.find((e) => e.status === "SUCCESS")?._count.id ?? 0;
   const failedEvents = metrics.eventsByStatus.find((e) => e.status === "FAILED")?._count.id ?? 0;
@@ -122,7 +123,7 @@ export default async function AdminMetricsPage() {
                   .map((item) => (
                     <div key={item.plan} className="flex items-center justify-between text-sm">
                       <Badge variant="secondary" className="capitalize">
-                        {PLAN_LIMITS[item.plan]?.label ?? item.plan}
+                        {labelOfPlan[item.plan] ?? item.plan}
                       </Badge>
                       <span className="font-semibold">{item._count.id} {t.adminClientsUnit}</span>
                     </div>

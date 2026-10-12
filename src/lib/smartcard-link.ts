@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSmartcardAdminClient } from "./smartcard-supabase";
 import { prisma } from "./prisma";
-import { PLAN_LIMITS, isUnlimited } from "./permissions";
+import { getPlan } from "./plans";
 import { UserError } from "./user-error";
 import type {
   SmartcardCompanyLink,
@@ -374,9 +374,8 @@ export async function syncSmartcardMemberLimit(organizationId: string, limit: nu
 }
 
 /** Límite de integrantes de SmartCard que corresponde al plan de Reymen (null = sin límite). */
-export function planMemberLimit(plan: string): number | null {
-  const users = (PLAN_LIMITS[plan] ?? PLAN_LIMITS.starter).users;
-  return isUnlimited(users) ? null : users;
+export async function planMemberLimit(plan: string): Promise<number | null> {
+  return (await getPlan(plan)).limits.users;
 }
 
 /**
@@ -385,7 +384,7 @@ export function planMemberLimit(plan: string): number | null {
  */
 export async function syncSmartcardMemberLimitForPlan(organizationId: string, plan: string): Promise<MemberLimitSync | "failed"> {
   try {
-    return await syncSmartcardMemberLimit(organizationId, planMemberLimit(plan));
+    return await syncSmartcardMemberLimit(organizationId, await planMemberLimit(plan));
   } catch (e) {
     console.error("[smartcard-link] No se pudo igualar el límite de SmartCard al plan:", e);
     return "failed";

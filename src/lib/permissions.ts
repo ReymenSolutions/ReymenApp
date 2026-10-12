@@ -1,4 +1,4 @@
-import type { PlatformModule, UserRole } from "@prisma/client";
+import type { UserRole } from "@prisma/client";
 
 export type Action =
   | "leads:create"
@@ -95,45 +95,3 @@ export const UNLIMITED = Number.POSITIVE_INFINITY;
 export function isUnlimited(limit: number): boolean {
   return limit === UNLIMITED;
 }
-
-export const PLAN_LIMITS: Record<string, { leads: number; users: number; automations: number; label: string }> = {
-  starter:      { leads: 500,       users: 2,         automations: 3,         label: "Starter" },
-  professional: { leads: 5000,      users: 10,        automations: 10,        label: "Professional" },
-  business:   { leads: UNLIMITED, users: UNLIMITED, automations: UNLIMITED, label: "Business" },
-};
-
-// Precio mensual de lista por plan, en MXN: la fuente única de lo que paga un cliente (ROI y facturación lo leen de
-// aquí en lugar de repetir su propia tabla). Un cliente puede tener un precio pactado distinto
-// (Organization.customMonthlyPriceMxn), que reemplaza al de lista sin tocar el catálogo general.
-export const PLAN_PRICES_MXN: Record<string, number> = {
-  starter: 999,
-  professional: 1999,
-  business: 3999,
-};
-
-/** Precio mensual en MXN de una organización: el pactado si lo hay, si no el de lista de su plan (plan desconocido = Starter). */
-export function getMonthlyPlanPriceMxn(plan: string, customMonthlyPriceMxn: number | null): number {
-  if (customMonthlyPriceMxn !== null && customMonthlyPriceMxn > 0) return customMonthlyPriceMxn;
-  return PLAN_PRICES_MXN[plan] ?? PLAN_PRICES_MXN.starter;
-}
-
-// Presupuesto interno de IA por plan (MXN al mes): el costo máximo que Reymen asume por ese cliente. Valor de partida hasta que
-// el catálogo de planes viva en la base de datos (se lee solo desde src/lib/ai/budget.ts). Un admin puede fijar otro por cliente.
-export const PLAN_AI_BUDGET_MXN: Record<string, number> = {
-  starter: 75,
-  professional: 200,
-  business: 500,
-};
-
-// Which PlatformModules each plan tier commercially includes — a catalog
-// reference only. It does NOT drive OrganizationModule automatically: the
-// module axis stays a separate, explicit entitlement (see modules.ts) that
-// an admin grants/suspends by hand, or aligns to this list on purpose via
-// syncModulesToPlan() (src/actions/admin/modules.ts). An org can carry
-// modules its plan doesn't list (e.g. AI_WHATSAPP granted as a courtesy on
-// Starter) — that's expected, not a mismatch to "fix".
-export const PLAN_MODULES: Record<string, PlatformModule[]> = {
-  starter: ["CRM"],
-  professional: ["CRM", "AUTOMATIONS"],
-  business: ["CRM", "AUTOMATIONS", "AI_WHATSAPP"],
-};

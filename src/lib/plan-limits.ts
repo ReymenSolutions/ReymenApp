@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { PLAN_LIMITS } from "./permissions";
+import { getPlan } from "./plans";
 import { UserError } from "./user-error";
 
 type PlanResource = "leads" | "users" | "automations";
@@ -27,7 +27,9 @@ export async function assertPlanCapacity(organizationId: string, resource: PlanR
     where: { id: organizationId },
     select: { plan: true },
   });
-  const limit = (PLAN_LIMITS[org.plan] ?? PLAN_LIMITS.starter)[resource];
+  const limit = (await getPlan(org.plan)).limits[resource];
+  // Sin tope (ilimitado): nunca se bloquea.
+  if (limit === null) return;
   const currentCount = await countResource(organizationId, resource);
 
   if (currentCount >= limit) {

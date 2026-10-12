@@ -1,3 +1,4 @@
+import { getPlans } from "./plans";
 import Stripe from "stripe";
 
 let client: Stripe | null = null;
@@ -15,16 +16,20 @@ export function isStripeConfigured(): boolean {
   return !!process.env.STRIPE_SECRET_KEY;
 }
 
-/** Paid plans only — "starter" has no Stripe price, it's the default free/unbilled tier. */
-export const PLAN_PRICE_ENV: Record<string, string | undefined> = {
-  professional: process.env.STRIPE_PRICE_PROFESSIONAL,
-  business: process.env.STRIPE_PRICE_BUSINESS,
-};
+/**
+ * Precio de Stripe de un plan: el que se captura en Admin → Planes y, si no hay, la variable de entorno STRIPE_PRICE_<LLAVE>
+ * (p. ej. STRIPE_PRICE_PROFESSIONAL). Sin ninguno, ese plan no se cobra en línea.
+ */
+export async function stripePriceIdFor(plan: string): Promise<string | null> {
+  const found = (await getPlans({ includeInactive: true })).find((p) => p.key === plan);
+  return found?.stripePriceId || process.env[`STRIPE_PRICE_${plan.toUpperCase()}`] || null;
+}
 
-export function planForPriceId(priceId: string | null | undefined): string | null {
+/** El plan al que corresponde un precio de Stripe (null si no es de ningún plan). */
+export async function planForPriceId(priceId: string | null | undefined): Promise<string | null> {
   if (!priceId) return null;
-  for (const [plan, id] of Object.entries(PLAN_PRICE_ENV)) {
-    if (id && id === priceId) return plan;
+  for (const p of await getPlans({ includeInactive: true })) {
+    if ((p.stripePriceId || process.env[`STRIPE_PRICE_${p.key.toUpperCase()}`]) === priceId) return p.key;
   }
   return null;
 }

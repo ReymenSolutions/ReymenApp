@@ -1,6 +1,6 @@
 import { Prisma, type AiBudgetAdjustmentType, type AiBudgetPolicy } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { PLAN_AI_BUDGET_MXN } from "@/lib/permissions";
+import { getPlan } from "@/lib/plans";
 import { getMxnPerUsdRate } from "@/lib/exchange-rate";
 import { toMxn } from "./cost";
 
@@ -91,9 +91,9 @@ export function statusFor(percent: number): BudgetStatus {
   return percent >= 100 ? "EXHAUSTED" : percent >= 90 ? "CRITICAL_90" : percent >= 75 ? "WARN_75" : percent >= 50 ? "WARN_50" : "OK";
 }
 
-/** Presupuesto base mensual de un plan: único lugar desde donde se lee (después vendrá del catálogo de planes). */
-export function planBudgetMxn(plan: string): number {
-  return PLAN_AI_BUDGET_MXN[plan] ?? PLAN_AI_BUDGET_MXN.starter;
+/** Presupuesto base mensual de un plan: sale del catálogo de planes (Admin → Planes). */
+export async function planBudgetMxn(plan: string): Promise<number> {
+  return (await getPlan(plan)).aiBudgetMxn;
 }
 
 async function loadState(tx: Tx, organizationId: string, now: Date): Promise<BudgetState & { raw: { spent: Prisma.Decimal; reserved: Prisma.Decimal; available: Prisma.Decimal; degradeCap: Prisma.Decimal | null } }> {
@@ -105,7 +105,7 @@ async function loadState(tx: Tx, organizationId: string, now: Date): Promise<Bud
     tx.aiBudgetReservation.aggregate({ where: { organizationId, released: false, expiresAt: { gt: now } }, _sum: { amountMxn: true } }),
     tx.aiBudgetAdjustment.aggregate({ where: { organizationId, cycleStart: start }, _sum: { amountMxn: true } }),
   ]);
-  const base = setting?.monthlyBudgetMxn ?? D(planBudgetMxn(org.plan));
+  const base = setting?.monthlyBudgetMxn ?? D(await planBudgetMxn(org.plan));
   const adj = adjAgg._sum.amountMxn ?? D(0);
   const spent = spentAgg._sum.costMxn ?? D(0);
   const reserved = reservedAgg._sum.amountMxn ?? D(0);

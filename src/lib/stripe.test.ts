@@ -35,16 +35,16 @@ describe("stripe helpers", () => {
     vi.stubEnv("STRIPE_PRICE_BUSINESS", "price_ent_456");
     const { planForPriceId } = await import("./stripe");
 
-    expect(planForPriceId("price_pro_123")).toBe("professional");
-    expect(planForPriceId("price_ent_456")).toBe("business");
+    expect(await planForPriceId("price_pro_123")).toBe("professional");
+    expect(await planForPriceId("price_ent_456")).toBe("business");
   });
 
   it("planForPriceId returns null for an unknown or missing price id", async () => {
     vi.stubEnv("STRIPE_PRICE_PROFESSIONAL", "price_pro_123");
     const { planForPriceId } = await import("./stripe");
 
-    expect(planForPriceId("price_unknown")).toBeNull();
-    expect(planForPriceId(null)).toBeNull();
-    expect(planForPriceId(undefined)).toBeNull();
+    expect(await planForPriceId("price_unknown")).toBeNull();
+    expect(await planForPriceId(null)).toBeNull();
+    expect(await planForPriceId(undefined)).toBeNull();
   });
 });

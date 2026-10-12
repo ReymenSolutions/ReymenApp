@@ -3,7 +3,7 @@
 import { auth } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import { getStripeClient, isStripeConfigured, PLAN_PRICE_ENV } from "@/lib/stripe";
+import { getStripeClient, isStripeConfigured, stripePriceIdFor } from "@/lib/stripe";
 import type { UserRole } from "@prisma/client";
 import { getAppUrl } from "@/lib/app-url";
 import { UserError } from "@/lib/user-error";
@@ -44,7 +44,7 @@ export async function createCheckoutSession(plan: "professional"): Promise<{ url
   if (!stripe) throw new UserError("La facturación no está configurada");
 
   if (plan !== "professional") throw new UserError("Este plan se contrata con una cotización, no con pago en línea");
-  const priceId = PLAN_PRICE_ENV[plan];
+  const priceId = await stripePriceIdFor(plan);
   if (!priceId) throw new UserError(`No hay un precio de Stripe configurado para el plan ${plan}`);
 
   const customerId = await getOrCreateStripeCustomer(session.user.organizationId!);

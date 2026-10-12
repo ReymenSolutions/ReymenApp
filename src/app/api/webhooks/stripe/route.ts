@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
 
 async function applySubscriptionToOrg(orgId: string, subscription: Stripe.Subscription) {
   const priceId = subscription.items.data[0]?.price.id;
-  const plan = planForPriceId(priceId) ?? "starter";
+  const plan = (await planForPriceId(priceId)) ?? "starter";
 
   await prisma.organization.update({
     where: { id: orgId },
