@@ -11,6 +11,9 @@ import { ArticleDialog } from "@/components/portal/ArticleDialog";
 import { DeleteArticleButton } from "@/components/portal/DeleteArticleButton";
 import { PortalSectionTabs } from "@/components/portal/PortalSectionTabs";
 import { getAiWhatsappTabs } from "@/lib/portal-nav-tabs";
+import { RulebookEditor } from "@/components/portal/RulebookEditor";
+import { getRulebook } from "@/lib/rulebook";
+import { can } from "@/lib/permissions";
 import { formatDate } from "@/lib/utils";
 import { getServerT, getServerLang } from "@/lib/i18n-server";
 import type { UserRole } from "@prisma/client";
@@ -27,7 +30,8 @@ export default async function KnowledgeBasePage() {
   if (!session?.user.organizationId) return redirect("/login");
   await requireModule(session.user.organizationId, "AI_WHATSAPP");
 
-  const [articles, lang, t] = await Promise.all([getArticles(session.user.organizationId), getServerLang(), getServerT()]);
+  const [articles, lang, t, rulebook] = await Promise.all([getArticles(session.user.organizationId), getServerLang(), getServerT(), getRulebook(session.user.organizationId)]);
+  const canEditRulebook = can(session.user.role as UserRole, "knowledge_base:manage");
   const activeCount = articles.filter((a) => a.isActive).length;
 
   // Group by category
@@ -41,13 +45,16 @@ export default async function KnowledgeBasePage() {
   return (
     <div>
       <PageHeader
-        title={lang === "es" ? "Base de Conocimiento" : "Knowledge Base"}
+        title={lang === "es" ? "Base de Conocimiento y Rulebook" : "Knowledge Base & Rulebook"}
         description={lang === "es" ? `${articles.length} artículos · ${activeCount} activos` : `${articles.length} articles · ${activeCount} active`}
         actions={<ArticleDialog mode="create" />}
       />
 
       <PortalSectionTabs tabs={getAiWhatsappTabs(t, session.user.role as UserRole)} />
 
+      <RulebookEditor initial={rulebook} canEdit={canEditRulebook} />
+
+      <h2 className="mb-3 text-base font-semibold text-slate-900">{lang === "es" ? "Conocimiento adicional" : "Additional knowledge"}</h2>
       <div className="mb-4 rounded-lg bg-blue-50 border border-blue-100 p-3">
         <p className="text-sm text-blue-700">
           {lang === "es" ? (
