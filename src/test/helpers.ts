@@ -60,8 +60,21 @@ export function fakeSession(user: { id: string; role: UserRole; organizationId: 
   };
 }
 
+/**
+ * Tarifa barata para el modelo por defecto: el gateway de IA no llama a un modelo sin tarifa (no puede calcular su costo,
+ * y sin costo no hay presupuesto que cuidar), así que las pruebas que usan IA simulada la necesitan. Idempotente.
+ */
+export async function seedTestAiRate(provider = "anthropic", models: string[] = ["claude-opus-5-5", "claude-sonnet-5-5"]) {
+  for (const model of models) {
+    const existing = await prisma.aiRate.findFirst({ where: { provider, model, source: "test-seed" } });
+    // En MXN a propósito: así no depende de un tipo de cambio.
+    if (!existing) await prisma.aiRate.create({ data: { provider, model, currency: "MXN", inputPerMTok: 0.001, outputPerMTok: 0.001, effectiveFrom: new Date("2020-01-01"), source: "test-seed" } });
+  }
+}
+
 /** Deletes an org and everything scoped to it, in FK-safe order. Best-effort — used for test cleanup only. */
 export async function cleanupOrg(orgId: string) {
+  await prisma.aiBudgetReservation.deleteMany({ where: { organizationId: orgId } });
   await prisma.automationEvent.deleteMany({ where: { organizationId: orgId } });
   await prisma.message.deleteMany({ where: { conversation: { organizationId: orgId } } });
   await prisma.conversation.deleteMany({ where: { organizationId: orgId } });

@@ -8,6 +8,7 @@ import { EXECUTIONS_PAGE_SIZE } from "@/lib/automation/retry";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { RetryExecutionButton } from "@/components/admin/RetryExecutionButton";
+import { SearchableSelect } from "@/components/shared/SearchableSelect";
 import { EXECUTION_LABEL, SKIP_REASON, describeAction } from "@/lib/automation/labels";
 import { formatDateTime, formatMoney } from "@/lib/utils";
 
@@ -126,17 +127,8 @@ export default async function ClientAutomationsPage({ params, searchParams }: { 
       )}
 
       <form method="get" className="flex flex-wrap items-end gap-3 rounded-card border border-slate-200 bg-white p-3">
-        <label className="text-xs font-medium text-slate-600">
-          Automatización
-          <select name="automation" defaultValue={sp.automation ?? ""} className="mt-1 block h-9 rounded-md border border-slate-200 bg-transparent px-2 text-sm">
-            <option value="">Todas</option>
-            {view.automations.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {/* Con muchas automatizaciones una lista desplegable no alcanza: se puede escribir para encontrar la que se busca. */}
+        <SearchableSelect name="automation" label="Automatización" value={sp.automation ?? ""} options={view.automations.map((a) => ({ value: a.id, label: a.name }))} allLabel="Todas" placeholder="Buscar automatización…" noResults="Sin resultados" className="w-64" />
         <label className="text-xs font-medium text-slate-600">
           Estado
           <select name="status" defaultValue={status ?? ""} className="mt-1 block h-9 rounded-md border border-slate-200 bg-transparent px-2 text-sm">

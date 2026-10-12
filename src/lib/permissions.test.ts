@@ -35,9 +35,9 @@ describe("can", () => {
 describe("PLAN_LIMITS", () => {
   it("orders plans from lowest to highest capacity", () => {
     expect(PLAN_LIMITS.starter.leads).toBeLessThan(PLAN_LIMITS.professional.leads);
-    expect(PLAN_LIMITS.professional.leads).toBeLessThan(PLAN_LIMITS.enterprise.leads);
+    expect(PLAN_LIMITS.professional.leads).toBeLessThan(PLAN_LIMITS.business.leads);
     expect(PLAN_LIMITS.starter.users).toBeLessThan(PLAN_LIMITS.professional.users);
-    expect(PLAN_LIMITS.professional.users).toBeLessThan(PLAN_LIMITS.enterprise.users);
+    expect(PLAN_LIMITS.professional.users).toBeLessThan(PLAN_LIMITS.business.users);
   });
 
   it("has a human label for every plan", () => {

@@ -5,7 +5,7 @@ import { createTestOrg, cleanupOrg, fakeSession } from "@/test/helpers";
 // STRIPE_PRICE_PROFESSIONAL is deliberately left unset in this isolated file —
 // src/lib/stripe.ts reads its price-id env vars once at module load, so this
 // scenario needs its own module graph rather than sharing billing.test.ts's.
-// (Enterprise ya no se cobra en línea: su precio se pacta por cliente.)
+// (Business ya no se cobra en línea: su precio se pacta por cliente.)
 vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_dummy");
 vi.stubEnv("STRIPE_PRICE_PROFESSIONAL", "");
 

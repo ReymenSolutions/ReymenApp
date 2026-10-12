@@ -728,7 +728,7 @@ Verás el plan contratado y los límites de uso:
 |------|-------|----------|------------------|
 | **Starter** | 500 | 2 | 3 |
 | **Professional** | 5,000 | 10 | 15 |
-| **Enterprise** | Ilimitado | 99 | 99 |
+| **Business** | Ilimitado | 99 | 99 |
 
 Si necesitas más capacidad, crea una solicitud de tipo `change` para actualizar tu plan.
 
@@ -972,7 +972,7 @@ Desde el botón **"Credenciales n8n"** en la página de detalle del cliente pued
 ### Cambiar el Plan de un Cliente
 
 1. En la página de detalle del cliente, haz clic en **"Cambiar Plan"**.
-2. Selecciona el nuevo plan: **Starter**, **Professional** o **Enterprise**.
+2. Selecciona el nuevo plan: **Starter**, **Professional** o **Business**.
 3. Confirma el cambio.
 
 El cambio aplica inmediatamente y los nuevos límites entran en vigor de inmediato.
@@ -981,7 +981,7 @@ El cambio aplica inmediatamente y los nuevos límites entran en vigor de inmedia
 |------|-----------------|---------------------|---------------------------|
 | Starter | 500 | 2 | 3 |
 | Professional | 5,000 | 10 | 15 |
-| Enterprise | 99,999 | 99 | 99 |
+| Business | 99,999 | 99 | 99 |
 
 ### Activar/Inactivar un Cliente
 

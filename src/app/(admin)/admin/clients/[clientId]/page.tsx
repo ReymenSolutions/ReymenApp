@@ -14,7 +14,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { ChangePlanDialog } from "@/components/admin/ChangePlanDialog";
 import { ToggleClientStatusButton } from "@/components/admin/ToggleClientStatusButton";
 import { OrgWebhookInfoDialog } from "@/components/admin/OrgWebhookInfoDialog";
-import { OrganizationBlueprintsPanel } from "@/components/admin/OrganizationBlueprintsPanel";
+import { ClientAutomationsHub } from "@/components/admin/ClientAutomationsHub";
 import { getOrganizationBlueprints } from "@/actions/admin/blueprints";
 import { OrganizationModulesPanel } from "@/components/admin/OrganizationModulesPanel";
 import { PurgePosSalesPanel } from "@/components/admin/PurgePosSalesPanel";
@@ -24,6 +24,9 @@ import { AdminClientUsersPanel } from "@/components/admin/AdminClientUsersPanel"
 import { ConsumptionChart } from "@/components/charts/ConsumptionChart";
 import { getOrganizationModules } from "@/actions/admin/modules";
 import { TemplateConfigButton } from "@/components/admin/TemplateConfigButton";
+import { AiBudgetPanel } from "@/components/admin/AiBudgetPanel";
+import { getOrgAiBudget } from "@/actions/admin/ai-budget";
+import { listProviders } from "@/lib/ai/providers";
 import { formatDate } from "@/lib/utils";
 import type { PlatformModule } from "@prisma/client";
 
@@ -103,6 +106,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
     getOrganizationBlueprints(clientId),
   ]);
   if (!client) notFound();
+  const aiBudget = await getOrgAiBudget({ orgId: clientId });
+  // Plantillas instaladas cuya versión declara parámetros: tienen pantalla de configuración.
+  const configurableAutomationIds = new Set(client.templateInstallations.filter((i) => i.status === "ACTIVE" && i.automationId && i.version.configSpec).map((i) => i.automationId as string));
 
   const { filled: rulebookFilled, total: rulebookTotal } = rulebookProgress(await getRulebook(clientId));
   const planInfo = PLAN_LIMITS[client.plan] ?? PLAN_LIMITS.starter;
@@ -213,36 +219,6 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {hasModule("AUTOMATIONS") && (
-          <Card>
-            <CardHeader className="flex-row items-center justify-between">
-              <CardTitle>{t.automations}</CardTitle>
-              <div className="flex items-center gap-3">
-                {/* Los blueprints (automatizaciones inteligentes) se configuran más abajo, en su propio panel. */}
-                <a href="#blueprints" className="text-xs font-medium text-brand-700 hover:underline">Configurar automatizaciones inteligentes ↓</a>
-                <Zap className="h-4 w-4 text-slate-400" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              {client.automations.length === 0 ? (
-                <p className="text-sm text-slate-400 text-center py-4">{t.adminNoAutomationsAssigned}</p>
-              ) : (
-                <div className="space-y-3">
-                  {client.automations.map((auto) => (
-                    <div key={auto.id} className="flex items-start justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">{auto.name}</p>
-                        <p className="text-xs text-slate-400">{auto.type}</p>
-                      </div>
-                      <StatusBadge status={auto.status} />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
         {hasModule("CRM") && (
           <Card>
             <CardHeader className="flex-row items-center justify-between">
@@ -345,7 +321,13 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
           planModules={planModules}
         />
 
-        <OrganizationBlueprintsPanel orgId={client.id} blueprints={blueprints} />
+        <ClientAutomationsHub
+          orgId={client.id}
+          blueprints={blueprints}
+          legacy={client.automations
+            .filter((a) => !a.blueprintKey)
+            .map((a) => ({ id: a.id, name: a.name, type: a.type, status: a.status, n8nWorkflowId: a.n8nWorkflowId, lastRunAt: a.lastRunAt?.toISOString() ?? null, configurable: configurableAutomationIds.has(a.id) }))}
+        />
 
         {hasModule("FOOD_OPS") && <PurgePosSalesPanel orgId={client.id} />}
 
@@ -367,6 +349,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
             <ConsumptionChart data={consumption} />
           </CardContent>
         </Card>
+
+        {hasModule("AI_WHATSAPP") && <AiBudgetPanel orgId={client.id} view={aiBudget} providers={listProviders().map((p) => p.name)} />}
 
         {hasModule("AUTOMATIONS") && (
           <Card className="lg:col-span-2">

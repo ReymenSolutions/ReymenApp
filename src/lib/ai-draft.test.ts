@@ -1,8 +1,10 @@
 // @vitest-environment node
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { createTestOrg, cleanupOrg } from "@/test/helpers";
+import { createTestOrg, cleanupOrg, seedTestAiRate } from "@/test/helpers";
 import { buildDraftMessages, buildDraftSystem, getOrCreateReplyDraft, dismissReplyDraft, markReplyDraftUsed, setDraftClientForTests, draftsAvailable, DEFAULT_DRAFT_MODEL } from "./ai-draft";
+
+await seedTestAiRate();
 
 describe("armado de la solicitud (puro)", () => {
   it("empieza y termina con el cliente, une turnos seguidos y descarta sistema y vacíos", () => {

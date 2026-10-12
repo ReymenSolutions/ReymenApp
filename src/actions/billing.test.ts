@@ -5,7 +5,7 @@ import { createTestOrg, cleanupOrg, fakeSession } from "@/test/helpers";
 
 vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_dummy");
 vi.stubEnv("STRIPE_PRICE_PROFESSIONAL", "price_pro_123");
-vi.stubEnv("STRIPE_PRICE_ENTERPRISE", "price_ent_456");
+vi.stubEnv("STRIPE_PRICE_BUSINESS", "price_ent_456");
 
 const authMock = vi.fn();
 vi.mock("@/lib/auth", () => ({ auth: () => authMock() }));
@@ -65,9 +65,9 @@ describe("billing actions", () => {
     expect(checkoutSessionsCreate).toHaveBeenCalledTimes(2);
   });
 
-  it("refuses an online checkout for Enterprise, which is quoted per client", async () => {
+  it("refuses an online checkout for Business, which is quoted per client", async () => {
     authMock.mockResolvedValue(fakeSession({ id: "u1", role: "OWNER", organizationId: org.id }));
-    await expect(createCheckoutSession("enterprise" as "professional")).rejects.toThrow(/cotización/);
+    await expect(createCheckoutSession("business" as "professional")).rejects.toThrow(/cotización/);
   });
 
   it("opens the billing portal only once a Stripe customer exists", async () => {

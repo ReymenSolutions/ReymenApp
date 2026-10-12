@@ -92,9 +92,9 @@ describe("admin/clients actions", () => {
     const org = await createTestOrg("Custom Price Org");
     createdOrgIds.push(org.id);
 
-    await changePlan(org.id, "enterprise", 18500);
+    await changePlan(org.id, "business", 18500);
     let updated = await prisma.organization.findUniqueOrThrow({ where: { id: org.id } });
-    expect(updated.plan).toBe("enterprise");
+    expect(updated.plan).toBe("business");
     expect(Number(updated.customMonthlyPriceMxn)).toBe(18500);
 
     await changePlan(org.id, "professional", null);
@@ -107,6 +107,6 @@ describe("admin/clients actions", () => {
     authMock.mockResolvedValue(fakeSession({ id: "admin1", role: "SUPER_ADMIN", organizationId: null }));
     const org = await createTestOrg("Bad Custom Price Org");
     createdOrgIds.push(org.id);
-    await expect(changePlan(org.id, "enterprise", 0)).rejects.toThrow(/mayor a 0/);
+    await expect(changePlan(org.id, "business", 0)).rejects.toThrow(/mayor a 0/);
   });
 });

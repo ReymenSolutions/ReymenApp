@@ -6,6 +6,7 @@ import { createTestOrg, cleanupOrg } from "@/test/helpers";
 import { computeCost, toMxn } from "./cost";
 import { runAiCall, findRate } from "./gateway";
 import { setAnthropicClientForTests } from "./providers/anthropic";
+import { AiBudgetError } from "./budget";
 import { resetExchangeRateCache } from "@/lib/exchange-rate";
 
 const D = (v: string | number) => new Prisma.Decimal(v);
@@ -79,10 +80,11 @@ describe("gateway de IA: ledger por tenant", () => {
     expect(row.completedAt).not.toBeNull();
   });
 
-  it("sin tarifa vigente NO inventa el costo: queda 'sin tarifa'; usa la tarifa con la vigencia correcta", async () => {
+  it("sin tarifa vigente NO se llama al modelo (no hay forma de cuidar el presupuesto): queda BLOCKED; usa la tarifa con la vigencia correcta", async () => {
     create.mockResolvedValue(usageBody());
-    await runAiCall(ctx(org.id, { requestId: "a" }), input);
-    expect((await rows(org.id))[0]).toMatchObject({ costBasis: "NO_RATE", costOriginal: null, costMxn: null, rateId: null });
+    await expect(runAiCall(ctx(org.id, { requestId: "a" }), input)).rejects.toMatchObject({ name: "AiBudgetError", code: "NO_RATE" });
+    expect(create).not.toHaveBeenCalled();
+    expect((await rows(org.id))[0]).toMatchObject({ status: "BLOCKED", errorCode: "NO_RATE", costMxn: null, rateId: null });
     const old = await addRate({ effectiveFrom: new Date("2026-01-01") });
     const next = await addRate({ effectiveFrom: new Date("2026-06-01"), inputPerMTok: 6 });
     await addRate({ effectiveFrom: new Date("2099-01-01"), inputPerMTok: 100 }); // futura: no aplica todavía
@@ -104,6 +106,7 @@ describe("gateway de IA: ledger por tenant", () => {
   });
 
   it("idempotencia: la misma llamada lógica no se vuelve a hacer ni a cobrar (ni en paralelo)", async () => {
+    await addRate();
     create.mockResolvedValue(usageBody());
     await runAiCall(ctx(org.id, { requestId: "dup" }), input);
     await expect(runAiCall(ctx(org.id, { requestId: "dup" }), input)).rejects.toThrow("ai_duplicate_request");
@@ -117,6 +120,7 @@ describe("gateway de IA: ledger por tenant", () => {
   });
 
   it("un error del proveedor queda registrado como FAILED y se propaga; un rechazo del modelo como REFUSED", async () => {
+    await addRate();
     create.mockRejectedValueOnce(new Error("overloaded"));
     await expect(runAiCall(ctx(org.id, { requestId: "e1" }), input)).rejects.toThrow("overloaded");
     create.mockResolvedValueOnce(usageBody({ output_tokens: 3 }) && { ...usageBody({ output_tokens: 3 }), stop_reason: "refusal" });
@@ -131,6 +135,7 @@ describe("gateway de IA: ledger por tenant", () => {
     vi.stubEnv("AI_PROVIDER", "openai");
     vi.stubEnv("AI_OPENAI_MODEL", "");
     await expect(runAiCall(ctx(org.id, { requestId: "m" }), input)).rejects.toThrow("ai_model_not_configured");
+    expect(AiBudgetError).toBeDefined();
     expect(await rows(org.id)).toHaveLength(0);
   });
 
@@ -143,7 +148,8 @@ describe("gateway de IA: ledger por tenant", () => {
     vi.stubGlobal("fetch", fetchMock);
     const out = await runAiCall(ctx(org.id, { requestId: "oa1" }), input);
     expect(out).toMatchObject({ text: "Hola OA", model: "oa-test-2026" });
-    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe("Bearer sk-test");
+    const openaiCall = fetchMock.mock.calls.find((c) => String(c[0]).includes("api.openai.com"));
+    expect(openaiCall?.[1].headers.Authorization).toBe("Bearer sk-test");
     const [row] = await rows(org.id);
     expect(row).toMatchObject({ provider: "openai", inputTokens: 600, cacheReadTokens: 400, outputTokens: 200, reasoningTokens: 100, costBasis: "ESTIMATED" });
     // 600×2 + 200×8 + 400×0.5 + 100×8 (razonamiento a tarifa de salida) = 1200+1600+200+800 = 3800 / 1e6

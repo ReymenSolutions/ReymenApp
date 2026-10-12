@@ -7,6 +7,7 @@ import { UserError } from "@/lib/user-error";
 import { getChannelMode } from "@/lib/agent-mode";
 import { buildBusinessInstructions } from "@/lib/rulebook";
 import { buildDraftMessages, generateText, isDraftProviderConfigured } from "@/lib/ai-draft";
+import { AiBudgetError } from "@/lib/ai/budget";
 import { syncLeadStatusFromOpportunity } from "@/lib/lead-status-sync";
 
 // ── Pipeline con IA ──────────────────────────────────────────────────────────
@@ -199,6 +200,7 @@ export async function runPipelineAgent(organizationId: string, conversationId: s
     await logAudit({ organizationId, action: "pipeline_ai.apply", resource: "Lead", resourceId: lead.id, metadata: { kind: plan.kind, reason: plan.reason, opportunityId } });
     return "analyzed";
   } catch (err) {
+    if (err instanceof AiBudgetError) return "skipped"; // pausa por presupuesto: el pipeline manual sigue funcionando
     console.error("[ai-pipeline] failed", err);
     return "skipped";
   }

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePreferences } from "@/context/preferences";
 
-export type DraftUi = { status: "loading" } | { status: "ready"; id: string; content: string } | { status: "failed" } | null;
+export type DraftUi = { status: "loading" } | { status: "ready"; id: string; content: string } | { status: "failed" } | { status: "budget" } | null;
 
 const COPY = {
   es: {
@@ -16,6 +16,7 @@ const COPY = {
     another: "Otra versión",
     dismiss: "Descartar",
     failed: "No se pudo redactar una sugerencia.",
+    budget: "El Agente IA está en pausa: se agotó la capacidad de IA de este periodo. Responde tú; se reanuda al renovarse tu plan o al adquirir capacidad adicional.",
     retry: "Reintentar",
     hint: "Ya está en tu cuadro de respuesta: edítala y presiona Enviar (Ctrl/Cmd + Enter). Nada se envía solo.",
   },
@@ -27,6 +28,7 @@ const COPY = {
     another: "Another version",
     dismiss: "Dismiss",
     failed: "Couldn't draft a suggestion.",
+    budget: "The AI agent is paused: this period's AI capacity is used up. Reply yourself; it resumes when your plan renews or you add capacity.",
     retry: "Retry",
     hint: "It's already in your reply box: edit it and press Send (Ctrl/Cmd + Enter). Nothing sends on its own.",
   },
@@ -68,6 +70,9 @@ export function ReplyDraftPanel({ draft, busy, onUse, onRegenerate, onDismiss }:
             </Button>
           </div>
         </>
+      )}
+      {draft.status === "budget" && (
+        <p role="status" className="text-xs text-slate-600">{t.budget}</p>
       )}
       {draft.status === "failed" && (
         <div className="flex flex-wrap items-center gap-3">

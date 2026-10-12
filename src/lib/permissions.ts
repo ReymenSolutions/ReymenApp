@@ -86,7 +86,7 @@ export function can(role: UserRole, action: Action): boolean {
   return ROLE_PERMISSIONS[role]?.includes(action) ?? false;
 }
 
-// Sin tope real. Antes Enterprise usaba 99 / 99999 como "ilimitado" y cada
+// Sin tope real. Antes Business usaba 99 / 99999 como "ilimitado" y cada
 // pantalla comparaba contra su propio número mágico (=== 99, >= 99999); con
 // Infinity el límite de verdad no existe (assertPlanCapacity nunca bloquea)
 // y las pantallas preguntan isUnlimited() en vez de adivinar el número.
@@ -99,7 +99,7 @@ export function isUnlimited(limit: number): boolean {
 export const PLAN_LIMITS: Record<string, { leads: number; users: number; automations: number; label: string }> = {
   starter:      { leads: 500,       users: 2,         automations: 3,         label: "Starter" },
   professional: { leads: 5000,      users: 10,        automations: 15,        label: "Professional" },
-  enterprise:   { leads: UNLIMITED, users: UNLIMITED, automations: UNLIMITED, label: "Enterprise" },
+  business:   { leads: UNLIMITED, users: UNLIMITED, automations: UNLIMITED, label: "Business" },
 };
 
 // Precio mensual de lista por plan, en MXN: la fuente única de lo que paga un cliente (ROI y facturación lo leen de
@@ -108,7 +108,7 @@ export const PLAN_LIMITS: Record<string, { leads: number; users: number; automat
 export const PLAN_PRICES_MXN: Record<string, number> = {
   starter: 999,
   professional: 1999,
-  enterprise: 3999,
+  business: 3999,
 };
 
 /** Precio mensual en MXN de una organización: el pactado si lo hay, si no el de lista de su plan (plan desconocido = Starter). */
@@ -116,6 +116,14 @@ export function getMonthlyPlanPriceMxn(plan: string, customMonthlyPriceMxn: numb
   if (customMonthlyPriceMxn !== null && customMonthlyPriceMxn > 0) return customMonthlyPriceMxn;
   return PLAN_PRICES_MXN[plan] ?? PLAN_PRICES_MXN.starter;
 }
+
+// Presupuesto interno de IA por plan (MXN al mes): el costo máximo que Reymen asume por ese cliente. Valor de partida hasta que
+// el catálogo de planes viva en la base de datos (se lee solo desde src/lib/ai/budget.ts). Un admin puede fijar otro por cliente.
+export const PLAN_AI_BUDGET_MXN: Record<string, number> = {
+  starter: 75,
+  professional: 200,
+  business: 500,
+};
 
 // Which PlatformModules each plan tier commercially includes — a catalog
 // reference only. It does NOT drive OrganizationModule automatically: the
@@ -127,5 +135,5 @@ export function getMonthlyPlanPriceMxn(plan: string, customMonthlyPriceMxn: numb
 export const PLAN_MODULES: Record<string, PlatformModule[]> = {
   starter: ["CRM"],
   professional: ["CRM", "AUTOMATIONS"],
-  enterprise: ["CRM", "AUTOMATIONS", "AI_WHATSAPP"],
+  business: ["CRM", "AUTOMATIONS", "AI_WHATSAPP"],
 };

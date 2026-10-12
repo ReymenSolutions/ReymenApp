@@ -101,9 +101,9 @@ describe("assertPlanCapacity", () => {
     await expect(assertPlanCapacity(org.id, "automations")).resolves.toBeUndefined();
   });
 
-  it("uses the enterprise plan's much higher limit", async () => {
+  it("uses the business plan's much higher limit", async () => {
     org = await createTestOrg("Plan Limits Org");
-    await prisma.organization.update({ where: { id: org.id }, data: { plan: "enterprise" } });
+    await prisma.organization.update({ where: { id: org.id }, data: { plan: "business" } });
 
     await prisma.lead.createMany({
       data: Array.from({ length: 500 }, (_, i) => ({
@@ -116,11 +116,11 @@ describe("assertPlanCapacity", () => {
     await expect(assertPlanCapacity(org.id, "leads")).resolves.toBeUndefined();
   });
 
-  // Enterprise antes tenía un tope escondido de 99 usuarios/automatizaciones
+  // Business antes tenía un tope escondido de 99 usuarios/automatizaciones
   // (y 99999 leads) aunque la pantalla dijera "Ilimitado".
-  it("never blocks an enterprise org, even past the old hidden cap of 99 users", async () => {
+  it("never blocks a business org, even past the old hidden cap of 99 users", async () => {
     org = await createTestOrg("Plan Limits Org");
-    await prisma.organization.update({ where: { id: org.id }, data: { plan: "enterprise" } });
+    await prisma.organization.update({ where: { id: org.id }, data: { plan: "business" } });
 
     await prisma.user.createMany({
       data: Array.from({ length: 100 }, (_, i) => ({

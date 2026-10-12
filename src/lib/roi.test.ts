@@ -190,13 +190,13 @@ describe("getRoiData", () => {
     });
 
     // Sin precio pactado paga el de lista del plan ($3,999 MXN = $200 USD a 20 pesos por dólar).
-    let data = await getRoiData(org.id, "enterprise");
+    let data = await getRoiData(org.id, "business");
     expect(data.planCostMxn).toBe(3999);
     expect(data.planCost).toBe(199.95);
 
     // Con precio pactado en MXN (plan personalizado de este cliente) se usa ese.
     await prisma.organization.update({ where: { id: org.id }, data: { customMonthlyPriceMxn: 30000 } });
-    data = await getRoiData(org.id, "enterprise");
+    data = await getRoiData(org.id, "business");
     expect(data.planCostMxn).toBe(30000);
     expect(data.planCost).toBe(1500);
     expect(data.roi).toBe(100);

@@ -74,6 +74,7 @@ export function MessageThread({ conversationId, contactName, initialMessages, ha
           } else if (r.state === "generating" && attempt < 6) {
             timer = setTimeout(() => ask(attempt + 1), 3000);
           } else if (r.state === "failed") setDraft({ status: "failed" });
+          else if (r.state === "budget_exhausted") setDraft({ status: "budget" });
           else setDraft(null);
         })
         .catch(() => !cancelled && setDraft({ status: "failed" }));
@@ -92,7 +93,7 @@ export function MessageThread({ conversationId, contactName, initialMessages, ha
       if (r.state === "ready") {
         setDraft({ status: "ready", id: r.draft.id, content: r.draft.content });
         setPrefill({ key: r.draft.id, text: r.draft.content, force: true });
-      } else setDraft(r.state === "failed" ? { status: "failed" } : null);
+      } else setDraft(r.state === "failed" ? { status: "failed" } : r.state === "budget_exhausted" ? { status: "budget" } : null);
     } catch {
       setDraft({ status: "failed" });
     } finally {

@@ -32,11 +32,11 @@ describe("stripe helpers", () => {
 
   it("planForPriceId maps a configured price id back to its plan", async () => {
     vi.stubEnv("STRIPE_PRICE_PROFESSIONAL", "price_pro_123");
-    vi.stubEnv("STRIPE_PRICE_ENTERPRISE", "price_ent_456");
+    vi.stubEnv("STRIPE_PRICE_BUSINESS", "price_ent_456");
     const { planForPriceId } = await import("./stripe");
 
     expect(planForPriceId("price_pro_123")).toBe("professional");
-    expect(planForPriceId("price_ent_456")).toBe("enterprise");
+    expect(planForPriceId("price_ent_456")).toBe("business");
   });
 
   it("planForPriceId returns null for an unknown or missing price id", async () => {

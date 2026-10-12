@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, afterAll, beforeEach, vi } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { createTestOrg, createTestPipelineStages, cleanupOrg } from "@/test/helpers";
+import { createTestOrg, createTestPipelineStages, cleanupOrg, seedTestAiRate } from "@/test/helpers";
 
 vi.mock("next/server", () => ({ after: () => { throw new Error("outside request"); } }));
 
@@ -18,6 +18,8 @@ const stages = [
 const analysis = (over: Record<string, unknown> = {}) => ({ intent: "pricing_inquiry" as const, summary: "Pregunta precios", action: "create_opportunity" as const, title: "Interés", reason: "Preguntó precios", ...over });
 const ctx = (over: Record<string, unknown> = {}) => ({ leadName: "Ana", stages, openOpportunity: null, blocked: new Set<string>(), ...over });
 const opp = { id: "o1", title: "Venta Ana", stageId: "s2" };
+
+await seedTestAiRate();
 
 describe("reglas del pipeline con IA (puras)", () => {
   it("lee el análisis del modelo y descarta lo que no se entiende", () => {

@@ -5,6 +5,7 @@ import { hasModule } from "@/lib/modules";
 import { buildBusinessInstructions } from "@/lib/rulebook";
 import { getChannelMode } from "@/lib/agent-mode";
 import { runAiCall } from "@/lib/ai/gateway";
+import { AiBudgetError, isBudgetBlocked } from "@/lib/ai/budget";
 import type { AiUsageContext } from "@/lib/ai/types";
 import { activeProviderName, getProvider } from "@/lib/ai/providers";
 import { DEFAULT_ANTHROPIC_MODEL, setAnthropicClientForTests } from "@/lib/ai/providers/anthropic";
@@ -83,20 +84,22 @@ export const setDraftClientForTests = setAnthropicClientForTests;
  * Llamada al modelo (por el gateway, que registra el uso del tenant) o al proveedor de prueba. Con `json` el de prueba
  * responde con la decisión del modo automático.
  */
-export async function generateText(usage: AiUsageContext, system: string, messages: Anthropic.MessageParam[], opts: { json?: boolean; mockText?: string } = {}): Promise<DraftResult> {
+export async function generateText(usage: AiUsageContext, system: string, messages: Anthropic.MessageParam[], opts: { json?: boolean; mockText?: string; maxOutputTokens?: number } = {}): Promise<DraftResult> {
   if (activeProviderName() === "mock") {
     if (opts.json && opts.mockText) return { text: opts.mockText, model: "mock", inputTokens: 0, outputTokens: 0 };
     if (opts.json) return { text: JSON.stringify({ action: "reply", reply: "Hola, gracias por escribirnos. En un momento te ayudamos con tu consulta." }), model: "mock", inputTokens: 0, outputTokens: 0 };
     const last = (messages[messages.length - 1]?.content as string | undefined) ?? "";
     return { text: `Hola, gracias por escribirnos. Sobre "${last.slice(0, 60).trim()}": con gusto te ayudamos. ¿Te parece si agendamos una llamada para darte el detalle?`, model: "mock", inputTokens: 0, outputTokens: 0 };
   }
-  return runAiCall(usage, { system, messages: messages as { role: "user" | "assistant"; content: string }[], maxOutputTokens: MAX_OUTPUT_TOKENS });
+  return runAiCall(usage, { system, messages: messages as { role: "user" | "assistant"; content: string }[], maxOutputTokens: opts.maxOutputTokens ?? MAX_OUTPUT_TOKENS });
 }
 
 // ── Borrador de una conversación ─────────────────────────────────────────────
 
 export type DraftState =
   | { state: "off" }
+  /** El agente está en pausa temporal porque el tenant agotó su presupuesto de IA del ciclo (no es lo mismo que apagado). */
+  | { state: "budget_exhausted" }
   | { state: "none" }
   /** Otra petición lo está redactando: conviene volver a preguntar en unos segundos. */
   | { state: "generating" }
@@ -133,6 +136,7 @@ export async function getOrCreateReplyDraft(organizationId: string, conversation
   });
   if (!conversation) return { state: "none" };
   if (!(await draftsAvailable(organizationId, conversation.channel))) return { state: "off" };
+  if (await isBudgetBlocked(organizationId, now)) return { state: "budget_exhausted" };
 
   const recent = await prisma.message.findMany({ where: { conversationId }, orderBy: { createdAt: "desc" }, take: TRANSCRIPT_LIMIT, select: { id: true, role: true, content: true } });
   const messages = recent.reverse();
@@ -176,6 +180,11 @@ export async function getOrCreateReplyDraft(organizationId: string, conversation
       draft = await prisma.replyDraft.update({ where: { id: draft.id }, data: { status: "READY", content: result.text, model: result.model, inputTokens: result.inputTokens, outputTokens: result.outputTokens, error: null } });
     }
   } catch (err) {
+    if (err instanceof AiBudgetError) {
+      // Pausa por presupuesto: no se deja un borrador "fallido" que seguiría ahí después de desbloquear; se reintenta solo.
+      await prisma.replyDraft.delete({ where: { id: draft.id } }).catch(() => undefined);
+      return { state: "budget_exhausted" };
+    }
     const message = (err instanceof Error ? err.message : String(err)).slice(0, 300);
     draft = await prisma.replyDraft.update({ where: { id: draft.id }, data: { status: "FAILED", error: message } });
   }

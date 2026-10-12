@@ -280,7 +280,7 @@ describe("syncSmartcardMemberLimit", () => {
   it("maps Reymen plans to SmartCard limits", () => {
     expect(planMemberLimit("starter")).toBe(2);
     expect(planMemberLimit("professional")).toBe(10);
-    expect(planMemberLimit("enterprise")).toBeNull();
+    expect(planMemberLimit("business")).toBeNull();
     expect(planMemberLimit("unknown")).toBe(2);
   });
 });

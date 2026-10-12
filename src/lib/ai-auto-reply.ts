@@ -9,6 +9,7 @@ import { outboundWorkflowPath, messagePreview } from "@/lib/channels";
 import { buildBusinessInstructions } from "@/lib/rulebook";
 import { getChannelMode } from "@/lib/agent-mode";
 import { buildDraftMessages, generateText, isDraftProviderConfigured } from "@/lib/ai-draft";
+import { AiBudgetError } from "@/lib/ai/budget";
 
 // ── Reglas de seguridad del modo Automático ──────────────────────────────────
 // El agente solo contesta lo rutinario dentro del rulebook; ante cualquier duda, o si el cliente pide a una persona,
@@ -114,7 +115,14 @@ export async function runAutoReply(organizationId: string, conversationId: strin
     const system = [AUTO_PREAMBLE, `BUSINESS RULEBOOK\n${instructions.trim() || "(empty: the business has not written a rulebook, so escalate everything)"}`, `CUSTOMER CONTEXT\n${customer.join("\n")}`].join("\n\n");
     const turns = buildDraftMessages(messages as { role: MessageRole; content: string }[]);
 
-    const result = await generateText({ organizationId, agentKey: `inbox:${conv.channel}`, operation: "auto_reply", origin: conv.channel, conversationId, requestId: `auto:${draft.id}` }, system, turns, { json: true });
+    let result;
+    try {
+      result = await generateText({ organizationId, agentKey: `inbox:${conv.channel}`, operation: "auto_reply", origin: conv.channel, conversationId, requestId: `auto:${draft.id}` }, system, turns, { json: true });
+    } catch (err) {
+      // Pausa temporal por presupuesto: el cliente no se queda sin respuesta, la conversación pasa a una persona.
+      if (err instanceof AiBudgetError) return escalate("el Agente IA está en pausa: se agotó la capacidad de IA del periodo");
+      throw err;
+    }
     if ("refused" in result) return escalate("el modelo no pudo responder este mensaje");
     const decision = parseDecision(result.text);
     if (decision.action === "escalate") return escalate(decision.reason);
