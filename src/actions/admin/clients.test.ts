@@ -70,6 +70,20 @@ describe("admin/clients actions", () => {
     expect(user?.role).toBe("OWNER");
   });
 
+  it("a new client starts with only WhatsApp attended by the agent (the rest off)", async () => {
+    authMock.mockResolvedValue(fakeSession({ id: "admin1", role: "SUPER_ADMIN", organizationId: null }));
+    const fd = new FormData();
+    fd.set("orgName", `Agents Default Co ${Date.now()}`);
+    fd.set("userName", "Owner");
+    fd.set("userEmail", `agents.${Date.now()}@test.local`);
+    fd.set("password", "password123");
+    const result = await createClient(fd);
+    createdOrgIds.push(result.orgId);
+    const rows = await prisma.agentChannelSetting.findMany({ where: { organizationId: result.orgId } });
+    expect(rows).toHaveLength(6);
+    expect(rows.filter((r) => r.mode !== "OFF").map((r) => r.channel)).toEqual(["whatsapp"]);
+  });
+
   it("suspending an organization sets isActive to false and audits it", async () => {
     authMock.mockResolvedValue(fakeSession({ id: "admin1", role: "SUPER_ADMIN", organizationId: null }));
     const org = await createTestOrg("Suspend Test Org");

@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/audit";
 import { requireAdmin } from "@/lib/guards";
 import { UserError } from "@/lib/user-error";
 import { getPlans } from "@/lib/plans";
+import { NEW_ORG_AGENT_SETTINGS } from "@/lib/agent-cap";
 import { syncSmartcardMemberLimitForPlan } from "@/lib/smartcard-link";
 
 const createClientSchema = z.object({
@@ -56,6 +57,8 @@ export async function createClient(formData: FormData) {
       // Same default pipeline every pre-existing org received via the
       // add_crm_pipeline migration backfill — keeps new orgs consistent
       // with it instead of starting with an empty, unusable pipeline.
+      // Un cliente nuevo arranca con solo WhatsApp atendido por el agente; el resto de canales se enciende después (cuenta para el tope del plan).
+      agentChannelSettings: { create: NEW_ORG_AGENT_SETTINGS },
       pipelineStages: {
         create: [
           { name: "Nuevo", order: 0, leadStatus: "NEW" },

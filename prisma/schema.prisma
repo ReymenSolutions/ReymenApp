@@ -25,6 +25,8 @@ model Organization {
   customMonthlyPriceUsd    Decimal?  @db.Decimal(10, 2)
   // Precio mensual en MXN pactado con este cliente (plan personalizado, p. ej. Villa Gardenia). Null = precio de lista del plan.
   customMonthlyPriceMxn    Decimal?  @db.Decimal(10, 2)
+  // Tope de agentes IA activos pactado con este cliente (plan Custom). Null = el de su plan (Plan.maxAiAgents).
+  aiAgentsCapOverride      Int?
   // IANA timezone name (e.g. "America/Mexico_City") — used to render
   // appointment times and to evaluate AvailabilityRule/reminder windows in
   // the org's local time rather than the server's.

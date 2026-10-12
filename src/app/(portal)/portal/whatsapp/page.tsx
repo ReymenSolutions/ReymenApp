@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { AssistantConfigForm } from "@/components/portal/AssistantConfigForm";
 import { AgentModesPanel } from "@/components/portal/AgentModesPanel";
 import { getAgentModes } from "@/lib/agent-mode";
+import { getAgentCap } from "@/lib/agent-cap";
 import { isDraftProviderConfigured } from "@/lib/ai-draft";
 import { can } from "@/lib/permissions";
 import { PortalSectionTabs } from "@/components/portal/PortalSectionTabs";
@@ -57,7 +58,7 @@ export default async function WhatsAppCenterPage() {
       getWhatsAppData(session.user.organizationId),
     ]);
 
-  const modes = await getAgentModes(session.user.organizationId);
+  const [modes, agentCap] = await Promise.all([getAgentModes(session.user.organizationId), getAgentCap(session.user.organizationId)]);
   const canConfigure = can(session.user.role as UserRole, "knowledge_base:manage");
   const agentActive = Object.values(modes).some((m) => m !== "OFF");
 
@@ -73,7 +74,7 @@ export default async function WhatsAppCenterPage() {
 
       <PortalSectionTabs tabs={getAiWhatsappTabs(t, session.user.role as UserRole)} />
 
-      <AgentModesPanel initial={modes} canEdit={canConfigure} aiConfigured={isDraftProviderConfigured()} />
+      <AgentModesPanel initial={modes} cap={{ cap: agentCap.cap, overBy: agentCap.overBy }} canEdit={canConfigure} aiConfigured={isDraftProviderConfigured()} />
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4 mb-6 lg:grid-cols-4">
