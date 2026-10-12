@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { getMonthlyPlanPrice } from "./permissions";
+import { getMonthlyPlanPriceMxn } from "./permissions";
 import { toUsd } from "./currency";
 import { getMxnPerUsdRate, type ExchangeRateSource } from "./exchange-rate";
 
@@ -10,7 +10,9 @@ export interface RoiData {
   avgDealValue: number;
   last30WonOpportunities: number;
   last30Revenue: number;
-  /** null = plan de precio personalizado todavía sin precio pactado. */
+  /** Precio mensual del plan en MXN (el pactado con el cliente o el de lista). */
+  planCostMxn: number;
+  /** El mismo precio en USD (para compararlo con los ingresos, que se suman en USD); null si no hubo tipo de cambio. */
   planCost: number | null;
   /** Pesos por dólar usados para convertir los montos en MXN, o null si no hubo tipo de cambio disponible. */
   mxnPerUsd: number | null;
@@ -19,7 +21,7 @@ export interface RoiData {
   rateDate: string | null;
   /** Oportunidades ganadas que no se pudieron convertir a USD y quedaron fuera de los totales. */
   unconvertedOpportunities: number;
-  /** null when there's no plan cost to divide by (shouldn't happen in practice — every plan has a price). */
+  /** null when there's no USD plan cost to divide by (no exchange rate available). */
   roi: number | null;
 }
 
@@ -29,7 +31,7 @@ export interface RoiData {
  * on opportunities sitting in a PipelineStage marked isWon — the same data
  * the sales pipeline itself considers a won deal, not a separate estimate.
  *
- * Amounts are converted to USD (the currency plan prices are in) with the
+ * Amounts are converted to USD (the plan price, set in MXN, is converted too) with the
  * automatic MXN/USD exchange rate — see exchange-rate.ts. Opportunities that can't be
  * converted are left out of the totals and counted in unconvertedOpportunities.
  *
@@ -87,10 +89,11 @@ export async function getRoiData(organizationId: string, plan: string): Promise<
   const last30Revenue = last30.revenue;
   const org = await prisma.organization.findUnique({
     where: { id: organizationId },
-    select: { customMonthlyPriceUsd: true },
+    select: { customMonthlyPriceMxn: true },
   });
-  const customPrice = org?.customMonthlyPriceUsd != null ? Number(org.customMonthlyPriceUsd) : null;
-  const planCost = getMonthlyPlanPrice(plan, customPrice);
+  const customPrice = org?.customMonthlyPriceMxn != null ? Number(org.customMonthlyPriceMxn) : null;
+  const planCostMxn = getMonthlyPlanPriceMxn(plan, customPrice);
+  const planCost = mxnPerUsd ? Math.round((planCostMxn / mxnPerUsd) * 100) / 100 : null;
 
   return {
     hasWonDeals: totalWonOpportunities > 0,
@@ -99,6 +102,7 @@ export async function getRoiData(organizationId: string, plan: string): Promise<
     avgDealValue: totalWonOpportunities > 0 ? totalRevenue / totalWonOpportunities : 0,
     last30WonOpportunities,
     last30Revenue,
+    planCostMxn,
     planCost,
     mxnPerUsd,
     rateSource: rate?.source ?? null,

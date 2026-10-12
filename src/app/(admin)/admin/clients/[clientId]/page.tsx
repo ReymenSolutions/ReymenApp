@@ -149,7 +149,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
             <ChangePlanDialog
               orgId={client.id}
               currentPlan={client.plan}
-              currentCustomPrice={client.customMonthlyPriceUsd !== null ? Number(client.customMonthlyPriceUsd) : null}
+              currentCustomPrice={client.customMonthlyPriceMxn !== null ? Number(client.customMonthlyPriceMxn) : null}
             />
             <ToggleClientStatusButton orgId={client.id} isActive={client.isActive} />
             <Badge variant={client.isActive ? "success" : "destructive"}>

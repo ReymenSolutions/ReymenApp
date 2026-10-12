@@ -20,7 +20,11 @@ model Organization {
   // Precio mensual en USD pactado con este cliente. Solo aplica a planes de
   // precio personalizado (Enterprise, PLAN_PRICES.enterprise = null); lo
   // captura un admin al cambiar el plan. Null = aún sin precio pactado.
+  // OBSOLETO: los precios de plan pasaron a MXN (ver customMonthlyPriceMxn). Ya no se lee ni se escribe; se retira
+  // cuando se confirme que no hay precios pactados que rescatar.
   customMonthlyPriceUsd    Decimal?  @db.Decimal(10, 2)
+  // Precio mensual en MXN pactado con este cliente (plan personalizado, p. ej. Villa Gardenia). Null = precio de lista del plan.
+  customMonthlyPriceMxn    Decimal?  @db.Decimal(10, 2)
   // IANA timezone name (e.g. "America/Mexico_City") — used to render
   // appointment times and to evaluate AvailabilityRule/reminder windows in
   // the org's local time rather than the server's.

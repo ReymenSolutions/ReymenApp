@@ -6,7 +6,6 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { generateSlug, generateWebhookSecret } from "@/lib/utils";
 import { logAudit } from "@/lib/audit";
-import { hasCustomPrice } from "@/lib/permissions";
 import { requireAdmin } from "@/lib/guards";
 import { UserError } from "@/lib/user-error";
 import { syncSmartcardMemberLimitForPlan } from "@/lib/smartcard-link";
@@ -82,22 +81,21 @@ export async function createClient(formData: FormData) {
   return { success: true, orgId: org.id };
 }
 
-export async function changePlan(orgId: string, plan: string, customMonthlyPriceUsd: number | null = null) {
+export async function changePlan(orgId: string, plan: string, customMonthlyPriceMxn: number | null = null) {
   const session = await requireAdmin();
 
   const validPlans = ["starter", "professional", "enterprise"];
   if (!validPlans.includes(plan)) throw new UserError("Plan inválido");
 
-  // El precio pactado solo existe en planes de precio personalizado; al pasar
-  // a un plan de precio fijo se borra para no dejar un precio viejo colgando.
-  const customPrice = hasCustomPrice(plan) ? customMonthlyPriceUsd : null;
+  // Precio pactado opcional (plan personalizado de un cliente): vacío = precio de lista del plan.
+  const customPrice = customMonthlyPriceMxn;
   if (customPrice !== null && !(Number.isFinite(customPrice) && customPrice > 0)) {
     throw new UserError("El precio personalizado debe ser mayor a 0");
   }
 
   const org = await prisma.organization.update({
     where: { id: orgId },
-    data: { plan, customMonthlyPriceUsd: customPrice },
+    data: { plan, customMonthlyPriceMxn: customPrice },
   });
 
   // SmartCard guarda su propio límite de integrantes; se iguala al del plan.
@@ -109,7 +107,7 @@ export async function changePlan(orgId: string, plan: string, customMonthlyPrice
     action: "client.plan_change",
     resource: "Organization",
     resourceId: orgId,
-    metadata: { newPlan: plan, customMonthlyPriceUsd: customPrice, smartcardMemberLimit },
+    metadata: { newPlan: plan, customMonthlyPriceMxn: customPrice, smartcardMemberLimit },
   });
 
   revalidatePath(`/admin/clients/${orgId}`);
