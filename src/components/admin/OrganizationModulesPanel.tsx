@@ -29,6 +29,9 @@ const STATUS_BADGE_ES: Record<ModuleStatus, { variant: "success" | "secondary" |
   CANCELLED: { variant: "destructive", icon: Ban, label: "Cancelado" },
 };
 
+// Opción para quitar el módulo por completo (queda como "sin habilitar", igual que uno que nunca se contrató).
+const NOT_ENABLED_LABEL = { es: "Sin habilitar", en: "Not enabled" } as const;
+
 const STATUS_BADGE_EN: Record<ModuleStatus, { variant: "success" | "secondary" | "destructive"; icon: typeof Check; label: string }> = {
   ACTIVE: { variant: "success", icon: Check, label: "Active" },
   SUSPENDED: { variant: "secondary", icon: Clock3, label: "Suspended" },
@@ -50,7 +53,7 @@ export function OrganizationModulesPanel({
   const MODULE_LABEL = getModuleLabel(lang);
   const STATUS_BADGE = lang === "es" ? STATUS_BADGE_ES : STATUS_BADGE_EN;
   const [editing, setEditing] = useState<PlatformModule | null>(null);
-  const [status, setStatus] = useState<ModuleStatus>("ACTIVE");
+  const [status, setStatus] = useState<ModuleStatus | "NOT_ENABLED">("ACTIVE");
   const [source, setSource] = useState<ModuleSource>("SUBSCRIBED");
   const [notes, setNotes] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -176,8 +179,8 @@ export function OrganizationModulesPanel({
           <div className="space-y-4 py-2">
             <div>
               <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{lang === "es" ? "Estado" : "Status"}</label>
-              <div className="flex gap-2">
-                {(["ACTIVE", "SUSPENDED", "CANCELLED"] as const).map((s) => (
+              <div className="flex flex-wrap gap-2">
+                {(["ACTIVE", "SUSPENDED", "CANCELLED", "NOT_ENABLED"] as const).map((s) => (
                   <button
                     key={s}
                     type="button"
@@ -186,12 +189,19 @@ export function OrganizationModulesPanel({
                       status === s ? "border-brand-500 bg-brand-50 text-brand-700" : "border-slate-200 text-slate-600 hover:border-slate-300"
                     }`}
                   >
-                    {STATUS_BADGE[s].label}
+                    {s === "NOT_ENABLED" ? NOT_ENABLED_LABEL[lang === "es" ? "es" : "en"] : STATUS_BADGE[s].label}
                   </button>
                 ))}
               </div>
             </div>
 
+            {status === "NOT_ENABLED" ? (
+              <p className="rounded-md bg-slate-50 p-3 text-xs text-slate-600">
+                {lang === "es"
+                  ? "El módulo se quita por completo: el cliente deja de verlo y vuelve a \"Sin habilitar\", como si nunca se hubiera contratado. Se puede volver a activar cuando quieras."
+                  : "The module is removed entirely: the client stops seeing it and it goes back to \"Not enabled\", as if it was never contracted. You can activate it again any time."}
+              </p>
+            ) : (<>
             <div>
               <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{lang === "es" ? "Origen" : "Source"}</label>
               <div className="flex gap-2">
@@ -225,6 +235,7 @@ export function OrganizationModulesPanel({
                 placeholder={lang === "es" ? "Ej: cortesía de prueba por 30 días, suspendido por falta de pago…" : "E.g.: 30-day trial courtesy, suspended for non-payment…"}
               />
             </div>
+            </>)}
           </div>
 
           <DialogFooter>
