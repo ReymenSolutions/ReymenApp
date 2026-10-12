@@ -23,6 +23,7 @@ export const postVisitFeedback: Blueprint<Config> = {
   description: "Un rato después de la compra le manda al cliente (con su consentimiento) un enlace para calificar su visita. Una calificación de 3 o menos abre un caso de seguimiento y avisa a dueños y gerentes. La invitación a reseña pública se ofrece a todos los que respondan.",
   trigger: "sale.completed",
   requiredModules: ["REYMEN_POS"],
+  overlapCategories: ["follow_up"],
   status: "active",
   configSchema,
   defaultConfig: configSchema.parse({}),

@@ -22,6 +22,7 @@ export const secondVisit: Blueprint<Config> = {
   description: "Si un cliente vino una sola vez y pasan N días sin que regrese, le escribe para invitarlo a volver (solo con su consentimiento y una vez por cliente).",
   trigger: "customer.second_visit_due",
   requiredModules: ["REYMEN_POS"],
+  overlapCategories: ["retention"],
   status: "active",
   configSchema,
   defaultConfig: configSchema.parse({}),

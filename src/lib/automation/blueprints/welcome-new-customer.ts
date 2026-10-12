@@ -18,6 +18,7 @@ export const welcomeNewCustomer: Blueprint<Config> = {
   description: "Cuando un cliente deja su teléfono por primera vez en el POS (con su consentimiento), le da la bienvenida.",
   trigger: "customer.created",
   requiredModules: ["REYMEN_POS"],
+  overlapCategories: ["onboarding"],
   status: "active",
   configSchema,
   defaultConfig: configSchema.parse({}),

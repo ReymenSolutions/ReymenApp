@@ -21,6 +21,7 @@ export const inventoryLowAlert: Blueprint<Config> = {
   trigger: "inventory.level_changed",
   audience: "internal",
   requiredModules: ["FOOD_OPS"],
+  overlapCategories: ["notifications"],
   status: "active",
   configSchema,
   defaultConfig: configSchema.parse({}),

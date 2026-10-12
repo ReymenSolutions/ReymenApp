@@ -451,3 +451,9 @@ Ambas usan los detectores del reloj (`detectors.ts`): el `tick` busca candidatos
 - **Reseñas sin manipulación:** la invitación a la reseña pública (`reviewUrl`) se ofrece a **todos** los que responden, sin condicionarla a la calificación.
 - **Admin:** `/admin/automations` ahora muestra el catálogo de blueprints y en qué clientes están encendidos (con enlace); se habilitan desde el cliente.
 - **Pendiente:** dar de alta la plantilla `post_visit_feedback_v1` en el proveedor de WhatsApp antes de pasar a envío real.
+
+## T. Un solo catálogo y aviso de solapamiento con plantillas n8n
+
+- **Catálogo único** en Admin → Automatizaciones: blueprints (lógica en la app) y plantillas de n8n (marketplace) juntos, por categoría, con su etiqueta "Blueprint · app" / "Plantilla · n8n", cuántos clientes lo usan y enlace al lugar donde se gestiona. Abajo quedan las automatizaciones n8n ya instaladas.
+- **Solapamiento:** cada blueprint declara `overlapCategories` (categorías de `AutomationTemplate` con un trabajo parecido: `onboarding` → bienvenida, `retention` → segunda visita y recuperación, `follow_up` → feedback, `notifications` → alertas y reporte). Si el cliente tiene una plantilla ACTIVA de esa categoría, el panel del blueprint muestra un aviso y **pasar a envío real exige confirmarlo** (`acknowledgeOverlap`, validado también en el servidor). Habilitarlo en simulación no se bloquea: no contacta a nadie.
+- Pendiente (necesita datos de producción): revisar qué plantillas tienen instaladas los clientes con POS y retirar o marcar las equivalentes.

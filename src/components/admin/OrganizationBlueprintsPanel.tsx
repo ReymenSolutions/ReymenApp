@@ -22,6 +22,8 @@ const COPY = {
     toLive: "Pasar a envío real",
     toDry: "Volver a simulación",
     confirmLive: "¿Pasar a envío real? Solo hazlo si el negocio ya tiene su aviso de privacidad y el canal de envío conectado.",
+    overlapWarn: (names: string) => `Este cliente ya tiene instalada la plantilla de n8n «${names}», que hace un trabajo parecido. Con las dos en envío real el cliente podría recibir mensajes duplicados.`,
+    overlapConfirm: "¿Confirmas que no se duplicarán (por ejemplo, ya desactivaste la plantilla)?",
     needs: "Requiere",
     last: "Última ejecución",
     never: "Aún sin ejecuciones",
@@ -39,6 +41,8 @@ const COPY = {
     live: "Live sending",
     toLive: "Switch to live sending",
     toDry: "Back to simulation",
+    overlapWarn: (names: string) => `This client already has the n8n template “${names}” installed, which does a similar job. With both live the customer could get duplicate messages.`,
+    overlapConfirm: "Do you confirm they will not be duplicated (e.g. you already turned the template off)?",
     confirmLive: "Switch to live sending? Only do this if the business already has its privacy notice and the sending channel connected.",
     needs: "Requires",
     last: "Last run",
@@ -91,6 +95,11 @@ export function OrganizationBlueprintsPanel({ orgId, blueprints }: { orgId: stri
               <p className="text-xs text-muted-foreground">
                 {t.needs}: {b.requiredModules.join(", ")}
               </p>
+              {b.overlaps.length > 0 && (
+                <p role="note" className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                  {t.overlapWarn(b.overlaps.map((o) => o.templateName).join(", "))}
+                </p>
+              )}
               {inst && (
                 <p className="text-xs text-muted-foreground">
                   {Object.keys(inst.counts).length === 0
@@ -115,7 +124,10 @@ export function OrganizationBlueprintsPanel({ orgId, blueprints }: { orgId: stri
                       disabled={pending}
                       onClick={() => {
                         if (inst.dryRun && !window.confirm(t.confirmLive)) return;
-                        run(b.key, () => setBlueprintDryRun({ orgId, automationId: inst.id, dryRun: !inst.dryRun }));
+                        // Con una plantilla n8n parecida activa, pasar a envío real exige confirmar que no se duplicará.
+                        const acknowledgeOverlap = inst.dryRun && b.overlaps.length > 0;
+                        if (acknowledgeOverlap && !window.confirm(`${t.overlapWarn(b.overlaps.map((o) => o.templateName).join(", "))}\n\n${t.overlapConfirm}`)) return;
+                        run(b.key, () => setBlueprintDryRun({ orgId, automationId: inst.id, dryRun: !inst.dryRun, acknowledgeOverlap }));
                       }}
                     >
                       {inst.dryRun ? t.toLive : t.toDry}
