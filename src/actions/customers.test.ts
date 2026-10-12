@@ -8,7 +8,7 @@ vi.mock("@/lib/email", () => ({ sendEmail: vi.fn().mockResolvedValue({ sent: tru
 const authMock = vi.fn();
 vi.mock("@/lib/auth", () => ({ auth: () => authMock() }));
 
-const { createLeadFromCustomer } = await import("./customers");
+const { createLeadFromCustomer, setCustomerBirthday } = await import("./customers");
 const { createLead, mergeLeads } = await import("./leads");
 const { processFoodPosOrder } = await import("@/lib/food");
 const { processLeadEvent } = await import("@/lib/webhook-processors");
@@ -119,5 +119,26 @@ describe("clientes del POS y contactos del CRM", () => {
     const purchases = events.filter((e) => e.type === "purchase");
     expect(purchases).toHaveLength(2);
     expect(purchases.map((p) => p.type === "purchase" && [p.amount, p.cancelled]).sort()).toEqual([[200, false], [200, true]]);
+  });
+
+  it("el cumpleaños se captura y borra desde el portal: solo con consentimiento, fecha válida, permiso y misma organización", async () => {
+    await buy("5511110009");
+    const c = await customerOf("5511110009");
+    as(owner, "OWNER");
+    await setCustomerBirthday(c.id, { month: 3, day: 15 });
+    expect(await customerOf("5511110009")).toMatchObject({ birthMonth: 3, birthDay: 15 });
+    await expect(setCustomerBirthday(c.id, { month: 2, day: 31 })).rejects.toThrow();
+    await setCustomerBirthday(c.id, null);
+    expect(await customerOf("5511110009")).toMatchObject({ birthMonth: null, birthDay: null });
+
+    await prisma.customer.update({ where: { id: c.id }, data: { consentAccepted: false } });
+    await expect(setCustomerBirthday(c.id, { month: 3, day: 15 })).rejects.toThrow();
+    await prisma.customer.update({ where: { id: c.id }, data: { consentAccepted: true } });
+
+    as(viewer, "VIEWER");
+    await expect(setCustomerBirthday(c.id, { month: 3, day: 15 })).rejects.toThrow();
+    const otherOwner = await createTestUser(other.id, "OWNER", "cc-other-b");
+    as(otherOwner, "OWNER", other.id);
+    await expect(setCustomerBirthday(c.id, { month: 3, day: 15 })).rejects.toThrow();
   });
 });

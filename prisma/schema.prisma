@@ -1412,6 +1412,9 @@ model Customer {
   totalSpent         Decimal   @default(0) @db.Decimal(12, 2)
   firstVisitAt       DateTime?
   lastVisitAt        DateTime?
+  // Cumpleaños: solo día y mes (sin año ni edad), y solo se guarda si el cliente aceptó el contacto.
+  birthMonth         Int?
+  birthDay           Int?
   leadId             String?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
