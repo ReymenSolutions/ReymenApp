@@ -15,6 +15,7 @@ import { Zap, ArrowRight, Activity } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { FeedbackCases } from "@/components/portal/FeedbackCases";
 import { can } from "@/lib/permissions";
+import { EXECUTION_LABEL, SKIP_REASON, describeAction } from "@/lib/automation/labels";
 import { getAttributionSummary, ATTRIBUTION_WINDOW_DAYS } from "@/lib/automation/attribution";
 import type { UserRole } from "@prisma/client";
 
@@ -32,31 +33,6 @@ async function getAutomations(orgId: string) {
   });
 }
 
-const EXECUTION_LABEL: Record<string, { label: string; variant: "success" | "secondary" | "destructive" | "warning" | "info" }> = {
-  SUCCEEDED: { label: "Hecha", variant: "success" },
-  DISPATCHED: { label: "Enviada", variant: "info" },
-  PENDING: { label: "En cola", variant: "info" },
-  DRY_RUN: { label: "Simulada", variant: "secondary" },
-  SKIPPED: { label: "Omitida", variant: "secondary" },
-  FAILED: { label: "Falló", variant: "destructive" },
-};
-
-const SKIP_REASON: Record<string, string> = {
-  no_consent: "el cliente no dio su consentimiento",
-  quiet_hours: "horario de silencio",
-  cooldown: "ya se le contactó hace poco",
-  do_not_contact: "el cliente pidió no ser contactado",
-  no_phone: "sin teléfono",
-  not_low: "el insumo no está bajo",
-  below_min_level: "no llega al nivel configurado",
-  module_disabled: "módulo apagado",
-  invalid_config: "configuración inválida",
-  blueprint_unavailable: "automatización no disponible",
-  no_customer: "sin cliente",
-  already_returned: "el cliente ya regresó",
-  no_report: "sin datos del reporte",
-};
-
 /** Lo que cada automatización inteligente hizo (o por qué no) con sus últimos eventos. */
 async function getSmartActivity(orgId: string) {
   return prisma.automationExecution.findMany({
@@ -65,18 +41,6 @@ async function getSmartActivity(orgId: string) {
     take: 15,
     select: { id: true, status: true, skipReason: true, action: true, createdAt: true, automation: { select: { name: true } } },
   });
-}
-
-function describeAction(action: unknown): string | null {
-  const a = (action ?? {}) as { type?: string;  title?: string; body?: string; templateKey?: string; recipient?: { name?: string | null } };
-  if (a.type === "report") {
-    const r = action as { report?: { today?: { gross?: number; tickets?: number }; vsPreviousDayPct?: number | null } };
-    const t = r.report?.today;
-    return `${a.title ?? "Reporte"} — ventas ${formatMoney(t?.gross ?? 0)}, ${t?.tickets ?? 0} tickets${r.report?.vsPreviousDayPct != null ? `, ${r.report.vsPreviousDayPct > 0 ? "+" : ""}${r.report.vsPreviousDayPct}% vs. ayer` : ""}`;
-  }
-  if (a.type === "alert") return `${a.title ?? ""}${a.body ? ` — ${a.body}` : ""}`;
-  if (a.type === "message") return `Mensaje a ${a.recipient?.name ?? "un cliente"}`;
-  return null;
 }
 
 /** Calificaciones bajas (≤ 3) pendientes de seguimiento. */
@@ -225,7 +189,7 @@ export default async function PortalAutomationsPage() {
           <CardContent className="space-y-2">
             {activity.map((e) => {
               const meta = EXECUTION_LABEL[e.status] ?? { label: e.status, variant: "secondary" as const };
-              const detail = describeAction(e.action) ?? (e.skipReason ? `Omitida: ${SKIP_REASON[e.skipReason] ?? e.skipReason}` : null);
+              const detail = describeAction(e.action, formatMoney) ?? (e.skipReason ? `Omitida: ${SKIP_REASON[e.skipReason] ?? e.skipReason}` : null);
               return (
                 <div key={e.id} className="flex items-start justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
                   <div className="min-w-0">
