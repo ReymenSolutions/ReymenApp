@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { phoneKey } from "./phone";
+import { parseBirthday, type Birthday } from "./birthday";
 
 type Tx = Prisma.TransactionClient;
 
@@ -19,6 +20,8 @@ export interface PosCustomerInput {
   phone: string;
   name?: string;
   consent?: { accepted: boolean; textVersion?: string; at?: string };
+  /** Día y mes de cumpleaños (opcional). Solo se guarda si el cliente aceptó el contacto. */
+  birthday?: Birthday;
 }
 
 /** Lee el cliente del payload del POS. Un cliente mal formado se ignora: nunca debe tirar la venta. */
@@ -39,7 +42,8 @@ export function parsePosCustomer(raw: unknown): (PosCustomerInput & { phone: str
       };
     }
   }
-  return { phone, name, consent };
+  const birthday = parseBirthday(c.birthday) ?? undefined;
+  return { phone, name, consent, birthday };
 }
 
 /**
@@ -54,11 +58,15 @@ export async function upsertCustomer(tx: Tx, organizationId: string, input: PosC
   const consent = input.consent
     ? { consentAccepted: input.consent.accepted, consentTextVersion: input.consent.textVersion ?? null, consentAt: Number.isNaN(consentAt.getTime()) ? new Date() : consentAt }
     : {};
-  const existed = !!(await tx.customer.findUnique({ where: { organizationId_phoneKey: { organizationId, phoneKey: key } }, select: { id: true } }));
+  const current = await tx.customer.findUnique({ where: { organizationId_phoneKey: { organizationId, phoneKey: key } }, select: { id: true, consentAccepted: true } });
+  const existed = !!current;
+  // El cumpleaños es un dato personal: solo se guarda si el cliente aceptó el contacto (ahora o antes).
+  const consented = input.consent ? input.consent.accepted : (current?.consentAccepted ?? false);
+  const birth = input.birthday && consented ? { birthMonth: input.birthday.month, birthDay: input.birthday.day } : {};
   const customer = await tx.customer.upsert({
     where: { organizationId_phoneKey: { organizationId, phoneKey: key } },
-    create: { organizationId, phone: input.phone, phoneKey: key, name: input.name ?? null, leadId: lead?.id ?? null, ...consent },
-    update: { ...(input.name ? { name: input.name } : {}), ...(lead ? { leadId: lead.id } : {}), ...consent },
+    create: { organizationId, phone: input.phone, phoneKey: key, name: input.name ?? null, leadId: lead?.id ?? null, ...consent, ...birth },
+    update: { ...(input.name ? { name: input.name } : {}), ...(lead ? { leadId: lead.id } : {}), ...consent, ...birth },
   });
   return { ...customer, created: !existed };
 }

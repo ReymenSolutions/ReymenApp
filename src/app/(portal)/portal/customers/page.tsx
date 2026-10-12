@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { CreateLeadFromCustomerButton } from "@/components/portal/CreateLeadFromCustomerButton";
+import { CustomerBirthday } from "@/components/portal/CustomerBirthday";
 import { formatDate, formatMoney } from "@/lib/utils";
 import { Contact, DollarSign, Repeat, ShieldCheck } from "lucide-react";
 import type { Prisma } from "@prisma/client";
@@ -31,6 +32,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const query = q?.trim() ?? "";
   const es = (await getServerLang()) === "es";
   const crm = await hasModule(orgId, "CRM");
+  const canEdit = can(session.user.role, "food:manage");
   const canCreateLead = crm && can(session.user.role, "leads:create");
 
   const digits = query.replace(/\D/g, "");
@@ -100,6 +102,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                     <div className="min-w-[12rem] flex-1">
                       <p className="text-sm font-medium text-slate-900">{c.name ?? (es ? "Sin nombre" : "No name")}</p>
                       <p className="text-xs text-slate-500">{c.phone}</p>
+                      <CustomerBirthday customerId={c.id} month={c.birthMonth} day={c.birthDay} consent={c.consentAccepted} canEdit={canEdit} />
                     </div>
                     <div className="text-right text-sm">
                       <p className="font-semibold text-slate-900">{formatMoney(Number(c.totalSpent))}</p>

@@ -27,6 +27,8 @@ const EN: Record<string, string> = {
   "Categoría no encontrada": "Category not found",
   "Cita no encontrada": "Appointment not found",
   "Cliente no encontrado": "Client not found",
+  "Fecha de cumpleaños no válida": "Invalid birthday date",
+  "El cliente no aceptó el contacto: no se puede guardar su cumpleaños": "The customer did not accept contact: their birthday cannot be saved",
   "Compra no encontrada": "Purchase not found",
   "Contenido requerido": "Content is required",
   "Contraseña actual incorrecta": "Current password is incorrect",
