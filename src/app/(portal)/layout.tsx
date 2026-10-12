@@ -26,7 +26,7 @@ export default async function PortalLayout({ children }: { children: React.React
   const enabledModules = await getEnabledModules(org.id);
 
   // Inbox: clientes esperando respuesta (lo último lo dijo el cliente y la conversación sigue abierta).
-  // Solo se consulta si el negocio tiene CRM o WhatsApp AI, para no hacer una consulta de más al resto.
+  // Solo se consulta si el negocio tiene CRM o Agente IA, para no hacer una consulta de más al resto.
   const pendingConversations =
     enabledModules.includes("CRM") || enabledModules.includes("AI_WHATSAPP")
       ? await prisma.conversation.count({

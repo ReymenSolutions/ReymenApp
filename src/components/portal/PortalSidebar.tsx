@@ -12,6 +12,7 @@ import type { PlatformModule } from "@prisma/client";
 import { cn } from "@/lib/utils";
 import { usePreferences } from "@/context/preferences";
 import { LogoPickerDialog } from "@/components/shared/LogoPickerDialog";
+import { CRM_PATHS } from "@/lib/crm-tabs";
 
 
 interface NavItem {
@@ -34,6 +35,7 @@ function useNavItems() {
     whatsapp: t.whatsapp,
     conversations: t.conversations,
     inbox: t.inbox,
+    crm: t.crm,
     knowledgeBase: t.knowledgeBase,
     prompts: t.prompts,
     aiLab: t.aiLab,
@@ -58,19 +60,20 @@ function useNavItems() {
 // sección sin entradas visibles (módulos no contratados) no se dibuja.
 type NavSectionKey = "main" | "business" | "customers" | "communication" | "results" | "account";
 
-const NAV_ITEMS: { href: string; key: keyof ReturnType<typeof useNavItems>; icon: React.ElementType; section: NavSectionKey; module?: PlatformModule; /** Se muestra si está activo cualquiera de estos módulos. */ anyModule?: PlatformModule[]; alsoActiveFor?: string[] }[] = [
+const NAV_ITEMS: { href: string; key: keyof ReturnType<typeof useNavItems>; icon: React.ElementType; section: NavSectionKey; module?: PlatformModule; /** Se muestra si está activo cualquiera de estos módulos. */ anyModule?: PlatformModule[]; /** Se oculta cuando este módulo está activo (su contenido ya vive dentro de otra entrada). */ hiddenWithModule?: PlatformModule; alsoActiveFor?: string[] }[] = [
   { href: "/portal/home", key: "home", icon: Home, section: "main" },
 
   { href: "/portal/food", key: "food", icon: UtensilsCrossed, section: "business", module: "FOOD_OPS" },
   { href: "/portal/smartcard", key: "smartcard", icon: CreditCard, section: "business", module: "NFC_QR" },
 
-  { href: "/portal/today", key: "today", icon: ListChecks, section: "customers", module: "CRM" },
-  { href: "/portal/leads", key: "leads", icon: Users, section: "customers", module: "CRM" },
-  { href: "/portal/customers", key: "customersNav", icon: Contact, section: "customers", module: "FOOD_OPS" },
-  { href: "/portal/pipeline", key: "pipeline", icon: GitBranch, section: "customers", module: "CRM" },
+  // Con el módulo CRM, lo de clientes vive en UNA entrada "CRM" con pestañas (Hoy, Inbox, Leads, Pipeline,
+  // Clientes del negocio). Sin CRM se conservan las entradas sueltas que sí aplican.
+  { href: "/portal/today", key: "crm", icon: Users, section: "customers", module: "CRM", alsoActiveFor: CRM_PATHS },
+  { href: "/portal/customers", key: "customersNav", icon: Contact, section: "customers", module: "FOOD_OPS", hiddenWithModule: "CRM" },
+  // Citas es su propia entrada, visible siempre y separada del CRM.
   { href: "/portal/appointments", key: "appointments", icon: Calendar, section: "customers" },
 
-  { href: "/portal/inbox", key: "inbox", icon: MessageSquare, section: "communication", anyModule: ["CRM", "AI_WHATSAPP"], alsoActiveFor: ["/portal/conversations"] },
+  { href: "/portal/inbox", key: "inbox", icon: MessageSquare, section: "communication", anyModule: ["CRM", "AI_WHATSAPP"], hiddenWithModule: "CRM", alsoActiveFor: ["/portal/conversations"] },
   { href: "/portal/whatsapp", key: "whatsapp", icon: Bot, section: "communication", module: "AI_WHATSAPP", alsoActiveFor: ["/portal/knowledge-base", "/portal/prompts", "/portal/ai-lab"] },
   { href: "/portal/automations", key: "automations", icon: Zap, section: "communication", module: "AUTOMATIONS", alsoActiveFor: ["/portal/templates"] },
 
@@ -108,7 +111,7 @@ export function PortalSidebar({ orgName, orgLogoUrl: initialLogoUrl, enabledModu
   const pathname = usePathname();
   const { t, lang } = usePreferences();
   const labels = useNavItems();
-  const visibleNavItems = NAV_ITEMS.filter((item) => (!item.module || enabledModules.includes(item.module)) && (!item.anyModule || item.anyModule.some((m) => enabledModules.includes(m))));
+  const visibleNavItems = NAV_ITEMS.filter((item) => (!item.module || enabledModules.includes(item.module)) && (!item.anyModule || item.anyModule.some((m) => enabledModules.includes(m))) && !(item.hiddenWithModule && enabledModules.includes(item.hiddenWithModule)));
 
   // Secciones cerradas por el usuario; se recuerdan en este navegador. Al
   // entrar a una pantalla, su sección se abre sola.
@@ -240,7 +243,7 @@ export function PortalSidebar({ orgName, orgLogoUrl: initialLogoUrl, enabledModu
                     >
                       <Icon className="h-4 w-4 flex-shrink-0" />
                       <span className="flex-1">{labels[item.key]}</span>
-                      {item.key === "inbox" && pendingConversations > 0 && (
+                      {(item.key === "inbox" || item.key === "crm") && pendingConversations > 0 && (
                         <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-semibold text-amber-950">
                           {pendingConversations > 99 ? "99+" : pendingConversations}
                         </span>

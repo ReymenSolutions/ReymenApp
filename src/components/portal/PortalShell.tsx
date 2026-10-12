@@ -7,6 +7,7 @@ import { PullToRefresh } from "@/components/shared/PullToRefresh";
 import { useState } from "react";
 import { PortalSidebar } from "@/components/portal/PortalSidebar";
 import { TopBar } from "@/components/shared/TopBar";
+import { EnabledModulesProvider } from "@/context/modules";
 import type { PlatformModule } from "@prisma/client";
 
 interface PortalShellProps {
@@ -26,6 +27,7 @@ export function PortalShell({ orgName, orgLogoUrl, enabledModules, pendingConver
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
+    <EnabledModulesProvider modules={enabledModules}>
     <div className="flex h-screen overflow-hidden bg-slate-50">
       <PortalSidebar
         orgName={orgName}
@@ -46,5 +48,6 @@ export function PortalShell({ orgName, orgLogoUrl, enabledModules, pendingConver
         </main>
       </div>
     </div>
+    </EnabledModulesProvider>
   );
 }

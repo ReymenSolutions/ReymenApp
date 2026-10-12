@@ -57,7 +57,8 @@ test.describe("inbox unificado", () => {
 
   test("lista todos los canales, filtra por pestaña y muestra los pendientes", async ({ page }) => {
     await page.goto("/portal/dashboard");
-    await page.getByRole("link", { name: /^Inbox/ }).click();
+    await page.getByRole("link", { name: /^CRM/ }).click();
+    await page.getByRole("navigation", { name: "CRM" }).getByRole("link", { name: "Inbox" }).click();
     await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
     for (const name of ["Casey Instagram", "Shannon Correo", "Tahlia Chat"]) await expect(page.getByRole("button", { name: new RegExp(name) })).toBeVisible();
 

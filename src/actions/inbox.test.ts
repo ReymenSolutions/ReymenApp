@@ -37,7 +37,7 @@ describe("inbox (acciones)", () => {
     expect((await prisma.conversation.findUniqueOrThrow({ where: { id: conversationId } })).unreadCount).toBe(0);
   });
 
-  it("acepta CRM o WhatsApp AI y rechaza sin ninguno", async () => {
+  it("acepta CRM o Agente IA y rechaza sin ninguno", async () => {
     const withCrm = await newOrg(["CRM"]);
     const none = await newOrg([]);
     const a = await processConversationEvent({ channel: "email", contactEmail: "x@y.com", message: { role: "USER", content: "Hola" } }, withCrm.id);

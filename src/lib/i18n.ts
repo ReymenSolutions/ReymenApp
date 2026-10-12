@@ -12,7 +12,8 @@ export const strings = {
     customersNav: "Clientes del negocio",
     pipeline: "Pipeline",
     automations: "Automatizaciones",
-    whatsapp: "WhatsApp AI",
+    whatsapp: "Agente IA",
+    crm: "CRM",
     conversations: "Conversaciones",
     inbox: "Inbox",
     knowledgeBase: "Base de Conocimiento",
@@ -241,7 +242,7 @@ export const strings = {
     colEnd: "Fin",
 
     // ── WhatsApp ─────────────────────────────────────────────
-    whatsappTitle: "WhatsApp AI Center",
+    whatsappTitle: "Centro del Agente IA",
     whatsappDesc: "Configura y monitorea tu asistente de IA para WhatsApp",
     totalConversations: "Conversaciones totales",
     activeNow: "Activas ahora",
@@ -557,7 +558,8 @@ export const strings = {
     customersNav: "Business customers",
     pipeline: "Pipeline",
     automations: "Automations",
-    whatsapp: "WhatsApp AI",
+    whatsapp: "AI Agent",
+    crm: "CRM",
     conversations: "Conversations",
     inbox: "Inbox",
     knowledgeBase: "Knowledge Base",
@@ -785,7 +787,7 @@ export const strings = {
     colEnd: "End",
 
     // ── WhatsApp ─────────────────────────────────────────────
-    whatsappTitle: "WhatsApp AI Center",
+    whatsappTitle: "AI Agent Center",
     whatsappDesc: "Configure and monitor your AI assistant for WhatsApp",
     totalConversations: "Total conversations",
     activeNow: "Active now",

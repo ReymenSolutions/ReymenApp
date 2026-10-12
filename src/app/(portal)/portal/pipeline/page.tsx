@@ -1,3 +1,4 @@
+import { CrmTabs } from "@/components/portal/CrmTabs";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getServerT, getServerLang } from "@/lib/i18n-server";
@@ -52,6 +53,7 @@ export default async function PortalPipelinePage() {
         description={`${totalOpportunities} ${t.pipelineDesc}`}
         actions={stages.length > 0 ? <CreateOpportunityDialog stages={stageOptions} users={users} /> : undefined}
       />
+      <CrmTabs />
 
       {stages.length === 0 ? (
         <EmptyState

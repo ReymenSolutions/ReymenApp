@@ -14,7 +14,7 @@ const COPY = {
     viaPipeline: "desde el pipeline",
     note: "Nota de",
     customer: "Cliente",
-    ai: "Asistente IA",
+    ai: "Agente IA",
     team: "Equipo",
     escalated: "La conversación se pasó a una persona del equipo",
     appointment: "Cita",

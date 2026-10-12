@@ -1,3 +1,4 @@
+import { CrmTabs } from "@/components/portal/CrmTabs";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
@@ -62,6 +63,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         title={es ? "Clientes del negocio" : "Business customers"}
         description={es ? "Quienes compraron y dejaron su teléfono al cobrar en el POS. Si su número coincide con un contacto del CRM, quedan enlazados." : "People who bought and left their phone at the POS checkout. When their number matches a CRM contact, they're linked."}
       />
+      <CrmTabs />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard title={es ? "Clientes" : "Customers"} value={totals._count._all} icon={Contact} />
