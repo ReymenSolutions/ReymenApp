@@ -430,3 +430,12 @@ Mismo esquema de firma e idempotencia que `/api/webhooks/pos/orders` (HMAC con e
 - **Blueprint `daily_executive_report` v1:** audiencia interna, requiere Reymen Foods, config `sendHour`. Acción `{ type: "report", title, date, report }`.
 - **Entrega** (`internal-delivery.ts`): sin dry-run, el motor marca la ejecución `SUCCEEDED` y manda el correo (`dailyReportEmail`) a los usuarios activos con rol **OWNER o MANAGER**; un correo que falla no tumba el evento. Con dry-run solo se registra. El reporte también queda en la actividad de `/portal/automations` y la campana avisa "Reporte diario listo".
 - **Pendiente:** entrega por WhatsApp vía n8n (hoy solo correo; requiere `RESEND_API_KEY`).
+
+## R. `second_visit` y `customer_recovery` implementados (PR 10)
+
+Ambas usan los detectores del reloj (`detectors.ts`): el `tick` busca candidatos, deja **un evento por hecho** (llave única; solo se emiten los que aún no existen) y el motor aplica la política de contacto de siempre (consentimiento, enfriamiento, horas de silencio) y el dry-run. Requieren el módulo Reymen POS. Reglas puras en `customer-signals.ts`.
+
+- **`second_visit` v1** (evento `customer.second_visit_due`): cliente con **una sola visita**, consentimiento aceptado, con su primera visita entre `afterDays` (14) y `maxDays` (60) atrás. Una vez por cliente (`dedupeKey = customer.second_visit_due:<cliente>`). Plantilla `second_visit_v1` (`name`, `businessName`). Si regresó antes de procesarse → `already_returned`.
+- **`customer_recovery` v1** (evento `customer.at_risk`): cliente con `visitCount ≥ minVisits` (3) cuya ausencia pasa de `max(minDays = 21, factor = 2.5 × su intervalo mediano entre visitas)` sin llegar a `maxDays` (180, después ya no se le insiste). El intervalo es la **mediana** de los días entre visitas (varias compras el mismo día cuentan una). Un episodio por ausencia (`dedupeKey = customer.at_risk:<cliente>:<última visita>`): si regresa y se vuelve a alejar, es otro. Enfriamiento de 60 días. Plantilla `customer_recovery_v1` (`name`, `businessName`, `daysSince`). Si regresó antes de procesarse → `already_returned`.
+- **Protección al encenderlas:** las ventanas `maxDays` evitan mensajes masivos a clientes de hace años; los candidatos se toman en lotes de 200 por tick.
+- **Pendiente:** dar de alta las plantillas `second_visit_v1` y `customer_recovery_v1` en el proveedor de WhatsApp (Meta) antes de pasar a envío real.

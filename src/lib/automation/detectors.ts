@@ -4,13 +4,14 @@ import { emitDomainEvent } from "@/lib/domain-events";
 import { getBlueprint } from "./blueprints";
 import { localHour } from "./policy";
 import { addDays, buildDailyReport, localDateString } from "./report";
+import { atRiskDays } from "./customer-signals";
 
 /**
  * Detectores del reloj: lo que no lo dispara un hecho sino la hora. Hoy, el reporte diario: cuando en la zona del
  * negocio ya pasó la hora configurada, se arma el reporte del día anterior y se deja UN evento por día (la llave
  * única impide repetirlo aunque el tick corra cada 5 minutos).
  */
-export async function runClockDetectors(now: Date = new Date(), opts: { organizationId?: string } = {}): Promise<{ reports: number }> {
+export async function runClockDetectors(now: Date = new Date(), opts: { organizationId?: string } = {}): Promise<{ reports: number; secondVisits: number; atRisk: number }> {
   let reports = 0;
   const automations = await prisma.automation.findMany({
     where: { status: "ACTIVE", trigger: "report.daily_due", blueprintKey: { not: null }, ...(opts.organizationId ? { organizationId: opts.organizationId } : {}) },
@@ -37,5 +38,71 @@ export async function runClockDetectors(now: Date = new Date(), opts: { organiza
     );
     reports++;
   }
-  return { reports };
+  const customers = await runCustomerDetectors(now, opts);
+  return { reports, ...customers };
+}
+
+const DAY = 86_400_000;
+const CANDIDATES_PER_RUN = 200;
+
+/** Solo emite los eventos cuya llave aún no existe (el tick corre cada 5 min: no se reescribe lo ya detectado). */
+async function emitMissing(organizationId: string, now: Date, events: { type: string; subjectId: string; dedupeKey: string; payload: object }[]): Promise<number> {
+  if (events.length === 0) return 0;
+  const existing = new Set((await prisma.domainEvent.findMany({ where: { organizationId, dedupeKey: { in: events.map((e) => e.dedupeKey) } }, select: { dedupeKey: true } })).map((e) => e.dedupeKey));
+  const fresh = events.filter((e) => !existing.has(e.dedupeKey));
+  if (fresh.length === 0) return 0;
+  await prisma.$transaction(async (tx) => {
+    for (const e of fresh) await emitDomainEvent(tx, { organizationId, type: e.type, subjectType: "customer", subjectId: e.subjectId, occurredAt: now, payload: e.payload, dedupeKey: e.dedupeKey });
+  });
+  return fresh.length;
+}
+
+/** Clientes que vinieron una sola vez (segunda visita) y habituales que se alejan (recuperación). */
+async function runCustomerDetectors(now: Date, opts: { organizationId?: string }): Promise<{ secondVisits: number; atRisk: number }> {
+  let secondVisits = 0;
+  let atRisk = 0;
+  const automations = await prisma.automation.findMany({
+    where: { status: "ACTIVE", trigger: { in: ["customer.second_visit_due", "customer.at_risk"] }, blueprintKey: { not: null }, ...(opts.organizationId ? { organizationId: opts.organizationId } : {}) },
+  });
+  for (const automation of automations) {
+    const blueprint = getBlueprint(automation.blueprintKey!, automation.blueprintVersion);
+    if (!blueprint) continue;
+    const parsed = blueprint.configSchema.safeParse(automation.config ?? {});
+    if (!parsed.success) continue;
+    const config = parsed.data as Record<string, number>;
+    const organizationId = automation.organizationId;
+    let modulesOk = true;
+    for (const required of blueprint.requiredModules) if (!(await hasModule(organizationId, required))) modulesOk = false;
+    if (!modulesOk) continue;
+
+    if (automation.trigger === "customer.second_visit_due") {
+      const candidates = await prisma.customer.findMany({
+        where: { organizationId, visitCount: 1, consentAccepted: true, firstVisitAt: { lte: new Date(now.getTime() - config.afterDays * DAY), gte: new Date(now.getTime() - config.maxDays * DAY) } },
+        orderBy: { firstVisitAt: "desc" },
+        take: CANDIDATES_PER_RUN,
+        select: { id: true, firstVisitAt: true },
+      });
+      secondVisits += await emitMissing(organizationId, now, candidates.map((c) => ({ type: "customer.second_visit_due", subjectId: c.id, dedupeKey: `customer.second_visit_due:${c.id}`, payload: { customerId: c.id, firstVisitAt: c.firstVisitAt?.toISOString() ?? null } })));
+    } else {
+      const candidates = await prisma.customer.findMany({
+        where: { organizationId, visitCount: { gte: config.minVisits }, consentAccepted: true, lastVisitAt: { lte: new Date(now.getTime() - config.minDays * DAY), gte: new Date(now.getTime() - config.maxDays * DAY) } },
+        orderBy: { lastVisitAt: "desc" },
+        take: CANDIDATES_PER_RUN,
+        select: { id: true, visitCount: true, lastVisitAt: true },
+      });
+      if (candidates.length === 0) continue;
+      const sales = await prisma.foodSale.findMany({ where: { organizationId, customerId: { in: candidates.map((c) => c.id) }, grossAmount: { gt: 0 } }, select: { customerId: true, occurredAt: true } });
+      const byCustomer = new Map<string, Date[]>();
+      for (const s of sales) byCustomer.set(s.customerId!, [...(byCustomer.get(s.customerId!) ?? []), s.occurredAt]);
+      const events = [];
+      for (const c of candidates) {
+        const daysSince = atRiskDays({ visitCount: c.visitCount, lastVisitAt: c.lastVisitAt, visits: byCustomer.get(c.id) ?? [], now, minVisits: config.minVisits, minDays: config.minDays, factor: config.factor, maxDays: config.maxDays });
+        if (daysSince === null) continue;
+        // Un episodio por ausencia: la llave lleva la fecha de su última visita (si regresa y se vuelve a alejar, es otro).
+        events.push({ type: "customer.at_risk", subjectId: c.id, dedupeKey: `customer.at_risk:${c.id}:${c.lastVisitAt!.getTime()}`, payload: { customerId: c.id, lastVisitAt: c.lastVisitAt!.toISOString(), daysSince } });
+      }
+      atRisk += await emitMissing(organizationId, now, events);
+    }
+  }
+  return { secondVisits, atRisk };
 }
