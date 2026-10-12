@@ -1,0 +1,59 @@
+{
+  "name": "reymen-action-message",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "reymen-action-message",
+        "responseMode": "onReceived",
+        "options": { "rawBody": true }
+      },
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "Reymen: acción de mensaje",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "reymen-action-message"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1) Verifica la firma de Reymen y que la hora esté dentro de ±5 min (anti-replay).\n// 2) Envía el mensaje con el proveedor. HOY ES UN PROVEEDOR FICTICIO: no manda nada real;\n//    reemplaza el bloque PROVEEDOR por WhatsApp Business / SMS cuando exista el número y el aviso de privacidad.\n// 3) Prepara el callback firmado hacia Reymen.\n// Requiere NODE_FUNCTION_ALLOW_BUILTIN=crypto y N8N_WEBHOOK_SECRET en el entorno de n8n.\nconst crypto = require('crypto');\nconst secret = $env.N8N_WEBHOOK_SECRET;\nconst item = $input.first();\nconst headers = item.json.headers || {};\nconst raw = item.binary && item.binary.data ? Buffer.from(item.binary.data.data, 'base64').toString('utf8') : JSON.stringify(item.json.body);\nconst ts = String(headers['x-reymen-timestamp'] || '');\nconst sig = String(headers['x-reymen-signature'] || '');\nconst expected = 'sha256=' + crypto.createHmac('sha256', secret).update(ts + '.' + raw).digest('hex');\nconst age = Math.abs(Date.now() - Number(ts));\nif (!secret || !ts || age > 5 * 60 * 1000 || sig.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {\n  throw new Error('Firma inválida');\n}\nconst msg = JSON.parse(raw);\n\n// ---- PROVEEDOR (ficticio) ----\nconst result = { status: 'sent', providerMessageId: 'sim_' + msg.execution.id + '_' + msg.execution.attempt };\n// ------------------------------\n\nconst body = JSON.stringify({ executionId: msg.execution.id, token: msg.callback.token, status: result.status, providerMessageId: result.providerMessageId });\nconst cbTs = String(Date.now());\nconst cbSig = 'sha256=' + crypto.createHmac('sha256', secret).update(cbTs + '.' + body).digest('hex');\nreturn [{ json: { url: msg.callback.url, body, cbTs, cbSig } }];"
+      },
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "Verificar, enviar (ficticio) y firmar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Reymen-Timestamp", "value": "={{ $json.cbTs }}" },
+            { "name": "X-Reymen-Signature", "value": "={{ $json.cbSig }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "Callback a Reymen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [720, 300]
+    }
+  ],
+  "connections": {
+    "Reymen: acción de mensaje": { "main": [[{ "node": "Verificar, enviar (ficticio) y firmar", "type": "main", "index": 0 }]] },
+    "Verificar, enviar (ficticio) y firmar": { "main": [[{ "node": "Callback a Reymen", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "tags": [{ "name": "reymen" }, { "name": "generico" }]
+}
