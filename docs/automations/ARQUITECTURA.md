@@ -401,3 +401,12 @@ Mismo esquema de firma e idempotencia que `/api/webhooks/pos/orders` (HMAC con e
 - **Política de contacto** (`policy.ts`, única para todos los blueprints): consentimiento aceptado, enfriamiento por cliente y automatización, y horas de silencio en la zona horaria de la organización.
 - **Admin:** Admin → Cliente → "Automatizaciones (blueprints)": habilitar (exige los módulos del blueprint; nace en dry-run), pasar a envío real (con confirmación), pausar/reanudar y ver el conteo de ejecuciones por estado. Todo queda en la bitácora de auditoría (`automation.blueprint_*`).
 - **Pendiente de PR 7:** enviar las ejecuciones `PENDING` a n8n (firmado, con reintentos) y recibir el resultado.
+
+## O. Despachador y callback implementados (PR 7)
+
+- **Despachador** (`src/lib/automation/dispatcher.ts`), parte del `tick`: toma hasta 20 ejecuciones `PENDING` (solo existen con el dry-run apagado) cuyo reintento ya toca, las firma y las envía a `{N8N_BASE_URL}/webhook/reymen-action-message` con timeout de 5 s.
+  - Éxito → `DISPATCHED`. Fallo → reintento con espera de 1, 5, 30 min, 2 h y 12 h; al quinto fallo `FAILED`.
+  - Si la automatización se pausó o volvió a simulación antes de enviar, no se envía. Un mensaje con más de 24 h sin salir se omite (`expired`).
+  - Sin `N8N_BASE_URL`/`N8N_WEBHOOK_SECRET` no se intenta nada. n8n caído nunca bloquea ventas ni eventos.
+- **Callback** `POST /api/webhooks/n8n/automation-executions`: firma de plataforma + token por ejecución (HMAC), transiciones idempotentes. Contrato completo en `docs/automations/N8N.md`.
+- **Workflow genérico** `n8n/workflows/reymen-action-message.json` con proveedor ficticio.
