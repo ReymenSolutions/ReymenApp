@@ -4,6 +4,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
 import { usePreferences } from "@/context/preferences";
+import { useReducedMotion } from "@/components/motion/useReducedMotion";
+import { MOTION } from "@/lib/motion";
 
 interface FunnelItem {
   label: string;
@@ -17,6 +19,7 @@ interface LeadFunnelChartProps {
 
 export function LeadFunnelChart({ data }: LeadFunnelChartProps) {
   const { lang } = usePreferences();
+  const reduced = useReducedMotion();
 
   if (data.length === 0) {
     return (
@@ -43,7 +46,7 @@ export function LeadFunnelChart({ data }: LeadFunnelChartProps) {
           contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
           formatter={(value: number) => [value, "Leads"]}
         />
-        <Bar dataKey="count" radius={[0, 3, 3, 0]} maxBarSize={20}>
+        <Bar dataKey="count" isAnimationActive={!reduced} animationDuration={MOTION.count} animationEasing="ease-out" radius={[0, 3, 3, 0]} maxBarSize={20}>
           {data.map((entry, i) => (
             <Cell key={i} fill={entry.color} />
           ))}

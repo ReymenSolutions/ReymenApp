@@ -7,7 +7,7 @@ import { can } from "@/lib/permissions";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { CreateOpportunityDialog } from "@/components/portal/CreateOpportunityDialog";
-import { OpportunityCard } from "@/components/portal/OpportunityCard";
+import { PipelineBoard } from "@/components/portal/PipelineBoard";
 import { GitBranch } from "lucide-react";
 import type { UserRole } from "@prisma/client";
 
@@ -64,44 +64,24 @@ export default async function PortalPipelinePage() {
           }
         />
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {stages.map((stage) => (
-            <div key={stage.id} className="w-72 flex-shrink-0">
-              <div className="mb-2 flex items-center justify-between px-1">
-                <h3 className="text-sm font-semibold text-slate-900">{stage.name}</h3>
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-                  {stage.opportunities.length}
-                </span>
-              </div>
-              <div className="space-y-2 rounded-lg bg-slate-50 p-2 min-h-[120px]">
-                {stage.opportunities.length === 0 ? (
-                  <p className="px-2 py-4 text-center text-xs text-slate-400">
-                    {lang === "es" ? "Sin oportunidades" : "No opportunities"}
-                  </p>
-                ) : (
-                  stage.opportunities.map((opp) => (
-                    <OpportunityCard
-                      key={opp.id}
-                      opportunity={{
-                        id: opp.id,
-                        title: opp.title,
-                        amount: opp.amount,
-                        currency: opp.currency,
-                        estimatedCloseDate: opp.estimatedCloseDate,
-                        leadId: opp.lead.id,
-                        leadName: opp.lead.name,
-                        ownerName: opp.owner?.name ?? opp.owner?.email ?? null,
-                        currentStageId: stage.id,
-                      }}
-                      stages={stageOptions}
-                      canManage={canManage}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+        <PipelineBoard
+          canManage={canManage}
+          stages={stages.map((s) => ({ id: s.id, name: s.name, isWon: s.isWon, isLost: s.isLost }))}
+          opportunities={stages.flatMap((stage) =>
+            stage.opportunities.map((opp) => ({
+              id: opp.id,
+              title: opp.title,
+              amount: opp.amount,
+              currency: opp.currency,
+              estimatedCloseDate: opp.estimatedCloseDate ? opp.estimatedCloseDate.toISOString() : null,
+              leadId: opp.lead.id,
+              leadName: opp.lead.name,
+              ownerName: opp.owner?.name ?? opp.owner?.email ?? null,
+              tags: opp.tags,
+              stageId: stage.id,
+            })),
+          )}
+        />
       )}
     </div>
   );

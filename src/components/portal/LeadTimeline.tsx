@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AlertTriangle, Bot, Calendar, GitBranch, MessageSquare, Send, ShoppingBag, Sparkles, StickyNote, UserCheck, UserPlus, XCircle, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { formatDateTime, formatMoney } from "@/lib/utils";
+import { cn, formatDateTime, formatMoney } from "@/lib/utils";
 import type { LeadTimelineEvent } from "@/lib/lead-timeline";
 
 const COPY = {
@@ -71,19 +71,29 @@ function messageBadge(role: string, t: (typeof COPY)["es"]) {
 }
 
 /** Línea de tiempo del contacto: una sola secuencia con todo lo que ha pasado. */
-export function LeadTimeline({ events, hasMore, moreHref, lang }: { events: LeadTimelineEvent[]; hasMore: boolean; moreHref: string; lang: "es" | "en" }) {
+export function LeadTimeline({ events, hasMore, moreHref, lang, animateAfter }: { events: LeadTimelineEvent[]; hasMore: boolean; moreHref: string; lang: "es" | "en"; animateAfter?: number }) {
   const t = COPY[lang];
   if (events.length === 0) return <p className="text-xs text-slate-400">{t.empty}</p>;
+  // Llaves estables (tipo + hora, con contador si se repiten): un evento nuevo al inicio se monta como
+  // elemento nuevo en lugar de reutilizar el de la misma posición, y así puede entrar con animación.
+  const seen = new Map<string, number>();
+  const keyOf = (e: LeadTimelineEvent) => {
+    const base = `${e.type}:${new Date(e.date).getTime()}`;
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
+    return `${base}:${n}`;
+  };
 
   return (
     <div>
       <ol className="space-y-3">
-        {events.map((event, i) => {
+        {events.map((event) => {
           const Icon = event.type === "message" ? messageBadge(event.role, t).Icon : ICON[event.type];
+          const fresh = animateAfter !== undefined && new Date(event.date).getTime() >= animateAfter;
           return (
-            <li key={i} className="flex gap-2.5 text-sm">
-              <div className="mt-0.5 flex-shrink-0 text-slate-400">
-                <Icon className="h-4 w-4" />
+            <li key={keyOf(event)} className={cn("relative flex gap-2.5 text-sm", "[&:not(:last-child)]:before:absolute [&:not(:last-child)]:before:left-3 [&:not(:last-child)]:before:top-7 [&:not(:last-child)]:before:-bottom-3 [&:not(:last-child)]:before:w-px [&:not(:last-child)]:before:bg-slate-200", fresh && "animate-note-in")}>
+              <div className="relative z-10 mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                <Icon className="h-3.5 w-3.5" />
               </div>
               <div className="min-w-0 flex-1">
                 {event.type === "created" && <div className="text-slate-700">{t.created(event.source)}</div>}

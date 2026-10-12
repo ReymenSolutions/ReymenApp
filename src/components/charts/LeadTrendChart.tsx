@@ -4,6 +4,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { usePreferences } from "@/context/preferences";
+import { useReducedMotion } from "@/components/motion/useReducedMotion";
+import { MOTION } from "@/lib/motion";
 
 interface DataPoint {
   date: string;
@@ -16,6 +18,7 @@ interface LeadTrendChartProps {
 
 export function LeadTrendChart({ data }: LeadTrendChartProps) {
   const { lang } = usePreferences();
+  const reduced = useReducedMotion();
   if (data.length === 0) {
     return (
       <div className="flex h-48 items-center justify-center">
@@ -45,7 +48,7 @@ export function LeadTrendChart({ data }: LeadTrendChartProps) {
           labelStyle={{ color: "#475569" }}
           formatter={(value: number) => [value, "Leads"]}
         />
-        <Bar dataKey="total" fill="#6366f1" radius={[3, 3, 0, 0]} maxBarSize={32} />
+        <Bar dataKey="total" isAnimationActive={!reduced} animationDuration={MOTION.count} animationEasing="ease-out" fill="#6366f1" radius={[3, 3, 0, 0]} maxBarSize={32} />
       </BarChart>
     </ResponsiveContainer>
   );

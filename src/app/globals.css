@@ -12,6 +12,96 @@
   --color-brand-800: #1726b5;
   --color-brand-900: #18258e;
   --color-brand-950: #121756;
+
+  /* ── Tokens de la interfaz del CRM (radios, sombras, movimiento) ──────────
+     Un solo lugar: los componentes los usan con rounded-card, shadow-card,
+     shadow-pop y las utilidades motion-* de abajo, nunca con valores sueltos. */
+  --radius-card: 0.75rem;
+  --radius-chip: 0.5rem;
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 4%), 0 1px 3px rgb(15 23 42 / 6%);
+  --shadow-card-hover: 0 2px 4px rgb(15 23 42 / 5%), 0 6px 16px -4px rgb(15 23 42 / 10%);
+  --shadow-pop: 0 12px 32px -8px rgb(15 23 42 / 22%), 0 4px 10px -4px rgb(15 23 42 / 12%);
+  --ease-smooth: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  --animate-reveal: reveal-up var(--motion-enter) var(--ease-smooth) both;
+  --animate-panel-in: panel-in-right var(--motion-panel) var(--ease-smooth) both;
+  --animate-panel-out: panel-out-right 220ms var(--ease-smooth) both;
+  --animate-overlay-in: overlay-in var(--motion-panel) var(--ease-smooth) both;
+  --animate-overlay-out: overlay-out 220ms var(--ease-smooth) both;
+  --animate-pop-in: pop-in var(--motion-micro) var(--ease-smooth) both;
+  --animate-note-in: note-in var(--motion-enter) var(--ease-smooth) both;
+  --animate-skeleton: skeleton-pulse 1.6s ease-in-out infinite;
+
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes panel-in-right {
+    from { opacity: 0; transform: translateX(24px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes panel-out-right {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(24px); }
+  }
+  @keyframes overlay-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes overlay-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+  @keyframes pop-in {
+    from { opacity: 0; transform: scale(0.97); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes note-in {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+}
+
+:root {
+  /* Tiempos: microinteracciones 150–220 ms; paneles y entradas 250–350 ms. */
+  --motion-micro: 180ms;
+  --motion-enter: 320ms;
+  --motion-panel: 300ms;
+}
+
+/* Utilidades de movimiento: transición corta con el easing común. */
+@utility motion-micro {
+  transition-duration: var(--motion-micro);
+  transition-timing-function: var(--ease-smooth);
+}
+@utility motion-enter {
+  transition-duration: var(--motion-enter);
+  transition-timing-function: var(--ease-smooth);
+}
+/* Entrada escalonada: style={{ "--i": n }} → 50 ms por elemento (tope de 12). */
+@utility reveal {
+  animation: var(--animate-reveal);
+  animation-delay: calc(min(var(--i, 0), 12) * 50ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  [class*="animate-reveal"],
+  [class*="animate-panel"],
+  [class*="animate-overlay"],
+  [class*="animate-pop-in"],
+  [class*="animate-note-in"],
+  [class*="animate-skeleton"] {
+    animation: none !important;
+  }
+  .motion-micro,
+  .motion-enter {
+    transition-duration: 1ms;
+  }
 }
 
 * {

@@ -2,6 +2,8 @@
 
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { usePreferences } from "@/context/preferences";
+import { useReducedMotion } from "@/components/motion/useReducedMotion";
+import { MOTION } from "@/lib/motion";
 
 interface AutomationHealthChartProps {
   success: number;
@@ -11,6 +13,7 @@ interface AutomationHealthChartProps {
 
 export function AutomationHealthChart({ success, failed, pending }: AutomationHealthChartProps) {
   const { lang } = usePreferences();
+  const reduced = useReducedMotion();
   const data = [
     { name: lang === "es" ? "Exitosos" : "Successful", value: success, color: "#10b981" },
     { name: lang === "es" ? "Fallidos" : "Failed", value: failed, color: "#ef4444" },
@@ -36,6 +39,9 @@ export function AutomationHealthChart({ success, failed, pending }: AutomationHe
           outerRadius={80}
           paddingAngle={3}
           dataKey="value"
+          isAnimationActive={!reduced}
+          animationDuration={MOTION.count}
+          animationEasing="ease-out"
         >
           {data.map((entry, i) => (
             <Cell key={i} fill={entry.color} />
