@@ -18,8 +18,8 @@ Nombre (es/en), descripción, **precio mensual (MXN)**, límites de leads/usuari
 | Stripe (checkout y webhook) | precio de Stripe del plan (o `STRIPE_PRICE_<LLAVE>`) |
 | Admin → Métricas | nombre del plan |
 
-## Card «Personalizado»
-En Admin → Planes, junto a los planes del catálogo, hay un card **Personalizado**: no es una fila del catálogo sino los clientes con **precio pactado** (`Organization.customMonthlyPriceMxn`) —su plan base, el precio de lista y lo que pagan—. En **Cambiar plan** hay una tarjeta equivalente que lleva al campo «Precio mensual pactado».
+## Card «Custom»
+En Admin → Planes, junto a los planes del catálogo, hay un card **Custom**: no es una fila del catálogo sino los clientes con **precio pactado** (`Organization.customMonthlyPriceMxn`) —su plan base, el precio de lista y lo que pagan—. En **Cambiar plan** hay una tarjeta equivalente que lleva al campo «Precio mensual pactado».
 
 ## Reglas
 - Cada edición sube la **versión**, guarda cómo quedó el plan (`PlanRevision`) y queda en la bitácora con el antes y el después (`plan.update`, `plan.create`).

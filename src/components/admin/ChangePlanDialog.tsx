@@ -99,7 +99,7 @@ export function ChangePlanDialog({ orgId, currentPlan, currentCustomPrice, plans
             );
           })}
 
-          {/* Personalizado: no es otro plan del catálogo, es un precio pactado sobre el plan elegido (se escribe abajo). */}
+          {/* Custom: no es otro plan del catálogo, es un precio pactado sobre el plan elegido (se escribe abajo). */}
           <button
             type="button"
             onClick={() => document.getElementById("customPrice")?.focus()}
@@ -107,7 +107,7 @@ export function ChangePlanDialog({ orgId, currentPlan, currentCustomPrice, plans
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${accentTone("violet").badge}`}>{lang === "es" ? "Personalizado" : "Custom"}</span>
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${accentTone("violet").badge}`}>Custom</span>
                 <span className="text-sm font-medium text-slate-900">{customPrice.trim() !== "" ? `$${Number(customPrice).toLocaleString("en-US")} MXN/${lang === "es" ? "mes" : "mo"}` : lang === "es" ? "Precio pactado" : "Agreed price"}</span>
               </div>
               {customPrice.trim() !== "" && <Check className="h-4 w-4 text-violet-600" />}

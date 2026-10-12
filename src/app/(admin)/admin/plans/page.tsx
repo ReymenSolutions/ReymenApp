@@ -11,12 +11,26 @@ import { getModuleLabel } from "@/lib/modules";
 import { planDescription, planName } from "@/lib/plans";
 import { formatDateTime } from "@/lib/utils";
 
+/**
+ * Cuánto ancho ocupa cada card para que la última fila nunca deje un hueco: la cuadrícula tiene 6 columnas en pantallas grandes
+ * (cada card normal ocupa 2 = tres por fila). Si la última fila trae 1 card, ocupa todo el ancho; si trae 2, se reparten la mitad.
+ * En pantallas medianas (2 columnas) un total impar deja la última card a todo lo ancho.
+ */
+function spanClass(index: number, total: number): string {
+  const rest = total % 3;
+  const inLastRow = rest !== 0 && index >= total - rest;
+  const large = !inLastRow ? "lg:col-span-2" : rest === 1 ? "lg:col-span-6" : "lg:col-span-3";
+  const medium = total % 2 === 1 && index === total - 1 ? "md:col-span-2" : "";
+  return `${large} ${medium}`.trim();
+}
+
 /** Admin → Planes: el catálogo comercial. Lo que se edita aquí es lo que ven y usan todas las pantallas y reglas conectadas. */
 export default async function AdminPlansPage() {
   const es = (await getServerLang()) === "es";
   const lang = es ? "es" : "en";
   const [plans, customClients] = await Promise.all([listPlansForAdmin(), listCustomPlanClients()]);
   const moduleLabel = getModuleLabel(lang);
+  const wideCustom = spanClass(plans.length, plans.length + 1).includes("lg:col-span-6");
   const limit = (n: number | null, one: string, many: string, unlimited: string) => (n === null ? unlimited : `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`);
 
   return (
@@ -27,9 +41,10 @@ export default async function AdminPlansPage() {
         actions={<PlanEditorDialog />}
       />
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        {plans.map((p) => (
-          <Card key={p.key} className={`${accentTone(p.accent).card} ${p.isActive ? "" : "opacity-70"}`}>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+        {plans.map((p, index) => (
+          <div key={p.key} className={spanClass(index, plans.length + 1)}>
+          <Card className={`h-full ${accentTone(p.accent).card} ${p.isActive ? "" : "opacity-70"}`}>
             <CardHeader className="flex-row items-start justify-between gap-2 space-y-0">
               <div className="min-w-0">
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -66,39 +81,47 @@ export default async function AdminPlansPage() {
               )}
             </CardContent>
           </Card>
+          </div>
         ))}
 
         {/* Plan personalizado: no es una fila del catálogo; es un precio pactado con un cliente concreto sobre alguno de los planes. */}
-        <Card className={accentTone("violet").card}>
+        <div className={spanClass(plans.length, plans.length + 1)}>
+        <Card className={`h-full ${accentTone("violet").card}`}>
           <CardHeader className="space-y-1">
             <CardTitle className="flex items-center gap-2 text-lg">
-              <span className="h-2.5 w-2.5 rounded-full bg-violet-500" aria-hidden="true" /> {es ? "Personalizado" : "Custom"}
+              <span className="h-2.5 w-2.5 rounded-full bg-violet-500" aria-hidden="true" /> Custom
               <Sparkles className="h-4 w-4 text-violet-400" />
             </CardTitle>
             <p className="text-xs text-slate-500">{es ? "Precio pactado por cliente" : "Price agreed per client"} · {customClients.length} {es ? (customClients.length === 1 ? "cliente" : "clientes") : customClients.length === 1 ? "client" : "clients"}</p>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-3xl font-bold text-slate-900">{es ? "A la medida" : "Tailor-made"}</p>
-            <p className="text-sm text-slate-600">
-              {es ? "Para negocios con condiciones propias (p. ej. Villa Gardenia). El cliente conserva uno de los planes de arriba —con sus límites y módulos— y paga un precio pactado que no cambia al editar el precio de lista. Se fija en Cliente → Cambiar plan → «Precio mensual pactado»." : "For businesses with their own terms (e.g. Villa Gardenia). The client keeps one of the plans above —with its limits and modules— and pays an agreed price that does not change when the list price is edited. Set it in Client → Change plan → “Agreed monthly price”."}
-            </p>
-            {customClients.length === 0 ? (
-              <p className="text-sm text-slate-400">{es ? "Aún no hay clientes con precio pactado." : "No clients with an agreed price yet."}</p>
-            ) : (
-              <ul className="divide-y divide-violet-100 rounded-lg border border-violet-100 bg-white/60">
-                {customClients.map((c) => (
-                  <li key={c.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                    <Link href={`/admin/clients/${c.id}`} className="min-w-0 truncate font-medium text-slate-900 hover:underline">{c.name}</Link>
-                    <span className="flex-shrink-0 text-right">
-                      <span className="block font-semibold text-slate-900">${c.priceMxn.toLocaleString("en-US")} MXN</span>
-                      <span className="block text-xs text-slate-500">{c.planName} · {es ? "lista" : "list"} ${c.listPriceMxn.toLocaleString("en-US")}</span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
+          {/* A todo el ancho (cuando va sola en su fila) el texto queda a la izquierda y los clientes a la derecha. */}
+          <CardContent className={wideCustom ? "space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0" : "space-y-4"}>
+            <div className="space-y-4">
+              <p className="text-3xl font-bold text-slate-900">{es ? "A la medida" : "Tailor-made"}</p>
+              <p className="text-sm text-slate-600">
+                {es ? "Para negocios con condiciones propias (p. ej. Villa Gardenia). El cliente conserva uno de los planes de arriba —con sus límites y módulos— y paga un precio pactado que no cambia al editar el precio de lista. Se fija en Cliente → Cambiar plan → «Precio mensual pactado»." : "For businesses with their own terms (e.g. Villa Gardenia). The client keeps one of the plans above —with its limits and modules— and pays an agreed price that does not change when the list price is edited. Set it in Client → Change plan → “Agreed monthly price”."}
+              </p>
+            </div>
+            <div>
+              {customClients.length === 0 ? (
+                <p className="text-sm text-slate-400">{es ? "Aún no hay clientes con precio pactado." : "No clients with an agreed price yet."}</p>
+              ) : (
+                <ul className="divide-y divide-violet-100 rounded-lg border border-violet-100 bg-white/60">
+                  {customClients.map((c) => (
+                    <li key={c.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                      <Link href={`/admin/clients/${c.id}`} className="min-w-0 truncate font-medium text-slate-900 hover:underline">{c.name}</Link>
+                      <span className="flex-shrink-0 text-right">
+                        <span className="block font-semibold text-slate-900">${c.priceMxn.toLocaleString("en-US")} MXN</span>
+                        <span className="block text-xs text-slate-500">{c.planName} · {es ? "lista" : "list"} ${c.listPriceMxn.toLocaleString("en-US")}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </CardContent>
         </Card>
+        </div>
       </div>
     </div>
   );

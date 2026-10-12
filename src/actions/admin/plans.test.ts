@@ -121,7 +121,7 @@ describe("Admin → Planes: lo que se edita se actualiza en todo lo conectado", 
     if (active.length === 1) await expect(updatePlan(active[0].key, { ...base, modules: [], isActive: false })).rejects.toThrow(/al menos un plan/i);
   });
 
-  it("el color del plan se guarda, solo acepta los colores del catálogo, y los clientes con precio pactado aparecen en el card Personalizado", async () => {
+  it("el color del plan se guarda, solo acepta los colores del catálogo, y los clientes con precio pactado aparecen en el card Custom", async () => {
     admin();
     await updatePlan(KEY, { ...base, modules: [...base.modules], accent: "violet" });
     expect((await getPlan(KEY)).accent).toBe("violet");
