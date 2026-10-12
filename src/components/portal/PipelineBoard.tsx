@@ -60,6 +60,8 @@ const COPY = {
     cancel: (t: string) => `Se canceló el movimiento de ${t}.`,
     instructions: "Para mover una oportunidad: presiona Espacio, usa las flechas izquierda y derecha para elegir la etapa y presiona Espacio para soltar. Escape cancela.",
     stageCount: (n: number) => `${n} ${n === 1 ? "oportunidad" : "oportunidades"}`,
+    showMore: (n: number) => `Ver ${n} más`,
+    showLess: "Ver menos",
   },
   en: {
     empty: "No opportunities",
@@ -75,6 +77,8 @@ const COPY = {
     cancel: (t: string) => `Move of ${t} cancelled.`,
     instructions: "To move an opportunity: press Space, use the left and right arrows to pick the stage and press Space to drop. Escape cancels.",
     stageCount: (n: number) => `${n} ${n === 1 ? "opportunity" : "opportunities"}`,
+    showMore: (n: number) => `Show ${n} more`,
+    showLess: "Show less",
   },
 };
 
@@ -94,6 +98,9 @@ function totalsByCurrency(list: BoardOpportunity[]) {
   for (const o of list) if (o.amount != null) map.set(o.currency, (map.get(o.currency) ?? 0) + o.amount);
   return [...map.entries()].sort((a, b) => b[1] - a[1]);
 }
+
+/** Tarjetas visibles por etapa antes de "Ver más": evita que una columna larga lo amontone todo. */
+export const STAGE_VISIBLE_LIMIT = 5;
 
 const collision: CollisionDetection = (args) => {
   const within = pointerWithin(args);
@@ -133,14 +140,17 @@ export function PipelineBoard({ stages, opportunities, canManage }: { stages: Bo
     setPanelLeadId(leadId);
   };
 
-  const items = useMemo(
-    () =>
-      opportunities.map((o) => {
-        const ov = overrides[o.id];
-        return ov && ov.base === opportunities ? { ...o, stageId: ov.to } : o;
-      }),
-    [opportunities, overrides],
-  );
+  const items = useMemo(() => {
+    // Lo recién movido va primero en su nueva etapa (así siempre se ve aunque la columna esté recortada).
+    const moved: BoardOpportunity[] = [];
+    const rest: BoardOpportunity[] = [];
+    for (const o of opportunities) {
+      const ov = overrides[o.id];
+      if (ov && ov.base === opportunities) moved.push({ ...o, stageId: ov.to });
+      else rest.push(o);
+    }
+    return [...moved, ...rest];
+  }, [opportunities, overrides]);
   const byId = useMemo(() => new Map(items.map((o) => [o.id, o])), [items]);
   const stageName = (id: string) => stages.find((s) => s.id === id)?.name ?? "";
   useFlip(boardRef, items.map((o) => `${o.id}:${o.stageId}`).join("|"));
@@ -252,6 +262,9 @@ function Column({
   const t = COPY[lang === "en" ? "en" : "es"];
   const { setNodeRef } = useDroppable({ id: stage.id, disabled: !canManage });
   const totals = totalsByCurrency(list);
+  const [expanded, setExpanded] = useState(false);
+  const hidden = expanded ? 0 : Math.max(0, list.length - STAGE_VISIBLE_LIMIT);
+  const shown = hidden > 0 ? list.slice(0, STAGE_VISIBLE_LIMIT) : list;
   return (
     <section
       aria-label={stage.name}
@@ -285,13 +298,24 @@ function Column({
         ref={setNodeRef}
         className={cn(
           "min-h-[7.5rem] space-y-2 rounded-card border border-dashed p-2 motion-micro transition-colors",
+          expanded && "max-h-[70vh] overflow-y-auto overscroll-contain",
           highlighted ? "border-brand-400 bg-brand-50" : "border-transparent bg-slate-50",
         )}
       >
         {list.length === 0 ? (
           <p className="px-2 py-6 text-center text-xs text-slate-400">{highlighted ? t.dropHere : t.empty}</p>
         ) : (
-          list.map((opp) => <DraggableCard key={opp.id} opp={opp} stages={stages} canManage={canManage} dragging={activeId === opp.id} onOpen={onOpen} onMove={onMove} />)
+          shown.map((opp) => <DraggableCard key={opp.id} opp={opp} stages={stages} canManage={canManage} dragging={activeId === opp.id} onOpen={onOpen} onMove={onMove} />)
+        )}
+        {list.length > STAGE_VISIBLE_LIMIT && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+            className="w-full rounded-md py-1.5 text-xs font-medium text-brand-700 motion-micro hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+          >
+            {expanded ? t.showLess : t.showMore(hidden || list.length - STAGE_VISIBLE_LIMIT)}
+          </button>
         )}
       </div>
     </section>

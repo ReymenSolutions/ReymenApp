@@ -10,7 +10,7 @@ const toast = { success: vi.fn(), error: vi.fn() };
 vi.mock("sonner", () => ({ toast: { success: (...a: unknown[]) => toast.success(...a), error: (...a: unknown[]) => toast.error(...a) } }));
 vi.mock("@/components/portal/LeadDetailPanel", () => ({ LeadDetailPanel: ({ leadId }: { leadId: string | null }) => (leadId ? <div role="dialog">panel {leadId}</div> : null) }));
 
-import { PipelineBoard, type BoardOpportunity, type BoardStage } from "./PipelineBoard";
+import { PipelineBoard, STAGE_VISIBLE_LIMIT, type BoardOpportunity, type BoardStage } from "./PipelineBoard";
 
 const stages: BoardStage[] = [
   { id: "s1", name: "Nuevo", isWon: false, isLost: false },
@@ -81,5 +81,28 @@ describe("PipelineBoard", () => {
     render(<PipelineBoard stages={stages} opportunities={opportunities} canManage />);
     await userEvent.click(screen.getByRole("button", { name: "Abrir detalle: Trato c" }));
     expect(screen.getByRole("dialog")).toHaveTextContent("panel lead-c");
+  });
+
+  it("una etapa con muchas oportunidades muestra solo las primeras y se expande con Ver más", async () => {
+    const many = Array.from({ length: STAGE_VISIBLE_LIMIT + 3 }, (_, i) => opp(`m${i}`, "s1", { amount: 100 }));
+    render(<PipelineBoard stages={stages} opportunities={many} canManage />);
+    const col = column("Nuevo");
+    expect(within(col).getAllByRole("button", { name: /Abrir detalle/ })).toHaveLength(STAGE_VISIBLE_LIMIT);
+    // El total y el conteo siguen siendo de toda la etapa, no solo de lo visible.
+    expect(within(col).getByText(String(STAGE_VISIBLE_LIMIT + 3))).toBeInTheDocument();
+    await userEvent.click(within(col).getByRole("button", { name: "Ver 3 más" }));
+    expect(within(col).getAllByRole("button", { name: /Abrir detalle/ })).toHaveLength(STAGE_VISIBLE_LIMIT + 3);
+    await userEvent.click(within(col).getByRole("button", { name: "Ver menos" }));
+    expect(within(col).getAllByRole("button", { name: /Abrir detalle/ })).toHaveLength(STAGE_VISIBLE_LIMIT);
+  });
+
+  it("lo que se mueve a una etapa recortada aparece primero y se ve", async () => {
+    moveOpportunityStage.mockResolvedValue({ success: true });
+    const crowded = Array.from({ length: STAGE_VISIBLE_LIMIT + 2 }, (_, i) => opp(`p${i}`, "s2"));
+    render(<PipelineBoard stages={stages} opportunities={[opp("a", "s1"), ...crowded]} canManage />);
+    await userEvent.click(screen.getByRole("button", { name: /Mover a… Trato a/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Propuesta" }));
+    const first = within(column("Propuesta")).getAllByRole("button", { name: /Abrir detalle/ })[0];
+    expect(first).toHaveAccessibleName("Abrir detalle: Trato a");
   });
 });
