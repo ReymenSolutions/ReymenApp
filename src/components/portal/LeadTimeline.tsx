@@ -25,6 +25,13 @@ const COPY = {
     reason: "Motivo",
     purchase: "Compra en el negocio",
     purchaseCancelled: "Compra cancelada",
+    aiCreate: (title: string, to: string | null) => `Creó la oportunidad «${title}» en ${to}`,
+    aiAdvance: (title: string, from: string | null, to: string | null) => `Movió «${title}» de ${from} a ${to}`,
+    aiCloseWon: (title: string) => `Sugirió cerrar «${title}» como ganada`,
+    aiCloseLost: (title: string) => `Sugirió cerrar «${title}» como perdida`,
+    aiUndone: "Deshecho",
+    aiRejected: "Descartada",
+    aiAccepted: "Aplicada por una persona",
     more: "Ver actividad anterior",
   },
   en: {
@@ -46,6 +53,13 @@ const COPY = {
     reason: "Reason",
     purchase: "Purchase at the business",
     purchaseCancelled: "Purchase cancelled",
+    aiCreate: (title: string, to: string | null) => `Created opportunity “${title}” at ${to}`,
+    aiAdvance: (title: string, from: string | null, to: string | null) => `Moved “${title}” from ${from} to ${to}`,
+    aiCloseWon: (title: string) => `Suggested closing “${title}” as won`,
+    aiCloseLost: (title: string) => `Suggested closing “${title}” as lost`,
+    aiUndone: "Undone",
+    aiRejected: "Dismissed",
+    aiAccepted: "Applied by a person",
     more: "Show earlier activity",
   },
 };
@@ -62,6 +76,7 @@ const ICON: Record<LeadTimelineEvent["type"], LucideIcon> = {
   stage_change: GitBranch,
   opportunity_lost: XCircle,
   purchase: ShoppingBag,
+  ai_action: Bot,
 };
 
 function messageBadge(role: string, t: (typeof COPY)["es"]) {
@@ -145,6 +160,19 @@ export function LeadTimeline({ events, hasMore, moreHref, lang, animateAfter }: 
                 {event.type === "purchase" && (
                   <div className="text-slate-700">
                     {event.cancelled ? t.purchaseCancelled : t.purchase}: <span className={event.cancelled ? "font-medium text-red-600" : "font-medium"}>{formatMoney(event.amount)}</span>
+                  </div>
+                )}
+                {event.type === "ai_action" && (
+                  <div className="text-slate-700">
+                    <Badge variant="secondary" className="mr-1.5 text-[10px]">{t.ai}</Badge>
+                    {event.kind === "CREATE_OPPORTUNITY" && t.aiCreate(event.opportunityTitle, event.toStageName)}
+                    {event.kind === "ADVANCE_STAGE" && t.aiAdvance(event.opportunityTitle, event.fromStageName, event.toStageName)}
+                    {event.kind === "CLOSE_WON" && t.aiCloseWon(event.opportunityTitle)}
+                    {event.kind === "CLOSE_LOST" && t.aiCloseLost(event.opportunityTitle)}
+                    {event.status === "UNDONE" && <span className="text-slate-400"> · {t.aiUndone}</span>}
+                    {event.status === "REJECTED" && <span className="text-slate-400"> · {t.aiRejected}</span>}
+                    {event.status === "ACCEPTED" && <span className="text-slate-400"> · {t.aiAccepted}</span>}
+                    <span className="block text-xs text-slate-500">{t.reason}: {event.reason}</span>
                   </div>
                 )}
                 {event.type === "opportunity_lost" && (

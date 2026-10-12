@@ -3,6 +3,7 @@ import { processConversationEvent } from "@/lib/webhook-processors";
 import { getChannelMode } from "@/lib/agent-mode";
 import { prisma } from "@/lib/prisma";
 import { scheduleAutoReply } from "@/lib/ai-auto-reply";
+import { schedulePipelineAgent } from "@/lib/ai-pipeline";
 
 export const POST = createOrgWebhookHandler({
   rateLimitKey: "conversations",
@@ -15,7 +16,10 @@ export const POST = createOrgWebhookHandler({
     const conv = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { channel: true } });
     const aiMode = (await getChannelMode(orgId, conv?.channel ?? "whatsapp")).toLowerCase();
     // Canal en Automático: el agente contesta el mensaje del cliente después de responderle a n8n.
-    if (aiMode === "auto" && (payload as { message?: { role?: string } }).message?.role === "USER") scheduleAutoReply(orgId, conversationId);
+    const inbound = (payload as { message?: { role?: string } }).message?.role === "USER";
+    if (inbound && aiMode === "auto") scheduleAutoReply(orgId, conversationId);
+    // Con el agente encendido (sugerir o automático) también mantiene al día el pipeline del contacto.
+    if (inbound && aiMode !== "off") schedulePipelineAgent(orgId, conversationId);
     return { conversationId, aiMode };
   },
   successBody: (result) => ({ conversationId: result.conversationId, aiMode: result.aiMode }),
