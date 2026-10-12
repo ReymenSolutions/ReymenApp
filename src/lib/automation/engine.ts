@@ -5,6 +5,7 @@ import type { StoredDomainEvent } from "@/lib/domain-events";
 import { getBlueprint } from "./blueprints";
 import { evaluateContactPolicy, nextAllowedTime } from "./policy";
 import { withNotification } from "./notify";
+import { CONTROL_REASON, isControlGroup } from "./control-group";
 import type { ActionSpec } from "./types";
 
 type Outcome = { status: AutomationExecutionStatus; skipReason?: string; action?: Prisma.InputJsonValue; subjectType?: string; subjectId?: string; nextAttemptAt?: Date };
@@ -83,7 +84,7 @@ async function evaluate(
   const rules = blueprint.contactRules(config);
   const last = ctx.customer
     ? await prisma.automationExecution.findFirst({
-        where: { automationId: automation.id, subjectId: ctx.customer.id, status: { in: ["PENDING", "DISPATCHED", "SUCCEEDED", "DRY_RUN"] } },
+        where: { automationId: automation.id, subjectId: ctx.customer.id, OR: [{ status: { in: ["PENDING", "DISPATCHED", "SUCCEEDED", "DRY_RUN"] } }, { status: "SKIPPED", skipReason: CONTROL_REASON }] },
         orderBy: { createdAt: "desc" },
         select: { createdAt: true },
       })
@@ -92,6 +93,11 @@ async function evaluate(
   const delayed = rules.delayMinutes !== undefined;
   const policy = evaluateContactPolicy({ customer: ctx.customer, rules: delayed ? { ...rules, quietHours: null } : rules, now: ctx.now, timezone: ctx.organization.timezone, lastContactAt: last?.createdAt ?? null });
   if (!policy.ok) return { status: "SKIPPED", skipReason: policy.reason };
+
+  // Grupo de control: un % fijo (y estable) de los clientes ELEGIBLES no recibe el mensaje a propósito, para medir si de
+  // verdad provoca el regreso. Cuenta para el enfriamiento (así el control no se re-evalúa más veces que los tratados).
+  const controlPct = Number((config as { controlGroupPct?: number }).controlGroupPct ?? 0);
+  if (isControlGroup(automation.id, ctx.customer!.id, controlPct)) return { status: "SKIPPED", skipReason: CONTROL_REASON };
 
   const recipient = { phone: ctx.customer!.phone, name: ctx.customer!.name };
   const prepared = blueprint.prepare ? await blueprint.prepare({ organizationId: event.organizationId, event, customer: ctx.customer!, action: decision.action, config, dryRun: automation.dryRun }) : decision.action;

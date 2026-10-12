@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getOrganizationExecutions } from "@/actions/admin/executions";
+import { getOrganizationExecutions, getOrganizationLift } from "@/actions/admin/executions";
+import { MIN_GROUP_SIZE } from "@/lib/automation/control-group";
 import { EXECUTIONS_PAGE_SIZE } from "@/lib/automation/retry";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -23,7 +24,7 @@ export default async function ClientAutomationsPage({ params, searchParams }: { 
   const days = PERIODS.includes(Number(sp.days) as 7 | 30 | 90) ? Number(sp.days) : 30;
   const status = (STATUS_OPTIONS as readonly string[]).includes(sp.status ?? "") ? (sp.status as (typeof STATUS_OPTIONS)[number]) : undefined;
   const page = Math.max(1, Number(sp.page) || 1);
-  const view = await getOrganizationExecutions({ orgId: org.id, automationId: sp.automation || undefined, status, days, page });
+  const [view, lift] = await Promise.all([getOrganizationExecutions({ orgId: org.id, automationId: sp.automation || undefined, status, days, page }), getOrganizationLift(org.id)]);
   const pages = Math.max(1, Math.ceil(view.total / EXECUTIONS_PAGE_SIZE));
 
   const href = (over: Partial<Search>) => {
@@ -72,6 +73,57 @@ export default async function ClientAutomationsPage({ params, searchParams }: { 
         })}
       </div>
       <p className="-mt-3 text-xs text-slate-400">Ingresos <strong>asociados</strong> (último mensaje en los 7 días previos a comprar, una venta por automatización, sin cancelaciones): no prueban que la automatización los provocó.</p>
+
+      {lift.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <p className="text-sm font-semibold text-slate-900">Prueba de incrementalidad (grupo de control)</p>
+            <p className="text-xs text-slate-500">
+              Compara la tasa de regreso (alguna compra en los {lift[0].windowDays} días siguientes) de quienes recibieron el mensaje contra un grupo de control al que a propósito no se le escribió. Es la prueba real de si la automatización provoca el regreso; los ingresos <strong>asociados</strong> de arriba no lo prueban. Últimos 90 días.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {lift.map((l) => (
+              <div key={l.automationId} className="rounded-card border border-slate-200 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-slate-900">
+                    {l.name} <span className="font-normal text-slate-500">· control {l.controlGroupPct}%</span>
+                  </p>
+                  <Badge variant={!l.reliable ? "secondary" : l.liftPoints > 0 ? "success" : "warning"}>
+                    {!l.reliable ? "Muestra insuficiente" : `${l.liftPoints > 0 ? "+" : ""}${l.liftPoints} pts de regreso`}
+                  </Badge>
+                </div>
+                <table className="mt-2 w-full text-left text-xs text-slate-600">
+                  <thead>
+                    <tr className="text-slate-400">
+                      <th className="font-medium">Grupo</th>
+                      <th className="font-medium">Clientes</th>
+                      <th className="font-medium">Regresaron</th>
+                      <th className="font-medium">Tasa de regreso</th>
+                      <th className="font-medium">Gasto por cliente</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { label: "Recibió el mensaje", g: l.treated },
+                      { label: "Control (sin mensaje)", g: l.control },
+                    ].map(({ label, g }) => (
+                      <tr key={label}>
+                        <td className="py-0.5 font-medium text-slate-700">{label}</td>
+                        <td>{g.customers}</td>
+                        <td>{g.returned}</td>
+                        <td>{g.rate}%</td>
+                        <td>{formatMoney(g.revenuePerCustomer)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!l.reliable && <p className="mt-1.5 text-[11px] text-amber-700">Con menos de {MIN_GROUP_SIZE} clientes por grupo la diferencia puede ser ruido: no saques conclusiones todavía.</p>}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <form method="get" className="flex flex-wrap items-end gap-3 rounded-card border border-slate-200 bg-white p-3">
         <label className="text-xs font-medium text-slate-600">

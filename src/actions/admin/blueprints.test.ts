@@ -141,7 +141,7 @@ describe("blueprints (admin): configuración por cliente", () => {
     const form = await getBlueprintConfigForm({ orgId: org.id, key: "customer_recovery" });
     expect(form).toMatchObject({ key: "customer_recovery", timezone: "America/Mexico_City", live: false, enabled: true });
     expect(form.values).toMatchObject({ minVisits: 3, factor: 2.5, channel: "whatsapp" });
-    expect(form.fields.length).toBe(8);
+    expect(form.fields.length).toBe(9);
   });
 
   it("guarda solo lo válido, deja en la bitácora qué cambió y no toca a otro cliente", async () => {

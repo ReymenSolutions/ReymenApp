@@ -10,6 +10,7 @@ import { getBlueprint } from "@/lib/automation/blueprints";
 import { nextAllowedTime } from "@/lib/automation/policy";
 import { UserError } from "@/lib/user-error";
 import { EXECUTIONS_PAGE_SIZE, retryEligibility } from "@/lib/automation/retry";
+import { computeLift, type LiftResult } from "@/lib/automation/control-group";
 
 // ─── Ejecuciones, errores y conversiones por cliente (Admin) ─────────────────
 
@@ -177,4 +178,22 @@ export async function retryExecution(data: z.infer<typeof retrySchema>, now: Dat
   await logAudit({ userId: session.user.id, organizationId: orgId, action: "automation.execution_retry", resource: "AutomationExecution", resourceId: ex.id, metadata: { automationId: ex.automationId, previousError: ex.lastError?.slice(0, 200) ?? null } });
   revalidatePath(`/admin/clients/${orgId}/automations`);
   return { success: true, scheduledAt: sendAt };
+}
+
+export type LiftRow = LiftResult & { name: string; controlGroupPct: number };
+
+/**
+ * Prueba de incrementalidad por automatización: tasa de regreso de quienes recibieron el mensaje contra el grupo de
+ * control (últimos 90 días). Solo aparecen las que tienen grupo de control configurado o ya tienen clientes retenidos.
+ */
+export async function getOrganizationLift(orgId: string): Promise<LiftRow[]> {
+  await requireAdmin();
+  const automations = await prisma.automation.findMany({ where: { organizationId: orgId, blueprintKey: { not: null } }, select: { id: true, name: true, config: true } });
+  const rows: LiftRow[] = [];
+  for (const a of automations) {
+    const pct = Number((a.config as { controlGroupPct?: number } | null)?.controlGroupPct ?? 0);
+    const lift = await computeLift(orgId, a.id);
+    if (pct > 0 || lift.control.customers > 0) rows.push({ ...lift, name: a.name, controlGroupPct: pct });
+  }
+  return rows;
 }
