@@ -11,7 +11,7 @@ export async function GET() {
   const isPortal = !!session.user.organizationId;
   const orgFilter = isPortal ? { organizationId: session.user.organizationId! } : {};
 
-  const [escalated, openRequests, seenAt] = await Promise.all([
+  const [escalated, openRequests, seenAt, aiActions] = await Promise.all([
     prisma.conversation.findMany({
       where: { ...orgFilter, status: "ESCALATED" },
       take: 5,
@@ -26,6 +26,15 @@ export async function GET() {
     }),
     prisma.user.findUnique({ where: { id: session.user.id }, select: { notificationsSeenAt: true } })
       .then((u) => u?.notificationsSeenAt ?? null),
+    // Lo que el Agente IA hizo solo (con deshacer) y lo que sugiere: el aviso de "aplica lo seguro y avisa".
+    isPortal
+      ? prisma.pipelineAiAction.findMany({
+          where: { organizationId: session.user.organizationId!, OR: [{ status: "SUGGESTED" }, { status: "APPLIED", createdAt: { gte: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) } }] },
+          take: 5,
+          orderBy: { createdAt: "desc" },
+          select: { id: true, status: true, kind: true, opportunityTitle: true, toStageName: true, createdAt: true },
+        })
+      : Promise.resolve([]),
   ]);
 
   const items = [
@@ -35,6 +44,13 @@ export async function GET() {
       detail: c.contactName ?? "Sin nombre",
       href: isPortal ? "/portal/conversations" : "/admin/escalations",
       at: c.updatedAt,
+    })),
+    ...aiActions.map((a) => ({
+      type: a.status === "SUGGESTED" ? "ai_suggestion" : "ai_action",
+      label: a.status === "SUGGESTED" ? "El Agente IA sugiere" : "El Agente IA actualizó el pipeline",
+      detail: `${a.opportunityTitle}${a.toStageName ? ` → ${a.toStageName}` : ""}`,
+      href: "/portal/pipeline",
+      at: a.createdAt,
     })),
     ...openRequests.map((r) => ({
       type: "request",

@@ -108,8 +108,9 @@ async function callClaude(system: string, messages: Anthropic.MessageParam[]): P
 }
 
 /** Llamada al proveedor (Claude o el de prueba). Con `json` el de prueba responde con la decisión del modo automático. */
-export async function generateText(system: string, messages: Anthropic.MessageParam[], opts: { json?: boolean } = {}): Promise<DraftResult> {
+export async function generateText(system: string, messages: Anthropic.MessageParam[], opts: { json?: boolean; mockText?: string } = {}): Promise<DraftResult> {
   if (provider() === "mock") {
+    if (opts.json && opts.mockText) return { text: opts.mockText, model: "mock", inputTokens: 0, outputTokens: 0 };
     if (opts.json) return { text: JSON.stringify({ action: "reply", reply: "Hola, gracias por escribirnos. En un momento te ayudamos con tu consulta." }), model: "mock", inputTokens: 0, outputTokens: 0 };
     const last = (messages[messages.length - 1]?.content as string | undefined) ?? "";
     return { text: `Hola, gracias por escribirnos. Sobre "${last.slice(0, 60).trim()}": con gusto te ayudamos. ¿Te parece si agendamos una llamada para darte el detalle?`, model: "mock", inputTokens: 0, outputTokens: 0 };

@@ -1,0 +1,265 @@
+import { after } from "next/server";
+import type { LeadStatus, MessageRole, PipelineAiActionKind } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { hasModule } from "@/lib/modules";
+import { logAudit } from "@/lib/audit";
+import { UserError } from "@/lib/user-error";
+import { getChannelMode } from "@/lib/agent-mode";
+import { buildBusinessInstructions } from "@/lib/rulebook";
+import { buildDraftMessages, generateText, isDraftProviderConfigured } from "@/lib/ai-draft";
+import { syncLeadStatusFromOpportunity } from "@/lib/lead-status-sync";
+
+// ── Pipeline con IA ──────────────────────────────────────────────────────────
+// El agente lee cada mensaje nuevo de un contacto del CRM y decide qué pasa con su oportunidad.
+//  • Seguro (se aplica solo, con el motivo y botón de deshacer): crear la oportunidad de quien muestra interés de
+//    compra, o adelantarla UNA etapa abierta.
+//  • Riesgoso (solo sugerencia que una persona acepta o descarta): cerrarla como ganada o perdida.
+// Nunca retrocede etapas, nunca borra, nunca cambia montos. Con el canal en "Apagado" no hace nada.
+
+export const INTENTS = ["pricing_inquiry", "booking_request", "ready_to_buy", "support", "complaint", "not_interested", "other"] as const;
+export type Intent = (typeof INTENTS)[number];
+const BUYING: ReadonlySet<string> = new Set(["pricing_inquiry", "booking_request", "ready_to_buy"]);
+
+/** Entre dos análisis de la misma conversación pasa al menos esto (evita analizar cada mensajito). */
+export const ANALYSIS_COOLDOWN_MS = 10 * 60 * 1000;
+/** Si una persona deshizo una acción, el agente no la repite para esa oportunidad durante este tiempo. */
+export const UNDO_RESPECT_MS = 7 * 24 * 60 * 60 * 1000;
+
+export type Analysis = { intent: Intent; summary: string; action: "none" | "create_opportunity" | "advance_stage" | "close_won" | "close_lost"; title: string; reason: string };
+
+/** Lee el análisis del modelo (JSON). Si no se entiende, devuelve null y no se hace nada. */
+export function parseAnalysis(raw: string): Analysis | null {
+  const body = raw.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+  try {
+    const p = JSON.parse(body) as Record<string, unknown>;
+    const intent = (INTENTS as readonly string[]).includes(p.intent as string) ? (p.intent as Intent) : "other";
+    const actions = ["none", "create_opportunity", "advance_stage", "close_won", "close_lost"];
+    const action = actions.includes(p.action as string) ? (p.action as Analysis["action"]) : "none";
+    const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+    const summary = str(p.summary, 400);
+    if (!summary) return null;
+    return { intent, summary, action, title: str(p.title, 80), reason: str(p.reason, 300) };
+  } catch {
+    return null;
+  }
+}
+
+export type PlanStage = { id: string; name: string; order: number; isWon: boolean; isLost: boolean };
+export type PlanContext = {
+  leadName: string;
+  stages: PlanStage[];
+  openOpportunity: { id: string; title: string; stageId: string } | null;
+  /** Acciones que una persona deshizo hace poco (`kind:oportunidad`, o `kind:` para crear) y sugerencias aún pendientes. */
+  blocked: ReadonlySet<string>;
+};
+export type PlannedAction = {
+  kind: PipelineAiActionKind;
+  status: "APPLIED" | "SUGGESTED";
+  reason: string;
+  opportunityTitle: string;
+  toStage: PlanStage;
+  fromStage: PlanStage | null;
+};
+
+/** Decide, con reglas fijas, qué se hace con el análisis del modelo. El modelo propone; esto es lo que se permite. */
+export function planAction(analysis: Analysis, ctx: PlanContext): PlannedAction | null {
+  const open = [...ctx.stages].filter((s) => !s.isWon && !s.isLost).sort((a, b) => a.order - b.order);
+  const opp = ctx.openOpportunity;
+  const current = opp ? ctx.stages.find((s) => s.id === opp.stageId) ?? null : null;
+  const reason = analysis.reason || analysis.summary;
+  const blocked = (kind: PipelineAiActionKind) => ctx.blocked.has(`${kind}:${opp?.id ?? ""}`);
+
+  switch (analysis.action) {
+    case "create_opportunity": {
+      if (opp || !BUYING.has(analysis.intent) || !open[0] || blocked("CREATE_OPPORTUNITY")) return null;
+      return { kind: "CREATE_OPPORTUNITY", status: "APPLIED", reason, opportunityTitle: analysis.title || `Interés de ${ctx.leadName}`, toStage: open[0], fromStage: null };
+    }
+    case "advance_stage": {
+      if (!opp || !current || !BUYING.has(analysis.intent) || blocked("ADVANCE_STAGE")) return null;
+      const next = open.find((s) => s.order > current.order);
+      if (!next || current.isWon || current.isLost) return null;
+      return { kind: "ADVANCE_STAGE", status: "APPLIED", reason, opportunityTitle: opp.title, toStage: next, fromStage: current };
+    }
+    case "close_won": {
+      const won = ctx.stages.find((s) => s.isWon);
+      if (!opp || !current || !won || analysis.intent !== "ready_to_buy" || blocked("CLOSE_WON")) return null;
+      return { kind: "CLOSE_WON", status: "SUGGESTED", reason, opportunityTitle: opp.title, toStage: won, fromStage: current };
+    }
+    case "close_lost": {
+      const lost = ctx.stages.find((s) => s.isLost);
+      if (!opp || !current || !lost || analysis.intent !== "not_interested" || blocked("CLOSE_LOST")) return null;
+      return { kind: "CLOSE_LOST", status: "SUGGESTED", reason, opportunityTitle: opp.title, toStage: lost, fromStage: current };
+    }
+    default:
+      return null;
+  }
+}
+
+const SYSTEM = `You analyse a customer conversation of a small business to keep its sales pipeline up to date. A person supervises; you only classify and propose.
+
+Answer with ONLY this JSON:
+{"intent":"pricing_inquiry|booking_request|ready_to_buy|support|complaint|not_interested|other","summary":"<one sentence in Spanish: what the customer wants>","action":"none|create_opportunity|advance_stage|close_won|close_lost","title":"<short opportunity title in Spanish, only for create_opportunity>","reason":"<one sentence in Spanish explaining why you chose that action>"}
+
+Rules:
+- create_opportunity: the customer shows real buying interest (asks price, wants to book or buy) and has no open opportunity.
+- advance_stage: there is an open opportunity and the conversation clearly moved it one step forward (e.g. received a quote and asks to schedule).
+- close_won: the customer explicitly confirmed the purchase or booking. close_lost: the customer explicitly said they are not interested or chose someone else.
+- Greetings, support questions, complaints and anything unclear are "none". When in doubt, "none".`;
+
+type RunOutcome = "analyzed" | "skipped";
+
+/** Analiza el último mensaje del cliente de una conversación y aplica o sugiere lo que corresponda. Nunca lanza. */
+export async function runPipelineAgent(organizationId: string, conversationId: string, opts: { now?: Date } = {}): Promise<RunOutcome> {
+  const now = opts.now ?? new Date();
+  try {
+    if (!isDraftProviderConfigured()) return "skipped";
+    if (!(await hasModule(organizationId, "CRM")) || !(await hasModule(organizationId, "AI_WHATSAPP"))) return "skipped";
+
+    const conv = await prisma.conversation.findFirst({ where: { id: conversationId, organizationId } });
+    if (!conv?.leadId) return "skipped";
+    if ((await getChannelMode(organizationId, conv.channel)) === "OFF") return "skipped";
+    const lead = await prisma.lead.findFirst({ where: { id: conv.leadId, organizationId, deletedAt: null }, select: { id: true, name: true, status: true } });
+    if (!lead) return "skipped";
+
+    const recent = await prisma.message.findMany({ where: { conversationId }, orderBy: { createdAt: "desc" }, take: 20, select: { id: true, role: true, content: true } });
+    const messages = recent.reverse();
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "USER") return "skipped";
+
+    const lastRun = await prisma.pipelineAiRun.findFirst({ where: { conversationId }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
+    if (lastRun && now.getTime() - lastRun.createdAt.getTime() < ANALYSIS_COOLDOWN_MS) return "skipped";
+
+    const stages = await prisma.pipelineStage.findMany({ where: { organizationId }, orderBy: { order: "asc" }, select: { id: true, name: true, order: true, isWon: true, isLost: true } });
+    if (stages.length === 0) return "skipped";
+    const openOpp = await prisma.opportunity.findFirst({
+      where: { leadId: lead.id, organizationId, closedAt: null, pipelineStage: { isWon: false, isLost: false } },
+      orderBy: { updatedAt: "desc" },
+      select: { id: true, title: true, pipelineStageId: true },
+    });
+
+    const instructions = await buildBusinessInstructions(organizationId);
+    const system = [
+      SYSTEM,
+      `PIPELINE STAGES (in order)\n${stages.map((s) => `- ${s.name}${s.isWon ? " (won)" : s.isLost ? " (lost)" : ""}`).join("\n")}`,
+      `CONTACT\nName: ${lead.name}\nCRM status: ${lead.status}\nOpen opportunity: ${openOpp ? `"${openOpp.title}" at stage "${stages.find((s) => s.id === openOpp.pipelineStageId)?.name ?? "?"}"` : "none"}`,
+      ...(instructions.trim() ? [`BUSINESS CONTEXT\n${instructions.trim().slice(0, 3000)}`] : []),
+    ].join("\n\n");
+    const turns = buildDraftMessages(messages as { role: MessageRole; content: string }[]);
+    if (turns.length === 0) return "skipped";
+
+    const mockText = JSON.stringify({ intent: "pricing_inquiry", summary: "Pregunta por precios.", action: openOpp ? "none" : "create_opportunity", title: `Interés de ${lead.name}`, reason: "Preguntó por precios." });
+    const result = await generateText(system, turns, { json: true, mockText });
+    if ("refused" in result) return "skipped";
+    const analysis = parseAnalysis(result.text);
+    if (!analysis) return "skipped";
+
+    // Una sola vez por mensaje (llave única): si otra petición ya lo analizó, no se repite.
+    let run;
+    try {
+      run = await prisma.pipelineAiRun.create({ data: { organizationId, conversationId, leadId: lead.id, basedOnMessageId: last.id, intent: analysis.intent, summary: analysis.summary, model: result.model, inputTokens: result.inputTokens, outputTokens: result.outputTokens } });
+    } catch {
+      return "skipped";
+    }
+
+    const [undone, pending] = await Promise.all([
+      prisma.pipelineAiAction.findMany({ where: { leadId: lead.id, status: "UNDONE", resolvedAt: { gte: new Date(now.getTime() - UNDO_RESPECT_MS) } }, select: { kind: true, opportunityId: true } }),
+      prisma.pipelineAiAction.findMany({ where: { leadId: lead.id, status: "SUGGESTED" }, select: { kind: true, opportunityId: true } }),
+    ]);
+    const blocked = new Set([...undone, ...pending].map((a) => `${a.kind}:${a.opportunityId ?? ""}`));
+    // Crear: una oportunidad deshecha no tiene id al que atarse, así que cuenta por contacto.
+    for (const a of undone) if (a.kind === "CREATE_OPPORTUNITY") blocked.add("CREATE_OPPORTUNITY:");
+
+    const plan = planAction(analysis, { leadName: lead.name, stages, openOpportunity: openOpp ? { id: openOpp.id, title: openOpp.title, stageId: openOpp.pipelineStageId } : null, blocked });
+    if (!plan) return "analyzed";
+
+    if (plan.status === "SUGGESTED") {
+      await prisma.pipelineAiAction.create({ data: { organizationId, runId: run.id, leadId: lead.id, opportunityId: openOpp?.id ?? null, kind: plan.kind, status: "SUGGESTED", reason: plan.reason, opportunityTitle: plan.opportunityTitle, fromStageId: plan.fromStage?.id ?? null, fromStageName: plan.fromStage?.name ?? null, toStageId: plan.toStage.id, toStageName: plan.toStage.name } });
+      await logAudit({ organizationId, action: "pipeline_ai.suggest", resource: "Lead", resourceId: lead.id, metadata: { kind: plan.kind, reason: plan.reason } });
+      return "analyzed";
+    }
+
+    let opportunityId = openOpp?.id ?? null;
+    if (plan.kind === "CREATE_OPPORTUNITY") {
+      const created = await prisma.opportunity.create({ data: { organizationId, leadId: lead.id, pipelineStageId: plan.toStage.id, title: plan.opportunityTitle, ownerId: conv.assignedToId ?? null } });
+      opportunityId = created.id;
+      await logAudit({ organizationId, action: "opportunity.create", resource: "Opportunity", resourceId: created.id, metadata: { title: created.title, leadId: lead.id, via: "ai" } });
+    } else if (opportunityId) {
+      await prisma.opportunity.update({ where: { id: opportunityId }, data: { pipelineStageId: plan.toStage.id, closedAt: null } });
+      await logAudit({ organizationId, action: "opportunity.stage_change", resource: "Opportunity", resourceId: opportunityId, metadata: { fromStageId: plan.fromStage?.id, toStageId: plan.toStage.id, toStageName: plan.toStage.name, via: "ai" } });
+    }
+    let leadStatusAfter: LeadStatus | null = null;
+    if (opportunityId) leadStatusAfter = await syncLeadStatusFromOpportunity({ organizationId, opportunityId, userId: null });
+    await prisma.pipelineAiAction.create({
+      data: {
+        organizationId, runId: run.id, leadId: lead.id, opportunityId, kind: plan.kind, status: "APPLIED", reason: plan.reason, opportunityTitle: plan.opportunityTitle,
+        fromStageId: plan.fromStage?.id ?? null, fromStageName: plan.fromStage?.name ?? null, toStageId: plan.toStage.id, toStageName: plan.toStage.name,
+        leadStatusBefore: leadStatusAfter ? lead.status : null, leadStatusAfter,
+      },
+    });
+    await logAudit({ organizationId, action: "pipeline_ai.apply", resource: "Lead", resourceId: lead.id, metadata: { kind: plan.kind, reason: plan.reason, opportunityId } });
+    return "analyzed";
+  } catch (err) {
+    console.error("[ai-pipeline] failed", err);
+    return "skipped";
+  }
+}
+
+/** Programa el análisis para después de contestarle al webhook. */
+export function schedulePipelineAgent(organizationId: string, conversationId: string) {
+  const job = () => runPipelineAgent(organizationId, conversationId).then(() => undefined);
+  try {
+    after(job);
+  } catch {
+    void job();
+  }
+}
+
+// ── Deshacer / aceptar / descartar ───────────────────────────────────────────
+
+async function ownedAction(organizationId: string, actionId: string) {
+  const action = await prisma.pipelineAiAction.findFirst({ where: { id: actionId, organizationId } });
+  if (!action) throw new UserError("Acción no encontrada");
+  return action;
+}
+
+/** Deshace una acción que el agente aplicó solo. Si la oportunidad ya cambió después, no la toca. */
+export async function undoPipelineAiAction(organizationId: string, actionId: string, userId: string) {
+  const action = await ownedAction(organizationId, actionId);
+  if (action.status !== "APPLIED") throw new UserError("Esta acción ya no se puede deshacer");
+
+  const opp = action.opportunityId ? await prisma.opportunity.findFirst({ where: { id: action.opportunityId, organizationId } }) : null;
+  if (opp && (opp.pipelineStageId !== action.toStageId || opp.closedAt)) throw new UserError("La oportunidad ya cambió desde entonces; edítala a mano");
+
+  if (action.kind === "CREATE_OPPORTUNITY") {
+    if (opp) await prisma.opportunity.delete({ where: { id: opp.id } });
+  } else if (opp && action.fromStageId) {
+    await prisma.opportunity.update({ where: { id: opp.id }, data: { pipelineStageId: action.fromStageId, closedAt: null } });
+  }
+  if (action.leadStatusAfter && action.leadStatusBefore) {
+    await prisma.lead.updateMany({ where: { id: action.leadId, organizationId, status: action.leadStatusAfter }, data: { status: action.leadStatusBefore } });
+  }
+  await prisma.pipelineAiAction.update({ where: { id: action.id }, data: { status: "UNDONE", resolvedById: userId, resolvedAt: new Date() } });
+  await logAudit({ organizationId, userId, action: "pipeline_ai.undo", resource: "Lead", resourceId: action.leadId, metadata: { kind: action.kind, actionId } });
+}
+
+/** Una persona acepta una sugerencia (cerrar ganada o perdida): se aplica con su nombre. */
+export async function acceptPipelineAiAction(organizationId: string, actionId: string, userId: string) {
+  const action = await ownedAction(organizationId, actionId);
+  if (action.status !== "SUGGESTED") throw new UserError("Esta sugerencia ya fue resuelta");
+  const opp = action.opportunityId ? await prisma.opportunity.findFirst({ where: { id: action.opportunityId, organizationId } }) : null;
+  if (!opp || opp.closedAt || opp.pipelineStageId !== action.fromStageId || !action.toStageId) throw new UserError("La oportunidad ya cambió desde entonces; edítala a mano");
+
+  await prisma.opportunity.update({
+    where: { id: opp.id },
+    data: { pipelineStageId: action.toStageId, closedAt: new Date(), ...(action.kind === "CLOSE_LOST" ? { lossReason: action.reason } : {}) },
+  });
+  await logAudit({ organizationId, userId, action: action.kind === "CLOSE_LOST" ? "opportunity.lost" : "opportunity.stage_change", resource: "Opportunity", resourceId: opp.id, metadata: { lossReason: action.reason, fromStageName: action.fromStageName, toStageId: action.toStageId, toStageName: action.toStageName, via: "ai_suggestion" } });
+  await syncLeadStatusFromOpportunity({ organizationId, opportunityId: opp.id, userId });
+  await prisma.pipelineAiAction.update({ where: { id: action.id }, data: { status: "ACCEPTED", resolvedById: userId, resolvedAt: new Date() } });
+}
+
+export async function rejectPipelineAiAction(organizationId: string, actionId: string, userId: string) {
+  const action = await ownedAction(organizationId, actionId);
+  if (action.status !== "SUGGESTED") throw new UserError("Esta sugerencia ya fue resuelta");
+  await prisma.pipelineAiAction.update({ where: { id: action.id }, data: { status: "REJECTED", resolvedById: userId, resolvedAt: new Date() } });
+}

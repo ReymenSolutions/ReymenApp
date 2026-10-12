@@ -13,6 +13,8 @@ export type LeadPanelData = {
   opportunities: { id: string; title: string; amount: number | null; currency: string; stageId: string; stageName: string; ownerName: string | null; estimatedCloseDate: Date | null }[];
   stages: { id: string; name: string }[];
   timeline: { events: LeadTimelineEvent[]; hasMore: boolean };
+  /** Lo que el Agente IA hizo solo (con deshacer) o sugiere en este contacto: lo que sigue pendiente de revisar. */
+  aiActions: { id: string; status: "APPLIED" | "SUGGESTED"; kind: "CREATE_OPPORTUNITY" | "ADVANCE_STAGE" | "CLOSE_WON" | "CLOSE_LOST"; reason: string; opportunityTitle: string; fromStageName: string | null; toStageName: string | null; createdAt: Date }[];
   canManageOpps: boolean;
   canUpdateStatus: boolean;
   /** Nombre de quien tiene la sesión (autor de las notas que agrega desde el panel). */
@@ -32,7 +34,7 @@ export async function getLeadPanel(leadId: string): Promise<LeadPanelData> {
   const lead = await prisma.lead.findFirst({ where: { id: leadId, organizationId: orgId, deletedAt: null } });
   if (!lead) throw new UserError("Lead no encontrado");
 
-  const [opportunities, stages, timeline] = await Promise.all([
+  const [opportunities, stages, timeline, aiActions] = await Promise.all([
     prisma.opportunity.findMany({
       where: { leadId: lead.id, organizationId: orgId },
       orderBy: { updatedAt: "desc" },
@@ -40,6 +42,12 @@ export async function getLeadPanel(leadId: string): Promise<LeadPanelData> {
     }),
     prisma.pipelineStage.findMany({ where: { organizationId: orgId }, orderBy: { order: "asc" }, select: { id: true, name: true } }),
     getLeadTimeline(lead, 15),
+    prisma.pipelineAiAction.findMany({
+      where: { leadId: lead.id, organizationId: orgId, OR: [{ status: "SUGGESTED" }, { status: "APPLIED", createdAt: { gte: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) } }] },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: { id: true, status: true, kind: true, reason: true, opportunityTitle: true, fromStageName: true, toStageName: true, createdAt: true },
+    }),
   ]);
 
   return {
@@ -56,6 +64,7 @@ export async function getLeadPanel(leadId: string): Promise<LeadPanelData> {
     })),
     stages,
     timeline,
+    aiActions: aiActions.map((a) => ({ ...a, status: a.status as "APPLIED" | "SUGGESTED" })),
     canManageOpps: can(session.user.role as UserRole, "opportunities:manage"),
     canUpdateStatus: can(session.user.role as UserRole, "leads:update_status"),
     me: session.user.name ?? session.user.email ?? "",

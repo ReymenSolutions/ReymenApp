@@ -9,6 +9,8 @@ vi.mock("@/actions/lead-panel", () => ({ getLeadPanel: (...a: unknown[]) => getL
 const createNote = vi.fn();
 vi.mock("@/actions/notes", () => ({ createNote: (...a: unknown[]) => createNote(...a) }));
 vi.mock("@/actions/opportunities", () => ({ moveOpportunityStage: vi.fn() }));
+const undoAiAction = vi.fn();
+vi.mock("@/actions/ai-pipeline", () => ({ undoAiAction: (...a: unknown[]) => undoAiAction(...a), acceptAiSuggestion: vi.fn(), rejectAiSuggestion: vi.fn() }));
 vi.mock("@/actions/leads", () => ({ updateLeadStatus: vi.fn(), updateLeadTags: vi.fn() }));
 const toast = { success: vi.fn(), error: vi.fn() };
 vi.mock("sonner", () => ({ toast: { success: (...a: unknown[]) => toast.success(...a), error: (...a: unknown[]) => toast.error(...a) } }));
@@ -20,6 +22,7 @@ const panelData = {
   opportunities: [{ id: "o1", title: "Plan anual", amount: 12000, currency: "MXN", stageId: "s1", stageName: "Nuevo", ownerName: "Luis", estimatedCloseDate: null }],
   stages: [{ id: "s1", name: "Nuevo" }],
   timeline: { events: [{ type: "created", date: new Date("2026-10-01"), source: "whatsapp" }], hasMore: false },
+  aiActions: [] as unknown[],
   canManageOpps: false,
   canUpdateStatus: false,
   me: "Reymen Tester",
@@ -42,6 +45,17 @@ describe("LeadDetailPanel", () => {
     expect(screen.getByText("Plan anual")).toBeInTheDocument();
     expect(screen.getByText(/Llegó por whatsapp/)).toBeInTheDocument();
     expect(getLeadPanel).toHaveBeenCalledWith("l1");
+  });
+
+  it("muestra lo que el Agente IA hizo solo, con el motivo, y permite deshacerlo (recarga el panel)", async () => {
+    getLeadPanel.mockResolvedValue({ ...panelData, canManageOpps: true, aiActions: [{ id: "a1", status: "APPLIED", kind: "CREATE_OPPORTUNITY", reason: "Preguntó cuánto cuesta", opportunityTitle: "Revisión inicial", fromStageName: null, toStageName: "Nuevo", createdAt: new Date("2026-10-02") }] });
+    undoAiAction.mockResolvedValue({ success: true });
+    render(<LeadDetailPanel leadId="l1" onClose={() => {}} />);
+    expect(await screen.findByText(/Creó la oportunidad «Revisión inicial» en Nuevo/)).toBeInTheDocument();
+    expect(screen.getByText(/Por qué: Preguntó cuánto cuesta/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Deshacer/ }));
+    expect(undoAiAction).toHaveBeenCalledWith("a1");
+    await vi.waitFor(() => expect(getLeadPanel).toHaveBeenCalledTimes(2));
   });
 
   it("si no carga ofrece reintentar", async () => {

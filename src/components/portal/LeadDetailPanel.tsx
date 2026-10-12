@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { LeadTagsEditor } from "@/components/portal/LeadTagsEditor";
 import { LeadTimeline } from "@/components/portal/LeadTimeline";
+import { LeadAgentActions } from "@/components/portal/LeadAgentActions";
 import { usePreferences } from "@/context/preferences";
 import { getLeadPanel, type LeadPanelData } from "@/actions/lead-panel";
 import { createNote } from "@/actions/notes";
@@ -152,13 +153,19 @@ function PanelBody({ leadId }: { leadId: string }) {
   const [data, setData] = useState<LeadPanelData | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  // Cada carga nueva (por ejemplo tras deshacer algo del agente) vuelve a montar el contenido con los datos frescos.
+  const [version, setVersion] = useState(0);
   // Los eventos con fecha posterior a la apertura del panel (las notas nuevas) entran con animación.
   const [openedAt] = useState(() => Date.now());
 
   useEffect(() => {
     let cancelled = false;
     getLeadPanel(leadId)
-      .then((d) => !cancelled && setData(d))
+      .then((d) => {
+        if (cancelled) return;
+        setData(d);
+        setVersion((v) => v + 1);
+      })
       .catch(() => !cancelled && setFailed(true));
     return () => {
       cancelled = true;
@@ -190,10 +197,10 @@ function PanelBody({ leadId }: { leadId: string }) {
       </>
     );
   }
-  return <PanelContent data={data} openedAt={openedAt} />;
+  return <PanelContent key={version} data={data} openedAt={openedAt} onReload={() => setAttempt((n) => n + 1)} />;
 }
 
-function PanelContent({ data, openedAt }: { data: LeadPanelData; openedAt: number }) {
+function PanelContent({ data, openedAt, onReload }: { data: LeadPanelData; openedAt: number; onReload: () => void }) {
   const { lang } = usePreferences();
   const t = COPY[lang === "en" ? "en" : "es"];
   const { lead } = data;
@@ -307,6 +314,8 @@ function PanelContent({ data, openedAt }: { data: LeadPanelData; openedAt: numbe
         <section aria-label={t.tags}>
           <LeadTagsEditor leadId={lead.id} initialTags={lead.tags} />
         </section>
+
+        <LeadAgentActions actions={data.aiActions} canManage={data.canManageOpps} onChanged={onReload} />
 
         <section aria-label={t.opportunities} className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t.opportunities}</h3>

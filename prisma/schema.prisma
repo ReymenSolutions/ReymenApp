@@ -85,6 +85,8 @@ model Organization {
   automationExecutions    AutomationExecution[]
   rulebook                BusinessRulebook?
   agentChannelSettings    AgentChannelSetting[]
+  pipelineAiRuns          PipelineAiRun[]
+  pipelineAiActions       PipelineAiAction[]
   replyDrafts             ReplyDraft[]
   branches                Branch[]
   branchDishes            BranchDish[]
@@ -2034,4 +2036,80 @@ model FoodShiftClose {
 
   @@unique([organizationId, externalSessionId])
   @@index([organizationId, closedAt])
+}
+
+// ─── PIPELINE CON IA ──────────────────────────────────────────────
+// Cada mensaje entrante de un contacto del CRM se analiza una vez (PipelineAiRun): qué quiere y un resumen. De ahí
+// salen acciones sobre el pipeline (PipelineAiAction): las seguras se aplican solas y quedan con su motivo para
+// deshacerlas; las riesgosas (cerrar una venta, ganada o perdida) quedan como sugerencia que una persona decide.
+
+enum PipelineAiActionKind {
+  CREATE_OPPORTUNITY
+  ADVANCE_STAGE
+  CLOSE_WON
+  CLOSE_LOST
+}
+
+enum PipelineAiActionStatus {
+  /// Aplicada sola (acción segura); se puede deshacer.
+  APPLIED
+  /// Pendiente de que una persona decida (acción riesgosa).
+  SUGGESTED
+  /// Una persona la deshizo.
+  UNDONE
+  /// Una persona aceptó la sugerencia y se aplicó.
+  ACCEPTED
+  /// Una persona descartó la sugerencia.
+  REJECTED
+}
+
+model PipelineAiRun {
+  id               String   @id @default(cuid())
+  organizationId   String
+  conversationId   String
+  leadId           String
+  basedOnMessageId String
+  intent           String
+  summary          String   @db.Text
+  model            String?
+  inputTokens      Int?
+  outputTokens     Int?
+  createdAt        DateTime @default(now())
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actions      PipelineAiAction[]
+
+  @@unique([conversationId, basedOnMessageId])
+  @@index([organizationId, createdAt])
+  @@index([leadId, createdAt])
+}
+
+model PipelineAiAction {
+  id               String                 @id @default(cuid())
+  organizationId   String
+  runId            String
+  leadId           String
+  opportunityId    String?
+  kind             PipelineAiActionKind
+  status           PipelineAiActionStatus
+  /// Por qué el agente lo hizo o lo sugiere (visible para el equipo).
+  reason           String                 @db.Text
+  opportunityTitle String
+  fromStageId      String?
+  fromStageName    String?
+  toStageId        String?
+  toStageName      String?
+  /// Estado del contacto antes/después, si la acción lo cambió (para poder deshacerlo).
+  leadStatusBefore LeadStatus?
+  leadStatusAfter  LeadStatus?
+  resolvedById     String?
+  resolvedAt       DateTime?
+  createdAt        DateTime               @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  run          PipelineAiRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status, createdAt])
+  @@index([leadId, createdAt])
+  @@index([opportunityId])
 }

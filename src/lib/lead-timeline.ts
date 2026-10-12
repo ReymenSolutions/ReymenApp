@@ -13,6 +13,8 @@ export type LeadTimelineEvent =
   | { type: "opportunity_created"; date: Date; title: string }
   | { type: "stage_change"; date: Date; opportunityTitle: string; toStageName: string }
   | { type: "opportunity_lost"; date: Date; opportunityTitle: string; reason: string | null }
+  /** Algo que el Agente IA hizo o sugiere en el pipeline del contacto. */
+  | { type: "ai_action"; date: Date; kind: string; status: string; opportunityTitle: string; fromStageName: string | null; toStageName: string | null; reason: string }
   /** Compra del cliente enlazado (POS). `amount` con IVA; una cancelación llega con `cancelled`. */
   | { type: "purchase"; date: Date; amount: number; cancelled: boolean };
 
@@ -42,7 +44,7 @@ export async function getLeadTimeline(lead: TimelineLead, limit = TIMELINE_PAGE)
   const oppIds = opportunities.map((o) => o.id);
   const convWhere = conversationsOfLead(lead);
 
-  const [notes, messages, escalations, appointments, followUps, leadAudits, oppAudits, purchases] = await Promise.all([
+  const [notes, messages, escalations, appointments, followUps, leadAudits, oppAudits, purchases, aiActions] = await Promise.all([
     prisma.note.findMany({ where: { leadId: lead.id, organizationId: orgId }, orderBy: { createdAt: "desc" }, take, include: { author: { select: { name: true, email: true } } } }),
     prisma.message.findMany({ where: { conversation: convWhere }, orderBy: { createdAt: "desc" }, take }),
     prisma.conversation.findMany({ where: { ...convWhere, escalatedAt: { not: null } }, orderBy: { escalatedAt: "desc" }, take, select: { escalatedAt: true } }),
@@ -58,6 +60,7 @@ export async function getLeadTimeline(lead: TimelineLead, limit = TIMELINE_PAGE)
       : Promise.resolve([]),
     // Compras del POS de los clientes enlazados a este contacto (mismo teléfono).
     prisma.foodSale.findMany({ where: { organizationId: orgId, customer: { leadId: lead.id } }, orderBy: { occurredAt: "desc" }, take, select: { occurredAt: true, grossAmount: true } }),
+    prisma.pipelineAiAction.findMany({ where: { leadId: lead.id, organizationId: orgId }, orderBy: { createdAt: "desc" }, take }),
   ]);
 
   const ruleIds = [...new Set(followUps.map((f) => f.ruleId))];
@@ -79,7 +82,9 @@ export async function getLeadTimeline(lead: TimelineLead, limit = TIMELINE_PAGE)
       const meta = (a.metadata ?? {}) as { from?: string; to?: string; via?: string };
       return { type: "status_change", date: a.createdAt, from: meta.from ?? null, to: meta.to ?? "—", actorName: a.userId ? actorName.get(a.userId) ?? null : null, viaPipeline: meta.via === "pipeline" };
     }),
-    ...oppAudits.map((a): LeadTimelineEvent => {
+    ...aiActions.map((a): LeadTimelineEvent => ({ type: "ai_action", date: a.createdAt, kind: a.kind, status: a.status, opportunityTitle: a.opportunityTitle, fromStageName: a.fromStageName, toStageName: a.toStageName, reason: a.reason })),
+    // Lo que hizo el agente ya sale arriba con su motivo; aquí se omite para no mostrarlo dos veces.
+    ...oppAudits.filter((a) => (a.metadata as { via?: string } | null)?.via !== "ai").map((a): LeadTimelineEvent => {
       const title = oppTitle.get(a.resourceId ?? "") ?? "";
       const meta = (a.metadata ?? {}) as { toStageName?: string; lossReason?: string };
       if (a.action === "opportunity.create") return { type: "opportunity_created", date: a.createdAt, title };

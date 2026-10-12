@@ -24,3 +24,18 @@ Instagram, Messenger y correo requieren credenciales/aprobación de cada platafo
 ## Menú: un solo "CRM" con pestañas y módulo "Agente IA"
 - El módulo `AI_WHATSAPP` se muestra como **Agente IA** / **AI Agent** (el código interno y la base de datos no cambian): cubre el asistente, el rulebook y la base de conocimiento (única fuente de instrucciones; los antiguos Prompts se migraron al Rulebook), el probador y los borradores en todos los canales, no solo WhatsApp.
 - Con el módulo CRM, el menú tiene **una sola entrada "CRM"** (con el contador de clientes esperando respuesta) y las pantallas viven como pestañas: **Hoy, Inbox, Leads, Pipeline** y, con Reymen Foods, **Clientes del negocio** (`src/lib/crm-tabs.ts`, `CrmTabs`). Citas queda como entrada propia del menú, fuera del CRM. Las direcciones de siempre se conservan. Sin CRM, el menú mantiene las entradas sueltas que aplican (Citas, Clientes del negocio con Foods, Inbox con el Agente IA).
+
+## Pipeline con IA (fase 4)
+
+El CRM no debe ser otro trabajo: con el Agente IA encendido en el canal (Sugerir o Automático; en **Apagado** no hace nada), cada mensaje nuevo de un contacto del CRM se analiza una vez (`PipelineAiRun`: intención + resumen, con enfriamiento de 10 min por conversación) y el agente actúa dentro de reglas fijas (`src/lib/ai-pipeline.ts`, `planAction`; el modelo propone, el código decide qué se permite):
+
+| Acción | Quién la aplica | Condición |
+|---|---|---|
+| Crear la oportunidad | **Sola** (con motivo y Deshacer) | Interés de compra (precio, agendar, comprar) y el contacto no tiene una abierta; va a la primera etapa abierta |
+| Adelantar una etapa | **Sola** (con motivo y Deshacer) | Hay oportunidad abierta e interés de compra; solo UNA etapa abierta, nunca a ganada/perdida ni hacia atrás |
+| Cerrar como ganada / perdida | **Sugerencia**: una persona la aplica o la descarta | Confirmación explícita de compra / "no me interesa" |
+
+- Todo queda en `PipelineAiAction` (qué, por qué, etapa anterior y estado anterior del contacto) y en la bitácora (`pipeline_ai.apply|suggest|undo`).
+- **Deshacer** devuelve la etapa (o borra la oportunidad creada) y el estado del contacto, pero solo si nadie la tocó después; si ya cambió, pide editarla a mano. Lo que una persona deshace no se vuelve a hacer para esa oportunidad en 7 días.
+- **Avisos:** la campana del portal muestra lo que el agente hizo solo (3 días) y las sugerencias pendientes; el panel del contacto (`LeadAgentActions`) y su historial muestran cada acción con el motivo.
+- Nunca borra, cambia montos ni retrocede etapas.
