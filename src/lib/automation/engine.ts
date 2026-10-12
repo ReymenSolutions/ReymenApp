@@ -3,11 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { hasModule } from "@/lib/modules";
 import type { StoredDomainEvent } from "@/lib/domain-events";
 import { getBlueprint } from "./blueprints";
-import { evaluateContactPolicy } from "./policy";
+import { evaluateContactPolicy, nextAllowedTime } from "./policy";
 import { deliverInternalAction } from "./internal-delivery";
 import type { ActionSpec } from "./types";
 
-type Outcome = { status: AutomationExecutionStatus; skipReason?: string; action?: Prisma.InputJsonValue; subjectType?: string; subjectId?: string };
+type Outcome = { status: AutomationExecutionStatus; skipReason?: string; action?: Prisma.InputJsonValue; subjectType?: string; subjectId?: string; nextAttemptAt?: Date };
 
 /**
  * Consumidor de la bandeja de eventos: por cada evento busca las automatizaciones ACTIVAS de esa
@@ -40,6 +40,7 @@ export async function runAutomationsForEvent(event: StoredDomainEvent, now: Date
           status: outcome.status,
           skipReason: outcome.skipReason ?? null,
           action: outcome.action,
+          nextAttemptAt: outcome.nextAttemptAt ?? null,
         },
       });
     } catch (err) {
@@ -84,13 +85,19 @@ async function evaluate(
         select: { createdAt: true },
       })
     : null;
-  const policy = evaluateContactPolicy({ customer: ctx.customer, rules, now: ctx.now, timezone: ctx.organization.timezone, lastContactAt: last?.createdAt ?? null });
+  // Con retraso (p. ej. "2 h después de la compra") las horas de silencio se aplican al momento del ENVÍO, no al de procesar.
+  const delayed = rules.delayMinutes !== undefined;
+  const policy = evaluateContactPolicy({ customer: ctx.customer, rules: delayed ? { ...rules, quietHours: null } : rules, now: ctx.now, timezone: ctx.organization.timezone, lastContactAt: last?.createdAt ?? null });
   if (!policy.ok) return { status: "SKIPPED", skipReason: policy.reason };
 
-  const action = {
-    ...decision.action,
-    channel: rules.channel,
-    recipient: { phone: ctx.customer!.phone, name: ctx.customer!.name },
-  } as unknown as Prisma.InputJsonValue;
-  return { status: automation.dryRun ? "DRY_RUN" : "PENDING", action };
+  const recipient = { phone: ctx.customer!.phone, name: ctx.customer!.name };
+  const prepared = blueprint.prepare ? await blueprint.prepare({ organizationId: event.organizationId, event, customer: ctx.customer!, action: decision.action, config, dryRun: automation.dryRun }) : decision.action;
+  const action: Record<string, unknown> = { ...prepared, channel: rules.channel, recipient };
+  let nextAttemptAt: Date | undefined;
+  if (delayed) {
+    const target = new Date(Math.max(event.occurredAt.getTime() + rules.delayMinutes! * 60_000, ctx.now.getTime()));
+    nextAttemptAt = nextAllowedTime(target, ctx.organization.timezone, rules.quietHours);
+    action.sendAfter = nextAttemptAt.toISOString();
+  }
+  return { status: automation.dryRun ? "DRY_RUN" : "PENDING", action: action as Prisma.InputJsonValue, nextAttemptAt };
 }

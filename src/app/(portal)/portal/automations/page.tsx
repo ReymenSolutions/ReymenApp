@@ -13,6 +13,9 @@ import { getAutomationsTabs } from "@/lib/portal-nav-tabs";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/utils";
 import { Zap, ArrowRight, Activity } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { FeedbackCases } from "@/components/portal/FeedbackCases";
+import { can } from "@/lib/permissions";
+import type { UserRole } from "@prisma/client";
 
 async function getAutomations(orgId: string) {
   return prisma.automation.findMany({
@@ -49,6 +52,8 @@ const SKIP_REASON: Record<string, string> = {
   invalid_config: "configuración inválida",
   blueprint_unavailable: "automatización no disponible",
   no_customer: "sin cliente",
+  already_returned: "el cliente ya regresó",
+  no_report: "sin datos del reporte",
 };
 
 /** Lo que cada automatización inteligente hizo (o por qué no) con sus últimos eventos. */
@@ -73,15 +78,24 @@ function describeAction(action: unknown): string | null {
   return null;
 }
 
+/** Calificaciones bajas (≤ 3) pendientes de seguimiento. */
+async function getOpenFeedback(orgId: string) {
+  const rows = await prisma.customerFeedback.findMany({ where: { organizationId: orgId, status: "OPEN" }, orderBy: { respondedAt: "desc" }, take: 20 });
+  const customers = rows.length ? await prisma.customer.findMany({ where: { id: { in: rows.map((r) => r.customerId) }, organizationId: orgId }, select: { id: true, name: true, phone: true } }) : [];
+  const byId = new Map(customers.map((c) => [c.id, c]));
+  return rows.map((r) => ({ id: r.id, score: r.score ?? 0, comment: r.comment, customerName: byId.get(r.customerId)?.name ?? null, customerPhone: byId.get(r.customerId)?.phone ?? null, respondedAt: r.respondedAt }));
+}
+
 export default async function PortalAutomationsPage() {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
   await requireModule(session.user.organizationId, "AUTOMATIONS");
 
-  const [t, automations, activity] = await Promise.all([
+  const [t, automations, activity, feedbackCases] = await Promise.all([
     getServerT(),
     getAutomations(session.user.organizationId),
     getSmartActivity(session.user.organizationId),
+    getOpenFeedback(session.user.organizationId),
   ]);
 
   return (
@@ -155,6 +169,18 @@ export default async function PortalAutomationsPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {feedbackCases.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader className="pb-3">
+            <p className="font-semibold text-slate-900">Opiniones por atender ({feedbackCases.length})</p>
+            <p className="text-xs text-slate-400">Calificaciones de 3 o menos tras una visita. Contacta al cliente y marca el seguimiento como resuelto.</p>
+          </CardHeader>
+          <CardContent>
+            <FeedbackCases cases={feedbackCases} canResolve={can(session.user.role as UserRole, "conversations:resolve")} />
+          </CardContent>
+        </Card>
       )}
 
       {activity.length > 0 && (

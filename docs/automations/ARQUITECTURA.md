@@ -439,3 +439,15 @@ Ambas usan los detectores del reloj (`detectors.ts`): el `tick` busca candidatos
 - **`customer_recovery` v1** (evento `customer.at_risk`): cliente con `visitCount ≥ minVisits` (3) cuya ausencia pasa de `max(minDays = 21, factor = 2.5 × su intervalo mediano entre visitas)` sin llegar a `maxDays` (180, después ya no se le insiste). El intervalo es la **mediana** de los días entre visitas (varias compras el mismo día cuentan una). Un episodio por ausencia (`dedupeKey = customer.at_risk:<cliente>:<última visita>`): si regresa y se vuelve a alejar, es otro. Enfriamiento de 60 días. Plantilla `customer_recovery_v1` (`name`, `businessName`, `daysSince`). Si regresó antes de procesarse → `already_returned`.
 - **Protección al encenderlas:** las ventanas `maxDays` evitan mensajes masivos a clientes de hace años; los candidatos se toman en lotes de 200 por tick.
 - **Pendiente:** dar de alta las plantillas `second_visit_v1` y `customer_recovery_v1` en el proveedor de WhatsApp (Meta) antes de pasar a envío real.
+
+## S. `post_visit_feedback` implementado (PR 11)
+
+- **Blueprint `post_visit_feedback` v1:** trigger `sale.completed` (con cliente y consentimiento), requiere Reymen POS. Config: `delayMinutes` (120), `cooldownDays` (7), horas de silencio, `reviewUrl` (https, opcional). Plantilla `post_visit_feedback_v1` (`name`, `businessName`, `feedbackUrl`).
+- **Retraso en el motor:** `contactRules.delayMinutes` programa el envío (`nextAttemptAt` y `action.sendAfter`) = evento + retraso; si cae en horas de silencio se mueve a la primera hora permitida (`nextAllowedTime`). El despachador no envía antes y su plazo de 24 h cuenta desde `sendAfter`.
+- **`Blueprint.prepare`:** hook asíncrono del motor que completa la acción antes de registrar la ejecución (aquí crea la solicitud y su enlace); en dry-run no escribe nada.
+- **Modelo `CustomerFeedback`:** una solicitud por venta (`organizationId + saleId` único), con `token` aleatorio de 48 hex. Estados `REQUESTED → ANSWERED | OPEN → RESOLVED`.
+- **Formulario público** `/feedback/<token>` (sin cuenta; la ruta es pública en `proxy.ts`, `noindex`): calificación 1–5 y comentario opcional (máx. 1000). Solo cuenta la primera respuesta (el UPDATE exige `REQUESTED`); límite de intentos por enlace y por IP. Responde directo a la base: no se interpreta texto libre de WhatsApp.
+- **Calificación ≤ 3** (`LOW_SCORE_MAX`): el caso queda `OPEN`, se avisa por correo a dueños y gerentes y aparece en la campana y en "Opiniones por atender" de `/portal/automations`, donde el equipo lo cierra con una nota (`RESOLVED`, rol con `conversations:resolve`).
+- **Reseñas sin manipulación:** la invitación a la reseña pública (`reviewUrl`) se ofrece a **todos** los que responden, sin condicionarla a la calificación.
+- **Admin:** `/admin/automations` ahora muestra el catálogo de blueprints y en qué clientes están encendidos (con enlace); se habilitan desde el cliente.
+- **Pendiente:** dar de alta la plantilla `post_visit_feedback_v1` en el proveedor de WhatsApp antes de pasar a envío real.

@@ -4,11 +4,12 @@ import { inventoryLowAlert } from "./inventory-low-alert";
 import { dailyExecutiveReport } from "./daily-executive-report";
 import { secondVisit } from "./second-visit";
 import { customerRecovery } from "./customer-recovery";
+import { postVisitFeedback } from "./post-visit-feedback";
 
 // El catálogo: cada blueprint es código versionado con sus pruebas, no filas en la base.
 // Una v2 se agrega junto a la v1 (que sigue mientras haya instancias que la usen).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const ALL: Blueprint<any>[] = [welcomeNewCustomer, inventoryLowAlert, dailyExecutiveReport, secondVisit, customerRecovery];
+const ALL: Blueprint<any>[] = [welcomeNewCustomer, inventoryLowAlert, dailyExecutiveReport, secondVisit, customerRecovery, postVisitFeedback];
 
 export function listBlueprints(): Blueprint[] {
   return ALL;

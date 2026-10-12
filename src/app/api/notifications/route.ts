@@ -11,7 +11,7 @@ export async function GET() {
   const isPortal = !!session.user.organizationId;
   const orgFilter = isPortal ? { organizationId: session.user.organizationId! } : {};
 
-  const [escalated, openRequests, seenAt, aiActions, alerts] = await Promise.all([
+  const [escalated, openRequests, seenAt, aiActions, alerts, lowFeedback] = await Promise.all([
     prisma.conversation.findMany({
       where: { ...orgFilter, status: "ESCALATED" },
       take: 5,
@@ -44,6 +44,10 @@ export async function GET() {
           select: { action: true, createdAt: true },
         })
       : Promise.resolve([]),
+    // Calificaciones bajas de clientes pendientes de seguimiento.
+    isPortal
+      ? prisma.customerFeedback.findMany({ where: { organizationId: session.user.organizationId!, status: "OPEN" }, take: 5, orderBy: { respondedAt: "desc" }, select: { score: true, comment: true, respondedAt: true, createdAt: true } })
+      : Promise.resolve([]),
   ]);
 
   const items = [
@@ -66,6 +70,7 @@ export async function GET() {
       if (action.type === "report") return { type: "automation_report", label: "Reporte diario listo", detail: action.title ?? "", href: "/portal/automations", at: a.createdAt };
       return { type: "automation_alert", label: action.severity === "critical" ? "Alerta crítica" : "Alerta", detail: `${action.title ?? ""}${action.body ? ` — ${action.body}` : ""}`, href: action.href ?? "/portal/automations", at: a.createdAt };
     }),
+    ...lowFeedback.map((f) => ({ type: "customer_feedback", label: `Cliente insatisfecho (${f.score}/5)`, detail: f.comment ?? "Sin comentario", href: "/portal/automations", at: f.respondedAt ?? f.createdAt })),
     ...openRequests.map((r) => ({
       type: "request",
       label: "Solicitud abierta",

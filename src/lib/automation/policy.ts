@@ -23,6 +23,14 @@ export function inQuietHours(hour: number, q: { start: number; end: number }): b
   return q.start < q.end ? hour >= q.start && hour < q.end : hour >= q.start || hour < q.end;
 }
 
+/** Primer instante a partir de `from` (de hora en hora, hasta un día) que NO cae en horas de silencio. */
+export function nextAllowedTime(from: Date, timezone: string, quiet: { start: number; end: number } | null | undefined): Date {
+  if (!quiet) return from;
+  let t = from;
+  for (let i = 0; i < 24 && inQuietHours(localHour(t, timezone), quiet); i++) t = new Date(t.getTime() + 3_600_000);
+  return t;
+}
+
 /**
  * Política de contacto única para todas las automatizaciones: solo se contacta a quien dio su
  * consentimiento, no antes de que termine el enfriamiento y no en horas de silencio.

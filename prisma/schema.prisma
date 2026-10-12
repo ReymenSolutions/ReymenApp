@@ -87,6 +87,7 @@ model Organization {
   agentChannelSettings    AgentChannelSetting[]
   pipelineAiRuns          PipelineAiRun[]
   pipelineAiActions       PipelineAiAction[]
+  customerFeedback        CustomerFeedback[]
   replyDrafts             ReplyDraft[]
   branches                Branch[]
   branchDishes            BranchDish[]
@@ -2112,4 +2113,43 @@ model PipelineAiAction {
   @@index([organizationId, status, createdAt])
   @@index([leadId, createdAt])
   @@index([opportunityId])
+}
+
+// ─── FEEDBACK POST-VISITA ─────────────────────────────────────────
+// Cada solicitud de opinión (automatización post_visit_feedback) crea una fila con un enlace único e imposible de
+// adivinar. El cliente responde en un formulario de Reymen (no en texto libre por WhatsApp): la respuesta llega directo
+// aquí. Una calificación ≤ 3 deja el caso OPEN para dar seguimiento; el equipo lo cierra (RESOLVED).
+
+enum CustomerFeedbackStatus {
+  /// Se pidió la opinión y aún no responde.
+  REQUESTED
+  /// Respondió y no requiere seguimiento (calificación ≥ 4).
+  ANSWERED
+  /// Calificación baja: pendiente de seguimiento por el equipo.
+  OPEN
+  RESOLVED
+}
+
+model CustomerFeedback {
+  id             String                 @id @default(cuid())
+  organizationId String
+  customerId     String
+  saleId         String?
+  /// Parte del enlace público del formulario.
+  token          String                 @unique
+  status         CustomerFeedbackStatus @default(REQUESTED)
+  score          Int?
+  comment        String?                @db.Text
+  respondedAt    DateTime?
+  resolvedById   String?
+  resolvedAt     DateTime?
+  resolutionNote String?                @db.Text
+  createdAt      DateTime               @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Una sola solicitud por venta (reprocesar el evento no crea otra).
+  @@unique([organizationId, saleId])
+  @@index([organizationId, status, createdAt])
+  @@index([customerId])
 }
