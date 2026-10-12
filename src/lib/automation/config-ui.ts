@@ -20,12 +20,16 @@ export const GROUP_COPY: Record<ConfigGroup, { es: { title: string; hint: string
 
 export type ConfigFieldMeta = {
   group: ConfigGroup;
-  kind: "number" | "hour" | "select" | "url" | "phone";
+  kind: "number" | "hour" | "select" | "url" | "phone" | "text";
   label: { es: string; en: string };
   help: { es: string; en: string };
   unit?: { es: string; en: string };
   /** Etiquetas de las opciones de un `select` (los valores salen del esquema). */
   options?: Record<string, { es: string; en: string }>;
+  /** El dueño del negocio puede editarlo desde su portal (un subconjunto seguro; por defecto solo el admin). */
+  ownerEditable?: boolean;
+  /** Longitud máxima de un campo `text`. */
+  maxLength?: number;
 };
 
 /** Presentación de los parámetros de un blueprint: una entrada por cada llave de su configuración. */
@@ -57,6 +61,8 @@ export type ConfigFieldView = {
   step?: number;
   options?: { value: string; label: { es: string; en: string } }[];
   defaultValue: string | number | null;
+  ownerEditable: boolean;
+  maxLength?: number;
 };
 
 function unwrap(schema: ZodTypeAny): ZodTypeAny {
@@ -102,6 +108,8 @@ export function describeConfig(blueprint: Pick<Blueprint, "configSchema" | "defa
       step: kind === "number" && !int ? 0.1 : 1,
       options: enumValues?.map((value) => ({ value, label: meta.options?.[value] ?? { es: value, en: value } })),
       defaultValue: (defaults[key] as string | number | undefined) ?? null,
+      ownerEditable: meta.ownerEditable === true,
+      maxLength: kind === "text" ? meta.maxLength : undefined,
     });
   }
   return fields.sort((a, b) => CONFIG_GROUPS.indexOf(a.group) - CONFIG_GROUPS.indexOf(b.group));

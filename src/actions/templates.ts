@@ -57,7 +57,7 @@ async function installTemplateCore(
     userId,
     templateId,
     template: { name: template.name, description: template.description, category: template.category },
-    version: { id: latestVersion.id, version: latestVersion.version, n8nWorkflowId: latestVersion.n8nWorkflowId },
+    version: { id: latestVersion.id, version: latestVersion.version, n8nWorkflowId: latestVersion.n8nWorkflowId, configSpec: latestVersion.configSpec },
     config,
   });
 }

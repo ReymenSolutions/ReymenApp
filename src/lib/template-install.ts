@@ -3,13 +3,14 @@ import { generateWebhookSecret } from "./utils";
 import { logAudit } from "./audit";
 import type { Prisma } from "@prisma/client";
 import { UserError } from "./user-error";
+import { compileConfigSpec, validateConfigSpec } from "./automation/config-spec";
 
 interface ApplyTemplateInstallParams {
   orgId: string;
   userId: string;
   templateId: string;
   template: { name: string; description: string; category: string };
-  version: { id: string; version: string; n8nWorkflowId: string | null };
+  version: { id: string; version: string; n8nWorkflowId: string | null; configSpec?: Prisma.JsonValue | null };
   config?: Record<string, unknown>;
 }
 
@@ -38,6 +39,18 @@ export async function applyTemplateInstall({
     throw new UserError("Este template ya está instalado");
   }
 
+  // La configuración vive solo en Automation.config. Si la versión declara sus parámetros, se completa con los de fábrica
+  // y se valida con el mismo esquema que usará la pantalla de configuración del Admin.
+  let finalConfig: Record<string, unknown> | undefined = config;
+  if (version.configSpec) {
+    const spec = validateConfigSpec(version.configSpec);
+    if (spec.ok) {
+      const parsed = compileConfigSpec(spec.spec).configSchema.safeParse(config ?? {});
+      if (!parsed.success) throw new UserError("Los parámetros del template no son válidos");
+      finalConfig = parsed.data as Record<string, unknown>;
+    }
+  }
+
   const automation = await prisma.automation.create({
     data: {
       organizationId: orgId,
@@ -46,7 +59,7 @@ export async function applyTemplateInstall({
       type: template.category,
       webhookSecret: generateWebhookSecret(),
       n8nWorkflowId: version.n8nWorkflowId,
-      config: config ? (config as Prisma.InputJsonValue) : undefined,
+      config: finalConfig ? (finalConfig as Prisma.InputJsonValue) : undefined,
     },
   });
 
@@ -57,7 +70,6 @@ export async function applyTemplateInstall({
         versionId: version.id,
         automationId: automation.id,
         status: "ACTIVE",
-        config: config ? (config as Prisma.InputJsonValue) : undefined,
         updatedAt: new Date(),
       },
     });
@@ -69,7 +81,6 @@ export async function applyTemplateInstall({
         versionId: version.id,
         automationId: automation.id,
         status: "ACTIVE",
-        config: config ? (config as Prisma.InputJsonValue) : undefined,
       },
     });
   }
