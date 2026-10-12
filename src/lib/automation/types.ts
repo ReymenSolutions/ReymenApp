@@ -28,6 +28,8 @@ export type ContactRules = {
   cooldownDays: number;
   /** Horas locales (0–23) en las que no se contacta; si start > end cruza la medianoche (p. ej. 21 → 9). */
   quietHours?: { start: number; end: number } | null;
+  /** Retraso desde el evento hasta el envío (p. ej. 120 = 2 h después de la compra). El envío cae fuera de las horas de silencio. */
+  delayMinutes?: number;
 };
 
 export type Blueprint<C = Record<string, unknown>> = {
@@ -46,6 +48,11 @@ export type Blueprint<C = Record<string, unknown>> = {
   /** Función pura: decide, a partir del evento y el contexto, si actuar y con qué. */
   decide: (event: StoredDomainEvent, ctx: BlueprintContext, config: C) => BlueprintDecision;
   /** Cómo se contacta (canal, enfriamiento, horario) según la configuración. */
+  /**
+   * Antes de crear la ejecución (nunca en dry-run con efectos): completa la acción con lo que necesita y no es puro,
+   * por ejemplo crear el registro cuyo enlace va en el mensaje. `dryRun` = no escribir nada.
+   */
+  prepare?: (input: { organizationId: string; event: StoredDomainEvent; customer: Customer; action: ActionSpec; config: C; dryRun: boolean }) => Promise<ActionSpec>;
   /** Solo para audiencia de clientes. */
   contactRules: (config: C) => ContactRules;
 };

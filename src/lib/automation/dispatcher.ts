@@ -64,7 +64,10 @@ export async function dispatchPendingExecutions(opts: { now?: Date; limit?: numb
   for (const ex of pending) {
     // Si entre tanto se volvió a simulación o se pausó, no se envía.
     if (ex.automation.dryRun || ex.automation.status !== "ACTIVE") continue;
-    const deadline = new Date(ex.createdAt.getTime() + DEADLINE_HOURS * 3_600_000);
+    // El plazo cuenta desde cuando debía salir (un mensaje programado a 2 h no caduca por esperar).
+    const sendAfter = (ex.action as { sendAfter?: string } | null)?.sendAfter;
+    const base = sendAfter ? Math.max(ex.createdAt.getTime(), new Date(sendAfter).getTime()) : ex.createdAt.getTime();
+    const deadline = new Date(base + DEADLINE_HOURS * 3_600_000);
     if (now > deadline) {
       await prisma.automationExecution.update({ where: { id: ex.id }, data: { status: "SKIPPED", skipReason: "expired" } });
       result.expired++;

@@ -25,6 +25,8 @@ export default auth(async (req) => {
   const isAuthApiRoute = pathname.startsWith("/api/auth");
   const isCronRoute = pathname.startsWith("/api/cron");
   const isHealthRoute = pathname.startsWith("/api/health");
+  // Formulario público de opinión (el cliente entra desde un enlace con token único, sin cuenta).
+  const isFeedbackRoute = pathname.startsWith("/feedback/");
 
   // Public routes — webhook and cron routes authenticate themselves
   // (HMAC signature / CRON_SECRET) rather than via session, /api/v1/* routes
@@ -33,7 +35,7 @@ export default auth(async (req) => {
   // route) so n8n's pull requests must not be redirected to /login here, and
   // the health check must be reachable by load balancers/uptime monitors
   // without a session
-  if (isAuthPage || isWebhookRoute || isApiV1Route || isAuthApiRoute || isCronRoute || isHealthRoute) {
+  if (isAuthPage || isWebhookRoute || isApiV1Route || isAuthApiRoute || isCronRoute || isHealthRoute || isFeedbackRoute) {
     return NextResponse.next();
   }
 
