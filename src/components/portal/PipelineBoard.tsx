@@ -267,23 +267,26 @@ function Column({
   const shown = hidden > 0 ? list.slice(0, STAGE_VISIBLE_LIMIT) : list;
   return (
     <section
+      ref={setNodeRef}
       aria-label={stage.name}
-      className="reveal w-[17.5rem] flex-shrink-0 snap-start sm:w-72"
+      className={cn(
+        "reveal flex w-[17.5rem] flex-shrink-0 snap-start flex-col overflow-hidden rounded-card border bg-slate-50 shadow-card motion-micro transition-[border-color,box-shadow,background-color] sm:w-72",
+        highlighted ? "border-brand-400 bg-brand-50 ring-2 ring-brand-400/40" : "border-slate-300",
+      )}
       style={{ "--i": index } as React.CSSProperties}
     >
-      <div className="mb-2 px-1">
+      {/* Franja de color de la etapa: separa visualmente cada rectángulo. */}
+      <div aria-hidden="true" className={cn("h-1 w-full flex-shrink-0", stage.isWon ? "bg-emerald-500" : stage.isLost ? "bg-red-400" : "bg-brand-500")} />
+      <div className="border-b border-slate-200 bg-white px-3 py-2.5">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="flex min-w-0 items-center gap-1.5 truncate text-sm font-semibold text-slate-900">
-            <span className={cn("h-2 w-2 flex-shrink-0 rounded-full", stage.isWon ? "bg-emerald-500" : stage.isLost ? "bg-red-400" : "bg-brand-500")} aria-hidden="true" />
-            <span className="truncate">{stage.name}</span>
-          </h3>
+          <h3 className="min-w-0 truncate text-sm font-semibold text-slate-900">{stage.name}</h3>
           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium tabular-nums text-slate-600" title={t.stageCount(list.length)}>
             {list.length}
           </span>
         </div>
         <p className="mt-0.5 min-h-4 text-xs tabular-nums text-slate-500">
           {totals.length === 0 ? (
-            " "
+            "\u00a0"
           ) : (
             totals.map(([currency, total], i) => (
               <span key={currency}>
@@ -295,11 +298,9 @@ function Column({
         </p>
       </div>
       <div
-        ref={setNodeRef}
         className={cn(
-          "min-h-[7.5rem] space-y-2 rounded-card border border-dashed p-2 motion-micro transition-colors",
+          "min-h-[7.5rem] flex-1 space-y-2 p-2",
           expanded && "max-h-[70vh] overflow-y-auto overscroll-contain",
-          highlighted ? "border-brand-400 bg-brand-50" : "border-transparent bg-slate-50",
         )}
       >
         {list.length === 0 ? (
