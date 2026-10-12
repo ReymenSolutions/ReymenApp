@@ -1,4 +1,5 @@
 import { createWebhookSignature } from "./webhook-validator";
+import type { AutomationEnvelope } from "./automation/config-delivery";
 
 const N8N_BASE_URL = process.env.N8N_BASE_URL ?? "http://localhost:5678";
 const N8N_WEBHOOK_SECRET = process.env.N8N_WEBHOOK_SECRET ?? "";
@@ -7,6 +8,8 @@ export interface N8nTriggerPayload {
   organizationId: string;
   event: string;
   data: Record<string, unknown>;
+  /** Cuando el evento es para una automatización concreta: quién es y su configuración (ver automation/config-delivery.ts). */
+  automation?: AutomationEnvelope;
 }
 
 // webhookPath ends up in the request URL — restrict it to a safe path
