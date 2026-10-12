@@ -349,7 +349,8 @@ Con eso, cada automatización nueva es un archivo de blueprint más sus pruebas,
 | 5 | App | Outbox `DomainEvent` + cron `tick` con candado | §H PR 4 |
 | 6 | App | Blueprints en código + `Automation.blueprintKey/Version/dryRun` + `AutomationExecution` + política de contacto + dry-run + Admin "habilitar blueprint" | §H PR 5 |
 | 7 | App | Despachador firmado hacia n8n + callback con token por ejecución + reintentos + workflows genéricos en `n8n/workflows/` (proveedor ficticio) | §H PR 6 |
-| 8+ | App | UI `/portal/automations`, luego P0: `inventory_low_alert`, `daily_executive_report`, `post_visit_feedback`, `second_visit`, `customer_recovery`, atribución | §H PRs 7–13 |
+| 8 ✅ | App | `inventory_low_alert` + actividad en `/portal/automations` (§P) |  |  |
+| 9+ | App | P0: `daily_executive_report`, `post_visit_feedback`, `second_visit`, `customer_recovery`, atribución | §H PRs 7–13 |
 
 **Siguiente paso exacto:** PR 1 (ReymenApp).
 - Migración incremental `…_customers`: tabla `Customer` y columnas opcionales en `FoodSale`.
@@ -410,3 +411,14 @@ Mismo esquema de firma e idempotencia que `/api/webhooks/pos/orders` (HMAC con e
   - Sin `N8N_BASE_URL`/`N8N_WEBHOOK_SECRET` no se intenta nada. n8n caído nunca bloquea ventas ni eventos.
 - **Callback** `POST /api/webhooks/n8n/automation-executions`: firma de plataforma + token por ejecución (HMAC), transiciones idempotentes. Contrato completo en `docs/automations/N8N.md`.
 - **Workflow genérico** `n8n/workflows/reymen-action-message.json` con proveedor ficticio.
+
+## P. `inventory_low_alert` y avisos internos implementados (PR 8)
+
+- **Evento `inventory.level_changed`:** `applyStockMovements` (único lugar que mueve existencias) lo escribe en la misma transacción **solo cuando un movimiento empeora el nivel** del insumo: `ok → low`, `low → critical` u `ok → critical`. Quedarse igual o mejorar no avisa; al recuperarse y volver a bajar empieza un episodio nuevo. Es un INSERT: nunca bloquea una venta. Insumos desactivados no avisan.
+  - Niveles (`stockLevel`): **bajo** = existencia ≤ mínimo; **crítico** = ≤ 0 o ≤ 25 % del mínimo. Sin mínimo configurado, solo alerta al agotarse.
+  - Payload: `inventoryItemId`, `name`, `unit`, `level`, `previousLevel`, `currentStock`, `minStock`, `branchId`, `movementType`.
+- **Blueprint `inventory_low_alert` v1:** `audience: "internal"`, requiere Reymen Foods, config `minLevel` (`low` | `critical`, por defecto `low`). Acción `{ type: "alert", severity, title, body, href }`.
+- **Audiencia interna en el motor:** no hay cliente ni política de contacto. Con dry-run se registra `DRY_RUN` ("se habría avisado"); sin dry-run la ejecución queda `SUCCEEDED` al instante (el aviso **es** el registro) y no pasa por el despachador ni por n8n.
+- **Dónde se ve:** la campana del portal (avisos de los últimos 3 días, solo los reales, no los simulados) y "Actividad de las automatizaciones inteligentes" en `/portal/automations` (qué hizo cada automatización o por qué se omitió).
+- **Habilitar:** Admin → Cliente → Automatizaciones (blueprints) → Alerta de inventario bajo (nace en dry-run).
+- **Siguientes (PR 9+):** `daily_executive_report`, `post_visit_feedback`, `second_visit`, `customer_recovery`, atribución (§E–F).

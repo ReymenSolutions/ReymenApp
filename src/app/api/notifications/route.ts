@@ -11,7 +11,7 @@ export async function GET() {
   const isPortal = !!session.user.organizationId;
   const orgFilter = isPortal ? { organizationId: session.user.organizationId! } : {};
 
-  const [escalated, openRequests, seenAt, aiActions] = await Promise.all([
+  const [escalated, openRequests, seenAt, aiActions, alerts] = await Promise.all([
     prisma.conversation.findMany({
       where: { ...orgFilter, status: "ESCALATED" },
       take: 5,
@@ -35,6 +35,15 @@ export async function GET() {
           select: { id: true, status: true, kind: true, opportunityTitle: true, toStageName: true, createdAt: true },
         })
       : Promise.resolve([]),
+    // Avisos internos de las automatizaciones (p. ej. insumo bajo el mínimo). Las pruebas (dry-run) no avisan.
+    isPortal
+      ? prisma.automationExecution.findMany({
+          where: { organizationId: session.user.organizationId!, status: "SUCCEEDED", createdAt: { gte: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) }, action: { path: ["type"], equals: "alert" } },
+          take: 5,
+          orderBy: { createdAt: "desc" },
+          select: { action: true, createdAt: true },
+        })
+      : Promise.resolve([]),
   ]);
 
   const items = [
@@ -52,6 +61,10 @@ export async function GET() {
       href: "/portal/pipeline",
       at: a.createdAt,
     })),
+    ...alerts.map((a) => {
+      const action = (a.action ?? {}) as { title?: string; body?: string; href?: string; severity?: string };
+      return { type: "automation_alert", label: action.severity === "critical" ? "Alerta crítica" : "Alerta", detail: `${action.title ?? ""}${action.body ? ` — ${action.body}` : ""}`, href: action.href ?? "/portal/automations", at: a.createdAt };
+    }),
     ...openRequests.map((r) => ({
       type: "request",
       label: "Solicitud abierta",
