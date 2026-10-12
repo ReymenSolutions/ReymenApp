@@ -1,6 +1,7 @@
 import type { Customer, PlatformModule } from "@prisma/client";
 import type { ZodType, ZodTypeDef } from "zod";
 import type { StoredDomainEvent } from "@/lib/domain-events";
+import type { DailyReport } from "./report";
 
 export type MessageChannel = "whatsapp" | "sms";
 
@@ -8,7 +9,9 @@ export type MessageChannel = "whatsapp" | "sms";
 export type ActionSpec =
   | { type: "message"; channel: MessageChannel; templateKey: string; variables: Record<string, string> }
   /** Aviso interno para el equipo (campana del portal): no contacta a ningún cliente. */
-  | { type: "alert"; severity: "warning" | "critical"; title: string; body: string; href: string };
+  | { type: "alert"; severity: "warning" | "critical"; title: string; body: string; href: string }
+  /** Reporte periódico para dueños y gerentes (correo + actividad del portal). */
+  | { type: "report"; title: string; date: string; report: DailyReport };
 
 export type BlueprintContext = {
   organization: { id: string; name: string; timezone: string };

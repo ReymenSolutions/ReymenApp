@@ -38,7 +38,7 @@ export async function GET() {
     // Avisos internos de las automatizaciones (p. ej. insumo bajo el mínimo). Las pruebas (dry-run) no avisan.
     isPortal
       ? prisma.automationExecution.findMany({
-          where: { organizationId: session.user.organizationId!, status: "SUCCEEDED", createdAt: { gte: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) }, action: { path: ["type"], equals: "alert" } },
+          where: { organizationId: session.user.organizationId!, status: "SUCCEEDED", createdAt: { gte: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) }, OR: [{ action: { path: ["type"], equals: "alert" } }, { action: { path: ["type"], equals: "report" } }] },
           take: 5,
           orderBy: { createdAt: "desc" },
           select: { action: true, createdAt: true },
@@ -62,7 +62,8 @@ export async function GET() {
       at: a.createdAt,
     })),
     ...alerts.map((a) => {
-      const action = (a.action ?? {}) as { title?: string; body?: string; href?: string; severity?: string };
+      const action = (a.action ?? {}) as { type?: string; title?: string; body?: string; href?: string; severity?: string };
+      if (action.type === "report") return { type: "automation_report", label: "Reporte diario listo", detail: action.title ?? "", href: "/portal/automations", at: a.createdAt };
       return { type: "automation_alert", label: action.severity === "critical" ? "Alerta crítica" : "Alerta", detail: `${action.title ?? ""}${action.body ? ` — ${action.body}` : ""}`, href: action.href ?? "/portal/automations", at: a.createdAt };
     }),
     ...openRequests.map((r) => ({

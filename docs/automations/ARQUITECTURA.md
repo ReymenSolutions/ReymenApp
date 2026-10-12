@@ -422,3 +422,11 @@ Mismo esquema de firma e idempotencia que `/api/webhooks/pos/orders` (HMAC con e
 - **Dónde se ve:** la campana del portal (avisos de los últimos 3 días, solo los reales, no los simulados) y "Actividad de las automatizaciones inteligentes" en `/portal/automations` (qué hizo cada automatización o por qué se omitió).
 - **Habilitar:** Admin → Cliente → Automatizaciones (blueprints) → Alerta de inventario bajo (nace en dry-run).
 - **Siguientes (PR 9+):** `daily_executive_report`, `post_visit_feedback`, `second_visit`, `customer_recovery`, atribución (§E–F).
+
+## Q. `daily_executive_report` y detectores del reloj implementados (PR 9)
+
+- **Detector del reloj** (`src/lib/automation/detectors.ts`, corre en cada `tick` antes de procesar la bandeja): para cada automatización ACTIVA con trigger `report.daily_due`, si en la zona del negocio ya pasó `sendHour` (por defecto 8:00), arma el reporte del **día local anterior** y deja **un solo evento por día** (`dedupeKey = report.daily_due:YYYY-MM-DD`; antes de armarlo comprueba que no exista, así el tick cada 5 min no recalcula).
+- **Reporte** (`report.ts`, `buildDailyReport`): ventas brutas y netas, tickets, ticket promedio, cancelaciones (ventas en negativo), comparativo contra el día anterior y contra el mismo día de la semana pasada, top 5 productos, stock crítico (+ cuántos están bajo su mínimo) y merma (`WASTE`) del día. Los días se miden en la zona horaria de la organización (`zonedDayStart`).
+- **Blueprint `daily_executive_report` v1:** audiencia interna, requiere Reymen Foods, config `sendHour`. Acción `{ type: "report", title, date, report }`.
+- **Entrega** (`internal-delivery.ts`): sin dry-run, el motor marca la ejecución `SUCCEEDED` y manda el correo (`dailyReportEmail`) a los usuarios activos con rol **OWNER o MANAGER**; un correo que falla no tumba el evento. Con dry-run solo se registra. El reporte también queda en la actividad de `/portal/automations` y la campana avisa "Reporte diario listo".
+- **Pendiente:** entrega por WhatsApp vía n8n (hoy solo correo; requiere `RESEND_API_KEY`).

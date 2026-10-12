@@ -4,6 +4,8 @@ import { hasModule } from "@/lib/modules";
 import type { StoredDomainEvent } from "@/lib/domain-events";
 import { getBlueprint } from "./blueprints";
 import { evaluateContactPolicy } from "./policy";
+import { deliverInternalAction } from "./internal-delivery";
+import type { ActionSpec } from "./types";
 
 type Outcome = { status: AutomationExecutionStatus; skipReason?: string; action?: Prisma.InputJsonValue; subjectType?: string; subjectId?: string };
 
@@ -45,6 +47,8 @@ export async function runAutomationsForEvent(event: StoredDomainEvent, now: Date
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") continue;
       throw err;
     }
+    // Acción interna real (no simulada): se entrega aquí, una sola vez (una ejecución duplicada ya salió por el `continue`).
+    if (outcome.status === "SUCCEEDED" && outcome.action) await deliverInternalAction(event.organizationId, organization.name, outcome.action as unknown as ActionSpec);
     await prisma.automation.update({ where: { id: automation.id }, data: { lastRunAt: now, lastStatus: outcome.status } });
   }
 }
