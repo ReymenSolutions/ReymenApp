@@ -88,7 +88,7 @@ export async function openInboxThread(conversationId: string): Promise<InboxThre
     hasMore,
     canReply: can(role, "conversations:reply") && conv.status !== "RESOLVED" && conv.status !== "CLOSED",
     canAssign: can(role, "conversations:assign"),
-    aiDrafts: await draftsAvailable(orgId),
+    aiDrafts: await draftsAvailable(orgId, conv.channel),
     teamUsers,
   };
 }

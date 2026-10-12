@@ -3,6 +3,7 @@ import { Prisma, type MessageRole, type ReplyDraft } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { hasModule } from "@/lib/modules";
 import { buildBusinessInstructions } from "@/lib/rulebook";
+import { getChannelMode } from "@/lib/agent-mode";
 
 // ── Configuración ────────────────────────────────────────────────────────────
 
@@ -124,12 +125,11 @@ export type DraftState =
   | { state: "ready"; draft: { id: string; content: string } }
   | { state: "failed" };
 
-/** ¿Esta organización puede recibir borradores? (módulo de IA, clave configurada y el interruptor del rulebook) */
-export async function draftsAvailable(organizationId: string): Promise<boolean> {
+/** ¿Hay borradores para este canal? (módulo de IA, clave configurada y el agente no está apagado en ese canal) */
+export async function draftsAvailable(organizationId: string, channel: string): Promise<boolean> {
   if (!isDraftProviderConfigured()) return false;
   if (!(await hasModule(organizationId, "AI_WHATSAPP"))) return false;
-  const rulebook = await prisma.businessRulebook.findUnique({ where: { organizationId }, select: { draftsEnabled: true } });
-  return rulebook?.draftsEnabled ?? true;
+  return (await getChannelMode(organizationId, channel)) !== "OFF";
 }
 
 function toState(draft: ReplyDraft): DraftState {
@@ -145,7 +145,6 @@ function toState(draft: ReplyDraft): DraftState {
  * nada que responder ("none"). Con `force` se descarta el actual y se redacta otra versión.
  */
 export async function getOrCreateReplyDraft(organizationId: string, conversationId: string, opts: { force?: boolean; now?: Date } = {}): Promise<DraftState> {
-  if (!(await draftsAvailable(organizationId))) return { state: "off" };
   const now = opts.now ?? new Date();
 
   const conversation = await prisma.conversation.findFirst({
@@ -155,6 +154,7 @@ export async function getOrCreateReplyDraft(organizationId: string, conversation
     },
   });
   if (!conversation) return { state: "none" };
+  if (!(await draftsAvailable(organizationId, conversation.channel))) return { state: "off" };
 
   const recent = await prisma.message.findMany({ where: { conversationId }, orderBy: { createdAt: "desc" }, take: TRANSCRIPT_LIMIT, select: { id: true, role: true, content: true } });
   const messages = recent.reverse();

@@ -11,7 +11,10 @@ import { MetricCard } from "@/components/shared/MetricCard";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { AssistantConfigForm } from "@/components/portal/AssistantConfigForm";
-import { AssistantToggle } from "@/components/portal/AssistantToggle";
+import { AgentModesPanel } from "@/components/portal/AgentModesPanel";
+import { getAgentModes } from "@/lib/agent-mode";
+import { isDraftProviderConfigured } from "@/lib/ai-draft";
+import { can } from "@/lib/permissions";
 import { PortalSectionTabs } from "@/components/portal/PortalSectionTabs";
 import { getAiWhatsappTabs } from "@/lib/portal-nav-tabs";
 import { formatDate, formatDateTime } from "@/lib/utils";
@@ -54,6 +57,10 @@ export default async function WhatsAppCenterPage() {
       getWhatsAppData(session.user.organizationId),
     ]);
 
+  const modes = await getAgentModes(session.user.organizationId);
+  const canConfigure = can(session.user.role as UserRole, "knowledge_base:manage");
+  const agentActive = Object.values(modes).some((m) => m !== "OFF");
+
   const resolutionRate =
     totalConvs > 0 ? Math.round((resolvedCount / totalConvs) * 100) : 0;
 
@@ -65,6 +72,8 @@ export default async function WhatsAppCenterPage() {
       />
 
       <PortalSectionTabs tabs={getAiWhatsappTabs(t, session.user.role as UserRole)} />
+
+      <AgentModesPanel initial={modes} canEdit={canConfigure} aiConfigured={isDraftProviderConfigured()} />
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4 mb-6 lg:grid-cols-4">
@@ -98,9 +107,8 @@ export default async function WhatsAppCenterPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-sm text-slate-500">
-                    {assistant?.isActive ?? false ? t.activeStatus : t.pausedStatus}
+                    {agentActive ? t.activeStatus : t.pausedStatus}
                   </span>
-                  <AssistantToggle isActive={assistant?.isActive ?? false} />
                 </div>
               </div>
             </CardHeader>

@@ -36,6 +36,18 @@ describe("POST /api/webhooks/n8n/conversations — per-organization secret isola
     await cleanupOrg(orgB.id);
   });
 
+  it("le dice a n8n el modo del Agente IA en el canal (sugerir por defecto, off si está apagado)", async () => {
+    const body = (channel: string) => JSON.stringify({ contactHandle: `h-${channel}`, channel, message: { role: "USER", content: "hola" } });
+    const send = async (channel: string) => {
+      const b = body(channel);
+      const res = await POST(makeRequest(b, { ...signed(b, orgA.n8nWebhookSecret), "x-reymen-orgid": orgA.id }));
+      return res.json();
+    };
+    expect(await send("instagram")).toMatchObject({ aiMode: "suggest" });
+    await prisma.agentChannelSetting.create({ data: { organizationId: orgA.id, channel: "messenger", mode: "OFF" } });
+    expect(await send("messenger")).toMatchObject({ aiMode: "off" });
+  });
+
   it("accepts a request signed with the target org's own secret", async () => {
     const body = JSON.stringify({
       contactPhone: "+15551234567",
