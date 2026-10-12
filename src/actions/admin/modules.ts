@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
-import { PLAN_MODULES } from "@/lib/permissions";
+import { getPlan } from "@/lib/plans";
 import type { ModuleSource, ModuleStatus, PlatformModule } from "@prisma/client";
 import { requireAdmin } from "@/lib/guards";
 import { ALL_MODULES, hasModule } from "@/lib/modules";
@@ -75,7 +75,7 @@ export async function setOrganizationModule(
 }
 
 /**
- * Activates whichever modules the org's current plan (PLAN_MODULES) includes
+ * Activates whichever modules the org's current plan (Admin → Planes) includes
  * that aren't already ACTIVE — additive only. Never suspends or cancels a
  * module the org already has, even one outside the plan's list (an
  * ADMIN_GRANTED courtesy module stays exactly as it is). This is the one
@@ -88,7 +88,7 @@ export async function syncModulesToPlan(orgId: string) {
   const session = await requireAdmin();
 
   const org = await prisma.organization.findUniqueOrThrow({ where: { id: orgId }, select: { plan: true } });
-  const planModules = PLAN_MODULES[org.plan] ?? PLAN_MODULES.starter;
+  const planModules = (await getPlan(org.plan)).modules;
 
   const existing = await prisma.organizationModule.findMany({
     where: { organizationId: orgId, module: { in: planModules } },

@@ -108,7 +108,7 @@ export async function syncSmartcardMemberLimitAction(data: { orgId: string }) {
   const orgId = z.string().min(1).parse(data.orgId);
   const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { plan: true } });
   if (!org) throw new UserError("Ese cliente no existe.");
-  const limit = planMemberLimit(org.plan);
+  const limit = await planMemberLimit(org.plan);
   const outcome = await syncSmartcardMemberLimit(orgId, limit);
   if (outcome === "no_module") throw new UserError("Esa empresa no tiene el módulo SmartCard activo en SmartCard.");
   if (outcome === "unlinked") throw new UserError("Este cliente no está vinculado con SmartCard.");

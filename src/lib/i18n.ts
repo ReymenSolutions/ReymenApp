@@ -268,6 +268,7 @@ export const strings = {
     adminNavMetrics: "Métricas",
     adminNavAudit: "Auditoría",
     adminNavAi: "IA y Consumo",
+    adminNavPlans: "Planes",
     adminNavWebhooks: "Webhooks",
     adminNavPackages: "Paquetes",
 
@@ -814,6 +815,7 @@ export const strings = {
     adminNavMetrics: "Metrics",
     adminNavAudit: "Audit",
     adminNavAi: "AI & Usage",
+    adminNavPlans: "Plans",
     adminNavWebhooks: "Webhooks",
     adminNavPackages: "Packages",
 

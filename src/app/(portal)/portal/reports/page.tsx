@@ -4,7 +4,7 @@ import { getServerT, getServerLang } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { getEnabledModules } from "@/lib/modules";
 import { getRoiData } from "@/lib/roi";
-import { PLAN_LIMITS } from "@/lib/permissions";
+import { getPlan, planName } from "@/lib/plans";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricCard } from "@/components/shared/MetricCard";
@@ -86,7 +86,7 @@ export default async function PortalReportsPage({ searchParams }: { searchParams
   const crmReport = enabledModules.includes("CRM") ? await getCrmReport(orgId, range) : null;
 
   const hasModule = (m: PlatformModule) => enabledModules.includes(m);
-  const planLabel = (PLAN_LIMITS[org.plan] ?? PLAN_LIMITS.starter).label;
+  const planLabel = planName(await getPlan(org.plan), lang);
 
   const wonLeads = data.leadsByStatus.find((l) => l.status === "WON")?._count.id ?? 0;
   const conversionRate = data.totalLeads > 0 ? Math.round((wonLeads / data.totalLeads) * 100) : 0;

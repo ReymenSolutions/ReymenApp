@@ -14,7 +14,7 @@ import { BillingActions } from "@/components/portal/BillingActions";
 import { PipelineStagesPanel } from "@/components/portal/PipelineStagesPanel";
 import { formatDate } from "@/lib/utils";
 import { can } from "@/lib/permissions";
-import { PLAN_LIMITS, PLAN_MODULES, getMonthlyPlanPriceMxn, isUnlimited } from "@/lib/permissions";
+import { getPlan, monthlyPriceMxn, planDescription, planName } from "@/lib/plans";
 import { getModuleLabel } from "@/lib/modules";
 import { isStripeConfigured } from "@/lib/stripe";
 import type { UserRole } from "@prisma/client";
@@ -56,8 +56,8 @@ export default async function PortalSettingsPage() {
   const canManageTeam = can(session.user.role as UserRole, "team:manage");
   const canManageBilling = can(session.user.role as UserRole, "settings:manage");
   const canManagePipeline = can(session.user.role as UserRole, "pipeline:manage");
-  const plan = PLAN_LIMITS[org.plan] ?? PLAN_LIMITS.starter;
-  const planModules = PLAN_MODULES[org.plan] ?? PLAN_MODULES.starter;
+  const plan = await getPlan(org.plan);
+  const planModules = plan.modules;
   const stripeEnabled = isStripeConfigured();
   const hasActiveSubscription =
     org.stripeSubscriptionStatus === "active" || org.stripeSubscriptionStatus === "trialing";
@@ -91,19 +91,19 @@ export default async function PortalSettingsPage() {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-500">{t.plan}</span>
-              <Badge variant="secondary" className="capitalize text-sm px-3">{plan.label}</Badge>
+              <Badge variant="secondary" className="text-sm px-3">{planName(plan, lang)}</Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-500">{lang === "es" ? "Mensualidad" : "Monthly price"}</span>
               <span className="text-sm font-medium text-slate-900">
-                ${getMonthlyPlanPriceMxn(org.plan, org.customMonthlyPriceMxn !== null ? Number(org.customMonthlyPriceMxn) : null).toLocaleString("en-US")} MXN/{lang === "es" ? "mes" : "mo"}
+                ${monthlyPriceMxn(plan, org.customMonthlyPriceMxn !== null ? Number(org.customMonthlyPriceMxn) : null).toLocaleString("en-US")} MXN/{lang === "es" ? "mes" : "mo"}
               </span>
             </div>
             <div className="space-y-2">
               {[
-                { label: t.includedLeads, value: isUnlimited(plan.leads) ? t.unlimited : plan.leads.toLocaleString("en-US") },
-                { label: t.users, value: isUnlimited(plan.users) ? t.unlimited : plan.users },
-                { label: t.automations, value: isUnlimited(plan.automations) ? t.unlimitedF : plan.automations },
+                { label: t.includedLeads, value: plan.limits.leads === null ? t.unlimited : plan.limits.leads.toLocaleString("en-US") },
+                { label: t.users, value: plan.limits.users === null ? t.unlimited : plan.limits.users },
+                { label: t.automations, value: plan.limits.automations === null ? t.unlimitedF : plan.limits.automations },
               ].map(({ label, value }) => (
                 <div key={label} className="flex justify-between text-sm">
                   <span className="text-slate-500">{label}</span>
@@ -111,6 +111,14 @@ export default async function PortalSettingsPage() {
                 </div>
               ))}
             </div>
+            {planDescription(plan, lang) && <p className="text-xs text-slate-500">{planDescription(plan, lang)}</p>}
+            {plan.features.length > 0 && (
+              <ul className="space-y-1 text-xs text-slate-600">
+                {plan.features.map((f) => (
+                  <li key={f.es} className="flex gap-1.5"><span aria-hidden="true" className="text-emerald-600">✓</span>{lang === "en" ? f.en : f.es}</li>
+                ))}
+              </ul>
+            )}
             <p className="text-xs text-slate-400">
               {lang === "es" ? "Tu plan incluye" : "Your plan includes"}: {planModules.map((m) => getModuleLabel(lang)[m]).join(", ")}
             </p>

@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { getMonthlyPlanPriceMxn } from "./permissions";
+import { getPlan, monthlyPriceMxn } from "./plans";
 import { toUsd } from "./currency";
 import { getMxnPerUsdRate, type ExchangeRateSource } from "./exchange-rate";
 
@@ -92,7 +92,7 @@ export async function getRoiData(organizationId: string, plan: string): Promise<
     select: { customMonthlyPriceMxn: true },
   });
   const customPrice = org?.customMonthlyPriceMxn != null ? Number(org.customMonthlyPriceMxn) : null;
-  const planCostMxn = getMonthlyPlanPriceMxn(plan, customPrice);
+  const planCostMxn = monthlyPriceMxn(await getPlan(plan), customPrice);
   const planCost = mxnPerUsd ? Math.round((planCostMxn / mxnPerUsd) * 100) / 100 : null;
 
   return {

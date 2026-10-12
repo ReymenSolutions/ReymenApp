@@ -12,6 +12,7 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 const { syncModulesToPlan, getOrganizationModules, setOrganizationModule } = await import("./modules");
+const { invalidatePlanCache } = await import("@/lib/plans");
 
 describe("getOrganizationModules", () => {
   it("CRITICAL: refuses a non-admin caller (it is a public server action)", async () => {
@@ -27,6 +28,8 @@ describe("syncModulesToPlan", () => {
 
   afterEach(async () => {
     if (org) await cleanupOrg(org.id);
+    await prisma.plan.deleteMany({ where: { key: "sync-test" } });
+    invalidatePlanCache();
   });
 
   it("denies a non-admin session", async () => {
@@ -38,8 +41,10 @@ describe("syncModulesToPlan", () => {
   it("activates modules the plan includes that aren't already active, and is additive only", async () => {
     authMock.mockResolvedValue(fakeSession({ id: "admin1", role: "SUPER_ADMIN", organizationId: null }));
     org = await createTestOrg("Sync Modules Additive Org");
-    // starter plan (the org's default) → PLAN_MODULES.starter = ["CRM"] only.
-    await prisma.organization.update({ where: { id: org.id }, data: { plan: "starter" } });
+    // A plan whose module list is only CRM (the catalog lives in the database now, so the test brings its own plan).
+    await prisma.plan.upsert({ where: { key: "sync-test" }, create: { key: "sync-test", name: "Sync test", nameEn: "Sync test", priceMxn: 1, aiBudgetMxn: 1, modules: ["CRM"] }, update: { modules: ["CRM"] } });
+    invalidatePlanCache();
+    await prisma.organization.update({ where: { id: org.id }, data: { plan: "sync-test" } });
     // Suspend CRM and AI_WHATSAPP; leave AUTOMATIONS active (outside the plan's list).
     await prisma.organizationModule.updateMany({
       where: { organizationId: org.id, module: "CRM" },

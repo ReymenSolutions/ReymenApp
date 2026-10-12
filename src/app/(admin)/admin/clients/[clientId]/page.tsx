@@ -6,7 +6,7 @@ import { getRulebook, rulebookProgress } from "@/lib/rulebook";
 import { getServerT } from "@/lib/i18n-server";
 import { getEnabledModules } from "@/lib/modules";
 import { METRIC_KEYS, monthPeriod } from "@/lib/metrics";
-import { PLAN_LIMITS, PLAN_MODULES, getMonthlyPlanPriceMxn, isUnlimited } from "@/lib/permissions";
+import { getPlan, getPlans, monthlyPriceMxn } from "@/lib/plans";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -111,9 +111,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
   const configurableAutomationIds = new Set(client.templateInstallations.filter((i) => i.status === "ACTIVE" && i.automationId && i.version.configSpec).map((i) => i.automationId as string));
 
   const { filled: rulebookFilled, total: rulebookTotal } = rulebookProgress(await getRulebook(clientId));
-  const planInfo = PLAN_LIMITS[client.plan] ?? PLAN_LIMITS.starter;
-  const leadsLimit = planInfo.leads;
-  const planModules = PLAN_MODULES[client.plan] ?? PLAN_MODULES.starter;
+  const [planInfo, catalog, planMemberCap] = await Promise.all([getPlan(client.plan), getPlans(), planMemberLimit(client.plan)]);
+  const leadsLimit = planInfo.limits.leads;
+  const planModules = planInfo.modules;
 
   const hasModule = (m: PlatformModule) => enabledModules.includes(m);
   const automationErrors = client.automations.filter((a) => a.status === "ERROR").length;
@@ -143,7 +143,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
 
       <PageHeader
         title={client.name}
-        description={`${client.slug} · ${client.industry ?? t.adminNoIndustry} · ${planInfo.label} $${getMonthlyPlanPriceMxn(client.plan, client.customMonthlyPriceMxn !== null ? Number(client.customMonthlyPriceMxn) : null).toLocaleString("en-US")} MXN`}
+        description={`${client.slug} · ${client.industry ?? t.adminNoIndustry} · ${planInfo.name} $${monthlyPriceMxn(planInfo, client.customMonthlyPriceMxn !== null ? Number(client.customMonthlyPriceMxn) : null).toLocaleString("en-US")} MXN`}
         actions={
           <div className="flex items-center gap-2">
             <OrgWebhookInfoDialog
@@ -155,6 +155,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
             <ChangePlanDialog
               orgId={client.id}
               currentPlan={client.plan}
+              plans={catalog}
               currentCustomPrice={client.customMonthlyPriceMxn !== null ? Number(client.customMonthlyPriceMxn) : null}
             />
             <ToggleClientStatusButton orgId={client.id} isActive={client.isActive} />
@@ -194,8 +195,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
             <CardContent className="p-4 text-center">
               <p className="text-2xl font-bold text-slate-900">{client._count.leads}</p>
               <p className="text-xs text-slate-500 mt-1">{t.totalLeads}</p>
-              <p className={`text-xs mt-0.5 ${client._count.leads >= leadsLimit ? "text-red-500 font-medium" : "text-slate-400"}`}>
-                {client._count.leads} / {isUnlimited(leadsLimit) ? "∞" : leadsLimit} ({t.plan})
+              <p className={`text-xs mt-0.5 ${leadsLimit !== null && client._count.leads >= leadsLimit ? "text-red-500 font-medium" : "text-slate-400"}`}>
+                {client._count.leads} / {leadsLimit === null ? "∞" : leadsLimit} ({t.plan})
               </p>
             </CardContent>
           </Card>
@@ -317,7 +318,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
         <OrganizationModulesPanel
           orgId={client.id}
           modules={moduleEntitlements}
-          planLabel={planInfo.label}
+          planLabel={planInfo.name}
           planModules={planModules}
         />
 
@@ -336,7 +337,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
             orgId={client.id}
             state={await getSmartcardLinkState(client.id)}
             users={client.users.filter((u) => u.isActive).map(({ id, name, email }) => ({ id, name, email }))}
-            planLimit={planMemberLimit(client.plan)}
+            planLimit={planMemberCap}
           />
         )}
 

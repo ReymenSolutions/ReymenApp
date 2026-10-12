@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { can, PLAN_LIMITS } from "./permissions";
+import { can } from "./permissions";
 import type { UserRole } from "@prisma/client";
 
 describe("can", () => {
@@ -29,20 +29,5 @@ describe("can", () => {
 
   it("returns false for a role with no permission table (defensive)", () => {
     expect(can("NOT_A_REAL_ROLE" as UserRole, "team:manage")).toBe(false);
-  });
-});
-
-describe("PLAN_LIMITS", () => {
-  it("orders plans from lowest to highest capacity", () => {
-    expect(PLAN_LIMITS.starter.leads).toBeLessThan(PLAN_LIMITS.professional.leads);
-    expect(PLAN_LIMITS.professional.leads).toBeLessThan(PLAN_LIMITS.business.leads);
-    expect(PLAN_LIMITS.starter.users).toBeLessThan(PLAN_LIMITS.professional.users);
-    expect(PLAN_LIMITS.professional.users).toBeLessThan(PLAN_LIMITS.business.users);
-  });
-
-  it("has a human label for every plan", () => {
-    for (const plan of Object.values(PLAN_LIMITS)) {
-      expect(plan.label).toBeTruthy();
-    }
   });
 });

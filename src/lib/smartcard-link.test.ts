@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+vi.mock("./plans", () => ({ getPlan: async (key: string) => ({ limits: { users: key === "professional" ? 10 : key === "business" ? null : 2 } }) }));
+
 // Cliente falso de Supabase: cada consulta queda registrada con su tabla,
 // operación y filtros, y responde lo que diga `respond`.
 interface Call {
@@ -277,10 +279,10 @@ describe("syncSmartcardMemberLimit", () => {
     expect(calls.some((c) => c.op !== "select")).toBe(false);
   });
 
-  it("maps Reymen plans to SmartCard limits", () => {
-    expect(planMemberLimit("starter")).toBe(2);
-    expect(planMemberLimit("professional")).toBe(10);
-    expect(planMemberLimit("business")).toBeNull();
-    expect(planMemberLimit("unknown")).toBe(2);
+  it("maps Reymen plans to SmartCard limits", async () => {
+    expect(await planMemberLimit("starter")).toBe(2);
+    expect(await planMemberLimit("professional")).toBe(10);
+    expect(await planMemberLimit("business")).toBeNull();
+    expect(await planMemberLimit("unknown")).toBe(2);
   });
 });

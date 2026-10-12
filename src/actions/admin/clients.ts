@@ -8,6 +8,7 @@ import { generateSlug, generateWebhookSecret } from "@/lib/utils";
 import { logAudit } from "@/lib/audit";
 import { requireAdmin } from "@/lib/guards";
 import { UserError } from "@/lib/user-error";
+import { getPlans } from "@/lib/plans";
 import { syncSmartcardMemberLimitForPlan } from "@/lib/smartcard-link";
 
 const createClientSchema = z.object({
@@ -84,8 +85,11 @@ export async function createClient(formData: FormData) {
 export async function changePlan(orgId: string, plan: string, customMonthlyPriceMxn: number | null = null) {
   const session = await requireAdmin();
 
-  const validPlans = ["starter", "professional", "business"];
-  if (!validPlans.includes(plan)) throw new UserError("Plan inválido");
+  // Plan activo del catálogo (o el que el cliente ya tiene: un plan retirado no impide dejarlo como está).
+  const catalog = await getPlans({ includeInactive: true });
+  const current = await prisma.organization.findUnique({ where: { id: orgId }, select: { plan: true } });
+  const chosen = catalog.find((p) => p.key === plan);
+  if (!chosen || (!chosen.isActive && current?.plan !== plan)) throw new UserError("Plan inválido");
 
   // Precio pactado opcional (plan personalizado de un cliente): vacío = precio de lista del plan.
   const customPrice = customMonthlyPriceMxn;
