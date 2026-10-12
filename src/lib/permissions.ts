@@ -23,7 +23,11 @@ export type Action =
   | "settings:manage"
   // Food: menú, recetas, precios, costos, inventario, compras y proveedores.
   // Agente y Visor pueden ver Food pero no cambiarlo.
-  | "food:manage";
+  | "food:manage"
+  // Lealtad (Food): registrar visitas y canjear recompensas en caja. Lo tiene
+  // también el Agente (personal de caja); configurar el programa sigue
+  // pidiendo food:manage. Ver el tablero de Lealtad no pide permiso aparte.
+  | "loyalty:operate";
 
 const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
   SUPER_ADMIN: [
@@ -33,7 +37,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
     "conversations:view", "conversations:escalate", "conversations:resolve", "conversations:reply", "conversations:assign",
     "knowledge_base:manage", "prompts:manage", "team:manage",
     "requests:create", "reports:view", "settings:view", "settings:manage",
-    "food:manage",
+    "food:manage", "loyalty:operate",
   ],
   ADMIN: [
     "leads:create", "leads:delete", "leads:update_status",
@@ -42,7 +46,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
     "conversations:view", "conversations:escalate", "conversations:resolve", "conversations:reply", "conversations:assign",
     "knowledge_base:manage", "prompts:manage", "team:manage",
     "requests:create", "reports:view", "settings:view", "settings:manage",
-    "food:manage",
+    "food:manage", "loyalty:operate",
   ],
   OWNER: [
     "leads:create", "leads:delete", "leads:update_status",
@@ -51,7 +55,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
     "conversations:view", "conversations:escalate", "conversations:resolve", "conversations:reply", "conversations:assign",
     "knowledge_base:manage", "prompts:manage", "team:manage",
     "requests:create", "reports:view", "settings:view", "settings:manage",
-    "food:manage",
+    "food:manage", "loyalty:operate",
   ],
   MANAGER: [
     "leads:create", "leads:update_status",
@@ -60,7 +64,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
     "conversations:view", "conversations:escalate", "conversations:resolve", "conversations:reply", "conversations:assign",
     "knowledge_base:manage", "prompts:manage",
     "requests:create", "reports:view", "settings:view",
-    "food:manage",
+    "food:manage", "loyalty:operate",
   ],
   AGENT: [
     "leads:create", "leads:update_status",
@@ -68,6 +72,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
     "automations:view",
     "conversations:view", "conversations:escalate", "conversations:resolve", "conversations:reply",
     "requests:create",
+    "loyalty:operate",
   ],
   VIEWER: [
     "leads:update_status",

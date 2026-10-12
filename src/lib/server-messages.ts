@@ -223,6 +223,28 @@ const EN: Record<string, string> = {
   "Ya existe un usuario con ese email": "A user with that email already exists",
   "Ya existe una categoría con ese nombre": "A category with that name already exists",
   "Zona horaria inválida": "Invalid time zone",
+  // Lealtad (Reymen Food)
+  "Cliente no encontrado.": "Customer not found.",
+  "Demasiados intentos. Intenta de nuevo en unos minutos.": "Too many attempts. Try again in a few minutes.",
+  "El código postal debe tener 5 dígitos.": "The postal code must have 5 digits.",
+  "El programa de lealtad está en pausa por ahora.": "The loyalty program is paused for now.",
+  "El programa de lealtad está en pausa.": "The loyalty program is paused.",
+  "Elige la sucursal del programa.": "Choose the program's branch.",
+  "Esa sucursal no existe.": "That branch doesn't exist.",
+  "Escribe tu nombre.": "Enter your name.",
+  "Esta recompensa ya fue canjeada.": "This reward was already redeemed.",
+  "Este cliente acaba de registrar una visita. Espera unos minutos para registrar otra.": "This customer just recorded a visit. Wait a few minutes to record another one.",
+  "Este programa de lealtad no está disponible.": "This loyalty program isn't available.",
+  "Este programa solo acumula visitas en su sucursal.": "This program only collects visits at its own branch.",
+  "Para inscribirte acepta el uso de tus datos para el programa.": "To sign up, accept the use of your data for the program.",
+  "Primero configura el programa de lealtad.": "Set up the loyalty program first.",
+  "Recompensa no encontrada.": "Reward not found.",
+  "Revisa el monto de la venta.": "Check the sale amount.",
+  "Revisa los datos del programa.": "Check the program details.",
+  "Revisa tu correo.": "Check your email.",
+  "Revisa tu número de WhatsApp (10 dígitos).": "Check your WhatsApp number (10 digits).",
+  "Revisa tus datos.": "Check your details.",
+  "Solicitud inválida. Recarga la página.": "Invalid request. Reload the page.",
 };
 
 // Los pocos mensajes que se escribieron en inglés en el servidor.

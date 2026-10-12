@@ -32,3 +32,14 @@ export async function requireFoodManager() {
   await assertModuleEnabled(session.user.organizationId, "FOOD_OPS");
   return session;
 }
+
+/**
+ * Caja de Lealtad: registrar visitas y canjear recompensas. Sesión de la
+ * organización con loyalty:operate (incluye al Agente, que es quien cobra) y
+ * el módulo Food activo — Lealtad es parte de Reymen Food.
+ */
+export async function requireLoyaltyOperator() {
+  const session = await requireOrgPermission("loyalty:operate");
+  await assertModuleEnabled(session.user.organizationId, "FOOD_OPS");
+  return session;
+}
