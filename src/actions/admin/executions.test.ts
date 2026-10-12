@@ -7,7 +7,8 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 const authMock = vi.fn();
 vi.mock("@/lib/auth", () => ({ auth: () => authMock(), isAdmin: (r: string) => r === "SUPER_ADMIN" || r === "ADMIN" }));
 
-const { getOrganizationExecutions, retryExecution, retryEligibility } = await import("./executions");
+const { getOrganizationExecutions, retryExecution } = await import("./executions");
+const { retryEligibility } = await import("@/lib/automation/retry");
 
 describe("retryEligibility (puro)", () => {
   const ok = { status: "FAILED" as const, providerMessageId: null, action: { type: "message" } };
