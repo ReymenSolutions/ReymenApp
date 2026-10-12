@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Loader2, Zap } from "lucide-react";
+import { Loader2, Settings2, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BlueprintConfigDialog } from "@/components/admin/BlueprintConfigDialog";
 import { enableBlueprint, setBlueprintDryRun, disableBlueprint, type BlueprintRow } from "@/actions/admin/blueprints";
 import { usePreferences } from "@/context/preferences";
 import { getErrorMessage } from "@/lib/user-error";
@@ -17,6 +18,7 @@ const COPY = {
     enable: "Habilitar",
     pause: "Pausar",
     resume: "Reanudar",
+    configure: "Configurar",
     dry: "Simulación",
     live: "Envío real",
     toLive: "Pasar a envío real",
@@ -37,6 +39,7 @@ const COPY = {
     enable: "Enable",
     pause: "Pause",
     resume: "Resume",
+    configure: "Configure",
     dry: "Simulation",
     live: "Live sending",
     toLive: "Switch to live sending",
@@ -58,6 +61,7 @@ export function OrganizationBlueprintsPanel({ orgId, blueprints }: { orgId: stri
   const t = COPY[lang === "en" ? "en" : "es"];
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
+  const [configuring, setConfiguring] = useState<string | null>(null);
 
   function run(id: string, fn: () => Promise<unknown>) {
     setBusy(id);
@@ -73,14 +77,14 @@ export function OrganizationBlueprintsPanel({ orgId, blueprints }: { orgId: stri
   }
 
   return (
-    <Card>
+    <Card id="blueprints" className="lg:col-span-2 scroll-mt-20">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Zap className="h-4 w-4" /> {t.title}
         </CardTitle>
         <p className="text-sm text-muted-foreground">{t.intro}</p>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="grid gap-3 md:grid-cols-2">
         {blueprints.map((b) => {
           const inst = b.instance;
           const active = inst?.status === "ACTIVE";
@@ -132,21 +136,30 @@ export function OrganizationBlueprintsPanel({ orgId, blueprints }: { orgId: stri
                     >
                       {inst.dryRun ? t.toLive : t.toDry}
                     </Button>
+                    <Button size="sm" variant="outline" disabled={pending} onClick={() => setConfiguring(b.key)}>
+                      <Settings2 className="mr-1 h-3 w-3" /> {t.configure}
+                    </Button>
                     <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(b.key, () => disableBlueprint({ orgId, automationId: inst.id }))}>
                       {t.pause}
                     </Button>
                   </>
                 )}
                 {inst && !active && (
-                  <Button size="sm" variant="outline" disabled={pending} onClick={() => run(b.key, () => enableBlueprint({ orgId, key: b.key }))}>
-                    {t.resume}
-                  </Button>
+                  <>
+                    <Button size="sm" variant="outline" disabled={pending} onClick={() => setConfiguring(b.key)}>
+                      <Settings2 className="mr-1 h-3 w-3" /> {t.configure}
+                    </Button>
+                    <Button size="sm" variant="outline" disabled={pending} onClick={() => run(b.key, () => enableBlueprint({ orgId, key: b.key }))}>
+                      {t.resume}
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
           );
         })}
       </CardContent>
+      <BlueprintConfigDialog orgId={orgId} blueprintKey={configuring} onClose={() => setConfiguring(null)} />
     </Card>
   );
 }

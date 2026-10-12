@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Blueprint } from "../types";
+import { COMMON, UNIT } from "../config-ui";
 import type { DailyReport } from "../report";
 
 const configSchema = z.object({
@@ -21,6 +22,9 @@ export const dailyExecutiveReport: Blueprint<Config> = {
   status: "active",
   configSchema,
   defaultConfig: configSchema.parse({}),
+  configUi: {
+    sendHour: { group: "when", kind: "hour", label: { es: "Enviar a partir de las", en: "Send from" }, help: { es: "Hora local del negocio. Se manda el resumen del día anterior, una vez al día.", en: "Local business time. The previous day's summary is sent once a day." } },
+  },
   decide: (event) => {
     const report = (event.payload ?? {}) as Partial<DailyReport>;
     if (!report.date || !report.today) return { kind: "skip", reason: "no_report" };

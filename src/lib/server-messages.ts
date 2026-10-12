@@ -174,6 +174,7 @@ const EN: Record<string, string> = {
   "Borrador no encontrado": "Draft not found",
   "Canal no válido": "Invalid channel",
   "Modo no válido": "Invalid mode",
+  "Primero habilita esta automatización para el cliente": "First enable this automation for the client",
   "Este cliente ya tiene una plantilla de n8n parecida activa; confirma que no se duplicarán los mensajes": "This client already has a similar n8n template active; confirm that messages will not be duplicated",
   "Enlace no válido": "Invalid link",
   "Elige una calificación del 1 al 5": "Choose a rating from 1 to 5",

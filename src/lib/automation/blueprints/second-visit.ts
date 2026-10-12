@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Blueprint } from "../types";
+import { COMMON, UNIT } from "../config-ui";
 
 const configSchema = z.object({
   channel: z.enum(["whatsapp", "sms"]).default("whatsapp"),
@@ -26,6 +27,14 @@ export const secondVisit: Blueprint<Config> = {
   status: "active",
   configSchema,
   defaultConfig: configSchema.parse({}),
+  crossCheck: (c) => (c.afterDays >= c.maxDays ? { key: "afterDays", code: "must_be_less", other: "maxDays" } : null),
+  configUi: {
+    channel: COMMON.channel,
+    afterDays: { group: "when", kind: "number", label: { es: "Escribir después de", en: "Message after" }, help: { es: "Días desde su primera visita sin que haya vuelto.", en: "Days since their first visit without coming back." }, unit: UNIT.days },
+    maxDays: { group: "limits", kind: "number", label: { es: "No escribir pasados", en: "Do not message after" }, help: { es: "Pasado este tiempo desde su primera visita ya no se le escribe (evita mensajes a clientes de hace años al encenderla).", en: "After this time since their first visit they are no longer messaged (avoids writing to customers from years ago when switched on)." }, unit: UNIT.days },
+    cooldownDays: { group: "limits", kind: "number", label: { es: "Un mensaje cada", en: "One message every" }, help: { es: "Un cliente recibe este mensaje una sola vez en este lapso.", en: "A customer receives this message only once in this period." }, unit: UNIT.days },
+    quietStart: COMMON.quietStart, quietEnd: COMMON.quietEnd,
+  },
   decide: (_event, ctx) => {
     const customer = ctx.customer;
     if (!customer) return { kind: "skip", reason: "no_customer" };
