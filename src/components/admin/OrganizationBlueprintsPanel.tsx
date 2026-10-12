@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Loader2, Settings2, Zap } from "lucide-react";
+import Link from "next/link";
+import { ListChecks, Loader2, Settings2, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ const COPY = {
     pause: "Pausar",
     resume: "Reanudar",
     configure: "Configurar",
+    executions: "Ver ejecuciones y errores",
     dry: "Simulación",
     live: "Envío real",
     toLive: "Pasar a envío real",
@@ -40,6 +42,7 @@ const COPY = {
     pause: "Pause",
     resume: "Resume",
     configure: "Configure",
+    executions: "View executions and errors",
     dry: "Simulation",
     live: "Live sending",
     toLive: "Switch to live sending",
@@ -81,6 +84,9 @@ export function OrganizationBlueprintsPanel({ orgId, blueprints }: { orgId: stri
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Zap className="h-4 w-4" /> {t.title}
+          <Link href={`/admin/clients/${orgId}/automations`} className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline">
+            <ListChecks className="h-3.5 w-3.5" /> {t.executions}
+          </Link>
         </CardTitle>
         <p className="text-sm text-muted-foreground">{t.intro}</p>
       </CardHeader>
