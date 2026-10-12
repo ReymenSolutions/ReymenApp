@@ -171,6 +171,7 @@ const EN: Record<string, string> = {
   "Paquete no encontrado": "Package not found",
   "Para activar Reymen POS primero activa Reymen Foods": "To enable Reymen POS, enable Reymen Foods first",
   "Automatización no encontrada": "Automation not found",
+  "Borrador no encontrado": "Draft not found",
   "Activa primero los módulos que necesita esta automatización": "First enable the modules this automation needs",
   "Para activar un perfil digital en esta tarjeta, usa el botón Activar perfil digital en vez de este formulario.":
     "To activate a digital profile on this card, use the Activate digital profile button instead of this form.",

@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { can } from "@/lib/permissions";
 import { assertInboxAccess } from "@/lib/inbox";
+import { draftsAvailable } from "@/lib/ai-draft";
 import { logAudit } from "@/lib/audit";
 import { UserError } from "@/lib/user-error";
 import type { Message, UserRole } from "@prisma/client";
@@ -38,6 +39,8 @@ export type InboxThread = {
   hasMore: boolean;
   canReply: boolean;
   canAssign: boolean;
+  /** La IA puede sugerir un borrador (módulo, clave de Claude e interruptor del negocio). */
+  aiDrafts: boolean;
   teamUsers: { id: string; name: string | null; email: string }[];
 };
 
@@ -85,6 +88,7 @@ export async function openInboxThread(conversationId: string): Promise<InboxThre
     hasMore,
     canReply: can(role, "conversations:reply") && conv.status !== "RESOLVED" && conv.status !== "CLOSED",
     canAssign: can(role, "conversations:assign"),
+    aiDrafts: await draftsAvailable(orgId),
     teamUsers,
   };
 }

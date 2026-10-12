@@ -5,6 +5,7 @@ import { strings } from "@/lib/i18n";
 
 vi.mock("@/context/preferences", () => ({ usePreferences: () => ({ lang: "es", t: strings.es }) }));
 const saveRulebook = vi.fn();
+vi.mock("@/actions/ai-drafts", () => ({ setDraftsEnabled: vi.fn() }));
 vi.mock("@/actions/rulebook", () => ({ saveRulebook: (...a: unknown[]) => saveRulebook(...a) }));
 const toast = { success: vi.fn(), error: vi.fn() };
 vi.mock("sonner", () => ({ toast: { success: (...a: unknown[]) => toast.success(...a), error: (...a: unknown[]) => toast.error(...a) } }));

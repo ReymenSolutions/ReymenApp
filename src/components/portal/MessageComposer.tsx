@@ -17,12 +17,29 @@ const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 export function MessageComposer({
   conversationId,
   onSent,
+  prefill,
+  draftId,
+  slot,
 }: {
   conversationId: string;
   onSent: (message: MessageWithSender) => void;
+  /** Texto que se pone en el cuadro (el borrador de la IA). `force` lo reemplaza aunque haya algo escrito. */
+  prefill?: { key: string; text: string; force?: boolean } | null;
+  /** Borrador de IA del que parte la respuesta: al enviar se registra qué se mandó. */
+  draftId?: string | null;
+  /** Contenido extra sobre el cuadro de respuesta (el panel de la sugerencia de IA). */
+  slot?: React.ReactNode;
 }) {
   const { lang } = usePreferences();
   const [content, setContent] = useState("");
+  const [appliedKey, setAppliedKey] = useState<string | null>(null);
+  if (prefill && prefill.key !== appliedKey) {
+    setAppliedKey(prefill.key);
+    if (prefill.force || content.trim() === "") setContent(prefill.text);
+  }
+  // Con un borrador de IA (varias líneas) Enter agrega un renglón y se envía con Ctrl/Cmd + Enter: así un
+  // toque accidental no manda el mensaje a medias.
+  const multiline = !!draftId;
   const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
   const [attachmentType, setAttachmentType] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -53,6 +70,7 @@ export function MessageComposer({
           content,
           attachmentUrl: attachmentUrl ?? undefined,
           attachmentType: attachmentType ?? undefined,
+          draftId: draftId ?? undefined,
         });
         onSent(result.message as MessageWithSender);
         if (!result.delivered) {
@@ -69,6 +87,7 @@ export function MessageComposer({
 
   return (
     <div className="border-t border-slate-100 p-3">
+      {slot}
       {attachmentUrl && (
         <div className="mb-2 flex items-center gap-2 rounded-md bg-slate-50 px-2.5 py-1.5 text-xs text-slate-600">
           {attachmentType?.startsWith("image/") ? (
@@ -98,14 +117,15 @@ export function MessageComposer({
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              handleSend();
-            }
+            if (e.key !== "Enter" || e.shiftKey) return;
+            if (multiline && !(e.metaKey || e.ctrlKey)) return;
+            e.preventDefault();
+            handleSend();
           }}
           placeholder={lang === "es" ? "Escribe una respuesta..." : "Write a reply..."}
-          className="min-h-[40px] flex-1 resize-none text-sm"
-          rows={1}
+          aria-label={lang === "es" ? "Tu respuesta" : "Your reply"}
+          className={multiline ? "min-h-[120px] flex-1 resize-y text-sm" : "min-h-[40px] flex-1 resize-none text-sm"}
+          rows={multiline ? 5 : 1}
         />
         <Button size="sm" onClick={handleSend} disabled={isPending || (!content.trim() && !attachmentUrl)}>
           {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
