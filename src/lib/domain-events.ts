@@ -17,7 +17,7 @@ export type DomainEventInput = {
 };
 
 /** Eventos que emite hoy el sistema (el motor de automatizaciones se suscribe a estos). */
-export const DOMAIN_EVENT_TYPES = ["sale.completed", "sale.cancelled", "customer.created", "inventory.level_changed", "report.daily_due"] as const;
+export const DOMAIN_EVENT_TYPES = ["sale.completed", "sale.cancelled", "customer.created", "inventory.level_changed", "report.daily_due", "customer.second_visit_due", "customer.at_risk"] as const;
 export type DomainEventType = (typeof DOMAIN_EVENT_TYPES)[number];
 
 /**
