@@ -15,6 +15,7 @@ import { Zap, ArrowRight, Activity } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { FeedbackCases } from "@/components/portal/FeedbackCases";
 import { can } from "@/lib/permissions";
+import { getAttributionSummary, ATTRIBUTION_WINDOW_DAYS } from "@/lib/automation/attribution";
 import type { UserRole } from "@prisma/client";
 
 async function getAutomations(orgId: string) {
@@ -91,11 +92,12 @@ export default async function PortalAutomationsPage() {
   if (!session?.user.organizationId) return redirect("/login");
   await requireModule(session.user.organizationId, "AUTOMATIONS");
 
-  const [t, automations, activity, feedbackCases] = await Promise.all([
+  const [t, automations, activity, feedbackCases, attribution] = await Promise.all([
     getServerT(),
     getAutomations(session.user.organizationId),
     getSmartActivity(session.user.organizationId),
     getOpenFeedback(session.user.organizationId),
+    getAttributionSummary(session.user.organizationId, 30),
   ]);
 
   return (
@@ -169,6 +171,27 @@ export default async function PortalAutomationsPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {attribution.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader className="pb-3">
+            <p className="font-semibold text-slate-900">Ingresos asociados a automatizaciones</p>
+            <p className="text-xs text-slate-400">
+              Últimos 30 días. Se asocia una venta al último mensaje que el cliente recibió en los {ATTRIBUTION_WINDOW_DAYS} días anteriores a comprar (una venta cuenta para una sola automatización; las cancelaciones se restan). Son ingresos <strong>asociados</strong>, no prueba de que la automatización los provocó: el cliente pudo haber comprado de todos modos.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {attribution.map((a) => (
+              <div key={a.automationId} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-slate-50 px-3 py-2">
+                <p className="text-sm font-medium text-slate-700">{a.name}</p>
+                <p className="text-xs text-slate-500">
+                  {a.touches} mensajes enviados · {a.conversions} {a.conversions === 1 ? "venta asociada" : "ventas asociadas"} · <span className="font-semibold text-slate-900">{formatMoney(a.revenue)}</span>
+                </p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       )}
 
       {feedbackCases.length > 0 && (

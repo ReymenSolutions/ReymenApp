@@ -88,6 +88,8 @@ model Organization {
   pipelineAiRuns          PipelineAiRun[]
   pipelineAiActions       PipelineAiAction[]
   customerFeedback        CustomerFeedback[]
+  automationTouches       AutomationTouch[]
+  automationConversions   AutomationConversion[]
   replyDrafts             ReplyDraft[]
   branches                Branch[]
   branchDishes            BranchDish[]
@@ -2152,4 +2154,53 @@ model CustomerFeedback {
   @@unique([organizationId, saleId])
   @@index([organizationId, status, createdAt])
   @@index([customerId])
+}
+
+// ─── ATRIBUCIÓN DE INGRESOS (conservadora y auditable) ────────────
+// Un contacto (touch) = una ejecución de mensaje que salió con éxito a un cliente. Una conversión = una venta de ese
+// cliente dentro de la ventana siguiente al último contacto. Una venta se atribuye a lo más a UNA automatización.
+// Lenguaje honesto: "ingresos asociados" (último contacto), no "ingresos generados": no prueba causalidad.
+
+model AutomationTouch {
+  id                   String   @id @default(cuid())
+  organizationId       String
+  customerId           String
+  automationId         String
+  executionId          String   @unique
+  channel              String
+  touchedAt            DateTime
+  conversionWindowDays Int      @default(7)
+  createdAt            DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, customerId, touchedAt])
+  @@index([automationId, touchedAt])
+}
+
+model AutomationConversion {
+  id                String    @id @default(cuid())
+  organizationId    String
+  customerId        String
+  automationId      String
+  executionId       String
+  touchId           String
+  saleId            String
+  /// Fecha de la venta (los reportes por periodo cuentan por esta, no por cuándo se procesó).
+  saleAt            DateTime
+  /// Monto NETO de la venta (sin propina ni IVA); baja si hay cancelaciones parciales.
+  attributedRevenue Decimal   @db.Decimal(12, 2)
+  /// Versión de la regla (blueprint) vigente al atribuir.
+  ruleVersion       Int?
+  /// Una cancelación revierte la conversión con este registro; nunca se borra la fila.
+  revertedAt        DateTime?
+  revertedBySaleId  String?
+  createdAt         DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Una venta se atribuye como máximo a una automatización.
+  @@unique([organizationId, saleId])
+  @@index([automationId, saleAt])
+  @@index([organizationId, saleAt])
 }
