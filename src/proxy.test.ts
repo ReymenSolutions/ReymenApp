@@ -44,4 +44,18 @@ describe("middleware", () => {
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toContain("/login");
   });
+
+  it("lets the public loyalty enrollment and card pages through without a session", async () => {
+    for (const path of ["/lealtad/cafe-norte-demo", "/lealtad/cafe-norte-demo/tarjeta/abcdefghijklmnopqrstuvwx"]) {
+      const res = (await middleware(makeReq(path), {} as never)) as Response;
+      expect(res.status).not.toBe(307);
+    }
+  });
+
+  it("does not open look-alike paths: /lealtadx and the portal loyalty dashboard still need a session", async () => {
+    for (const path of ["/lealtadx/algo", "/portal/food/loyalty"]) {
+      const res = (await middleware(makeReq(path), {} as never)) as Response;
+      expect(res.status).toBe(307);
+    }
+  });
 });

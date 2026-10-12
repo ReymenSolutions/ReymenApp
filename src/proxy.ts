@@ -25,6 +25,9 @@ export default auth(async (req) => {
   const isAuthApiRoute = pathname.startsWith("/api/auth");
   const isCronRoute = pathname.startsWith("/api/cron");
   const isHealthRoute = pathname.startsWith("/api/health");
+  // Lealtad (Reymen Food): inscripción y tarjeta del cliente final. Públicas a
+  // propósito — el cliente no tiene cuenta; la tarjeta se abre con su token.
+  const isPublicLoyaltyRoute = pathname === "/lealtad" || pathname.startsWith("/lealtad/");
 
   // Public routes — webhook and cron routes authenticate themselves
   // (HMAC signature / CRON_SECRET) rather than via session, /api/v1/* routes
@@ -33,7 +36,7 @@ export default auth(async (req) => {
   // route) so n8n's pull requests must not be redirected to /login here, and
   // the health check must be reachable by load balancers/uptime monitors
   // without a session
-  if (isAuthPage || isWebhookRoute || isApiV1Route || isAuthApiRoute || isCronRoute || isHealthRoute) {
+  if (isAuthPage || isWebhookRoute || isApiV1Route || isAuthApiRoute || isCronRoute || isHealthRoute || isPublicLoyaltyRoute) {
     return NextResponse.next();
   }
 
