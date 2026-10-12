@@ -1,8 +1,10 @@
 import { z } from "zod";
 import type { Blueprint } from "../types";
-import { COMMON, UNIT } from "../config-ui";
+import { COMMON, CONTROL_FIELD, UNIT } from "../config-ui";
 
 const configSchema = z.object({
+  /** % de clientes elegibles que quedan como grupo de control (no reciben el mensaje). 0 = apagado. */
+  controlGroupPct: z.number().int().min(0).max(50).default(0),
   channel: z.enum(["whatsapp", "sms"]).default("whatsapp"),
   /** Un cliente recibe la bienvenida una sola vez en este lapso. */
   cooldownDays: z.number().int().min(1).max(3650).default(365),
@@ -24,6 +26,7 @@ export const welcomeNewCustomer: Blueprint<Config> = {
   configSchema,
   defaultConfig: configSchema.parse({}),
   configUi: {
+    controlGroupPct: CONTROL_FIELD,
     channel: COMMON.channel,
     cooldownDays: { group: "limits", kind: "number", label: { es: "Una bienvenida cada", en: "One welcome every" }, help: { es: "Un cliente recibe la bienvenida una sola vez en este lapso.", en: "A customer gets the welcome only once in this period." }, unit: UNIT.days },
     quietStart: COMMON.quietStart, quietEnd: COMMON.quietEnd,

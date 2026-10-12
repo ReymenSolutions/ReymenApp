@@ -1,8 +1,10 @@
 import { z } from "zod";
 import type { Blueprint } from "../types";
-import { COMMON, UNIT } from "../config-ui";
+import { COMMON, CONTROL_FIELD, UNIT } from "../config-ui";
 
 const configSchema = z.object({
+  /** % de clientes elegibles que quedan como grupo de control (no reciben el mensaje). 0 = apagado. */
+  controlGroupPct: z.number().int().min(0).max(50).default(0),
   channel: z.enum(["whatsapp", "sms"]).default("whatsapp"),
   /** Días desde su primera visita sin que haya vuelto. */
   afterDays: z.number().int().min(3).max(90).default(14),
@@ -29,6 +31,7 @@ export const secondVisit: Blueprint<Config> = {
   defaultConfig: configSchema.parse({}),
   crossCheck: (c) => (c.afterDays >= c.maxDays ? { key: "afterDays", code: "must_be_less", other: "maxDays" } : null),
   configUi: {
+    controlGroupPct: CONTROL_FIELD,
     channel: COMMON.channel,
     afterDays: { group: "when", kind: "number", label: { es: "Escribir después de", en: "Message after" }, help: { es: "Días desde su primera visita sin que haya vuelto.", en: "Days since their first visit without coming back." }, unit: UNIT.days },
     maxDays: { group: "limits", kind: "number", label: { es: "No escribir pasados", en: "Do not message after" }, help: { es: "Pasado este tiempo desde su primera visita ya no se le escribe (evita mensajes a clientes de hace años al encenderla).", en: "After this time since their first visit they are no longer messaged (avoids writing to customers from years ago when switched on)." }, unit: UNIT.days },

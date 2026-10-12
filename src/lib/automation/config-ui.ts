@@ -130,3 +130,12 @@ export const NOTIFY_FIELDS = {
     help: { es: "Número en formato internacional, p. ej. +5215512345678. Solo se usa si el aviso incluye WhatsApp.", en: "Number in international format, e.g. +5215512345678. Only used if the notice includes WhatsApp." },
   },
 } satisfies Record<string, ConfigFieldMeta>;
+
+/** Grupo de control: porcentaje de clientes elegibles a quienes NO se les escribe, para medir si el mensaje de verdad provoca el regreso. */
+export const CONTROL_FIELD = {
+  group: "extras",
+  kind: "number",
+  label: { es: "Grupo de control", en: "Control group" },
+  help: { es: "Porcentaje de clientes elegibles a quienes a propósito NO se les escribe, para medir si el mensaje de verdad provoca que regresen (se compara contra quienes sí lo reciben). 0 = apagado; 10 es lo habitual.", en: "Share of eligible customers who are deliberately NOT messaged, to measure whether the message really brings them back (compared against those who do receive it). 0 = off; 10 is typical." },
+  unit: { es: "%", en: "%" },
+} satisfies ConfigFieldMeta;

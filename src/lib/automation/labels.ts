@@ -26,6 +26,7 @@ export const SKIP_REASON: Record<string, string> = {
   already_returned: "el cliente ya regresó",
   no_report: "sin datos del reporte",
   expired: "pasó el plazo de envío",
+  control_group: "grupo de control (a propósito no se le escribió, para medir el efecto)",
   provider_skipped: "el proveedor la omitió",
   unsupported_action: "acción no soportada",
 };

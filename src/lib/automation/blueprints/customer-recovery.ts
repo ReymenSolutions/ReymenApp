@@ -1,8 +1,10 @@
 import { z } from "zod";
 import type { Blueprint } from "../types";
-import { COMMON, UNIT } from "../config-ui";
+import { COMMON, CONTROL_FIELD, UNIT } from "../config-ui";
 
 const configSchema = z.object({
+  /** % de clientes elegibles que quedan como grupo de control (no reciben el mensaje). 0 = apagado. */
+  controlGroupPct: z.number().int().min(0).max(50).default(0),
   channel: z.enum(["whatsapp", "sms"]).default("whatsapp"),
   /** Visitas mínimas para considerar a alguien cliente habitual. */
   minVisits: z.number().int().min(2).max(50).default(3),
@@ -32,6 +34,7 @@ export const customerRecovery: Blueprint<Config> = {
   defaultConfig: configSchema.parse({}),
   crossCheck: (c) => (c.minDays >= c.maxDays ? { key: "minDays", code: "must_be_less", other: "maxDays" } : null),
   configUi: {
+    controlGroupPct: CONTROL_FIELD,
     channel: COMMON.channel,
     minVisits: { group: "who", kind: "number", label: { es: "Visitas mínimas", en: "Minimum visits" }, help: { es: "Cuántas veces tiene que haber venido para considerarlo cliente habitual.", en: "How many times they must have visited to count as a regular." }, unit: UNIT.visits },
     minDays: { group: "when", kind: "number", label: { es: "Mínimo sin venir", en: "Minimum time away" }, help: { es: "No se considera en riesgo antes de estos días sin venir, aunque su ritmo sea muy corto.", en: "Not considered at risk before this many days away, even if their pace is very short." }, unit: UNIT.days },
