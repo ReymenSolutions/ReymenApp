@@ -348,10 +348,10 @@ function ThreadPane({ conversationId, onBack, onChanged }: { conversationId: str
       </div>
     );
   }
-  return <ThreadContent data={data} onBack={onBack} onChanged={onChanged} />;
+  return <ThreadContent data={data} onBack={onBack} onChanged={onChanged} onReload={() => setAttempt((n) => n + 1)} />;
 }
 
-function ThreadContent({ data, onBack, onChanged }: { data: InboxThread; onBack: () => void; onChanged: () => void }) {
+function ThreadContent({ data, onBack, onChanged, onReload }: { data: InboxThread; onBack: () => void; onChanged: () => void; onReload: () => void }) {
   const { lang } = usePreferences();
   const t = COPY[lang === "en" ? "en" : "es"];
   const c = data.conversation;
@@ -438,7 +438,7 @@ function ThreadContent({ data, onBack, onChanged }: { data: InboxThread; onBack:
         </div>
       </header>
       <div className="border-b border-slate-100 px-4 py-2">
-        <ConversationActions conversationId={c.id} status={c.status} aiHandled={c.aiHandled} assignedTo={c.assignedTo} teamUsers={data.teamUsers} canReply={data.canReply} canAssign={data.canAssign} />
+        <ConversationActions conversationId={c.id} status={c.status} aiHandled={c.aiHandled} assignedTo={c.assignedTo} teamUsers={data.teamUsers} canReply={data.canReply} canAssign={data.canAssign} onChanged={onReload} />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         <MessageThread conversationId={c.id} contactName={c.contactName} initialMessages={data.messages} hasMoreInitially={data.hasMore} canReply={data.canReply} aiDrafts={data.aiDrafts} />

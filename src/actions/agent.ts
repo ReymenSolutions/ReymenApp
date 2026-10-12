@@ -7,11 +7,15 @@ import { assertModuleEnabled } from "@/lib/modules";
 import { logAudit } from "@/lib/audit";
 import { UserError } from "@/lib/user-error";
 import { INBOX_CHANNELS } from "@/lib/channels";
-import { SELECTABLE_AGENT_MODES, isAgentMode, setChannelMode } from "@/lib/agent-mode";
+import { isAgentMode, setChannelMode } from "@/lib/agent-mode";
+import { getRulebook, rulebookProgress } from "@/lib/rulebook";
 import type { UserRole } from "@prisma/client";
 
-/** Cambia lo que hace el Agente IA en un canal: apagado, sugerir o (próximamente) automático. */
-export async function setAgentChannelMode(channel: string, mode: string) {
+/**
+ * Cambia lo que hace el Agente IA en un canal: apagado, sugerir o automático. El automático responde sin que nadie
+ * revise, así que exige confirmación explícita y que el negocio ya tenga escrito su Rulebook.
+ */
+export async function setAgentChannelMode(channel: string, mode: string, opts: { confirmed?: boolean } = {}) {
   const session = await auth();
   if (!session?.user.organizationId) throw new UserError("No autorizado");
   if (!can(session.user.role as UserRole, "knowledge_base:manage")) throw new UserError("No autorizado");
@@ -19,7 +23,11 @@ export async function setAgentChannelMode(channel: string, mode: string) {
   await assertModuleEnabled(organizationId, "AI_WHATSAPP");
 
   if (!(INBOX_CHANNELS as readonly string[]).includes(channel)) throw new UserError("Canal no válido");
-  if (!isAgentMode(mode) || !SELECTABLE_AGENT_MODES.includes(mode)) throw new UserError("Modo no válido");
+  if (!isAgentMode(mode)) throw new UserError("Modo no válido");
+  if (mode === "AUTO") {
+    if (!opts.confirmed) throw new UserError("Confirma que el agente responda solo en este canal");
+    if (rulebookProgress(await getRulebook(organizationId)).filled === 0) throw new UserError("Escribe tu Rulebook antes de activar el modo automático");
+  }
 
   await setChannelMode(organizationId, channel, mode, session.user.id);
   await logAudit({ organizationId, userId: session.user.id, action: "agent.mode", resource: "AgentChannelSetting", resourceId: channel, metadata: { channel, mode } });

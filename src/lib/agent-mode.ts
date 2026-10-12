@@ -5,8 +5,6 @@ import { INBOX_CHANNELS, normalizeChannel } from "@/lib/channels";
 /** Sin configuración, el Agente IA sugiere borradores: nunca contesta solo sin que el dueño lo active. */
 export const DEFAULT_AGENT_MODE: AgentMode = "SUGGEST";
 export const AGENT_MODES: readonly AgentMode[] = ["OFF", "SUGGEST", "AUTO"];
-/** Modos que ya se pueden elegir (AUTO llega en su propio cambio). */
-export const SELECTABLE_AGENT_MODES: readonly AgentMode[] = ["OFF", "SUGGEST"];
 
 export function isAgentMode(value: unknown): value is AgentMode {
   return typeof value === "string" && (AGENT_MODES as readonly string[]).includes(value);

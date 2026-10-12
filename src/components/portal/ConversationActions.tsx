@@ -23,10 +23,12 @@ interface ConversationActionsProps {
   teamUsers: TeamUser[];
   canReply: boolean;
   canAssign: boolean;
+  /** Para pantallas que guardan la conversación en su propio estado (el inbox): vuelve a cargarla tras un cambio. */
+  onChanged?: () => void;
 }
 
 export function ConversationActions({
-  conversationId, status, aiHandled, assignedTo, teamUsers, canReply, canAssign,
+  conversationId, status, aiHandled, assignedTo, teamUsers, canReply, canAssign, onChanged,
 }: ConversationActionsProps) {
   const { lang } = usePreferences();
   const [loading, setLoading] = useState<string | null>(null);
@@ -38,6 +40,7 @@ export function ConversationActions({
       await action();
       toast.success(successMsg);
       router.refresh();
+      onChanged?.();
     } catch (e) {
       toast.error(getErrorMessage(e, (lang === "es" ? "Error" : "Error")));
     } finally {
