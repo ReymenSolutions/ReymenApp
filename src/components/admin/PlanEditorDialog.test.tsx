@@ -14,7 +14,7 @@ vi.mock("sonner", () => ({ toast: { success: (...a: unknown[]) => toast.success(
 import { PlanEditorDialog } from "./PlanEditorDialog";
 import type { PlanRow } from "@/actions/admin/plans";
 
-const plan: PlanRow = { key: "professional", name: "Professional", nameEn: "Professional", description: "", descriptionEn: "", priceMxn: 1999, limits: { leads: 5000, users: 10, automations: 10 }, aiBudgetMxn: 200, maxAiAgents: 3, modules: ["CRM", "AUTOMATIONS"], features: [{ es: "3 agentes IA activos", en: "3 active AI agents" }], stripePriceId: null, sortOrder: 1, isActive: true, version: 3, clients: 4, revisions: [] };
+const plan: PlanRow = { key: "professional", name: "Professional", nameEn: "Professional", description: "", descriptionEn: "", priceMxn: 1999, limits: { leads: 5000, users: 10, automations: 10 }, aiBudgetMxn: 200, maxAiAgents: 3, modules: ["CRM", "AUTOMATIONS"], features: [{ es: "3 agentes IA activos", en: "3 active AI agents" }], stripePriceId: null, accent: "blue", sortOrder: 1, isActive: true, version: 3, clients: 4, revisions: [] };
 
 describe("PlanEditorDialog", () => {
   beforeEach(() => { updatePlan.mockClear(); createPlan.mockClear(); toast.success.mockClear(); });
@@ -51,5 +51,18 @@ describe("PlanEditorDialog", () => {
     await userEvent.type(screen.getByLabelText("Presupuesto interno de IA (MXN/mes)"), "900");
     await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
     expect(createPlan).toHaveBeenCalledWith(expect.objectContaining({ key: "premium", name: "Premium", priceMxn: "5999", aiBudgetMxn: "900" }));
+  });
+});
+
+describe("PlanEditorDialog: color", () => {
+  it("se elige el color del plan y viaja al guardar", async () => {
+    updatePlan.mockClear();
+    render(<PlanEditorDialog plan={plan} />);
+    await userEvent.click(screen.getByRole("button", { name: /Editar/ }));
+    expect(screen.getByRole("radio", { name: "Azul" })).toHaveAttribute("aria-checked", "true");
+    await userEvent.click(screen.getByRole("radio", { name: "Violeta" }));
+    expect(screen.getByRole("radio", { name: "Violeta" })).toHaveAttribute("aria-checked", "true");
+    await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
+    expect(updatePlan.mock.calls[0][1]).toMatchObject({ accent: "violet" });
   });
 });

@@ -10,7 +10,7 @@ vi.mock("@/lib/smartcard-link", async (orig) => ({ ...(await orig<typeof import(
 const authMock = vi.fn();
 vi.mock("@/lib/auth", () => ({ auth: () => authMock(), isAdmin: (role: string) => role === "SUPER_ADMIN" || role === "ADMIN" }));
 
-const { updatePlan, createPlan, listPlansForAdmin } = await import("./plans");
+const { updatePlan, createPlan, listPlansForAdmin, listCustomPlanClients } = await import("./plans");
 const { changePlan } = await import("./clients");
 const { assertPlanCapacity } = await import("@/lib/plan-limits");
 const { getRoiData } = await import("@/lib/roi");
@@ -21,7 +21,7 @@ const { getPlan } = await import("@/lib/plans");
 const { stripePriceIdFor, planForPriceId } = await import("@/lib/stripe");
 
 const KEY = "qa-plan";
-const base = { name: "QA", nameEn: "QA", description: "Plan de pruebas", descriptionEn: "", priceMxn: 500, maxLeads: 5, maxUsers: 1, maxAutomations: 1, aiBudgetMxn: 10, maxAiAgents: 2, modules: ["CRM"] as const, features: [{ es: "Una cosa", en: "One thing" }], stripePriceId: null, sortOrder: 90, isActive: true };
+const base = { name: "QA", nameEn: "QA", description: "Plan de pruebas", descriptionEn: "", priceMxn: 500, maxLeads: 5, maxUsers: 1, maxAutomations: 1, aiBudgetMxn: 10, maxAiAgents: 2, modules: ["CRM"] as const, features: [{ es: "Una cosa", en: "One thing" }], stripePriceId: null, accent: "emerald" as const, sortOrder: 90, isActive: true };
 
 describe("Admin → Planes: lo que se edita se actualiza en todo lo conectado", () => {
   let org: { id: string };
@@ -119,6 +119,20 @@ describe("Admin → Planes: lo que se edita se actualiza en todo lo conectado", 
     // No se puede retirar el último plan activo.
     const active = await prisma.plan.findMany({ where: { isActive: true }, select: { key: true } });
     if (active.length === 1) await expect(updatePlan(active[0].key, { ...base, modules: [], isActive: false })).rejects.toThrow(/al menos un plan/i);
+  });
+
+  it("el color del plan se guarda, solo acepta los colores del catálogo, y los clientes con precio pactado aparecen en el card Personalizado", async () => {
+    admin();
+    await updatePlan(KEY, { ...base, modules: [...base.modules], accent: "violet" });
+    expect((await getPlan(KEY)).accent).toBe("violet");
+    await expect(updatePlan(KEY, { ...base, modules: [], accent: "fucsia" as never })).rejects.toThrow(/plan/i);
+    await prisma.organization.update({ where: { id: org.id }, data: { customMonthlyPriceMxn: 1234 } });
+    const custom = await listCustomPlanClients();
+    expect(custom.find((c) => c.id === org.id)).toMatchObject({ plan: KEY, priceMxn: 1234 });
+    await prisma.organization.update({ where: { id: org.id }, data: { customMonthlyPriceMxn: null } });
+    expect((await listCustomPlanClients()).some((c) => c.id === org.id)).toBe(false);
+    authMock.mockResolvedValue(fakeSession({ id: "u1", role: "OWNER", organizationId: org.id }));
+    await expect(listCustomPlanClients()).rejects.toThrow(/autorizado/i);
   });
 
   it("valida los datos y las llaves nuevas", async () => {

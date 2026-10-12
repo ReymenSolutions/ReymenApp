@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { changePlan } from "@/actions/admin/clients";
 import { planName, type PlanDef } from "@/lib/plans";
+import { accentTone } from "@/lib/plan-accent";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getModuleLabel } from "@/lib/modules";
@@ -23,13 +24,6 @@ interface ChangePlanDialogProps {
   /** Precio pactado actual (MXN/mes), o null si paga el precio de lista del plan. */
   currentCustomPrice: number | null;
 }
-
-// Colores por posición en el catálogo (los planes los define Admin → Planes, no este archivo).
-const TONES = [
-  { color: "border-slate-200", badge: "bg-slate-100 text-slate-700" },
-  { color: "border-brand-300", badge: "bg-brand-100 text-brand-700" },
-  { color: "border-amber-300", badge: "bg-amber-100 text-amber-700" },
-];
 
 export function ChangePlanDialog({ orgId, currentPlan, currentCustomPrice, plans }: ChangePlanDialogProps) {
   const { lang } = usePreferences();
@@ -70,8 +64,8 @@ export function ChangePlanDialog({ orgId, currentPlan, currentCustomPrice, plans
         </DialogHeader>
 
         <div className="space-y-3 py-2">
-          {plans.map((plan, idx) => {
-            const tone = TONES[Math.min(idx, TONES.length - 1)];
+          {plans.map((plan) => {
+            const tone = accentTone(plan.accent);
             const isSelected = selected === plan.key;
             // El precio sale del catálogo: es el mismo que usa el ROI, la facturación y el portal.
             const price = `$${plan.priceMxn.toLocaleString("en-US")} MXN/${lang === "es" ? "mes" : "mo"}`;
@@ -81,7 +75,7 @@ export function ChangePlanDialog({ orgId, currentPlan, currentCustomPrice, plans
                 key={plan.key}
                 onClick={() => setSelected(plan.key)}
                 className={`w-full rounded-lg border-2 p-4 text-left transition-all ${
-                  isSelected ? `${tone.color} bg-slate-50` : "border-slate-100 hover:border-slate-200"
+                  isSelected ? `${tone.border} bg-slate-50` : "border-slate-100 hover:border-slate-200"
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -104,6 +98,22 @@ export function ChangePlanDialog({ orgId, currentPlan, currentCustomPrice, plans
               </button>
             );
           })}
+
+          {/* Personalizado: no es otro plan del catálogo, es un precio pactado sobre el plan elegido (se escribe abajo). */}
+          <button
+            type="button"
+            onClick={() => document.getElementById("customPrice")?.focus()}
+            className={`w-full rounded-lg border-2 p-4 text-left transition-all ${customPrice.trim() !== "" ? `${accentTone("violet").border} bg-slate-50` : "border-dashed border-slate-200 hover:border-violet-300"}`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${accentTone("violet").badge}`}>{lang === "es" ? "Personalizado" : "Custom"}</span>
+                <span className="text-sm font-medium text-slate-900">{customPrice.trim() !== "" ? `$${Number(customPrice).toLocaleString("en-US")} MXN/${lang === "es" ? "mes" : "mo"}` : lang === "es" ? "Precio pactado" : "Agreed price"}</span>
+              </div>
+              {customPrice.trim() !== "" && <Check className="h-4 w-4 text-violet-600" />}
+            </div>
+            <p className="mt-1.5 text-xs text-slate-500">{lang === "es" ? "Conserva el plan elegido (sus límites y módulos) con un precio propio para este cliente." : "Keeps the selected plan (its limits and modules) with its own price for this client."}</p>
+          </button>
         </div>
 
         <div className="space-y-1.5">

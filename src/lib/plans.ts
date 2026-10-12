@@ -23,6 +23,8 @@ export type PlanDef = {
   modules: PlatformModule[];
   features: PlanFeature[];
   stripePriceId: string | null;
+  /** Color de diferenciación (ver plan-accent.ts). */
+  accent: string;
   sortOrder: number;
   isActive: boolean;
   version: number;
@@ -45,6 +47,7 @@ export function toPlanDef(row: Plan): PlanDef {
     modules: row.modules,
     features,
     stripePriceId: row.stripePriceId,
+    accent: row.accent,
     sortOrder: row.sortOrder,
     isActive: row.isActive,
     version: row.version,

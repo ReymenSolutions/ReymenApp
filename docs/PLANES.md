@@ -3,7 +3,7 @@
 El catálogo comercial vive en la base de datos (`Plan`, con su historial en `PlanRevision`) y se edita en **Admin → Planes**. `Organization.plan` guarda la **llave** del plan (`starter`, `professional`, `business`…); el nombre visible, el precio y todo lo demás se pueden cambiar sin tocar código.
 
 ## Qué se edita
-Nombre (es/en), descripción, **precio mensual (MXN)**, límites de leads/usuarios/automatizaciones (vacío = ilimitado), **presupuesto interno de IA**, **agentes IA activos**, módulos incluidos, **"qué incluye"** (líneas es/en), precio de Stripe, orden y si el plan está activo.
+Nombre (es/en), descripción, **precio mensual (MXN)**, límites de leads/usuarios/automatizaciones (vacío = ilimitado), **presupuesto interno de IA**, **agentes IA activos**, módulos incluidos, **"qué incluye"** (líneas es/en), precio de Stripe, **color de diferenciación** (sutil: borde superior, fondo suave e insignia; se ve igual en Planes, Cambiar plan y Configuración del portal), orden y si el plan está activo.
 
 ## Dónde se actualiza al guardar (de inmediato, todo lee de `src/lib/plans.ts`)
 | Dónde | Qué toma del plan |
@@ -17,6 +17,9 @@ Nombre (es/en), descripción, **precio mensual (MXN)**, límites de leads/usuari
 | SmartCard | límite de integrantes = usuarios del plan |
 | Stripe (checkout y webhook) | precio de Stripe del plan (o `STRIPE_PRICE_<LLAVE>`) |
 | Admin → Métricas | nombre del plan |
+
+## Card «Personalizado»
+En Admin → Planes, junto a los planes del catálogo, hay un card **Personalizado**: no es una fila del catálogo sino los clientes con **precio pactado** (`Organization.customMonthlyPriceMxn`) —su plan base, el precio de lista y lo que pagan—. En **Cambiar plan** hay una tarjeta equivalente que lleva al campo «Precio mensual pactado».
 
 ## Reglas
 - Cada edición sube la **versión**, guarda cómo quedó el plan (`PlanRevision`) y queda en la bitácora con el antes y el después (`plan.update`, `plan.create`).

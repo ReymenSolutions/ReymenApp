@@ -2425,6 +2425,8 @@ model Plan {
   features       Json             @default("[]")
   // Precio de Stripe de este plan (si se cobra en línea); vacío = se toma de la variable de entorno STRIPE_PRICE_<LLAVE>.
   stripePriceId  String?
+  // Color de diferenciación (src/lib/plan-accent.ts): slate, blue, amber, emerald, violet o rose.
+  accent         String           @default("slate")
   sortOrder      Int              @default(0)
   // Un plan inactivo no se puede asignar a clientes nuevos; los que ya lo tienen lo conservan.
   isActive       Boolean          @default(true)

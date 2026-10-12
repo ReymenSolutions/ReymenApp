@@ -21,6 +21,7 @@ describe("catálogo de planes", () => {
     expect([starter.maxAiAgents, pro.maxAiAgents, business.maxAiAgents]).toEqual([1, 3, 5]);
     expect(starter.features.length).toBeGreaterThan(3);
     expect(planName(business, "es")).toBe("Business");
+    expect([starter.accent, pro.accent, business.accent]).toEqual(["slate", "blue", "amber"]);
     expect(planDescription(business, "en")).toBe("");
   });
 

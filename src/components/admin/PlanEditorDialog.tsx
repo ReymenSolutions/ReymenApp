@@ -13,22 +13,23 @@ import { getModuleLabel } from "@/lib/modules";
 import { usePreferences } from "@/context/preferences";
 import { getErrorMessage } from "@/lib/user-error";
 import type { PlatformModule } from "@prisma/client";
+import { ACCENT_TONES, PLAN_ACCENTS, type PlanAccent } from "@/lib/plan-accent";
 
 const MODULES: PlatformModule[] = ["CRM", "AI_WHATSAPP", "AUTOMATIONS", "FOOD_OPS", "REYMEN_POS", "NFC_QR", "MARKETING_ADS"];
 
 type Form = {
   key: string; name: string; nameEn: string; description: string; descriptionEn: string; priceMxn: string;
   leads: string; users: string; automations: string; aiBudgetMxn: string; aiAgents: string;
-  modules: PlatformModule[]; features: { es: string; en: string }[]; stripePriceId: string; sortOrder: string; isActive: boolean;
+  modules: PlatformModule[]; features: { es: string; en: string }[]; stripePriceId: string; accent: PlanAccent; sortOrder: string; isActive: boolean;
 };
 
-const EMPTY: Form = { key: "", name: "", nameEn: "", description: "", descriptionEn: "", priceMxn: "", leads: "", users: "", automations: "", aiBudgetMxn: "", aiAgents: "", modules: ["CRM"], features: [], stripePriceId: "", sortOrder: "10", isActive: true };
+const EMPTY: Form = { key: "", name: "", nameEn: "", description: "", descriptionEn: "", priceMxn: "", leads: "", users: "", automations: "", aiBudgetMxn: "", aiAgents: "", modules: ["CRM"], features: [], stripePriceId: "", accent: "slate", sortOrder: "10", isActive: true };
 
 const fromPlan = (p: PlanRow): Form => ({
   key: p.key, name: p.name, nameEn: p.nameEn, description: p.description, descriptionEn: p.descriptionEn, priceMxn: String(p.priceMxn),
   leads: p.limits.leads === null ? "" : String(p.limits.leads), users: p.limits.users === null ? "" : String(p.limits.users), automations: p.limits.automations === null ? "" : String(p.limits.automations),
   aiBudgetMxn: String(p.aiBudgetMxn), aiAgents: p.maxAiAgents === null ? "" : String(p.maxAiAgents), modules: p.modules, features: p.features.map((f) => ({ ...f })),
-  stripePriceId: p.stripePriceId ?? "", sortOrder: String(p.sortOrder), isActive: p.isActive,
+  stripePriceId: p.stripePriceId ?? "", accent: (PLAN_ACCENTS as readonly string[]).includes(p.accent) ? (p.accent as PlanAccent) : "slate", sortOrder: String(p.sortOrder), isActive: p.isActive,
 });
 
 /** Alta y edición de un plan: nombre, precio, límites, presupuesto de IA, módulos y "qué incluye". Aplica a todo lo conectado al guardar. */
@@ -63,7 +64,7 @@ export function PlanEditorDialog({ plan }: { plan?: PlanRow }) {
           name: form.name, nameEn: form.nameEn || form.name, description: form.description, descriptionEn: form.descriptionEn,
           priceMxn: form.priceMxn, maxLeads: form.leads, maxUsers: form.users, maxAutomations: form.automations, aiBudgetMxn: form.aiBudgetMxn, maxAiAgents: form.aiAgents,
           modules: form.modules, features: form.features.filter((f) => f.es.trim()).map((f) => ({ es: f.es, en: f.en.trim() || f.es })),
-          stripePriceId: form.stripePriceId || null, sortOrder: form.sortOrder, isActive: form.isActive,
+          stripePriceId: form.stripePriceId || null, accent: form.accent, sortOrder: form.sortOrder, isActive: form.isActive,
         };
         if (plan) await updatePlan(plan.key, body as never);
         else await createPlan({ ...body, key: form.key } as never);
@@ -119,6 +120,18 @@ export function PlanEditorDialog({ plan }: { plan?: PlanRow }) {
             {limitField("users", es ? "Usuarios" : "Users", es ? "Ilimitado" : "Unlimited")}
             {limitField("automations", es ? "Automatizaciones" : "Automations", es ? "Ilimitadas" : "Unlimited")}
             {limitField("aiAgents", es ? "Agentes IA activos" : "Active AI agents", es ? "Sin tope" : "No cap")}
+          </section>
+
+          <section className="space-y-2">
+            <Label id="plan-accent-label">{es ? "Color del plan (sutil, para diferenciarlo)" : "Plan color (subtle, to tell plans apart)"}</Label>
+            <div role="radiogroup" aria-labelledby="plan-accent-label" className="flex flex-wrap gap-2">
+              {PLAN_ACCENTS.map((a) => (
+                <button key={a} type="button" role="radio" aria-checked={form.accent === a} aria-label={ACCENT_TONES[a].label[es ? "es" : "en"]} title={ACCENT_TONES[a].label[es ? "es" : "en"]} onClick={() => set("accent", a)}
+                  className={`flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors ${form.accent === a ? `${ACCENT_TONES[a].border} ${ACCENT_TONES[a].badge}` : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
+                  <span className={`h-3 w-3 rounded-full ${ACCENT_TONES[a].swatch}`} />{ACCENT_TONES[a].label[es ? "es" : "en"]}
+                </button>
+              ))}
+            </div>
           </section>
 
           <section className="space-y-2">

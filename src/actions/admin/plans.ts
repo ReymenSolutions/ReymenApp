@@ -8,6 +8,7 @@ import { logAudit } from "@/lib/audit";
 import { requireAdmin } from "@/lib/guards";
 import { UserError } from "@/lib/user-error";
 import { getPlans, invalidatePlanCache, toPlanDef, type PlanDef } from "@/lib/plans";
+import { PLAN_ACCENTS } from "@/lib/plan-accent";
 
 // ─── Admin → Planes: el catálogo comercial se edita aquí y se actualiza en todo lo conectado ───────────────────────
 
@@ -29,6 +30,7 @@ const planFields = z.object({
   modules: z.array(z.enum(MODULES)).max(MODULES.length),
   features: z.array(z.object({ es: z.string().trim().min(1).max(120), en: z.string().trim().min(1).max(120) })).max(14),
   stripePriceId: z.string().trim().max(120).nullable().optional(),
+  accent: z.enum(PLAN_ACCENTS).default("slate"),
   sortOrder: z.coerce.number().int().min(0).max(1000).default(0),
   isActive: z.boolean().default(true),
 });
@@ -90,7 +92,7 @@ export async function updatePlan(key: string, data: PlanInput) {
         name: d.name, nameEn: d.nameEn, description: d.description, descriptionEn: d.descriptionEn,
         priceMxn: d.priceMxn, maxLeads: d.maxLeads, maxUsers: d.maxUsers, maxAutomations: d.maxAutomations,
         aiBudgetMxn: d.aiBudgetMxn, maxAiAgents: d.maxAiAgents, modules: d.modules, features: d.features,
-        stripePriceId: d.stripePriceId || null, sortOrder: d.sortOrder, isActive: d.isActive,
+        stripePriceId: d.stripePriceId || null, accent: d.accent, sortOrder: d.sortOrder, isActive: d.isActive,
         version: { increment: 1 }, updatedById: session.user.id,
       },
     });
@@ -117,7 +119,7 @@ export async function createPlan(data: PlanInput & { key: string }) {
       data: {
         key: data.key, name: d.name, nameEn: d.nameEn, description: d.description, descriptionEn: d.descriptionEn, priceMxn: d.priceMxn,
         maxLeads: d.maxLeads, maxUsers: d.maxUsers, maxAutomations: d.maxAutomations, aiBudgetMxn: d.aiBudgetMxn, maxAiAgents: d.maxAiAgents,
-        modules: d.modules, features: d.features, stripePriceId: d.stripePriceId || null, sortOrder: d.sortOrder, isActive: d.isActive, updatedById: session.user.id,
+        modules: d.modules, features: d.features, stripePriceId: d.stripePriceId || null, accent: d.accent, sortOrder: d.sortOrder, isActive: d.isActive, updatedById: session.user.id,
       },
     });
     await tx.planRevision.create({ data: { planId: row.id, version: row.version, snapshot: snapshotOf(toPlanDef(row)), changedById: session.user.id } });
@@ -126,4 +128,19 @@ export async function createPlan(data: PlanInput & { key: string }) {
   await logAudit({ userId: session.user.id, action: "plan.create", resource: "Plan", resourceId: created.id, metadata: { key: data.key, name: d.name, priceMxn: d.priceMxn } });
   propagate();
   return { success: true, key: data.key };
+}
+
+export type CustomPlanClient = { id: string; name: string; plan: string; planName: string; priceMxn: number; listPriceMxn: number };
+
+/** Clientes con un precio pactado (plan personalizado): su plan base, el precio de lista y lo que realmente pagan. */
+export async function listCustomPlanClients(): Promise<CustomPlanClient[]> {
+  await requireAdmin();
+  const [orgs, plans] = await Promise.all([
+    prisma.organization.findMany({ where: { customMonthlyPriceMxn: { not: null }, isActive: true }, select: { id: true, name: true, plan: true, customMonthlyPriceMxn: true }, orderBy: { name: "asc" } }),
+    getPlans({ includeInactive: true }),
+  ]);
+  return orgs.map((o) => {
+    const plan = plans.find((p) => p.key === o.plan);
+    return { id: o.id, name: o.name, plan: o.plan, planName: plan?.name ?? o.plan, priceMxn: Number(o.customMonthlyPriceMxn), listPriceMxn: plan?.priceMxn ?? 0 };
+  });
 }

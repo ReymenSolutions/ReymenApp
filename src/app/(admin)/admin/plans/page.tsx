@@ -1,6 +1,8 @@
-import { Layers3 } from "lucide-react";
+import Link from "next/link";
+import { Sparkles } from "lucide-react";
 import { getServerLang } from "@/lib/i18n-server";
-import { listPlansForAdmin } from "@/actions/admin/plans";
+import { listCustomPlanClients, listPlansForAdmin } from "@/actions/admin/plans";
+import { accentTone } from "@/lib/plan-accent";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +15,7 @@ import { formatDateTime } from "@/lib/utils";
 export default async function AdminPlansPage() {
   const es = (await getServerLang()) === "es";
   const lang = es ? "es" : "en";
-  const plans = await listPlansForAdmin();
+  const [plans, customClients] = await Promise.all([listPlansForAdmin(), listCustomPlanClients()]);
   const moduleLabel = getModuleLabel(lang);
   const limit = (n: number | null, one: string, many: string, unlimited: string) => (n === null ? unlimited : `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`);
 
@@ -27,11 +29,11 @@ export default async function AdminPlansPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         {plans.map((p) => (
-          <Card key={p.key} className={p.isActive ? "" : "opacity-70"}>
+          <Card key={p.key} className={`${accentTone(p.accent).card} ${p.isActive ? "" : "opacity-70"}`}>
             <CardHeader className="flex-row items-start justify-between gap-2 space-y-0">
               <div className="min-w-0">
                 <CardTitle className="flex items-center gap-2 text-lg">
-                  <Layers3 className="h-4 w-4 text-slate-400" /> {planName(p, lang)}
+                  <span className={`h-2.5 w-2.5 rounded-full ${accentTone(p.accent).dot}`} aria-hidden="true" /> {planName(p, lang)}
                   {!p.isActive && <Badge variant="secondary" className="text-[10px]">{es ? "Retirado" : "Retired"}</Badge>}
                 </CardTitle>
                 <p className="mt-1 text-xs text-slate-500">{p.key} · v{p.version} · {p.clients} {es ? (p.clients === 1 ? "cliente" : "clientes") : p.clients === 1 ? "client" : "clients"}</p>
@@ -65,6 +67,38 @@ export default async function AdminPlansPage() {
             </CardContent>
           </Card>
         ))}
+
+        {/* Plan personalizado: no es una fila del catálogo; es un precio pactado con un cliente concreto sobre alguno de los planes. */}
+        <Card className={accentTone("violet").card}>
+          <CardHeader className="space-y-1">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <span className="h-2.5 w-2.5 rounded-full bg-violet-500" aria-hidden="true" /> {es ? "Personalizado" : "Custom"}
+              <Sparkles className="h-4 w-4 text-violet-400" />
+            </CardTitle>
+            <p className="text-xs text-slate-500">{es ? "Precio pactado por cliente" : "Price agreed per client"} · {customClients.length} {es ? (customClients.length === 1 ? "cliente" : "clientes") : customClients.length === 1 ? "client" : "clients"}</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-3xl font-bold text-slate-900">{es ? "A la medida" : "Tailor-made"}</p>
+            <p className="text-sm text-slate-600">
+              {es ? "Para negocios con condiciones propias (p. ej. Villa Gardenia). El cliente conserva uno de los planes de arriba —con sus límites y módulos— y paga un precio pactado que no cambia al editar el precio de lista. Se fija en Cliente → Cambiar plan → «Precio mensual pactado»." : "For businesses with their own terms (e.g. Villa Gardenia). The client keeps one of the plans above —with its limits and modules— and pays an agreed price that does not change when the list price is edited. Set it in Client → Change plan → “Agreed monthly price”."}
+            </p>
+            {customClients.length === 0 ? (
+              <p className="text-sm text-slate-400">{es ? "Aún no hay clientes con precio pactado." : "No clients with an agreed price yet."}</p>
+            ) : (
+              <ul className="divide-y divide-violet-100 rounded-lg border border-violet-100 bg-white/60">
+                {customClients.map((c) => (
+                  <li key={c.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                    <Link href={`/admin/clients/${c.id}`} className="min-w-0 truncate font-medium text-slate-900 hover:underline">{c.name}</Link>
+                    <span className="flex-shrink-0 text-right">
+                      <span className="block font-semibold text-slate-900">${c.priceMxn.toLocaleString("en-US")} MXN</span>
+                      <span className="block text-xs text-slate-500">{c.planName} · {es ? "lista" : "list"} ${c.listPriceMxn.toLocaleString("en-US")}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

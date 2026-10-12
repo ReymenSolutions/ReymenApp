@@ -15,6 +15,7 @@ import { PipelineStagesPanel } from "@/components/portal/PipelineStagesPanel";
 import { formatDate } from "@/lib/utils";
 import { can } from "@/lib/permissions";
 import { getPlan, monthlyPriceMxn, planDescription, planName } from "@/lib/plans";
+import { accentTone } from "@/lib/plan-accent";
 import { getModuleLabel } from "@/lib/modules";
 import { isStripeConfigured } from "@/lib/stripe";
 import type { UserRole } from "@prisma/client";
@@ -91,7 +92,7 @@ export default async function PortalSettingsPage() {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-500">{t.plan}</span>
-              <Badge variant="secondary" className="text-sm px-3">{planName(plan, lang)}</Badge>
+              <Badge variant="outline" className={`border-transparent text-sm px-3 ${accentTone(plan.accent).badge}`}>{planName(plan, lang)}</Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-500">{lang === "es" ? "Mensualidad" : "Monthly price"}</span>
