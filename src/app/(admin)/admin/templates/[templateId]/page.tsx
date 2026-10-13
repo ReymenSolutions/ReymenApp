@@ -151,7 +151,7 @@ export default async function TemplateDetailPage({
                           <p className="mt-1 text-xs text-slate-500">{v.changelog}</p>
                         )}
                       </div>
-                      <span className="text-xs text-slate-400">{formatDate(v.createdAt)}</span>
+                      <span className="text-xs text-slate-400">{formatDate(v.createdAt, lang)}</span>
                     </div>
                     {v.n8nWorkflowId && (
                       <p className="mt-1 text-xs text-emerald-600">
@@ -199,7 +199,7 @@ export default async function TemplateDetailPage({
                           {inst.organization.name}
                         </Link>
                         <p className="text-xs text-slate-400">
-                          v{inst.version.version} · {formatDate(inst.installedAt)}
+                          v{inst.version.version} · {formatDate(inst.installedAt, lang)}
                         </p>
                       </div>
                       <div className="flex items-center gap-1.5">

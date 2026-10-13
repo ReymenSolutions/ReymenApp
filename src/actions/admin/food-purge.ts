@@ -4,13 +4,14 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { logAudit } from "@/lib/audit";
 import { previewPosSalesPurge, purgePosSales, purgeRange, type PosSalesPurgeSummary } from "@/lib/food-purge";
+import { DEFAULT_TIMEZONE } from "@/lib/business-day";
 import { requireAdmin } from "@/lib/guards";
 import { UserError } from "@/lib/user-error";
 
 /** Fechas válidas o un error para mostrar; los errores de base de datos no se muestran tal cual. */
 function checkRange(from: string, to: string) {
   try {
-    purgeRange(from, to);
+    purgeRange(from, to, DEFAULT_TIMEZONE); // solo valida las fechas; la zona real se toma de la organización al ejecutar
   } catch (e) {
     throw new UserError((e as Error).message);
   }

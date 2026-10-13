@@ -1,5 +1,6 @@
 "use server";
 
+import { dayKeyFromString } from "@/lib/business-day";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
@@ -848,8 +849,8 @@ export async function logFoodDishSales(data: { date: string; entries: { variantI
   if (parsed.data.entries.length === 0) return;
 
   const organizationId = session.user.organizationId;
-  const occurredAt = new Date(parsed.data.date);
-  occurredAt.setHours(0, 0, 0, 0);
+  // La fecha capturada ES el día de negocio: su clave es esa misma fecha a las 00:00 UTC (ver business-day.ts).
+  const occurredAt = dayKeyFromString(parsed.data.date.slice(0, 10));
 
   const variantIds = parsed.data.entries.map((e) => e.variantId);
   const ownedCount = await prisma.foodDishVariant.count({ where: { id: { in: variantIds }, dish: { organizationId } } });

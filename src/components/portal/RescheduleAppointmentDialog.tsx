@@ -66,8 +66,8 @@ export function RescheduleAppointmentDialog({
           <DialogTitle>{lang === "es" ? "Reprogramar cita" : "Reschedule appointment"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-2 py-2">
-          <Label>{lang === "es" ? "Nueva fecha y hora de inicio" : "New start date and time"}</Label>
-          <Input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+          <Label htmlFor="rescheduleappointmentdialog-f1">{lang === "es" ? "Nueva fecha y hora de inicio" : "New start date and time"}</Label>
+          <Input id="rescheduleappointmentdialog-f1" type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
           <p className="text-xs text-slate-400">
             {lang === "es" ? "Se conserva la duración original de la cita." : "The appointment's original duration is preserved."}
           </p>

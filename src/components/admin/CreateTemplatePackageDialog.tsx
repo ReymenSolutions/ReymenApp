@@ -106,8 +106,8 @@ export function CreateTemplatePackageDialog({ templates }: { templates: Template
           </div>
 
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Nombre *" : "Name *"}</Label>
-            <Input placeholder={lang === "es" ? "Paquete inicial de Clínica" : "Starter Clinic package"} {...register("name")} />
+            <Label htmlFor="createtemplatepackagedialog-f1">{lang === "es" ? "Nombre *" : "Name *"}</Label>
+            <Input id="createtemplatepackagedialog-f1" placeholder={lang === "es" ? "Paquete inicial de Clínica" : "Starter Clinic package"} {...register("name")} />
             {errors.name && <p className="text-xs text-red-500">{translateMessage(errors.name.message)}</p>}
           </div>
 
@@ -125,8 +125,8 @@ export function CreateTemplatePackageDialog({ templates }: { templates: Template
           </div>
 
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Descripción *" : "Description *"}</Label>
-            <Textarea placeholder={lang === "es" ? "Lo esencial para arrancar una clínica con Reymen Solutions" : "The essentials to get a clinic started with Reymen Solutions"} rows={2} {...register("description")} />
+            <Label htmlFor="createtemplatepackagedialog-f2">{lang === "es" ? "Descripción *" : "Description *"}</Label>
+            <Textarea id="createtemplatepackagedialog-f2" placeholder={lang === "es" ? "Lo esencial para arrancar una clínica con Reymen Solutions" : "The essentials to get a clinic started with Reymen Solutions"} rows={2} {...register("description")} />
             {errors.description && <p className="text-xs text-red-500">{translateMessage(errors.description.message)}</p>}
           </div>
 

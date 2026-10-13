@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { rebuildCustomerStats } from "./customers";
+import { dayKey, dayKeyFromString, getOrgTimezone, startOfLocalDay } from "./business-day";
 
 /**
  * Borra ventas del POS de un rango de días -- pensado para limpiar las
@@ -26,36 +27,35 @@ export interface PosSalesPurgeSummary {
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_DAYS = 366;
 
-/** Mismo "día de negocio" que el webhook del POS (medianoche, hora del servidor). */
-function startOfDay(d: Date): Date {
-  const copy = new Date(d);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
+/** Rango de un purgado en las dos representaciones del día de negocio (ver business-day.ts). */
+export interface PurgeRange {
+  /** Momentos reales (ventas y consumos): medianoche local de la organización. */
+  instant: { gte: Date; lt: Date };
+  /** Claves de día de los conteos diarios: fecha local a las 00:00 UTC. */
+  key: { gte: Date; lt: Date };
 }
 
-function parseDay(day: string): Date {
-  if (!DAY_RE.test(day)) throw new Error("Fecha inválida");
-  const [y, m, d] = day.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) throw new Error("Fecha inválida");
-  return date;
-}
-
-/** [desde 00:00, día siguiente a "hasta" 00:00), ambos días incluidos. */
-export function purgeRange(from: string, to: string): { gte: Date; lt: Date } {
-  const gte = parseDay(from);
-  const last = parseDay(to);
-  if (last < gte) throw new Error("La fecha final es anterior a la inicial");
-  const lt = new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1);
-  if ((lt.getTime() - gte.getTime()) / 86_400_000 > MAX_DAYS) throw new Error("El rango no puede ser mayor a un año");
-  return { gte, lt };
+/** [desde 00:00, día siguiente a "hasta" 00:00) en la zona `tz`, ambos días incluidos. */
+export function purgeRange(from: string, to: string, tz: string): PurgeRange {
+  if (!DAY_RE.test(from) || !DAY_RE.test(to)) throw new Error("Fecha inválida");
+  const keyFrom = dayKeyFromString(from);
+  const keyLast = dayKeyFromString(to);
+  if (keyLast < keyFrom) throw new Error("La fecha final es anterior a la inicial");
+  const keyTo = new Date(keyLast.getTime() + 86_400_000);
+  if ((keyTo.getTime() - keyFrom.getTime()) / 86_400_000 > MAX_DAYS) throw new Error("El rango no puede ser mayor a un año");
+  // Medianoche local del primer día y del día siguiente al último: se busca desde el mediodía de esa fecha para caer en el día correcto.
+  const noon = (k: Date) => new Date(k.getTime() + 12 * 3_600_000);
+  return {
+    instant: { gte: startOfLocalDay(noon(keyFrom), tz), lt: startOfLocalDay(noon(keyTo), tz) },
+    key: { gte: keyFrom, lt: keyTo },
+  };
 }
 
 type Db = Pick<typeof prisma, "foodSale" | "foodRecipeUsage" | "foodDishSale">;
 
-async function collect(db: Db, organizationId: string, range: { gte: Date; lt: Date }) {
+async function collect(db: Db, organizationId: string, range: PurgeRange) {
   const sales = await db.foodSale.findMany({
-    where: { organizationId, source: "POS", occurredAt: range },
+    where: { organizationId, source: "POS", occurredAt: range.instant },
     select: { id: true, grossAmount: true, occurredAt: true, customerId: true },
     orderBy: { occurredAt: "asc" },
   });
@@ -73,7 +73,7 @@ async function collect(db: Db, organizationId: string, range: { gte: Date; lt: D
       stockBack.set(key, (stockBack.get(key) ?? 0) + Number(used));
     }
   }
-  const recorded = await db.foodDishSale.aggregate({ where: { organizationId, occurredAt: range }, _sum: { quantity: true } });
+  const recorded = await db.foodDishSale.aggregate({ where: { organizationId, occurredAt: range.key }, _sum: { quantity: true } });
   const summary: PosSalesPurgeSummary = {
     sales: sales.length,
     grossAmount: Math.round(sales.reduce((n, s) => n + Number(s.grossAmount), 0) * 100) / 100,
@@ -93,17 +93,17 @@ type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
  * las ventas del POS que quedan (FoodRecipeUsage). Así no queda ningún conteo
  * sin su venta, aunque venga de antes o de un rango anterior mal elegido.
  */
-async function rebuildDailyCounts(tx: Tx, organizationId: string, range: { gte: Date; lt: Date }) {
-  await tx.foodDishSale.deleteMany({ where: { organizationId, occurredAt: range } });
-  await tx.foodModifierOptionSale.deleteMany({ where: { organizationId, occurredAt: range } });
+async function rebuildDailyCounts(tx: Tx, organizationId: string, range: PurgeRange, tz: string) {
+  await tx.foodDishSale.deleteMany({ where: { organizationId, occurredAt: range.key } });
+  await tx.foodModifierOptionSale.deleteMany({ where: { organizationId, occurredAt: range.key } });
   const usages = await tx.foodRecipeUsage.findMany({
-    where: { organizationId, foodSaleId: { not: null }, occurredAt: range },
+    where: { organizationId, foodSaleId: { not: null }, occurredAt: range.instant },
     select: { variantId: true, modifierOptionId: true, units: true, occurredAt: true },
   });
   const dishes = new Map<string, { variantId: string; day: Date; quantity: number }>();
   const options = new Map<string, { optionId: string; day: Date; quantity: number }>();
   for (const u of usages) {
-    const day = startOfDay(u.occurredAt);
+    const day = dayKey(u.occurredAt, tz);
     const units = Number(u.units);
     if (u.variantId) {
       const key = `${day.getTime()}|${u.variantId}`;
@@ -136,11 +136,12 @@ async function rebuildDailyCounts(tx: Tx, organizationId: string, range: { gte: 
 }
 
 export async function previewPosSalesPurge(organizationId: string, from: string, to: string): Promise<PosSalesPurgeSummary> {
-  return (await collect(prisma, organizationId, purgeRange(from, to))).summary;
+  return (await collect(prisma, organizationId, purgeRange(from, to, await getOrgTimezone(organizationId)))).summary;
 }
 
 export async function purgePosSales(organizationId: string, from: string, to: string): Promise<PosSalesPurgeSummary> {
-  const range = purgeRange(from, to);
+  const tz = await getOrgTimezone(organizationId);
+  const range = purgeRange(from, to, tz);
   return prisma.$transaction(
     async (tx) => {
       const { sales, usages, stockBack, summary } = await collect(tx, organizationId, range);
@@ -167,7 +168,7 @@ export async function purgePosSales(organizationId: string, from: string, to: st
         for (const u of usages) {
           const units = Math.round(Number(u.units));
           if (units === 0) continue;
-          const occurredAt = startOfDay(u.occurredAt);
+          const occurredAt = dayKey(u.occurredAt, tz);
           touchedDays.add(occurredAt.getTime());
           if (u.variantId) {
             await tx.foodDishSale.updateMany({ where: { organizationId, variantId: u.variantId, occurredAt }, data: { quantity: { decrement: units } } });
@@ -191,7 +192,7 @@ export async function purgePosSales(organizationId: string, from: string, to: st
       await tx.foodSale.deleteMany({ where: { organizationId, id: { in: saleIds } } });
       // Las visitas y el gasto de los clientes de esas ventas se recalculan con lo que queda.
       await rebuildCustomerStats(tx, organizationId, sales.flatMap((s) => (s.customerId ? [s.customerId] : [])));
-      if (usesPos) await rebuildDailyCounts(tx, organizationId, range);
+      if (usesPos) await rebuildDailyCounts(tx, organizationId, range, tz);
       return summary;
     },
     { timeout: 60_000 },

@@ -80,8 +80,8 @@ export function FoodDishCategoryFormDialog({ category }: { category?: ExistingCa
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Nombre *" : "Name *"}</Label>
-            <Input placeholder={lang === "es" ? "Bebidas" : "Drinks"} {...register("name")} />
+            <Label htmlFor="fooddishcategoryformdialog-f1">{lang === "es" ? "Nombre *" : "Name *"}</Label>
+            <Input id="fooddishcategoryformdialog-f1" placeholder={lang === "es" ? "Bebidas" : "Drinks"} {...register("name")} />
             {errors.name && <p className="text-xs text-red-500">{translateMessage(errors.name.message)}</p>}
           </div>
           <DialogFooter>

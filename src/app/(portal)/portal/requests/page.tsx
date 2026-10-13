@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { getServerT } from "@/lib/i18n-server";
+import { getServerT, getServerLang } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -15,8 +15,9 @@ export default async function PortalRequestsPage() {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
 
-  const [t, requests] = await Promise.all([
+  const [t, lang, requests] = await Promise.all([
     getServerT(),
+    getServerLang(),
     prisma.request.findMany({
       where: { organizationId: session.user.organizationId },
       orderBy: { createdAt: "desc" },
@@ -66,7 +67,7 @@ export default async function PortalRequestsPage() {
                       </Badge>
                     </div>
                     <p className="mt-1 text-sm text-slate-500 line-clamp-2">{req.description}</p>
-                    <p className="mt-2 text-xs text-slate-400">{formatDate(req.createdAt)}</p>
+                    <p className="mt-2 text-xs text-slate-400">{formatDate(req.createdAt, lang)}</p>
                   </div>
                   <StatusBadge status={req.status} />
                 </div>

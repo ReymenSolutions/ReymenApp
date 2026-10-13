@@ -91,15 +91,15 @@ export function CreateAppointmentDialog({ services = [] }: { services?: ServiceO
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>{t.apptTitleLabel} *</Label>
-            <Input placeholder={t.apptTitlePlaceholder} {...register("title")} />
+            <Label htmlFor="createappointmentdialog-f1">{t.apptTitleLabel} *</Label>
+            <Input id="createappointmentdialog-f1" placeholder={t.apptTitlePlaceholder} {...register("title")} />
             {errors.title && <p className="text-xs text-red-500">{translateMessage(errors.title.message)}</p>}
           </div>
           {services.length > 0 && (
             <div className="space-y-2">
-              <Label>{lang === "es" ? "Servicio (opcional)" : "Service (optional)"}</Label>
+              <Label htmlFor="createappointmentdialog-f2">{lang === "es" ? "Servicio (opcional)" : "Service (optional)"}</Label>
               <Select value={serviceId} onValueChange={setServiceId}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="createappointmentdialog-f2"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">{lang === "es" ? "Sin servicio (duración manual)" : "No service (manual duration)"}</SelectItem>
                   {services.map((s) => (
@@ -111,8 +111,8 @@ export function CreateAppointmentDialog({ services = [] }: { services?: ServiceO
           )}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>{t.apptStartLabel} *</Label>
-              <Input type="datetime-local" {...register("startTime")} />
+              <Label htmlFor="createappointmentdialog-f3">{t.apptStartLabel} *</Label>
+              <Input id="createappointmentdialog-f3" type="datetime-local" {...register("startTime")} />
               {errors.startTime && <p className="text-xs text-red-500">{translateMessage(errors.startTime.message)}</p>}
             </div>
             <div className="space-y-2">
@@ -132,8 +132,8 @@ export function CreateAppointmentDialog({ services = [] }: { services?: ServiceO
             </div>
           </div>
           <div className="space-y-2">
-            <Label>{t.apptNotesLabel}</Label>
-            <Textarea placeholder={t.apptNotesPlaceholder} rows={2} {...register("description")} />
+            <Label htmlFor="createappointmentdialog-f4">{t.apptNotesLabel}</Label>
+            <Textarea id="createappointmentdialog-f4" placeholder={t.apptNotesPlaceholder} rows={2} {...register("description")} />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>{t.cancel}</Button>

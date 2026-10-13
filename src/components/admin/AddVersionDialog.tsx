@@ -140,8 +140,8 @@ export function AddVersionDialog({ templateId, templateName, currentVersion }: A
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>{lang === "es" ? "Número de versión *" : "Version number *"}</Label>
-              <Input
+              <Label htmlFor="addversiondialog-f1">{lang === "es" ? "Número de versión *" : "Version number *"}</Label>
+              <Input id="addversiondialog-f1"
                 placeholder={suggestNext()}
                 defaultValue={suggestNext()}
                 {...register("version")}
@@ -152,14 +152,14 @@ export function AddVersionDialog({ templateId, templateName, currentVersion }: A
               )}
             </div>
             <div className="space-y-2">
-              <Label>Changelog</Label>
-              <Input placeholder={lang === "es" ? "Mejoras en la calificación de leads" : "Improvements to lead qualification"} {...register("changelog")} />
+              <Label htmlFor="addversiondialog-f2">Changelog</Label>
+              <Input id="addversiondialog-f2" placeholder={lang === "es" ? "Mejoras en la calificación de leads" : "Improvements to lead qualification"} {...register("changelog")} />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Workflow n8n (JSON) *" : "n8n workflow (JSON) *"}</Label>
-            <Textarea
+            <Label htmlFor="addversiondialog-f3">{lang === "es" ? "Workflow n8n (JSON) *" : "n8n workflow (JSON) *"}</Label>
+            <Textarea id="addversiondialog-f3"
               rows={10}
               className="font-mono text-xs"
               {...register("n8nWorkflowJsonRaw")}
@@ -173,8 +173,8 @@ export function AddVersionDialog({ templateId, templateName, currentVersion }: A
           </div>
 
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Parámetros configurables (JSON, opcional)" : "Configurable parameters (JSON, optional)"}</Label>
-            <Textarea
+            <Label htmlFor="addversiondialog-f4">{lang === "es" ? "Parámetros configurables (JSON, opcional)" : "Configurable parameters (JSON, optional)"}</Label>
+            <Textarea id="addversiondialog-f4"
               placeholder='{"reviewUrl": {"kind": "url", "group": "extras", "label": {"es": "Enlace de reseñas", "en": "Review link"}, "help": {"es": "…", "en": "…"}, "ownerEditable": true}}'
               rows={3}
               className="font-mono text-xs"

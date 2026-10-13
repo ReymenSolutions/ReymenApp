@@ -59,7 +59,7 @@ export function BillingAdminPanel({ orgId, view }: { orgId: string; view: Billin
         <div className="flex flex-wrap items-center gap-3 text-sm">
           {badge}
           <span className="text-slate-600">{es ? "Mensualidad" : "Monthly"}: <strong>${view.amountMxn.toLocaleString("en-US")} MXN</strong></span>
-          {view.dueAt && <span className="text-slate-600">{es ? "Pagado hasta" : "Paid through"}: <strong>{formatDate(view.dueAt)}</strong></span>}
+          {view.dueAt && <span className="text-slate-600">{es ? "Pagado hasta" : "Paid through"}: <strong>{formatDate(view.dueAt, lang)}</strong></span>}
           {view.stripeSubscription && <Badge variant="secondary">{es ? "Cobro automático con Stripe" : "Automatic Stripe billing"}</Badge>}
         </div>
 
@@ -93,8 +93,8 @@ export function BillingAdminPanel({ orgId, view }: { orgId: string; view: Billin
               <li key={p.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 text-sm">
                 <span className="font-medium text-slate-900">${p.amountMxn.toLocaleString("en-US")} MXN</span>
                 <span className="text-xs text-slate-500">{METHODS[p.method as keyof typeof METHODS]?.[es ? "es" : "en"] ?? p.method}{p.externalRef ? ` · ${p.externalRef}` : ""}</span>
-                <span className="text-xs text-slate-500">{es ? "hasta" : "through"} {formatDate(p.periodEnd)}</span>
-                <span className="ml-auto text-xs text-slate-400">{formatDate(p.createdAt)}</span>
+                <span className="text-xs text-slate-500">{es ? "hasta" : "through"} {formatDate(p.periodEnd, lang)}</span>
+                <span className="ml-auto text-xs text-slate-400">{formatDate(p.createdAt, lang)}</span>
               </li>
             ))}
           </ul>

@@ -1,3 +1,4 @@
+import { daysAgoStart, getOrgTimezone } from "@/lib/business-day";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { hasModule, requireModule } from "@/lib/modules";
@@ -41,8 +42,7 @@ export default async function FoodSalesPage({ searchParams }: { searchParams: Pr
   const branch = parseBranchParam(branchParam, branches);
   const branchName = new Map(branches.map((b) => [b.id, b.name]));
 
-  const since30 = new Date();
-  since30.setDate(since30.getDate() - 30);
+  const since30 = daysAgoStart(30, await getOrgTimezone(orgId));
   const [t, lang, summary, byChannel, recentSales, usesPos, discounts] = await Promise.all([
     getServerT(),
     getServerLang(),
@@ -140,7 +140,7 @@ export default async function FoodSalesPage({ searchParams }: { searchParams: Pr
                     <li key={sale.id} className="flex items-center justify-between gap-3 px-6 py-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-slate-900">{formatDateTime(sale.occurredAt)}</p>
+                          <p className="text-sm font-medium text-slate-900">{formatDateTime(sale.occurredAt, lang)}</p>
                           {sale.source === "POS" && <Badge variant="secondary" className="text-[10px]">{f.posSaleBadge}</Badge>}
                         </div>
                         <p className="text-xs text-slate-500">

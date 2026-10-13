@@ -67,18 +67,18 @@ export function CreateLeadDialog() {
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Nombre *" : "Name *"}</Label>
-            <Input placeholder={lang === "es" ? "María López" : "Jane Doe"} {...register("name")} />
+            <Label htmlFor="createleaddialog-f1">{lang === "es" ? "Nombre *" : "Name *"}</Label>
+            <Input id="createleaddialog-f1" placeholder={lang === "es" ? "María López" : "Jane Doe"} {...register("name")} />
             {errors.name && <p className="text-xs text-red-500">{translateMessage(errors.name.message)}</p>}
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>Email</Label>
-              <Input type="email" placeholder="maria@email.com" {...register("email")} />
+              <Label htmlFor="createleaddialog-f2">Email</Label>
+              <Input id="createleaddialog-f2" type="email" placeholder="maria@email.com" {...register("email")} />
             </div>
             <div className="space-y-2">
-              <Label>{lang === "es" ? "Teléfono" : "Phone"}</Label>
-              <Input placeholder="+52 55 1234 5678" {...register("phone")} />
+              <Label htmlFor="createleaddialog-f3">{lang === "es" ? "Teléfono" : "Phone"}</Label>
+              <Input id="createleaddialog-f3" placeholder="+52 55 1234 5678" {...register("phone")} />
             </div>
           </div>
           <div className="space-y-2">
@@ -97,8 +97,8 @@ export function CreateLeadDialog() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Notas" : "Notes"}</Label>
-            <Textarea placeholder={lang === "es" ? "Información adicional..." : "Additional information..."} rows={3} {...register("notes")} />
+            <Label htmlFor="createleaddialog-f4">{lang === "es" ? "Notas" : "Notes"}</Label>
+            <Textarea id="createleaddialog-f4" placeholder={lang === "es" ? "Información adicional..." : "Additional information..."} rows={3} {...register("notes")} />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>{lang === "es" ? "Cancelar" : "Cancel"}</Button>

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
-import { getServerT } from "@/lib/i18n-server";
+import { getServerT, getServerLang } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { requireModule } from "@/lib/modules";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -27,8 +27,9 @@ export default async function PortalConversationsPage({
   const page = Math.max(1, Number(pageParam) || 1);
   const where = { organizationId: session.user.organizationId };
 
-  const [t, conversations, total] = await Promise.all([
+  const [t, lang, conversations, total] = await Promise.all([
     getServerT(),
+    getServerLang(),
     prisma.conversation.findMany({
       where,
       orderBy: { updatedAt: "desc" },
@@ -98,7 +99,7 @@ export default async function PortalConversationsPage({
                     <td className="px-4 py-3 text-xs text-slate-500">
                       {conv.assignedTo ? (conv.assignedTo.name ?? conv.assignedTo.email) : "—"}
                     </td>
-                    <td className="px-4 py-3 text-xs text-slate-500">{formatDate(conv.updatedAt)}</td>
+                    <td className="px-4 py-3 text-xs text-slate-500">{formatDate(conv.updatedAt, lang)}</td>
                   </tr>
                 );
               })}

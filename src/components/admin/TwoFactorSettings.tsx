@@ -115,8 +115,8 @@ export function TwoFactorSettings({ initialEnabled }: { initialEnabled: boolean 
             <Image src={qrCodeDataUrl} alt={lang === "es" ? "Código QR para 2FA" : "2FA QR code"} width={180} height={180} unoptimized className="rounded-lg border border-slate-200" />
           )}
           <div className="w-full space-y-1.5">
-            <Label className="text-xs">{lang === "es" ? "¿No puedes escanear? Ingresa esta clave manualmente" : "Can't scan? Enter this key manually"}</Label>
-            <Input readOnly value={manualSecret} className="font-mono text-xs" />
+            <Label htmlFor="twofactorsettings-f1" className="text-xs">{lang === "es" ? "¿No puedes escanear? Ingresa esta clave manualmente" : "Can't scan? Enter this key manually"}</Label>
+            <Input id="twofactorsettings-f1" readOnly value={manualSecret} className="font-mono text-xs" />
           </div>
         </div>
         <div className="space-y-1.5">

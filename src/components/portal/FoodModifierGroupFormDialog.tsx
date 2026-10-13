@@ -125,20 +125,20 @@ export function FoodModifierGroupFormDialog({ group, inventoryItems }: { group?:
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Nombre *" : "Name *"}</Label>
-            <Input placeholder={lang === "es" ? "Término, Extras..." : "Doneness, Extras..."} {...register("name")} />
+            <Label htmlFor="foodmodifiergroupformdialog-f1">{lang === "es" ? "Nombre *" : "Name *"}</Label>
+            <Input id="foodmodifiergroupformdialog-f1" placeholder={lang === "es" ? "Término, Extras..." : "Doneness, Extras..."} {...register("name")} />
             {errors.name && <p className="text-xs text-red-500">{translateMessage(errors.name.message)}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>{lang === "es" ? "Mínimo a elegir" : "Min. selections"}</Label>
-              <Input type="number" min="0" step="1" {...register("minSelect")} />
+              <Label htmlFor="foodmodifiergroupformdialog-f2">{lang === "es" ? "Mínimo a elegir" : "Min. selections"}</Label>
+              <Input id="foodmodifiergroupformdialog-f2" type="number" min="0" step="1" {...register("minSelect")} />
               <p className="text-xs text-slate-500">{lang === "es" ? "0 = opcional" : "0 = optional"}</p>
             </div>
             <div className="space-y-2">
-              <Label>{lang === "es" ? "Máximo a elegir" : "Max. selections"}</Label>
-              <Input type="number" min="1" step="1" {...register("maxSelect")} />
+              <Label htmlFor="foodmodifiergroupformdialog-f3">{lang === "es" ? "Máximo a elegir" : "Max. selections"}</Label>
+              <Input id="foodmodifiergroupformdialog-f3" type="number" min="1" step="1" {...register("maxSelect")} />
               <p className="text-xs text-slate-500">{lang === "es" ? "1 = elección única" : "1 = single choice"}</p>
             </div>
           </div>

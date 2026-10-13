@@ -170,13 +170,13 @@ export function FoodDishFormDialog({ inventoryItems, categories = [], modifierGr
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>{lang === "es" ? "Nombre del platillo *" : "Dish name *"}</Label>
-                <Input placeholder={lang === "es" ? "Berry Bloom" : "Berry Bloom"} autoFocus {...register("name")} />
+                <Label htmlFor="fooddishformdialog-f1">{lang === "es" ? "Nombre del platillo *" : "Dish name *"}</Label>
+                <Input id="fooddishformdialog-f1" placeholder={lang === "es" ? "Berry Bloom" : "Berry Bloom"} autoFocus {...register("name")} />
                 {errors.name && <p className="text-xs text-red-500">{translateMessage(errors.name.message)}</p>}
               </div>
               <div className="space-y-2">
-                <Label>{lang === "es" ? "Categoría" : "Category"}</Label>
-                <select
+                <Label htmlFor="fooddishformdialog-f2">{lang === "es" ? "Categoría" : "Category"}</Label>
+                <select id="fooddishformdialog-f2"
                   {...register("categoryId")}
                   className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500"
                 >
@@ -311,13 +311,13 @@ function VariantEditor({
     <div className="rounded-lg border border-slate-200 p-3">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
         <div className="space-y-1">
-          <Label className="text-xs">{lang === "es" ? "Nombre de variante *" : "Variant name *"}</Label>
-          <Input placeholder={DEFAULT_VARIANT_LABEL} {...register(`variants.${variantIndex}.label` as const)} />
+          <Label htmlFor="fooddishformdialog-f3" className="text-xs">{lang === "es" ? "Nombre de variante *" : "Variant name *"}</Label>
+          <Input id="fooddishformdialog-f3" placeholder={DEFAULT_VARIANT_LABEL} {...register(`variants.${variantIndex}.label` as const)} />
           {variantErrors?.label && <p className="text-xs text-red-500">{variantErrors.label.message}</p>}
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">{lang === "es" ? "Precio de venta *" : "Sale price *"}</Label>
-          <Input type="number" step="0.01" min="0" {...register(`variants.${variantIndex}.price` as const)} />
+          <Label htmlFor="fooddishformdialog-f4" className="text-xs">{lang === "es" ? "Precio de venta *" : "Sale price *"}</Label>
+          <Input id="fooddishformdialog-f4" type="number" step="0.01" min="0" {...register(`variants.${variantIndex}.price` as const)} />
           {variantErrors?.price && <p className="text-xs text-red-500">{variantErrors.price.message}</p>}
         </div>
         <Button

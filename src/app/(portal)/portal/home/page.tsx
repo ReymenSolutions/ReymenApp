@@ -1,3 +1,4 @@
+import { daysAgoStart, getOrgTimezone } from "@/lib/business-day";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
@@ -103,12 +104,6 @@ const COPY = {
   },
 };
 
-function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
 /** Inicio: lo primero que ve el cliente. Pocas cosas, con palabras de todos los días. */
 export default async function PortalHomePage() {
   const session = await auth();
@@ -123,8 +118,9 @@ export default async function PortalHomePage() {
   ]);
   const t = COPY[lang === "en" ? "en" : "es"];
   const has = (m: (typeof modules)[number]) => modules.includes(m);
-  const today = startOfToday();
-  const tomorrow = new Date(today.getTime() + 24 * 3600_000);
+  const tz = await getOrgTimezone(orgId);
+  const today = daysAgoStart(0, tz);
+  const tomorrow = daysAgoStart(-1, tz);
 
   const [waiting, errors, appointments, newClients, sales, lowStock] = await Promise.all([
     has("AI_WHATSAPP") ? prisma.conversation.count({ where: { organizationId: orgId, status: "ESCALATED" } }) : 0,

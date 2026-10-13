@@ -79,7 +79,7 @@ export default async function PortalSettingsPage() {
               { label: t.colName, value: org.name },
               { label: t.colSlug, value: org.slug },
               { label: t.colIndustry, value: org.industry ?? "—" },
-              { label: t.clientSince, value: formatDate(org.createdAt) },
+              { label: t.clientSince, value: formatDate(org.createdAt, lang) },
             ].map(({ label, value }) => (
               <div key={label} className="flex justify-between text-sm">
                 <span className="text-slate-500">{label}</span>

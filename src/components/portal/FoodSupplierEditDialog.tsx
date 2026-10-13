@@ -79,28 +79,28 @@ export function FoodSupplierEditDialog({ supplier }: { supplier: EditableSupplie
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Nombre *" : "Name *"}</Label>
-            <Input {...register("name")} />
+            <Label htmlFor="foodsuppliereditdialog-f1">{lang === "es" ? "Nombre *" : "Name *"}</Label>
+            <Input id="foodsuppliereditdialog-f1" {...register("name")} />
             {errors.name && <p className="text-xs text-red-500">{translateMessage(errors.name.message)}</p>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>{lang === "es" ? "Contacto" : "Contact"}</Label>
-              <Input {...register("contactName")} />
+              <Label htmlFor="foodsuppliereditdialog-f2">{lang === "es" ? "Contacto" : "Contact"}</Label>
+              <Input id="foodsuppliereditdialog-f2" {...register("contactName")} />
             </div>
             <div className="space-y-2">
-              <Label>{lang === "es" ? "Teléfono" : "Phone"}</Label>
-              <Input type="tel" {...register("phone")} />
+              <Label htmlFor="foodsuppliereditdialog-f3">{lang === "es" ? "Teléfono" : "Phone"}</Label>
+              <Input id="foodsuppliereditdialog-f3" type="tel" {...register("phone")} />
             </div>
           </div>
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Correo" : "Email"}</Label>
-            <Input type="email" {...register("email")} />
+            <Label htmlFor="foodsuppliereditdialog-f4">{lang === "es" ? "Correo" : "Email"}</Label>
+            <Input id="foodsuppliereditdialog-f4" type="email" {...register("email")} />
             {errors.email && <p className="text-xs text-red-500">{translateMessage(errors.email.message)}</p>}
           </div>
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Notas" : "Notes"}</Label>
-            <Textarea rows={2} {...register("notes")} />
+            <Label htmlFor="foodsuppliereditdialog-f5">{lang === "es" ? "Notas" : "Notes"}</Label>
+            <Textarea id="foodsuppliereditdialog-f5" rows={2} {...register("notes")} />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>{lang === "es" ? "Cancelar" : "Cancel"}</Button>

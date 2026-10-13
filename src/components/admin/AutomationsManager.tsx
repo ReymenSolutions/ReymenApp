@@ -324,8 +324,8 @@ function CreateAutomationDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>{t.colName ?? "Nombre"} *</Label>
-            <Input
+            <Label htmlFor="automationsmanager-f1">{t.colName ?? "Nombre"} *</Label>
+            <Input id="automationsmanager-f1"
               placeholder="Captura leads WhatsApp"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
@@ -347,16 +347,16 @@ function CreateAutomationDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>{t.colName ? "Descripción" : "Description"}</Label>
-            <Input
+            <Label htmlFor="automationsmanager-f2">{t.colName ? "Descripción" : "Description"}</Label>
+            <Input id="automationsmanager-f2"
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
             />
           </div>
 
           <div className="space-y-2">
-            <Label>ID Workflow n8n</Label>
-            <Input
+            <Label htmlFor="automationsmanager-f3">ID Workflow n8n</Label>
+            <Input id="automationsmanager-f3"
               placeholder="n8n workflow ID"
               value={form.n8nWorkflowId}
               onChange={(e) => setForm((f) => ({ ...f, n8nWorkflowId: e.target.value }))}
@@ -440,8 +440,8 @@ function EditAutomationDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label>{t.colName ?? "Nombre"}</Label>
-            <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+            <Label htmlFor="automationsmanager-f4">{t.colName ?? "Nombre"}</Label>
+            <Input id="automationsmanager-f4" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
           </div>
 
           <div className="space-y-2">
@@ -457,16 +457,16 @@ function EditAutomationDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>{t.colName ? "Descripción" : "Description"}</Label>
-            <Input
+            <Label htmlFor="automationsmanager-f5">{t.colName ? "Descripción" : "Description"}</Label>
+            <Input id="automationsmanager-f5"
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
             />
           </div>
 
           <div className="space-y-2">
-            <Label>ID Workflow n8n</Label>
-            <Input
+            <Label htmlFor="automationsmanager-f6">ID Workflow n8n</Label>
+            <Input id="automationsmanager-f6"
               value={form.n8nWorkflowId}
               onChange={(e) => setForm((f) => ({ ...f, n8nWorkflowId: e.target.value }))}
             />

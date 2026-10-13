@@ -55,12 +55,15 @@ afterEach(async () => {
 
 describe("purgeRange", () => {
   it("covers both days and validates input", () => {
-    const r = purgeRange("2026-10-03", "2026-10-04");
-    expect(r.gte).toEqual(new Date(2026, 9, 3));
-    expect(r.lt).toEqual(new Date(2026, 9, 5));
-    expect(() => purgeRange("2026-10-05", "2026-10-04")).toThrow(/anterior/);
-    expect(() => purgeRange("2026-02-30", "2026-03-01")).toThrow(/inválida/);
-    expect(() => purgeRange("2025-01-01", "2026-10-01")).toThrow(/año/);
+    const r = purgeRange("2026-10-03", "2026-10-04", "America/Mexico_City");
+    // Momentos reales: medianoche de México (UTC-6) de ambos días; claves de día: las fechas a las 00:00 UTC.
+    expect(r.instant.gte.toISOString()).toBe("2026-10-03T06:00:00.000Z");
+    expect(r.instant.lt.toISOString()).toBe("2026-10-05T06:00:00.000Z");
+    expect(r.key.gte.toISOString()).toBe("2026-10-03T00:00:00.000Z");
+    expect(r.key.lt.toISOString()).toBe("2026-10-05T00:00:00.000Z");
+    expect(() => purgeRange("2026-10-05", "2026-10-04", "America/Mexico_City")).toThrow(/anterior/);
+    expect(() => purgeRange("2026-02-30", "2026-03-01", "America/Mexico_City")).toThrow(/inválida/);
+    expect(() => purgeRange("2025-01-01", "2026-10-01", "America/Mexico_City")).toThrow(/año/);
   });
 });
 

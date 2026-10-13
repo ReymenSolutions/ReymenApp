@@ -85,18 +85,18 @@ export function ArticleDialog({ article, mode = "create" }: ArticleDialogProps) 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2 space-y-2">
-              <Label>{lang === "es" ? "Título *" : "Title *"}</Label>
-              <Input placeholder={lang === "es" ? "¿Cuáles son los horarios de atención?" : "What are your business hours?"} {...register("title")} />
+              <Label htmlFor="articledialog-f1">{lang === "es" ? "Título *" : "Title *"}</Label>
+              <Input id="articledialog-f1" placeholder={lang === "es" ? "¿Cuáles son los horarios de atención?" : "What are your business hours?"} {...register("title")} />
               {errors.title && <p className="text-xs text-red-500">{translateMessage(errors.title.message)}</p>}
             </div>
             <div className="space-y-2">
-              <Label>{lang === "es" ? "Categoría" : "Category"}</Label>
-              <Input placeholder={lang === "es" ? "faq, precios, servicios..." : "faq, pricing, services..."} {...register("category")} />
+              <Label htmlFor="articledialog-f2">{lang === "es" ? "Categoría" : "Category"}</Label>
+              <Input id="articledialog-f2" placeholder={lang === "es" ? "faq, precios, servicios..." : "faq, pricing, services..."} {...register("category")} />
             </div>
           </div>
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Contenido *" : "Content *"}</Label>
-            <Textarea
+            <Label htmlFor="articledialog-f3">{lang === "es" ? "Contenido *" : "Content *"}</Label>
+            <Textarea id="articledialog-f3"
               placeholder={lang === "es" ? "Escribe el contenido que el asistente usará para responder..." : "Write the content the assistant will use to reply..."}
               rows={8}
               {...register("content")}

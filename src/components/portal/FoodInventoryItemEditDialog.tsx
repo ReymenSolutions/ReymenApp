@@ -78,14 +78,14 @@ export function FoodInventoryItemEditDialog({ item }: { item: EditableInventoryI
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Nombre *" : "Name *"}</Label>
-            <Input {...register("name")} />
+            <Label htmlFor="foodinventoryitemeditdialog-f1">{lang === "es" ? "Nombre *" : "Name *"}</Label>
+            <Input id="foodinventoryitemeditdialog-f1" {...register("name")} />
             {errors.name && <p className="text-xs text-red-500">{translateMessage(errors.name.message)}</p>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>{lang === "es" ? "Unidad *" : "Unit *"}</Label>
-              <select {...register("unit")} className="h-9 w-full rounded-md border border-slate-300 px-2 text-sm">
+              <Label htmlFor="foodinventoryitemeditdialog-f2">{lang === "es" ? "Unidad *" : "Unit *"}</Label>
+              <select id="foodinventoryitemeditdialog-f2" {...register("unit")} className="h-9 w-full rounded-md border border-slate-300 px-2 text-sm">
                 {/* Unidad escrita a mano antes de la lista: se conserva hasta que se elija otra. */}
                 {!isFoodUnit(item.unit) && <option value={item.unit}>{item.unit} {lang === "es" ? "(actual, elige una de la lista)" : "(current, pick one from the list)"}</option>}
                 {FOOD_UNITS.map((u) => (
@@ -95,8 +95,8 @@ export function FoodInventoryItemEditDialog({ item }: { item: EditableInventoryI
               {errors.unit && <p className="text-xs text-red-500">{translateMessage(errors.unit.message)}</p>}
             </div>
             <div className="space-y-2">
-              <Label>{lang === "es" ? "Categoría" : "Category"}</Label>
-              <select {...register("category")} className="h-9 w-full rounded-md border border-slate-300 px-2 text-sm">
+              <Label htmlFor="foodinventoryitemeditdialog-f3">{lang === "es" ? "Categoría" : "Category"}</Label>
+              <select id="foodinventoryitemeditdialog-f3" {...register("category")} className="h-9 w-full rounded-md border border-slate-300 px-2 text-sm">
                 <option value="EDIBLE">{lang === "es" ? "Comestible" : "Edible"}</option>
                 <option value="NON_EDIBLE">{lang === "es" ? "No comestible" : "Non-edible"}</option>
               </select>
@@ -104,13 +104,13 @@ export function FoodInventoryItemEditDialog({ item }: { item: EditableInventoryI
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>{lang === "es" ? "Mínimo" : "Minimum"}</Label>
-              <Input type="number" step="0.001" min="0" {...register("minStock")} />
+              <Label htmlFor="foodinventoryitemeditdialog-f4">{lang === "es" ? "Mínimo" : "Minimum"}</Label>
+              <Input id="foodinventoryitemeditdialog-f4" type="number" step="0.001" min="0" {...register("minStock")} />
               {errors.minStock && <p className="text-xs text-red-500">{translateMessage(errors.minStock.message)}</p>}
             </div>
             <div className="space-y-2">
-              <Label>{lang === "es" ? "Costo unitario" : "Unit cost"}</Label>
-              <Input type="number" step="0.01" min="0" {...register("unitCost")} />
+              <Label htmlFor="foodinventoryitemeditdialog-f5">{lang === "es" ? "Costo unitario" : "Unit cost"}</Label>
+              <Input id="foodinventoryitemeditdialog-f5" type="number" step="0.01" min="0" {...register("unitCost")} />
             </div>
           </div>
           <p className="text-xs text-slate-500">

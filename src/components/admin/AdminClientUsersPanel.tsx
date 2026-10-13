@@ -96,13 +96,13 @@ function CreateUserDialog({ orgId }: { orgId: string }) {
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Nombre completo *" : "Full name *"}</Label>
-            <Input placeholder={lang === "es" ? "Ana Martínez" : "Jane Doe"} {...register("name")} />
+            <Label htmlFor="adminclientuserspanel-f1">{lang === "es" ? "Nombre completo *" : "Full name *"}</Label>
+            <Input id="adminclientuserspanel-f1" placeholder={lang === "es" ? "Ana Martínez" : "Jane Doe"} {...register("name")} />
             {errors.name && <p className="text-xs text-red-500">{translateMessage(errors.name.message)}</p>}
           </div>
           <div className="space-y-2">
-            <Label>Email *</Label>
-            <Input type="email" placeholder="ana@empresa.com" {...register("email")} />
+            <Label htmlFor="adminclientuserspanel-f2">Email *</Label>
+            <Input id="adminclientuserspanel-f2" type="email" placeholder="ana@empresa.com" {...register("email")} />
             {errors.email && <p className="text-xs text-red-500">{translateMessage(errors.email.message)}</p>}
           </div>
           <div className="space-y-2">
@@ -117,8 +117,8 @@ function CreateUserDialog({ orgId }: { orgId: string }) {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Contraseña temporal *" : "Temporary password *"}</Label>
-            <Input type="password" placeholder={lang === "es" ? "Mínimo 8 caracteres" : "At least 8 characters"} {...register("password")} />
+            <Label htmlFor="adminclientuserspanel-f3">{lang === "es" ? "Contraseña temporal *" : "Temporary password *"}</Label>
+            <Input id="adminclientuserspanel-f3" type="password" placeholder={lang === "es" ? "Mínimo 8 caracteres" : "At least 8 characters"} {...register("password")} />
             {errors.password && <p className="text-xs text-red-500">{translateMessage(errors.password.message)}</p>}
           </div>
           <DialogFooter>
@@ -176,8 +176,8 @@ function EditUserDialog({ user }: { user: AdminClientUser }) {
           </DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>{lang === "es" ? "Nombre completo *" : "Full name *"}</Label>
-              <Input {...register("name")} />
+              <Label htmlFor="adminclientuserspanel-f4">{lang === "es" ? "Nombre completo *" : "Full name *"}</Label>
+              <Input id="adminclientuserspanel-f4" {...register("name")} />
               {errors.name && <p className="text-xs text-red-500">{translateMessage(errors.name.message)}</p>}
             </div>
             <div className="space-y-2">

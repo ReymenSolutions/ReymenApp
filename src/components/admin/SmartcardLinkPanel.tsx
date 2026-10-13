@@ -158,9 +158,9 @@ export function SmartcardLinkPanel({
         ) : (
           <div className="flex flex-wrap items-end gap-3">
             <div className="min-w-56 flex-1 space-y-1">
-              <Label>{t.company}</Label>
+              <Label htmlFor="smartcardlinkpanel-f1">{t.company}</Label>
               <Select value={companyId} onValueChange={setCompanyId}>
-                <SelectTrigger aria-label={t.company}>
+                <SelectTrigger id="smartcardlinkpanel-f1" aria-label={t.company}>
                   <SelectValue placeholder={t.choose} />
                 </SelectTrigger>
                 <SelectContent>
@@ -284,9 +284,9 @@ export function SmartcardLinkPanel({
         ) : (
           <div className="flex flex-wrap items-end gap-3">
             <div className="min-w-56 flex-1 space-y-1">
-              <Label>{t.user}</Label>
+              <Label htmlFor="smartcardlinkpanel-f2">{t.user}</Label>
               <Select value={userId} onValueChange={setUserId}>
-                <SelectTrigger aria-label={t.user}>
+                <SelectTrigger id="smartcardlinkpanel-f2" aria-label={t.user}>
                   <SelectValue placeholder={t.chooseUser} />
                 </SelectTrigger>
                 <SelectContent>

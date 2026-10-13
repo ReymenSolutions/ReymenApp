@@ -21,4 +21,4 @@
 - Restauración real: `docker exec -i <db> pg_restore -U <usuario> -d <base> --clean --if-exists --no-owner < archivo.dump` (con la app detenida).
 
 ## Zona horaria
-La aplicación toma el día de negocio de Food (`startOfDay`) de la zona horaria **del proceso** del servidor; los contenedores corren en UTC salvo que se configure `TZ`. Ver `docs/AUDITORIA_SEGUIMIENTO.md` (AUD-015) antes de cambiarla.
+El día de negocio de Food (ventas de hoy, gráfica por hora, conteos diarios por platillo) usa la zona de **cada organización** (`Organization.timezone`, por defecto `America/Mexico_City`), no la del servidor. Los conteos diarios guardan la fecha local a las 00:00 UTC; si el contenedor corría en UTC (lo normal) los datos anteriores ya tienen esa forma y no se migran. Verifica con `docker exec reymen-ai-ops-preview date +%Z` (debe decir `UTC`). Cada cliente se configura con su zona en Admin → Cliente.

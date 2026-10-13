@@ -1,3 +1,4 @@
+import { daysAgoStart, getOrgTimezone } from "@/lib/business-day";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Users, Zap, MessageSquare, FileText, AlertTriangle, CheckCircle2, Rocket, ArrowRight, UtensilsCrossed, CreditCard, Wallet } from "lucide-react";
@@ -19,8 +20,7 @@ import { formatDate, formatMoney } from "@/lib/utils";
 import type { PlatformModule } from "@prisma/client";
 
 async function getPortalMetrics(orgId: string) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = daysAgoStart(0, await getOrgTimezone(orgId));
 
   const [
     totalLeads,
@@ -262,7 +262,7 @@ export default async function PortalDashboardPage() {
                     <div>
                       <p className="text-sm font-medium text-slate-900">{lead.name}</p>
                       <p className="text-xs text-slate-400">
-                        {lead.source ?? "manual"} · {formatDate(lead.createdAt)}
+                        {lead.source ?? "manual"} · {formatDate(lead.createdAt, lang)}
                       </p>
                     </div>
                     <StatusBadge status={lead.status} />
@@ -284,7 +284,7 @@ export default async function PortalDashboardPage() {
                   <div key={event.id} className="-mx-2 flex items-center justify-between rounded-md px-2 py-1.5 motion-micro hover:bg-slate-50">
                     <div>
                       <p className="text-sm font-medium text-slate-900">{event.automation.name}</p>
-                      <p className="text-xs text-slate-400">{formatDate(event.createdAt)}</p>
+                      <p className="text-xs text-slate-400">{formatDate(event.createdAt, lang)}</p>
                     </div>
                     <StatusBadge status={event.status} />
                   </div>

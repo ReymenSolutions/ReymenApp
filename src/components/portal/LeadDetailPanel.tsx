@@ -305,7 +305,7 @@ function PanelContent({ data, openedAt, onReload }: { data: LeadPanelData; opene
               {t.source}: <span className="font-medium text-slate-700">{lead.source ?? "manual"}</span>
             </span>
             <span>
-              {t.since} {formatDate(lead.createdAt)}
+              {t.since} {formatDate(lead.createdAt, lang)}
             </span>
           </div>
           {lead.doNotContact && <p className="rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">{t.doNotContact}</p>}
@@ -329,7 +329,7 @@ function PanelContent({ data, openedAt, onReload }: { data: LeadPanelData; opene
                     <p className="truncate text-sm font-medium text-slate-900">{o.title}</p>
                     <p className="text-xs text-slate-500">
                       {o.ownerName ?? "—"}
-                      {o.estimatedCloseDate ? ` · ${formatDate(o.estimatedCloseDate)}` : ""}
+                      {o.estimatedCloseDate ? ` · ${formatDate(o.estimatedCloseDate, lang)}` : ""}
                     </p>
                   </div>
                   <span className="text-sm font-semibold tabular-nums text-slate-900">{o.amount != null ? formatCurrency(o.amount, o.currency) : "—"}</span>

@@ -58,8 +58,8 @@ export function FoodStockAdjustDialog({ itemId, name, unit, currentStock, branch
             {lang === "es" ? "Existencia en el sistema:" : "Stock in the system:"} <strong>{currentStock} {unit}</strong>
           </p>
           <div className="space-y-2">
-            <Label>{lang === "es" ? `Existencia contada (${unit}) *` : `Counted stock (${unit}) *`}</Label>
-            <Input type="number" step="0.001" value={counted} onChange={(e) => setCounted(e.target.value)} />
+            <Label htmlFor="foodstockadjustdialog-f1">{lang === "es" ? `Existencia contada (${unit}) *` : `Counted stock (${unit}) *`}</Label>
+            <Input id="foodstockadjustdialog-f1" type="number" step="0.001" value={counted} onChange={(e) => setCounted(e.target.value)} />
             {valid && diff !== 0 && (
               <p className={`text-xs font-medium ${diff > 0 ? "text-emerald-600" : "text-red-600"}`}>
                 {lang === "es" ? "Diferencia" : "Difference"}: {diff > 0 ? "+" : ""}{diff} {unit}
@@ -67,8 +67,8 @@ export function FoodStockAdjustDialog({ itemId, name, unit, currentStock, branch
             )}
           </div>
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Motivo (opcional)" : "Reason (optional)"}</Label>
-            <Input
+            <Label htmlFor="foodstockadjustdialog-f2">{lang === "es" ? "Motivo (opcional)" : "Reason (optional)"}</Label>
+            <Input id="foodstockadjustdialog-f2"
               placeholder={lang === "es" ? "Conteo semanal, merma, caducado..." : "Weekly count, waste, expired..."}
               value={note}
               onChange={(e) => setNote(e.target.value)}

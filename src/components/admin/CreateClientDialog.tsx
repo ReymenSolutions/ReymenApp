@@ -92,8 +92,8 @@ export function CreateClientDialog() {
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Nombre de empresa" : "Company name"}</Label>
-            <Input placeholder={lang === "es" ? "Clínica San Rafael" : "San Rafael Clinic"} {...register("orgName")} />
+            <Label htmlFor="createclientdialog-f1">{lang === "es" ? "Nombre de empresa" : "Company name"}</Label>
+            <Input id="createclientdialog-f1" placeholder={lang === "es" ? "Clínica San Rafael" : "San Rafael Clinic"} {...register("orgName")} />
             {errors.orgName && <p className="text-xs text-red-500">{translateMessage(errors.orgName.message)}</p>}
           </div>
 
@@ -114,20 +114,20 @@ export function CreateClientDialog() {
           <hr className="border-slate-200" />
 
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Nombre del administrador" : "Administrator name"}</Label>
-            <Input placeholder={lang === "es" ? "Juan García" : "John Smith"} {...register("userName")} />
+            <Label htmlFor="createclientdialog-f2">{lang === "es" ? "Nombre del administrador" : "Administrator name"}</Label>
+            <Input id="createclientdialog-f2" placeholder={lang === "es" ? "Juan García" : "John Smith"} {...register("userName")} />
             {errors.userName && <p className="text-xs text-red-500">{translateMessage(errors.userName.message)}</p>}
           </div>
 
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Email de acceso" : "Login email"}</Label>
-            <Input type="email" placeholder="juan@empresa.com" {...register("userEmail")} />
+            <Label htmlFor="createclientdialog-f3">{lang === "es" ? "Email de acceso" : "Login email"}</Label>
+            <Input id="createclientdialog-f3" type="email" placeholder="juan@empresa.com" {...register("userEmail")} />
             {errors.userEmail && <p className="text-xs text-red-500">{translateMessage(errors.userEmail.message)}</p>}
           </div>
 
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Contraseña inicial" : "Initial password"}</Label>
-            <Input type="password" placeholder={lang === "es" ? "Mínimo 8 caracteres" : "At least 8 characters"} {...register("password")} />
+            <Label htmlFor="createclientdialog-f4">{lang === "es" ? "Contraseña inicial" : "Initial password"}</Label>
+            <Input id="createclientdialog-f4" type="password" placeholder={lang === "es" ? "Mínimo 8 caracteres" : "At least 8 characters"} {...register("password")} />
             {errors.password && <p className="text-xs text-red-500">{translateMessage(errors.password.message)}</p>}
           </div>
 

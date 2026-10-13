@@ -141,8 +141,8 @@ export function CreateOpportunityDialog({
           )}
 
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Título *" : "Title *"}</Label>
-            <Input
+            <Label htmlFor="createopportunitydialog-f1">{lang === "es" ? "Título *" : "Title *"}</Label>
+            <Input id="createopportunitydialog-f1"
               placeholder={lang === "es" ? "Ej. Paquete anual de mantenimiento" : "E.g. Annual maintenance package"}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -151,13 +151,13 @@ export function CreateOpportunityDialog({
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>{lang === "es" ? "Monto" : "Amount"}</Label>
-              <Input type="number" min="0" placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <Label htmlFor="createopportunitydialog-f2">{lang === "es" ? "Monto" : "Amount"}</Label>
+              <Input id="createopportunitydialog-f2" type="number" min="0" placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>{lang === "es" ? "Moneda" : "Currency"}</Label>
+              <Label htmlFor="createopportunitydialog-f3">{lang === "es" ? "Moneda" : "Currency"}</Label>
               <Select value={currency} onValueChange={setCurrency}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="createopportunitydialog-f3"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="MXN">MXN</SelectItem>
                   <SelectItem value="USD">USD</SelectItem>
@@ -169,18 +169,18 @@ export function CreateOpportunityDialog({
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>{lang === "es" ? "Etapa" : "Stage"}</Label>
+              <Label htmlFor="createopportunitydialog-f4">{lang === "es" ? "Etapa" : "Stage"}</Label>
               <Select value={stageId} onValueChange={setStageId}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="createopportunitydialog-f4"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {stages.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>{lang === "es" ? "Responsable" : "Owner"}</Label>
+              <Label htmlFor="createopportunitydialog-f5">{lang === "es" ? "Responsable" : "Owner"}</Label>
               <Select value={ownerId} onValueChange={setOwnerId}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="createopportunitydialog-f5"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {users.map((u) => <SelectItem key={u.id} value={u.id}>{u.name ?? u.email}</SelectItem>)}
                 </SelectContent>
@@ -189,8 +189,8 @@ export function CreateOpportunityDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Fecha estimada de cierre" : "Estimated close date"}</Label>
-            <Input type="date" value={closeDate} onChange={(e) => setCloseDate(e.target.value)} />
+            <Label htmlFor="createopportunitydialog-f6">{lang === "es" ? "Fecha estimada de cierre" : "Estimated close date"}</Label>
+            <Input id="createopportunitydialog-f6" type="date" value={closeDate} onChange={(e) => setCloseDate(e.target.value)} />
           </div>
         </div>
         <DialogFooter>

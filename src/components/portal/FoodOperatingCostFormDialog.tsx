@@ -81,13 +81,13 @@ export function FoodOperatingCostFormDialog({ cost }: { cost?: ExistingCost }) {
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Nombre *" : "Name *"}</Label>
-            <Input placeholder={lang === "es" ? "Renta del local" : "Rent"} {...register("name")} />
+            <Label htmlFor="foodoperatingcostformdialog-f1">{lang === "es" ? "Nombre *" : "Name *"}</Label>
+            <Input id="foodoperatingcostformdialog-f1" placeholder={lang === "es" ? "Renta del local" : "Rent"} {...register("name")} />
             {errors.name && <p className="text-xs text-red-500">{translateMessage(errors.name.message)}</p>}
           </div>
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Monto mensual *" : "Monthly amount *"}</Label>
-            <Input type="number" step="0.01" min="0" {...register("amountMonthly")} />
+            <Label htmlFor="foodoperatingcostformdialog-f2">{lang === "es" ? "Monto mensual *" : "Monthly amount *"}</Label>
+            <Input id="foodoperatingcostformdialog-f2" type="number" step="0.01" min="0" {...register("amountMonthly")} />
             {errors.amountMonthly && <p className="text-xs text-red-500">{translateMessage(errors.amountMonthly.message)}</p>}
           </div>
           <DialogFooter>
