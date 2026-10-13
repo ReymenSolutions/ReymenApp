@@ -9,6 +9,19 @@ const SCRIPT_SRC = process.env.NODE_ENV === "production"
   ? "script-src 'self' 'unsafe-inline'"
   : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
 
+// Teselas del mapa de Lealtad (Leaflet). Por omisión OpenStreetMap; con
+// NEXT_PUBLIC_MAP_TILE_URL se puede usar otro proveedor y su host entra aquí.
+function tileOrigin(): string {
+  const url = process.env.NEXT_PUBLIC_MAP_TILE_URL || "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+  try {
+    const host = new URL(url.replace(/\{s\}\./, "a.").replace(/\{[a-z]\}/g, "0")).host;
+    const wildcard = url.includes("{s}.") ? `*.${host.split(".").slice(1).join(".")}` : host;
+    return `https://${wildcard}`;
+  } catch {
+    return "https://tile.openstreetmap.org";
+  }
+}
+
 const CSP = [
   "default-src 'self'",
   // Next.js injects its hydration/RSC payload as inline <script> tags with no
@@ -17,7 +30,7 @@ const CSP = [
   // script, which is what actually matters against XSS/supply-chain risk.
   SCRIPT_SRC,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: https://api.dicebear.com",
+  `img-src 'self' data: https://api.dicebear.com ${tileOrigin()}`,
   "font-src 'self' data:",
   // Same-origin API calls, plus Sentry's error/trace ingestion when SENTRY_DSN
   // is configured (no-op otherwise — CSP only restricts requests actually made).

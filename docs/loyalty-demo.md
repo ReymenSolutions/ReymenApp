@@ -1,20 +1,21 @@
 # REYMEN Loyalty — demo (branch `feature/food-loyalty-demo`)
 
-> “Convierte cada visita en información comercial.” Lealtad por visitas dentro
-> de Reymen Foods (módulo `FOOD_OPS`), con mapa e inteligencia por código postal.
+> “Convierte cada visita en información comercial.” Lealtad por visitas como
+> módulo propio de la plataforma (`LOYALTY`), con mapa e inteligencia por código postal.
 
 Esta branch es una **demo evaluable**: no se ha integrado a `main`.
 
 ## Cómo verla
 
 ```bash
-npx prisma migrate deploy          # aplica 20261023090000_food_loyalty_demo (solo tablas nuevas)
+npm install                        # agrega leaflet (mapa)
+npx prisma migrate deploy          # 20261023090000_food_loyalty_demo + 20261024090000_loyalty_module
 npx tsx prisma/seed-loyalty-demo.ts
 npm run dev
 ```
 
 - Dueña: `demo@cafenorte.test` · Caja (rol Agente): `caja@cafenorte.test` · contraseña `CafeNorte2026!`
-- Panel: **Reymen Foods → Lealtad** (`/portal/food/loyalty`)
+- Panel: sección **Lealtad** del menú lateral (`/portal/loyalty`): Resumen, Programa, Clientes, Visitas, Mapa y Analytics
 - Inscripción pública: `/lealtad/cafe-norte-demo` (y `?suc=<id>` por sucursal)
 
 Escenarios sembrados: **Mariana López** 6/10 (caso 6 → 7), **Juan Pérez** 9/10
@@ -26,13 +27,13 @@ datos de lealtad y las ventas `Demo lealtad` de `cafe-norte-demo`.
 
 | Ruta | Qué es |
 |---|---|
-| `/portal/food/loyalty` | Resumen: KPIs, mapa, oportunidades, actividad, top CP, recompensas |
-| `/portal/food/loyalty/program` | Configuración del programa, enlace público y QR (general y por sucursal) |
-| `/portal/food/loyalty/members` | Tabla filtrable (CP, estado, progreso, recompensa, sucursal) |
-| `/portal/food/loyalty/members/[id]` | Perfil: progreso, venta acumulada, ticket, historial, recompensas, tarjeta |
-| `/portal/food/loyalty/visits` | Caja: identificar (QR/código/búsqueda) → confirmar → monto → registrar; canje |
-| `/portal/food/loyalty/map` | Mapa por CP con capas (clientes, ventas, participación, ticket, frecuencia) |
-| `/portal/food/loyalty/analytics` | Series, ranking por CP, recompensas, actividad y segmentos |
+| `/portal/loyalty` | Resumen: KPIs, mapa, oportunidades, actividad, top CP, recompensas |
+| `/portal/loyalty/program` | Configuración del programa, enlace público y QR (general y por sucursal) |
+| `/portal/loyalty/members` | Tabla filtrable (CP, estado, progreso, recompensa, sucursal) |
+| `/portal/loyalty/members/[id]` | Perfil: progreso, venta acumulada, ticket, historial, recompensas, tarjeta |
+| `/portal/loyalty/visits` | Caja: identificar (QR/código/búsqueda) → confirmar → monto → registrar; canje |
+| `/portal/loyalty/map` | Mapa por CP con capas (clientes, ventas, participación, ticket, frecuencia) |
+| `/portal/loyalty/analytics` | Series, ranking por CP, recompensas, actividad y segmentos |
 | `/lealtad/[slug]` | Inscripción pública (nombre, WhatsApp, CP; correo opcional) |
 | `/lealtad/[slug]/tarjeta/[token]` | Tarjeta del cliente con QR (pública, `noindex`) |
 | `/lealtad/[slug]/tarjeta/[token]/wallet/{apple,google}` | 501 hasta conectar credenciales |
@@ -64,13 +65,20 @@ siguiente) → `LoyaltyMember` → `LoyaltyVisit` / `LoyaltyReward`.
 - **Ventas**: la visita guarda `saleAmount` y un `saleId` opcional a `FoodSale`,
   desacoplado: no crea ventas ni toca las estadísticas del POS. La participación
   Loyalty compara contra la suma de `FoodSale` del periodo.
+- **Módulo propio**: `PlatformModule.LOYALTY` (se activa por organización desde el
+  admin, como cualquier módulo). No depende de `FOOD_OPS`; si el negocio también
+  tiene Food, la participación sobre ventas totales usa `FoodSale`. Permisos:
+  `loyalty:manage` (configurar) y `loyalty:operate` (caja).
 - **Sucursal**: `branchId = null` es la Principal implícita, igual que Food.
-- **Mapa**: SVG propio, sin dependencias ni proveedores externos. Agrega por CP;
-  nunca domicilios. Las posiciones de los CP de la demo son **ilustrativas**
-  (`postal-zones.ts`); falta un catálogo real de centroides (SEPOMEX/INEGI).
+- **Mapa**: Leaflet sobre teselas de OpenStreetMap (sin llave). Agrega por CP;
+  nunca domicilios. El mapa base es real; el punto de cada CP de la demo es
+  **aproximado** (`postal-zones.ts`, km desde la sucursal) porque falta un
+  catálogo real de centroides/polígonos (SEPOMEX/INEGI). Para producción con
+  tráfico conviene un proveedor de teselas con plan: `NEXT_PUBLIC_MAP_TILE_URL`
+  (su host entra solo a la CSP).
 - **Insights**: reglas explícitas en `metrics.ts` (no IA ni modelos predictivos).
-- **Permisos**: ver Lealtad = módulo Food; configurar = `food:manage`; registrar
-  visitas y canjear = `loyalty:operate` (incluye al Agente/caja).
+- **Permisos**: ver Lealtad = módulo LOYALTY; configurar = `loyalty:manage`;
+  registrar visitas y canjear = `loyalty:operate` (incluye al Agente/caja).
 
 ## Wallet
 
