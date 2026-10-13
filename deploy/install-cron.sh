@@ -8,7 +8,7 @@ if [ "$(id -u)" -ne 0 ]; then echo "✗ Córrelo con sudo." >&2; exit 1; fi
 
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 runner="$repo/deploy/cron-run.sh"
-chmod +x "$runner" "$repo/deploy/backup.sh" "$repo/deploy/restore-test.sh"
+chmod +x "$runner" "$repo/deploy/backup-smartcard.sh" "$repo/deploy/backup.sh" "$repo/deploy/restore-test.sh"
 container="${APP_CONTAINER:-reymen-ai-ops-preview}"
 
 if ! docker exec "$container" sh -c 'test -n "$CRON_SECRET"'; then
@@ -30,6 +30,8 @@ APP_CONTAINER=$container
 # Avisos de vencimiento de suscripción: 8:00 hora de México (14:00 UTC)
 0 14 * * * root $runner billing >> /var/log/reymen/cron.log 2>&1
 # Respaldo diario de la base (9:30 UTC); configura BACKUP_REMOTE en /etc/reymen-backup.env para copiarlo fuera del VPS
+# Respaldo de SmartCard (Supabase → B2), diario 10:15 UTC; se omite solo si no está configurado
+15 10 * * * root $repo/deploy/backup-smartcard.sh >> /var/log/reymen/backup.log 2>&1
 # Prueba de restauración el día 1 de cada mes (10:00 UTC): confirma que el último respaldo se puede restaurar
 0 10 1 * * root $repo/deploy/restore-test.sh >> /var/log/reymen/restore-test.log 2>&1
 30 9 * * * root DB_CONTAINER=\${DB_CONTAINER:-reymen-ai-ops-preview-postgres} $repo/deploy/backup.sh >> /var/log/reymen/backup.log 2>&1
