@@ -9,7 +9,7 @@ Esta branch es una **demo evaluable**: no se ha integrado a `main`.
 
 ```bash
 npm install                        # agrega leaflet (mapa)
-npx prisma migrate deploy          # 20261023090000_food_loyalty_demo + 20261024090000_loyalty_module
+npx prisma migrate deploy          # migraciones 20261023… (tablas), 20261024… (módulo) y 20261025… (ubicaciones/POS)
 npx tsx prisma/seed-loyalty-demo.ts
 npm run dev
 ```
@@ -79,6 +79,24 @@ siguiente) → `LoyaltyMember` → `LoyaltyVisit` / `LoyaltyReward`.
 - **Insights**: reglas explícitas en `metrics.ts` (no IA ni modelos predictivos).
 - **Permisos**: ver Lealtad = módulo LOYALTY; configurar = `loyalty:manage`;
   registrar visitas y canjear = `loyalty:operate` (incluye al Agente/caja).
+
+## Ubicación de las sucursales
+
+En **Programa → Ubicación de las sucursales** el negocio escribe el CP de cada
+punto de venta (Principal y sucursales) y marca el pin en el mapa
+(`LoyaltyLocation`, un renglón por sucursal; `branchKey = "main"` para la
+Principal). El mapa se centra en la sucursal del filtro y las distancias de
+cada CP se miden al punto de venta ubicado más cercano. Sin ninguna ubicación,
+el mapa se centra en Monterrey y no hay distancias ni "zonas de oportunidad".
+
+## Reymen POS
+
+La venta del POS registra la visita sola: ver `docs/loyalty-pos.md` (guía para
+el lado del POS) y `src/lib/loyalty/pos.ts`. Consulta firmada en
+`POST /api/webhooks/pos/loyalty`; la orden de siempre
+(`POST /api/webhooks/pos/orders`) acepta un bloque `loyalty` y responde con el
+progreso. La visita se crea en la misma transacción que la `FoodSale` (ligada
+por `saleId`, llave `pos:<orderId>`), y una cancelación la anula sin borrarla.
 
 ## Wallet
 

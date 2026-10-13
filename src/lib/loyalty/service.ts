@@ -279,9 +279,24 @@ export async function getPublicCard(orgSlug: string, token: string) {
 
 // ─── Caja: registrar visita ─────────────────────────────────────────────
 
+/**
+ * Regla de Lealtad que impide registrar la visita (programa en pausa, cliente
+ * de otra sucursal, visita repetida). Es un UserError (llega al usuario tal
+ * cual) con un código estable para que el POS sepa qué pasó.
+ */
+export class LoyaltyRuleError extends UserError {
+  constructor(
+    public code: "member_not_found" | "program_paused" | "branch_not_in_program" | "cooldown" | "invalid_request",
+    message: string
+  ) {
+    super(message);
+  }
+}
+
 export interface RegisterVisitInput {
   organizationId: string;
-  employeeUserId: string;
+  /** Quién confirmó la visita; null = la registró el POS con su propia orden. */
+  employeeUserId: string | null;
   memberId: string;
   /** null = sucursal principal. */
   branchId: string | null;
@@ -330,101 +345,7 @@ export async function registerVisit(input: RegisterVisitInput): Promise<Register
     if (!sale) throw new UserError("Venta no encontrada");
   }
 
-  const result = await prisma.$transaction(async (tx) => {
-    const locked = await tx.$queryRaw<{ id: string }[]>`
-      SELECT "id" FROM "LoyaltyMember" WHERE "id" = ${input.memberId} AND "organizationId" = ${organizationId} FOR UPDATE`;
-    if (locked.length === 0) throw new UserError("Cliente no encontrado.");
-
-    const member = await tx.loyaltyMember.findUniqueOrThrow({ where: { id: input.memberId } });
-    const program = await tx.loyaltyProgram.findUniqueOrThrow({ where: { id: member.programId } });
-    const rule = await tx.loyaltyProgramVersion.findUniqueOrThrow({
-      where: { programId_version: { programId: program.id, version: program.currentVersion } },
-    });
-
-    // Reintento (doble clic, recarga, red lenta): devuelve lo que ya se registró.
-    const prior = await tx.loyaltyVisit.findUnique({
-      where: { organizationId_idempotencyKey: { organizationId, idempotencyKey: input.idempotencyKey } },
-      include: { earnedReward: { select: { id: true, rewardName: true } } },
-    });
-    if (prior) {
-      if (prior.memberId !== member.id) throw new UserError("Solicitud inválida. Recarga la página.");
-      return {
-        visitId: prior.id,
-        replay: true,
-        progress: progressOf(member.cycleVisits, rule.visitGoal),
-        cycleNumber: member.cycleNumber,
-        reward: prior.earnedReward,
-        totalVisits: member.totalVisits,
-      };
-    }
-
-    if (program.status !== "ACTIVE") throw new UserError("El programa de lealtad está en pausa.");
-    if (program.scope === "BRANCH" && program.branchId !== input.branchId) {
-      throw new UserError("Este programa solo acumula visitas en su sucursal.");
-    }
-    if (member.lastVisitAt && now.getTime() - member.lastVisitAt.getTime() < VISIT_COOLDOWN_MINUTES * 60_000) {
-      throw new UserError("Este cliente acaba de registrar una visita. Espera unos minutos para registrar otra.");
-    }
-
-    const outcome = applyVisit({ cycleNumber: member.cycleNumber, cycleVisits: member.cycleVisits }, rule.visitGoal);
-    const visit = await tx.loyaltyVisit.create({
-      data: {
-        organizationId,
-        programId: program.id,
-        memberId: member.id,
-        branchId: input.branchId,
-        employeeUserId: input.employeeUserId,
-        saleId: input.saleId ?? null,
-        saleAmount,
-        occurredAt: now,
-        idempotencyKey: input.idempotencyKey,
-        programVersion: rule.version,
-        cycleNumber: outcome.countedInCycle,
-      },
-    });
-
-    let reward: { id: string; rewardName: string } | null = null;
-    if (outcome.rewardEarned) {
-      reward = await tx.loyaltyReward.create({
-        data: {
-          organizationId,
-          programId: program.id,
-          memberId: member.id,
-          programVersion: rule.version,
-          cycleNumber: outcome.countedInCycle,
-          visitGoal: rule.visitGoal,
-          rewardType: rule.rewardType,
-          rewardName: rule.rewardName,
-          rewardDescription: rule.rewardDescription,
-          earnedAt: now,
-          earnedVisitId: visit.id,
-        },
-        select: { id: true, rewardName: true },
-      });
-    }
-
-    const updated = await tx.loyaltyMember.update({
-      where: { id: member.id },
-      data: {
-        cycleNumber: outcome.next.cycleNumber,
-        cycleVisits: outcome.next.cycleVisits,
-        totalVisits: { increment: 1 },
-        ...(saleAmount !== null ? { visitsWithAmount: { increment: 1 }, totalSpent: { increment: saleAmount } } : {}),
-        lastVisitAt: now,
-        ...(member.firstVisitAt ? {} : { firstVisitAt: now }),
-      },
-    });
-
-    return {
-      visitId: visit.id,
-      replay: false,
-      // Recién completado: se muestra la meta alcanzada (10/10) en vez del ciclo nuevo en 0.
-      progress: outcome.rewardEarned ? progressOf(rule.visitGoal, rule.visitGoal) : progressOf(updated.cycleVisits, rule.visitGoal),
-      cycleNumber: updated.cycleNumber,
-      reward,
-      totalVisits: updated.totalVisits,
-    };
-  });
+  const result = await prisma.$transaction((tx) => registerVisitInTx(tx, { ...input, saleAmount }, now));
 
   if (!result.replay) {
     await logAudit({
@@ -488,4 +409,113 @@ export async function redeemReward(input: { organizationId: string; userId: stri
 export async function findMemberIdByToken(organizationId: string, token: string): Promise<string | null> {
   const m = await prisma.loyaltyMember.findFirst({ where: { organizationId, publicToken: token }, select: { id: true } });
   return m?.id ?? null;
+}
+
+/**
+ * Núcleo de registerVisit dentro de una transacción ya abierta: la caja la
+ * usa con la suya propia y el POS dentro de la transacción de la venta (la
+ * visita y la venta quedan juntas o no quedan). Toda regla que pueda fallar
+ * se revisa ANTES de escribir, así un LoyaltyRuleError no deja nada a medias.
+ * `input.saleAmount` ya viene validado y redondeado.
+ */
+export async function registerVisitInTx(
+  tx: Prisma.TransactionClient,
+  input: RegisterVisitInput,
+  now: Date
+): Promise<RegisterVisitResult> {
+  const { organizationId } = input;
+  const saleAmount = input.saleAmount;
+  const locked = await tx.$queryRaw<{ id: string }[]>`
+    SELECT "id" FROM "LoyaltyMember" WHERE "id" = ${input.memberId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+  if (locked.length === 0) throw new LoyaltyRuleError("member_not_found", "Cliente no encontrado.");
+
+  const member = await tx.loyaltyMember.findUniqueOrThrow({ where: { id: input.memberId } });
+  const program = await tx.loyaltyProgram.findUniqueOrThrow({ where: { id: member.programId } });
+  const rule = await tx.loyaltyProgramVersion.findUniqueOrThrow({
+    where: { programId_version: { programId: program.id, version: program.currentVersion } },
+  });
+
+  // Reintento (doble clic, recarga, red lenta): devuelve lo que ya se registró.
+  const prior = await tx.loyaltyVisit.findUnique({
+    where: { organizationId_idempotencyKey: { organizationId, idempotencyKey: input.idempotencyKey } },
+    include: { earnedReward: { select: { id: true, rewardName: true } } },
+  });
+  if (prior) {
+    if (prior.memberId !== member.id) throw new LoyaltyRuleError("invalid_request", "Solicitud inválida. Recarga la página.");
+    return {
+      visitId: prior.id,
+      replay: true,
+      progress: progressOf(member.cycleVisits, rule.visitGoal),
+      cycleNumber: member.cycleNumber,
+      reward: prior.earnedReward,
+      totalVisits: member.totalVisits,
+    };
+  }
+
+  if (program.status !== "ACTIVE") throw new LoyaltyRuleError("program_paused", "El programa de lealtad está en pausa.");
+  if (program.scope === "BRANCH" && program.branchId !== input.branchId) {
+    throw new LoyaltyRuleError("branch_not_in_program", "Este programa solo acumula visitas en su sucursal.");
+  }
+  if (member.lastVisitAt && now.getTime() - member.lastVisitAt.getTime() < VISIT_COOLDOWN_MINUTES * 60_000) {
+    throw new LoyaltyRuleError("cooldown", "Este cliente acaba de registrar una visita. Espera unos minutos para registrar otra.");
+  }
+
+  const outcome = applyVisit({ cycleNumber: member.cycleNumber, cycleVisits: member.cycleVisits }, rule.visitGoal);
+  const visit = await tx.loyaltyVisit.create({
+    data: {
+      organizationId,
+      programId: program.id,
+      memberId: member.id,
+      branchId: input.branchId,
+      employeeUserId: input.employeeUserId,
+      saleId: input.saleId ?? null,
+      saleAmount,
+      occurredAt: now,
+      idempotencyKey: input.idempotencyKey,
+      programVersion: rule.version,
+      cycleNumber: outcome.countedInCycle,
+    },
+  });
+
+  let reward: { id: string; rewardName: string } | null = null;
+  if (outcome.rewardEarned) {
+    reward = await tx.loyaltyReward.create({
+      data: {
+        organizationId,
+        programId: program.id,
+        memberId: member.id,
+        programVersion: rule.version,
+        cycleNumber: outcome.countedInCycle,
+        visitGoal: rule.visitGoal,
+        rewardType: rule.rewardType,
+        rewardName: rule.rewardName,
+        rewardDescription: rule.rewardDescription,
+        earnedAt: now,
+        earnedVisitId: visit.id,
+      },
+      select: { id: true, rewardName: true },
+    });
+  }
+
+  const updated = await tx.loyaltyMember.update({
+    where: { id: member.id },
+    data: {
+      cycleNumber: outcome.next.cycleNumber,
+      cycleVisits: outcome.next.cycleVisits,
+      totalVisits: { increment: 1 },
+      ...(saleAmount !== null ? { visitsWithAmount: { increment: 1 }, totalSpent: { increment: saleAmount } } : {}),
+      lastVisitAt: now,
+      ...(member.firstVisitAt ? {} : { firstVisitAt: now }),
+    },
+  });
+
+  return {
+    visitId: visit.id,
+    replay: false,
+    // Recién completado: se muestra la meta alcanzada (10/10) en vez del ciclo nuevo en 0.
+    progress: outcome.rewardEarned ? progressOf(rule.visitGoal, rule.visitGoal) : progressOf(updated.cycleVisits, rule.visitGoal),
+    cycleNumber: updated.cycleNumber,
+    reward,
+    totalVisits: updated.totalVisits,
+  };
 }

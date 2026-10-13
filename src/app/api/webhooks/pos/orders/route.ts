@@ -28,4 +28,6 @@ export const POST = createOrgWebhookHandler({
   // Una orden rechazada (p. ej. un platillo que no existe) es un error de
   // datos del POS, no del servidor: 422 con el motivo para que el POS lo muestre.
   failureResponse: (error) => NextResponse.json({ error }, { status: 422 }),
+  // Lealtad: el POS muestra al cajero el nuevo progreso o la recompensa desbloqueada.
+  successBody: (result) => (result.loyalty ? { loyalty: result.loyalty } : {}),
 });

@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
+import { applyPosOrderLoyalty, auditPosLoyalty, parsePosLoyalty, posLoyaltyEnabled, type PosLoyaltyResult } from "./loyalty/pos";
 import { hasModule } from "./modules";
 import { consumeRecipes, effectiveStockBranch } from "./food-inventory";
 import { branchWhere, type BranchFilter } from "./branches";
@@ -1101,9 +1102,18 @@ export interface FoodPosOrderPayload {
   customer?: { phone: string; name?: string; consent?: { accepted: boolean; textVersion?: string; at?: string } };
   discount?: { amount: number; reason?: string };
   branchId?: string; // sucursal de Reymen donde se vendió; ausente o desconocida = principal
+  // Lealtad (módulo LOYALTY): cliente identificado en caja y, si aplica, la
+  // recompensa que se canjeó en esta orden. Ver src/lib/loyalty/pos.ts.
+  loyalty?: { code?: string; phone?: string; redeemRewardId?: string };
 }
 
-export async function processFoodPosOrder(payload: unknown, organizationId: string): Promise<void> {
+export interface FoodPosOrderResult {
+  saleId: string;
+  /** Qué pasó con Lealtad en esta orden (null si la orden no la toca). */
+  loyalty: PosLoyaltyResult | null;
+}
+
+export async function processFoodPosOrder(payload: unknown, organizationId: string): Promise<FoodPosOrderResult> {
   if (!(await hasModule(organizationId, "FOOD_OPS"))) {
     throw new Error("El módulo Food no está habilitado para esta organización");
   }
@@ -1180,7 +1190,10 @@ export async function processFoodPosOrder(payload: unknown, organizationId: stri
     typeof body.branchId === "string" && body.branchId
       ? ((await prisma.branch.findFirst({ where: { id: body.branchId, organizationId }, select: { id: true } }))?.id ?? null)
       : null;
-  await prisma.$transaction(async (tx) => {
+  // Lealtad solo si la orden trae cliente de lealtad o es una cancelación, y el negocio tiene el módulo.
+  const loyaltyReq = parsePosLoyalty(body.loyalty);
+  const loyaltyOn = (loyaltyReq !== null || body.grossAmount < 0) && (await posLoyaltyEnabled(organizationId));
+  const outcome = await prisma.$transaction(async (tx) => {
     // Una cancelación hereda el cliente de la orden original si el POS no lo repite.
     const isCancel = body.grossAmount! < 0;
     const original =
@@ -1272,5 +1285,25 @@ export async function processFoodPosOrder(payload: unknown, organizationId: stri
     if (cancelled.length) {
       await consumeRecipes(tx, organizationId, withModifiers(cancelled), { type: "SALE_CANCELLATION", occurredAt, foodSaleId: sale.id, branchId: stockBranch, saleBranchId: saleBranch });
     }
+
+    // Lealtad va al final y en la misma transacción: la visita queda ligada a esta venta o no queda.
+    const loyalty = loyaltyOn
+      ? await applyPosOrderLoyalty(
+          tx,
+          {
+            organizationId,
+            saleId: sale.id,
+            externalOrderId,
+            branchId: sale.branchId,
+            grossAmount: body.grossAmount!,
+            occurredAt,
+            cancelsSaleId: isCancel ? (original?.id ?? null) : null,
+          },
+          loyaltyReq
+        )
+      : null;
+    return { saleId: sale.id, loyalty };
   });
+  await auditPosLoyalty(organizationId, outcome.saleId, outcome.loyalty);
+  return outcome;
 }
