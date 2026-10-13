@@ -261,6 +261,7 @@ const EN: Record<string, string> = {
   "Ya existe un grupo de modificadores con ese nombre": "A modifier group with that name already exists",
   "Ya existe un insumo con ese nombre": "A supply item with that name already exists",
   "Ya existe un platillo con ese nombre": "A dish with that name already exists",
+  "Ya tienes una solicitud de capacidad abierta": "You already have an open capacity request",
   "Ya existe un usuario con ese email": "A user with that email already exists",
   "Ya existe una categoría con ese nombre": "A category with that name already exists",
   "Zona horaria inválida": "Invalid time zone",

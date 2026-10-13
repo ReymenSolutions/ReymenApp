@@ -19,6 +19,10 @@ export function getAiWhatsappTabs(t: Strings, role: UserRole): PortalTab[] {
   if (can(role, "knowledge_base:manage")) {
     tabs.push({ href: "/portal/ai-lab", label: t.aiLab });
   }
+  // El consumo es información de la cuenta: solo quien ve la configuración.
+  if (can(role, "settings:view")) {
+    tabs.push({ href: "/portal/ai-usage", label: t.aiUsage });
+  }
   return tabs;
 }
 
