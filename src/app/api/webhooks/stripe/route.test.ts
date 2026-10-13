@@ -23,6 +23,10 @@ vi.mock("stripe", () => ({
 const syncSmartcard = vi.fn(async () => "updated");
 vi.mock("@/lib/smartcard-link", () => ({ syncSmartcardMemberLimitForPlan: syncSmartcard }));
 
+// Stripe incluye `created` en cada evento; cada evento de prueba es más nuevo que el anterior (como en la vida real).
+let createdCounter = Math.floor(Date.now() / 1000);
+const nextCreated = () => ++createdCounter;
+
 const { POST } = await import("./route");
 
 function makeRequest(body: string): NextRequest {
@@ -71,6 +75,7 @@ describe("POST /api/webhooks/stripe", () => {
   it("checkout.session.completed activates the subscribed plan on the org", async () => {
     subscriptionsRetrieve.mockResolvedValue(fakeSubscription());
     constructEvent.mockReturnValue({
+      created: nextCreated(),
       type: "checkout.session.completed",
       data: {
         object: {
@@ -99,6 +104,7 @@ describe("POST /api/webhooks/stripe", () => {
   it("customer.subscription.updated re-syncs the plan from the new price", async () => {
     await prisma.organization.update({ where: { id: org.id }, data: { stripeCustomerId: "cus_123" } });
     constructEvent.mockReturnValue({
+      created: nextCreated(),
       type: "customer.subscription.updated",
       data: { object: fakeSubscription({ items: { data: [{ price: { id: "price_ent_456" } }] } }) },
     });
@@ -113,6 +119,7 @@ describe("POST /api/webhooks/stripe", () => {
 
   it("customer.subscription.deleted reverts the org to the starter plan", async () => {
     constructEvent.mockReturnValue({
+      created: nextCreated(),
       type: "customer.subscription.deleted",
       data: { object: fakeSubscription() },
     });
@@ -129,6 +136,7 @@ describe("POST /api/webhooks/stripe", () => {
 
   it("ignores an event for a customer with no matching organization, without erroring", async () => {
     constructEvent.mockReturnValue({
+      created: nextCreated(),
       type: "customer.subscription.updated",
       data: { object: fakeSubscription({ customer: "cus_does_not_exist" }) },
     });
@@ -140,7 +148,7 @@ describe("POST /api/webhooks/stripe", () => {
   it("invoice.paid recorre el vencimiento una sola vez por factura y subscription.updated fija el fin de periodo", async () => {
     await prisma.organization.update({ where: { id: org.id }, data: { stripeCustomerId: "cus_123", billingPeriodEnd: null } });
     const end = Math.floor(Date.now() / 1000) + 30 * 86400;
-    constructEvent.mockReturnValue({ type: "invoice.paid", data: { object: { id: "in_test_1", customer: "cus_123", amount_paid: 129900, lines: { data: [{ period: { end } }] } } } });
+    constructEvent.mockReturnValue({ created: nextCreated(), type: "invoice.paid", data: { object: { id: "in_test_1", customer: "cus_123", amount_paid: 129900, lines: { data: [{ period: { end } }] } } } });
     expect((await POST(makeRequest("{}"))).status).toBe(200);
     expect((await POST(makeRequest("{}"))).status).toBe(200); // reintento del webhook
     expect(await prisma.billingPayment.count({ where: { organizationId: org.id, externalRef: "in_test_1" } })).toBe(1);
@@ -149,8 +157,25 @@ describe("POST /api/webhooks/stripe", () => {
     expect((await prisma.organization.findUniqueOrThrow({ where: { id: org.id } })).billingPeriodEnd?.getTime()).toBe(end * 1000);
 
     const later = end + 30 * 86400;
-    constructEvent.mockReturnValue({ type: "customer.subscription.updated", data: { object: fakeSubscription({ items: { data: [{ price: { id: "price_pro_123" }, current_period_end: later }] } }) } });
+    constructEvent.mockReturnValue({ created: nextCreated(), type: "customer.subscription.updated", data: { object: fakeSubscription({ items: { data: [{ price: { id: "price_pro_123" }, current_period_end: later }] } }) } });
     await POST(makeRequest("{}"));
     expect((await prisma.organization.findUniqueOrThrow({ where: { id: org.id } })).billingPeriodEnd?.getTime()).toBe(later * 1000);
+  });
+
+  it("AUD-010: un evento atrasado no restaura un plan anterior sobre uno más reciente", async () => {
+    await prisma.organization.update({ where: { id: org.id }, data: { stripeCustomerId: "cus_123", plan: "starter", stripeEventAt: null, stripeSubscriptionId: null } });
+    const newer = nextCreated();
+    const older = newer - 100;
+    // Llega primero el evento nuevo (Business) y luego, atrasado, uno viejo (Professional).
+    constructEvent.mockReturnValue({ created: newer, type: "customer.subscription.updated", data: { object: fakeSubscription({ items: { data: [{ price: { id: "price_ent_456" } }] } }) } });
+    expect((await POST(makeRequest("{}"))).status).toBe(200);
+    constructEvent.mockReturnValue({ created: older, type: "customer.subscription.updated", data: { object: fakeSubscription({ items: { data: [{ price: { id: "price_pro_123" } }] } }) } });
+    expect((await POST(makeRequest("{}"))).status).toBe(200);
+    expect((await prisma.organization.findUniqueOrThrow({ where: { id: org.id } })).plan).toBe("business");
+
+    // Una baja atrasada de una suscripción anterior tampoco degrada la vigente.
+    constructEvent.mockReturnValue({ created: older - 50, type: "customer.subscription.deleted", data: { object: fakeSubscription({ id: "sub_vieja" }) } });
+    expect((await POST(makeRequest("{}"))).status).toBe(200);
+    expect((await prisma.organization.findUniqueOrThrow({ where: { id: org.id } })).plan).toBe("business");
   });
 });

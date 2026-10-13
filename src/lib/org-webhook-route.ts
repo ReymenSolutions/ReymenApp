@@ -28,6 +28,8 @@ interface OrgWebhookOptions<T> {
    * evento registrado como fallido se descartaría como duplicado).
    */
   precheck?: (organizationId: string) => Promise<NextResponse | null>;
+  /** Rechaza (400) las entregas sin `x-reymen-event-id`: las ventas no pueden depender de que el emisor mande su id para no duplicarse. */
+  requireEventId?: boolean;
 }
 
 export function createOrgWebhookHandler<T>(options: OrgWebhookOptions<T>) {
@@ -55,6 +57,10 @@ export function createOrgWebhookHandler<T>(options: OrgWebhookOptions<T>) {
     // Ya autenticada la firma, una organización suspendida no ingresa eventos (el emisor puede reintentar al reactivarla).
     if (!org.isActive) return NextResponse.json({ error: "Organization suspended" }, { status: 403 });
 
+    if (options.requireEventId && !externalEventId) {
+      return NextResponse.json({ error: "x-reymen-event-id es obligatorio", code: "event_id_required" }, { status: 400 });
+    }
+
     const rateLimit = await checkRateLimit(`webhook:${options.rateLimitKey}:${orgId}`, { limit: 120, windowMs: 60 * 1000 });
     if (!rateLimit.allowed) {
       return NextResponse.json(
@@ -74,7 +80,7 @@ export function createOrgWebhookHandler<T>(options: OrgWebhookOptions<T>) {
     }
 
     const result = await ingestWebhookEvent(
-      { organizationId: orgId, source: options.source, eventType: options.eventType, payload: parsedBody, externalEventId },
+      { organizationId: orgId, source: options.source, eventType: options.eventType, payload: parsedBody, externalEventId, replayKey: signature || null },
       () => options.process(parsedBody, orgId)
     );
 

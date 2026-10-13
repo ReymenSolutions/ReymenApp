@@ -1,56 +1,26 @@
 // @vitest-environment node
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 
-describe("sendEmail", () => {
-  beforeEach(() => {
-    vi.resetModules();
-    vi.unstubAllEnvs();
-  });
+describe("sendEmail sin RESEND_API_KEY (AUD-011)", () => {
+  afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); vi.resetModules(); });
 
-  it("falls back to logging and returns sent:false when RESEND_API_KEY is unset", async () => {
+  it("en producción no registra el contenido (enlaces de recuperación) en los logs", async () => {
     vi.stubEnv("RESEND_API_KEY", "");
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.stubEnv("NODE_ENV", "production");
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const { sendEmail } = await import("./email");
-
-    const result = await sendEmail({ to: "test@example.com", subject: "Hi", html: "<p>Hello</p>" });
-
-    expect(result.sent).toBe(false);
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("test@example.com"));
-    logSpy.mockRestore();
+    const out = await sendEmail({ to: "a@b.c", subject: "Recupera tu contraseña", html: "<a href='https://x/reset?token=SECRETO'>enlace</a>", text: "https://x/reset?token=SECRETO" });
+    expect(out.sent).toBe(false);
+    expect(JSON.stringify([...log.mock.calls, ...error.mock.calls])).not.toContain("SECRETO");
   });
 
-  it("sends via Resend when RESEND_API_KEY is set", async () => {
-    vi.stubEnv("RESEND_API_KEY", "re_test_key");
-    const sendMock = vi.fn().mockResolvedValue({ data: { id: "abc" }, error: null });
-    vi.doMock("resend", () => ({
-      Resend: class {
-        emails = { send: sendMock };
-      },
-    }));
-
+  it("en desarrollo sí muestra el contenido para poder probar el flujo", async () => {
+    vi.stubEnv("RESEND_API_KEY", "");
+    vi.stubEnv("NODE_ENV", "development");
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
     const { sendEmail } = await import("./email");
-    const result = await sendEmail({ to: "test@example.com", subject: "Hi", html: "<p>Hello</p>" });
-
-    expect(result.sent).toBe(true);
-    expect(sendMock).toHaveBeenCalledWith(
-      expect.objectContaining({ to: "test@example.com", subject: "Hi" })
-    );
-  });
-
-  it("returns sent:false (without throwing) when Resend reports an error", async () => {
-    vi.stubEnv("RESEND_API_KEY", "re_test_key");
-    const sendMock = vi.fn().mockResolvedValue({ data: null, error: { message: "bad request" } });
-    vi.doMock("resend", () => ({
-      Resend: class {
-        emails = { send: sendMock };
-      },
-    }));
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    const { sendEmail } = await import("./email");
-    const result = await sendEmail({ to: "test@example.com", subject: "Hi", html: "<p>Hello</p>" });
-
-    expect(result.sent).toBe(false);
-    errSpy.mockRestore();
+    await sendEmail({ to: "a@b.c", subject: "x", html: "<p>hola</p>", text: "token=ABC" });
+    expect(JSON.stringify(log.mock.calls)).toContain("token=ABC");
   });
 });

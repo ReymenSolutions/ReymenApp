@@ -5,13 +5,28 @@ export const MAX_WEBHOOK_ATTEMPTS = 5;
 
 export class WebhookRetryError extends Error {}
 
+/** Un evento PROCESSING con más de esto sin avanzar es de un proceso que murió (reinicio, corte): se puede recuperar. */
+export const STALE_PROCESSING_MS = 10 * 60 * 1000;
+
+/** Filtro de los eventos que un reintento puede tomar: fallidos, o "en proceso" abandonados. */
+function retryableWhere(now: Date) {
+  const cutoff = new Date(now.getTime() - STALE_PROCESSING_MS);
+  return {
+    attempts: { lt: MAX_WEBHOOK_ATTEMPTS },
+    OR: [
+      { status: "FAILED" as const },
+      { status: "PROCESSING" as const, OR: [{ claimedAt: { lt: cutoff } }, { claimedAt: null, createdAt: { lt: cutoff } }] },
+    ],
+  };
+}
+
 /**
- * Re-runs a previously FAILED WebhookEvent's processing logic in place.
- * Refuses to retry an event that's already PROCESSED, or one that's
- * exhausted MAX_WEBHOOK_ATTEMPTS (surfaced to the admin UI/cron caller
- * as a reason rather than silently no-op'ing).
+ * Re-runs a previously FAILED (or abandoned PROCESSING) WebhookEvent's processing logic in place.
+ * The event is claimed with a single conditional UPDATE, so two concurrent retries (the cron and an admin click, or two
+ * cron instances) can never both run it: the loser gets a WebhookRetryError instead of a duplicate side effect.
+ * Refuses an event already PROCESSED or past MAX_WEBHOOK_ATTEMPTS.
  */
-export async function retryWebhookEvent(eventId: string): Promise<{ success: boolean }> {
+export async function retryWebhookEvent(eventId: string, now: Date = new Date()): Promise<{ success: boolean }> {
   const event = await prisma.webhookEvent.findUniqueOrThrow({ where: { id: eventId } });
 
   if (event.status === "PROCESSED") {
@@ -21,10 +36,11 @@ export async function retryWebhookEvent(eventId: string): Promise<{ success: boo
     throw new WebhookRetryError(`Se alcanzó el máximo de ${MAX_WEBHOOK_ATTEMPTS} intentos`);
   }
 
-  await prisma.webhookEvent.update({
-    where: { id: eventId },
-    data: { status: "PROCESSING", attempts: { increment: 1 } },
+  const claimed = await prisma.webhookEvent.updateMany({
+    where: { id: eventId, ...retryableWhere(now) },
+    data: { status: "PROCESSING", attempts: { increment: 1 }, claimedAt: now },
   });
+  if (claimed.count === 0) throw new WebhookRetryError("Este evento se está procesando en este momento");
 
   try {
     await processWebhookEventPayload(event.eventType, event.payload, event.organizationId);
@@ -49,7 +65,7 @@ export async function retryWebhookEvent(eventId: string): Promise<{ success: boo
 }
 
 /**
- * Retries every FAILED event still under the attempt cap, oldest first.
+ * Retries every FAILED event (and every abandoned PROCESSING one) still under the attempt cap, oldest first.
  * Used by the admin "retry all" action and the scheduled retry cron — both
  * call this with no `organizationId`, sweeping every organization's backlog
  * together (intentional: this is a platform-wide reliability sweep, not a
@@ -57,13 +73,12 @@ export async function retryWebhookEvent(eventId: string): Promise<{ success: boo
  * (e.g. clearing one org's backlog specifically) without a second code path.
  */
 export async function retryAllFailedWebhookEvents(
-  options: { limit?: number; organizationId?: string } = {}
+  options: { limit?: number; organizationId?: string; now?: Date } = {}
 ): Promise<{ retried: number; succeeded: number }> {
-  const { limit = 50, organizationId } = options;
+  const { limit = 50, organizationId, now = new Date() } = options;
   const events = await prisma.webhookEvent.findMany({
     where: {
-      status: "FAILED",
-      attempts: { lt: MAX_WEBHOOK_ATTEMPTS },
+      ...retryableWhere(now),
       ...(organizationId ? { organizationId } : {}),
     },
     orderBy: { createdAt: "asc" },
@@ -71,11 +86,18 @@ export async function retryAllFailedWebhookEvents(
     select: { id: true },
   });
 
+  let retried = 0;
   let succeeded = 0;
   for (const event of events) {
-    const result = await retryWebhookEvent(event.id);
-    if (result.success) succeeded++;
+    try {
+      const result = await retryWebhookEvent(event.id, now);
+      retried++;
+      if (result.success) succeeded++;
+    } catch (err) {
+      // Otro proceso lo tomó primero (o ya se procesó): no es un fallo del barrido.
+      if (!(err instanceof WebhookRetryError)) throw err;
+    }
   }
 
-  return { retried: events.length, succeeded };
+  return { retried, succeeded };
 }
