@@ -136,4 +136,21 @@ describe("POST /api/webhooks/stripe", () => {
     const res = await POST(makeRequest("{}"));
     expect(res.status).toBe(200);
   });
+
+  it("invoice.paid recorre el vencimiento una sola vez por factura y subscription.updated fija el fin de periodo", async () => {
+    await prisma.organization.update({ where: { id: org.id }, data: { stripeCustomerId: "cus_123", billingPeriodEnd: null } });
+    const end = Math.floor(Date.now() / 1000) + 30 * 86400;
+    constructEvent.mockReturnValue({ type: "invoice.paid", data: { object: { id: "in_test_1", customer: "cus_123", amount_paid: 129900, lines: { data: [{ period: { end } }] } } } });
+    expect((await POST(makeRequest("{}"))).status).toBe(200);
+    expect((await POST(makeRequest("{}"))).status).toBe(200); // reintento del webhook
+    expect(await prisma.billingPayment.count({ where: { organizationId: org.id, externalRef: "in_test_1" } })).toBe(1);
+    const paid = await prisma.billingPayment.findFirstOrThrow({ where: { organizationId: org.id } });
+    expect(Number(paid.amountMxn)).toBe(1299);
+    expect((await prisma.organization.findUniqueOrThrow({ where: { id: org.id } })).billingPeriodEnd?.getTime()).toBe(end * 1000);
+
+    const later = end + 30 * 86400;
+    constructEvent.mockReturnValue({ type: "customer.subscription.updated", data: { object: fakeSubscription({ items: { data: [{ price: { id: "price_pro_123" }, current_period_end: later }] } }) } });
+    await POST(makeRequest("{}"));
+    expect((await prisma.organization.findUniqueOrThrow({ where: { id: org.id } })).billingPeriodEnd?.getTime()).toBe(later * 1000);
+  });
 });

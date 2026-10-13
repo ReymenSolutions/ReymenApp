@@ -3,6 +3,11 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getEnabledModules } from "@/lib/modules";
 import { PortalShell } from "@/components/portal/PortalShell";
+import { BillingBanner } from "@/components/portal/BillingBanner";
+import { billingStatus } from "@/lib/billing";
+import { can } from "@/lib/permissions";
+import { getServerLang } from "@/lib/i18n-server";
+import type { UserRole } from "@prisma/client";
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -17,7 +22,7 @@ export default async function PortalLayout({ children }: { children: React.React
   const currentUser = await prisma.user.findUnique({
     where: { id: session.user.id, isActive: true },
     select: {
-      organization: { select: { id: true, name: true, logoUrl: true, isActive: true } },
+      organization: { select: { id: true, name: true, logoUrl: true, isActive: true, billingPeriodEnd: true } },
     },
   });
 
@@ -34,6 +39,10 @@ export default async function PortalLayout({ children }: { children: React.React
         })
       : 0;
 
+  // El aviso de vencimiento es para quien administra la cuenta (es quien puede pagar).
+  const status = can(session.user.role as UserRole, "settings:manage") ? billingStatus(org.billingPeriodEnd) : null;
+  const lang = status && (status.state === "DUE_SOON" || status.state === "OVERDUE") ? await getServerLang() : "es";
+
   return (
     <PortalShell
       orgName={org.name}
@@ -41,6 +50,7 @@ export default async function PortalLayout({ children }: { children: React.React
       enabledModules={enabledModules}
       pendingConversations={pendingConversations}
     >
+      {status && <BillingBanner status={status} lang={lang} />}
       {children}
     </PortalShell>
   );
