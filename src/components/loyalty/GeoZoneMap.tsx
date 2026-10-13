@@ -22,8 +22,8 @@ export interface GeoZone {
   ariaLabel: string;
 }
 
-const STRONG = "#059669";
-const OPPORTUNITY = "#d97706";
+const STRONG = "#1e3a8a";
+const OPPORTUNITY = "#7c3aed";
 const RINGS_KM = [1, 3, 5];
 
 const TILE_URL = process.env.NEXT_PUBLIC_MAP_TILE_URL || "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
@@ -110,7 +110,7 @@ export default function GeoZoneMap({
       title: referenceLabel,
       icon: L.divIcon({
         className: "",
-        html: `<span class="flex h-6 w-6 items-center justify-center rounded-full border-[3px] border-white bg-orange-500 shadow-md"><span class="h-2 w-2 rounded-full bg-white"></span></span>`,
+        html: `<span class="flex h-6 w-6 items-center justify-center rounded-full border-[3px] border-white bg-slate-900 shadow-md"><span class="h-2 w-2 rounded-full bg-white"></span></span>`,
         iconSize: [24, 24],
         iconAnchor: [12, 12],
       }),

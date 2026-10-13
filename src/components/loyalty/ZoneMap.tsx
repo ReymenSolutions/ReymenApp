@@ -13,10 +13,13 @@ import { DEFAULT_REFERENCE, offsetToLatLng, zonePosition, type GeoPoint } from "
 import type { GeoZone } from "./GeoZoneMap";
 import { money, num, pct } from "@/lib/loyalty/format";
 
-// Rampa secuencial de un solo tono (marca), clara → oscura = menos → más.
-const RAMP = ["#bbd0ff", "#8ab0ff", "#5585ff", "#1a3ef5", "#18258e"];
-const STRONG = "#059669"; // emerald-600 — siempre con ícono y texto, nunca solo color
-const OPPORTUNITY = "#d97706"; // amber-600 — anillo punteado + ícono + texto
+// Rampa tipo semáforo, menos → más: verde, verde lima, amarillo, naranja, rojo.
+// El rojo marca dónde se concentra más la métrica elegida (los puntos críticos).
+const RAMP = ["#16a34a", "#84cc16", "#facc15", "#f97316", "#dc2626"];
+// Los anillos de estado usan tonos fuera de la rampa para no confundirse con ella
+// y siempre van con ícono y texto, nunca solo color.
+const STRONG = "#1e3a8a"; // azul marino, anillo sólido
+const OPPORTUNITY = "#7c3aed"; // violeta, anillo punteado
 
 // Radio geográfico de cada círculo (metros), por raíz cuadrada del valor para
 // que el área —no el radio— sea proporcional a la métrica.
@@ -62,9 +65,9 @@ export function zoneLabelText(label: ZoneLabel, L: LoyaltyDict): string {
 export function ZoneLabelBadge({ label, L }: { label: ZoneLabel; L: LoyaltyDict }) {
   const Icon = { strong: CheckCircle2, opportunity: Target, high_value: Gem, low_frequency: Repeat }[label];
   const cls = {
-    strong: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-    opportunity: "bg-amber-50 text-amber-700 ring-amber-200",
-    high_value: "bg-brand-50 text-brand-700 ring-brand-200",
+    strong: "bg-blue-50 text-blue-900 ring-blue-200",
+    opportunity: "bg-violet-50 text-violet-700 ring-violet-200",
+    high_value: "bg-sky-50 text-sky-700 ring-sky-200",
     low_frequency: "bg-slate-100 text-slate-600 ring-slate-200",
   }[label];
   return (
@@ -118,7 +121,7 @@ export function ZoneMap({
         `<p class="mt-1 flex justify-between gap-3 text-slate-600"><span>${escapeHtml(metricLabel(metric, L))}</span><span class="font-semibold tabular-nums text-slate-900">${escapeHtml(formatMetric(metric, v))}</span></p>` +
         `<p class="flex justify-between gap-3 text-slate-500"><span>${escapeHtml(L.detailMembers)}</span><span class="tabular-nums">${escapeHtml(num(z.members))}</span></p>` +
         `<p class="flex justify-between gap-3 text-slate-500"><span>${escapeHtml(L.detailSales)}</span><span class="tabular-nums">${escapeHtml(money(z.sales))}</span></p>` +
-        (badges ? `<p class="mt-1 font-medium ${strong ? "text-emerald-700" : opportunity ? "text-amber-700" : "text-brand-700"}">${escapeHtml(badges)}</p>` : "") +
+        (badges ? `<p class="mt-1 font-medium ${strong ? "text-blue-900" : opportunity ? "text-violet-700" : "text-sky-700"}">${escapeHtml(badges)}</p>` : "") +
         `</div>`;
       return {
         postalCode: z.postalCode,
@@ -197,14 +200,14 @@ export function ZoneMap({
             </span>
             <span className="flex items-center gap-1">
               <span className="h-3 w-3 rounded-full border-2" style={{ borderColor: STRONG }} aria-hidden="true" />
-              <CheckCircle2 className="h-3 w-3 text-emerald-600" aria-hidden="true" /> {L.zoneStrong}
+              <CheckCircle2 className="h-3 w-3 text-blue-900" aria-hidden="true" /> {L.zoneStrong}
             </span>
             <span className="flex items-center gap-1">
               <span className="h-3 w-3 rounded-full border-2 border-dashed" style={{ borderColor: OPPORTUNITY }} aria-hidden="true" />
-              <Target className="h-3 w-3 text-amber-600" aria-hidden="true" /> {L.zoneOpportunity}
+              <Target className="h-3 w-3 text-violet-600" aria-hidden="true" /> {L.zoneOpportunity}
             </span>
             <span className="flex items-center gap-1">
-              <span className="h-2.5 w-2.5 rounded-full bg-orange-500" aria-hidden="true" /> {L.mapBranch}
+              <span className="h-2.5 w-2.5 rounded-full bg-slate-900" aria-hidden="true" /> {L.mapBranch}
             </span>
             <span>{L.mapRings}</span>
           </div>

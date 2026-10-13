@@ -470,12 +470,12 @@ summary:active {
   box-shadow: 0 10px 15px -3px rgb(15 23 42 / 0.12);
 }
 .loyalty-map .leaflet-tooltip.loyalty-branch-label {
-  border: 1px solid #fed7aa;
+  border: 1px solid #cbd5e1;
   border-radius: 9999px;
   padding: 0.125rem 0.625rem;
   font-size: 11px;
   font-weight: 600;
-  color: #9a3412;
+  color: #0f172a;
   box-shadow: none;
 }
 .loyalty-map .leaflet-tooltip.loyalty-branch-label::before {
