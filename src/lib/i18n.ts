@@ -19,6 +19,7 @@ export const strings = {
     knowledgeBase: "Base de Conocimiento",
     prompts: "Prompts",
     aiLab: "Probador",
+    aiUsage: "Mi consumo de IA",
     onboarding: "Configuración inicial",
     appointments: "Citas",
     reports: "Reportes",
@@ -230,6 +231,7 @@ export const strings = {
     typeNewAutomation: "Nueva automatización",
     typeChange: "Cambio",
     typeQuestion: "Pregunta",
+    typeAiCapacity: "Capacidad de IA",
 
     // ── Appointments ─────────────────────────────────────────
     appointmentsTitle: "Citas",
@@ -567,6 +569,7 @@ export const strings = {
     knowledgeBase: "Knowledge Base",
     prompts: "Prompts",
     aiLab: "Tester",
+    aiUsage: "My AI usage",
     onboarding: "Getting Started",
     appointments: "Appointments",
     reports: "Reports",
@@ -777,6 +780,7 @@ export const strings = {
     typeNewAutomation: "New automation",
     typeChange: "Change",
     typeQuestion: "Question",
+    typeAiCapacity: "AI capacity",
 
     // ── Appointments ─────────────────────────────────────────
     appointmentsTitle: "Appointments",

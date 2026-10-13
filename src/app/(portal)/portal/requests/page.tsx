@@ -28,6 +28,7 @@ export default async function PortalRequestsPage() {
     new_automation: t.typeNewAutomation,
     change: t.typeChange,
     question: t.typeQuestion,
+    ai_capacity: t.typeAiCapacity,
   };
 
   const openCount = requests.filter((r) => r.status === "OPEN" || r.status === "IN_PROGRESS").length;
