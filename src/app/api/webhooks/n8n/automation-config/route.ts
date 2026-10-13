@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { isTimestampFresh, verifyWebhookSignature } from "@/lib/webhook-validator";
+import { isOrgActive } from "@/lib/org-guards";
 import { buildAutomationEnvelope, findAutomationForDelivery } from "@/lib/automation/config-delivery";
 
 // Configuración de una automatización para n8n (contrato en docs/automations/N8N.md): lo usan los flujos que empiezan en
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest) {
   const templateId = typeof body.templateId === "string" ? body.templateId : undefined;
   if (!organizationId || (!automationId && !templateId)) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
 
+  if (!(await isOrgActive(organizationId))) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const automation = await findAutomationForDelivery({ organizationId, automationId, templateId });
   if (!automation) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(await buildAutomationEnvelope(automation));

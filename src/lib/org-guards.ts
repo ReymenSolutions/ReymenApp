@@ -17,3 +17,9 @@ export async function assertOrgLead(organizationId: string, leadId: string) {
   if (!lead) throw new UserError("Lead no encontrado");
   return lead;
 }
+
+/** La organización existe y no está suspendida. Toda entrada automática (webhooks, API keys) debe cerrarse con esto. */
+export async function isOrgActive(organizationId: string): Promise<boolean> {
+  const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { isActive: true } });
+  return !!org?.isActive;
+}

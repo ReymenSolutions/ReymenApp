@@ -16,18 +16,20 @@ async function requireAdminSession() {
 }
 
 /**
- * Begins enrollment: generates and stores a new secret (2FA stays OFF until
- * confirm2FAEnrollment verifies a code against it), and returns everything
- * needed to render the QR code / manual entry key.
+ * Begins enrollment: generates a PENDING secret (the active factor, if any, is untouched until confirm2FAEnrollment verifies a
+ * code against the new one) and returns everything needed to render the QR code / manual entry key. Replacing an already
+ * enabled factor requires the current password: otherwise a hijacked session could swap the second factor.
  */
-export async function start2FAEnrollment(): Promise<{ qrCodeDataUrl: string; secret: string }> {
+export async function start2FAEnrollment(password?: string): Promise<{ qrCodeDataUrl: string; secret: string }> {
   const session = await requireAdminSession();
 
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: session.user.id }, select: { totpEnabled: true, passwordHash: true } });
+  if (user.totpEnabled && (!password || !user.passwordHash || !(await bcrypt.compare(password, user.passwordHash)))) {
+    throw new UserError("Contraseña incorrecta");
+  }
+
   const secret = generateTotpSecret();
-  await prisma.user.update({
-    where: { id: session.user.id },
-    data: { totpSecret: secret, totpEnabled: false, totpBackupCodeHashes: [] },
-  });
+  await prisma.user.update({ where: { id: session.user.id }, data: { totpPendingSecret: secret } });
 
   const otpauthUri = buildOtpauthUri(secret, session.user.email ?? "admin");
   const qrCodeDataUrl = await QRCode.toDataURL(otpauthUri);
@@ -44,15 +46,15 @@ export async function confirm2FAEnrollment(code: string): Promise<{ backupCodes:
   const session = await requireAdminSession();
 
   const user = await prisma.user.findUniqueOrThrow({ where: { id: session.user.id } });
-  if (!user.totpSecret) throw new UserError("No hay una configuración de 2FA en progreso");
-  if (!verifyTotpCode(user.totpSecret, code)) throw new UserError("Código inválido");
+  if (!user.totpPendingSecret) throw new UserError("No hay una configuración de 2FA en progreso");
+  if (!verifyTotpCode(user.totpPendingSecret, code)) throw new UserError("Código inválido");
 
   const backupCodes = generateBackupCodes();
   const totpBackupCodeHashes = await Promise.all(backupCodes.map((c) => bcrypt.hash(c, 10)));
 
   await prisma.user.update({
     where: { id: session.user.id },
-    data: { totpEnabled: true, totpBackupCodeHashes },
+    data: { totpEnabled: true, totpSecret: user.totpPendingSecret, totpPendingSecret: null, totpBackupCodeHashes },
   });
 
   await logAudit({
@@ -76,7 +78,7 @@ export async function disable2FA(password: string): Promise<{ success: true }> {
 
   await prisma.user.update({
     where: { id: session.user.id },
-    data: { totpEnabled: false, totpSecret: null, totpBackupCodeHashes: [] },
+    data: { totpEnabled: false, totpSecret: null, totpPendingSecret: null, totpBackupCodeHashes: [] },
   });
 
   await logAudit({

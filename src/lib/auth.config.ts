@@ -15,6 +15,8 @@ declare module "next-auth" {
       organizationId: string | null;
       theme: string;
       language: string;
+      /** Versión de sesión con la que se emitió el JWT (ver session-guard). */
+      sessionVersion?: number;
       impersonating?: { adminId: string; adminName: string | null; adminEmail: string } | null;
     } & DefaultSession["user"];
   }
@@ -24,6 +26,7 @@ declare module "next-auth" {
     image?: string | null;
     theme?: string | null;
     language?: string | null;
+    sessionVersion?: number;
   }
 }
 
@@ -51,6 +54,7 @@ export const authConfig = {
         token.image = user.image ?? null;
         token.theme = user.theme ?? "light";
         token.language = user.language ?? "es";
+        token.sv = user.sessionVersion ?? 0;
       }
       return token;
     },
@@ -93,6 +97,7 @@ export const authConfig = {
         session.user.theme = (token.theme as string) ?? "light";
         session.user.language = (token.language as string) ?? "es";
         session.user.impersonating = null;
+        session.user.sessionVersion = (token.sv as number | undefined) ?? 0;
       }
       return session;
     },

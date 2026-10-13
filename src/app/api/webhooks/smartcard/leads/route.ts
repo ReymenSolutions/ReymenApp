@@ -3,6 +3,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { hasModule } from "@/lib/modules";
 import { ingestWebhookEvent } from "@/lib/webhook-ingest";
 import { isTimestampFresh, verifyWebhookSignature } from "@/lib/webhook-validator";
+import { isOrgActive } from "@/lib/org-guards";
 import { getOrgIdForSmartcardCompany } from "@/lib/smartcard-company";
 import { processLeadEvent } from "@/lib/webhook-processors";
 
@@ -55,6 +56,7 @@ export async function POST(req: NextRequest) {
 
   const orgId = await getOrgIdForSmartcardCompany(companyId);
   if (!orgId) return NextResponse.json({ error: "Unknown company" }, { status: 404 });
+  if (!(await isOrgActive(orgId))) return NextResponse.json({ error: "Organization suspended" }, { status: 403 });
   // Sin CRM contratado no se guarda nada (el emisor puede reintentar cuando lo tengan).
   if (!(await hasModule(orgId, "CRM"))) return NextResponse.json({ error: "CRM not enabled" }, { status: 403 });
 

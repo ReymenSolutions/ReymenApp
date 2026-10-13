@@ -245,7 +245,9 @@ export function TopBar({ title, onMenuClick }: TopBarProps) {
         await changePassword({ currentPassword: pwdForm.current, newPassword: pwdForm.next });
         setActiveDialog(null);
         setPwdForm({ current: "", next: "", confirm: "" });
-        toast.success(lang === "es" ? "Contraseña actualizada" : "Password updated");
+        toast.success(lang === "es" ? "Contraseña actualizada. Vuelve a iniciar sesión." : "Password updated. Please sign in again.");
+        // Las sesiones anteriores dejan de valer al cambiar la contraseña (también esta): se cierra y se vuelve a entrar.
+        signOut({ callbackUrl: "/login" });
       } catch (e) {
         toast.error(getErrorMessage(e, t.error));
       }

@@ -93,7 +93,7 @@ export async function resetPassword(data: {
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
 
   await prisma.$transaction([
-    prisma.user.update({ where: { id: user.id }, data: { passwordHash } }),
+    prisma.user.update({ where: { id: user.id }, data: { passwordHash, sessionVersion: { increment: 1 } } }),
     prisma.verificationToken.deleteMany({ where: { identifier: parsed.data.email } }),
   ]);
 
