@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
           startTime: { gt: now, lte: windowEnd },
           reminderLogs: { none: { ruleId: rule.id } },
         },
-        include: { lead: { select: { name: true, phone: true } } },
+        include: { lead: { select: { name: true, phone: true, organizationId: true } } },
       });
 
       return appointments.map((apt) => ({
@@ -46,8 +46,9 @@ export async function GET(req: NextRequest) {
         offsetMinutes: rule.offsetMinutes,
         title: apt.title,
         startTime: apt.startTime.toISOString(),
-        contactName: apt.lead?.name ?? null,
-        contactPhone: apt.lead?.phone ?? null,
+        // Defensa en profundidad: nunca se expone un contacto de otra organización, aunque un dato antiguo lo enlace.
+        contactName: apt.lead?.organizationId === orgId ? apt.lead.name : null,
+        contactPhone: apt.lead?.organizationId === orgId ? apt.lead.phone : null,
       }));
     })
   );
