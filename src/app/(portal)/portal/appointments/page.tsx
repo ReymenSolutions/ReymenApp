@@ -102,8 +102,8 @@ export default async function PortalAppointmentsPage() {
                       <p className="text-xs text-slate-400 truncate max-w-[200px]">{apt.description}</p>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-600">{formatDateTimeInTz(apt.startTime, org.timezone)}</td>
-                  <td className="px-4 py-3 text-xs text-slate-600">{formatDateTimeInTz(apt.endTime, org.timezone)}</td>
+                  <td className="px-4 py-3 text-xs text-slate-600">{formatDateTimeInTz(apt.startTime, org.timezone, lang)}</td>
+                  <td className="px-4 py-3 text-xs text-slate-600">{formatDateTimeInTz(apt.endTime, org.timezone, lang)}</td>
                   <td className="px-4 py-3 text-xs text-slate-500">{apt.source ?? "—"}</td>
                   <td className="px-4 py-3">
                     <AppointmentStatusSelect appointmentId={apt.id} currentStatus={apt.status} />

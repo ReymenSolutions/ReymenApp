@@ -142,7 +142,7 @@ export default async function AutomationDetailPage({
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-sm font-medium text-slate-900">{event.type}</span>
                           <span className="text-xs text-slate-400 flex-shrink-0">
-                            {formatDateTime(event.createdAt)}
+                            {formatDateTime(event.createdAt, lang)}
                           </span>
                         </div>
                         {event.errorMessage && (

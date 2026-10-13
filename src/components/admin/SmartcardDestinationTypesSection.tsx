@@ -156,12 +156,12 @@ export function SmartcardDestinationTypesSection({
       {canEdit && (
         <div className="mt-4 flex flex-wrap items-end gap-3 rounded-md border border-dashed border-slate-300 p-3">
           <div className="flex flex-col gap-1">
-            <Label className="text-xs">Código</Label>
-            <Input value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="TIKTOK" className="h-8 w-32" />
+            <Label htmlFor="smartcarddestinationtypessection-f1" className="text-xs">Código</Label>
+            <Input id="smartcarddestinationtypessection-f1" value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="TIKTOK" className="h-8 w-32" />
           </div>
           <div className="flex flex-col gap-1">
-            <Label className="text-xs">Nombre visible</Label>
-            <Input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="TikTok" className="h-8 w-40" />
+            <Label htmlFor="smartcarddestinationtypessection-f2" className="text-xs">Nombre visible</Label>
+            <Input id="smartcarddestinationtypessection-f2" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="TikTok" className="h-8 w-40" />
           </div>
           <label className="flex items-center gap-1 text-xs text-slate-700">
             <input type="checkbox" className="h-3.5 w-3.5" checked={newRequiresProfile} onChange={(e) => setNewRequiresProfile(e.target.checked)} />
@@ -172,8 +172,8 @@ export function SmartcardDestinationTypesSection({
             requiere URL
           </label>
           <div className="flex flex-col gap-1">
-            <Label className="text-xs">Orden</Label>
-            <Input
+            <Label htmlFor="smartcarddestinationtypessection-f3" className="text-xs">Orden</Label>
+            <Input id="smartcarddestinationtypessection-f3"
               type="number"
               value={newSortOrder}
               onChange={(e) => setNewSortOrder(Number(e.target.value) || 0)}

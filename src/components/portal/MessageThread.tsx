@@ -186,7 +186,7 @@ export function MessageThread({ conversationId, contactName, initialMessages, ha
                         : (lang === "es" ? "Sistema" : "System")}
                     </span>
                     <span className="text-xs text-slate-400">
-                      {formatDateTime(msg.createdAt)}
+                      {formatDateTime(msg.createdAt, lang)}
                     </span>
                     {msg.role === "AGENT" && <DeliveryStatusIcon status={msg.deliveryStatus} />}
                   </div>

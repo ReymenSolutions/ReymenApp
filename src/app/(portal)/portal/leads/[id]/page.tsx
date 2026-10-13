@@ -99,7 +99,7 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">{t.colDate}</span>
-                <span className="font-medium text-slate-900">{formatDate(lead.createdAt)}</span>
+                <span className="font-medium text-slate-900">{formatDate(lead.createdAt, lang)}</span>
               </div>
               {lead.notes && (
                 <div className="border-t border-slate-100 pt-3 text-sm text-slate-600">{lead.notes}</div>
@@ -170,7 +170,7 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
                         <p className="font-medium text-slate-900">{opp.title}</p>
                         <p className="text-xs text-slate-400">
                           {opp.pipelineStage.name} · {opp.owner?.name ?? opp.owner?.email ?? "—"}
-                          {opp.estimatedCloseDate && ` · ${formatDate(opp.estimatedCloseDate)}`}
+                          {opp.estimatedCloseDate && ` · ${formatDate(opp.estimatedCloseDate, lang)}`}
                         </p>
                       </div>
                       <span className="font-semibold text-slate-900">

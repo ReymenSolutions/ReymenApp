@@ -8,11 +8,13 @@ import { Input } from "@/components/ui/input";
 import { resolveCustomerFeedback } from "@/actions/feedback";
 import { getErrorMessage } from "@/lib/user-error";
 import { formatDateTime } from "@/lib/utils";
+import { usePreferences } from "@/context/preferences";
 
 export type FeedbackCase = { id: string; score: number; comment: string | null; customerName: string | null; customerPhone: string | null; respondedAt: Date | null };
 
 /** Calificaciones bajas pendientes de seguimiento: el equipo contacta al cliente y las marca como resueltas. */
 export function FeedbackCases({ cases, canResolve }: { cases: FeedbackCase[]; canResolve: boolean }) {
+  const { lang } = usePreferences();
   const [done, setDone] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [pending, start] = useTransition();
@@ -45,7 +47,7 @@ export function FeedbackCases({ cases, canResolve }: { cases: FeedbackCase[]; ca
               {c.customerName ?? "Cliente sin nombre"}
               {c.customerPhone && <span className="text-xs font-normal text-slate-500">{c.customerPhone}</span>}
             </div>
-            {c.respondedAt && <span className="text-xs text-slate-400">{formatDateTime(c.respondedAt)}</span>}
+            {c.respondedAt && <span className="text-xs text-slate-400">{formatDateTime(c.respondedAt, lang)}</span>}
           </div>
           <p className="mt-1 text-sm text-slate-700">{c.comment || <span className="text-slate-400">Sin comentario</span>}</p>
           {canResolve && (

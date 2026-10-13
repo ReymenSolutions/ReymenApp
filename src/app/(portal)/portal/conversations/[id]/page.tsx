@@ -107,12 +107,12 @@ export default async function ConversationDetailPage({
         )}
         {conv.escalatedAt && (
           <span className="text-xs text-amber-600">
-            {lang === "es" ? "Escalado" : "Escalated"} {formatDateTime(conv.escalatedAt)}
+            {lang === "es" ? "Escalado" : "Escalated"} {formatDateTime(conv.escalatedAt, lang)}
           </span>
         )}
         {conv.resolvedAt && (
           <span className="text-xs text-emerald-600">
-            {lang === "es" ? "Resuelto" : "Resolved"} {formatDateTime(conv.resolvedAt)}
+            {lang === "es" ? "Resuelto" : "Resolved"} {formatDateTime(conv.resolvedAt, lang)}
           </span>
         )}
       </div>

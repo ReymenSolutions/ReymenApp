@@ -54,13 +54,13 @@ export function AssistantConfigForm({ assistant }: { assistant: WhatsAppAssistan
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label>{t.assistantName}</Label>
-          <Input placeholder={t.assistantNamePlaceholder} {...register("name")} />
+          <Label htmlFor="assistantconfigform-f1">{t.assistantName}</Label>
+          <Input id="assistantconfigform-f1" placeholder={t.assistantNamePlaceholder} {...register("name")} />
           {errors.name && <p className="text-xs text-red-500">{translateMessage(errors.name.message)}</p>}
         </div>
         <div className="space-y-2">
-          <Label>{t.whatsappBusinessNumber}</Label>
-          <Input placeholder="+52 55 1234 5678" {...register("phoneNumber")} />
+          <Label htmlFor="assistantconfigform-f2">{t.whatsappBusinessNumber}</Label>
+          <Input id="assistantconfigform-f2" placeholder="+52 55 1234 5678" {...register("phoneNumber")} />
         </div>
       </div>
       <p className="text-xs text-slate-500">

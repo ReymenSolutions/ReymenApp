@@ -106,7 +106,7 @@ export default async function KnowledgeBasePage() {
                               <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
                             ))}
                             <span className="text-xs text-slate-400">
-                              {lang === "es" ? "Actualizado" : "Updated"} {formatDate(article.updatedAt)}
+                              {lang === "es" ? "Actualizado" : "Updated"} {formatDate(article.updatedAt, lang)}
                             </span>
                           </div>
                         </div>

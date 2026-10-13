@@ -92,8 +92,8 @@ export function EditUserDialog({ userId, userName, userRole }: EditUserDialogPro
           </DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>{lang === "es" ? "Nombre completo *" : "Full name *"}</Label>
-              <Input placeholder="Ana Martínez" {...register("name")} />
+              <Label htmlFor="edituserdialog-f1">{lang === "es" ? "Nombre completo *" : "Full name *"}</Label>
+              <Input id="edituserdialog-f1" placeholder="Ana Martínez" {...register("name")} />
               {errors.name && <p className="text-xs text-red-500">{translateMessage(errors.name.message)}</p>}
             </div>
             <div className="space-y-2">

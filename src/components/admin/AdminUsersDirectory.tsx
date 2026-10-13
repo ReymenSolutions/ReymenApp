@@ -92,13 +92,13 @@ function CreateStandaloneUserDialog() {
         </p>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Nombre completo *" : "Full name *"}</Label>
-            <Input placeholder={lang === "es" ? "Ana Martínez" : "Jane Doe"} {...register("name")} />
+            <Label htmlFor="adminusersdirectory-f1">{lang === "es" ? "Nombre completo *" : "Full name *"}</Label>
+            <Input id="adminusersdirectory-f1" placeholder={lang === "es" ? "Ana Martínez" : "Jane Doe"} {...register("name")} />
             {errors.name && <p className="text-xs text-red-500">{translateMessage(errors.name.message)}</p>}
           </div>
           <div className="space-y-2">
-            <Label>Email *</Label>
-            <Input type="email" placeholder="ana@reymen.io" {...register("email")} />
+            <Label htmlFor="adminusersdirectory-f2">Email *</Label>
+            <Input id="adminusersdirectory-f2" type="email" placeholder="ana@reymen.io" {...register("email")} />
             {errors.email && <p className="text-xs text-red-500">{translateMessage(errors.email.message)}</p>}
           </div>
           <div className="space-y-2">
@@ -113,8 +113,8 @@ function CreateStandaloneUserDialog() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Contraseña temporal *" : "Temporary password *"}</Label>
-            <Input type="password" placeholder={lang === "es" ? "Mínimo 8 caracteres" : "At least 8 characters"} {...register("password")} />
+            <Label htmlFor="adminusersdirectory-f3">{lang === "es" ? "Contraseña temporal *" : "Temporary password *"}</Label>
+            <Input id="adminusersdirectory-f3" type="password" placeholder={lang === "es" ? "Mínimo 8 caracteres" : "At least 8 characters"} {...register("password")} />
             {errors.password && <p className="text-xs text-red-500">{translateMessage(errors.password.message)}</p>}
           </div>
           <DialogFooter>

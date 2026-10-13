@@ -97,7 +97,7 @@ export function LeadAgentActions({ actions, canManage, onChanged }: { actions: A
           <p className="mt-1 text-xs text-slate-600">
             {t.why}: {a.reason}
           </p>
-          <p className="mt-0.5 text-[11px] text-slate-400">{formatDateTime(a.createdAt)}</p>
+          <p className="mt-0.5 text-[11px] text-slate-400">{formatDateTime(a.createdAt, lang)}</p>
           {gone[a.id] ? (
             <p className="mt-2 text-xs font-medium text-slate-500">{gone[a.id]}</p>
           ) : (

@@ -146,7 +146,7 @@ export function AiBudgetPanel({ orgId, view, providers }: { orgId: string; view:
                   <span className="min-w-[8rem] font-medium text-slate-900">{TYPE_LABEL[a.type]?.[es ? "es" : "en"] ?? a.type}</span>
                   <span className={a.amountMxn < 0 ? "text-red-600" : "text-emerald-700"}>{a.amountMxn >= 0 ? "+" : ""}${formatMoney(a.amountMxn).replace("$", "")} MXN</span>
                   <span className="min-w-[10rem] flex-1 text-xs text-slate-500">{a.reason}{a.externalRef ? ` · ${a.externalRef}` : ""}</span>
-                  <span className="text-xs text-slate-400">{a.createdBy ?? (es ? "sistema" : "system")} · {formatDateTime(a.createdAt)}</span>
+                  <span className="text-xs text-slate-400">{a.createdBy ?? (es ? "sistema" : "system")} · {formatDateTime(a.createdAt, lang)}</span>
                 </li>
               ))}
             </ul>

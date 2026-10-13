@@ -141,8 +141,8 @@ export function CreateTemplateDialog() {
           </div>
 
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Nombre *" : "Name *"}</Label>
-            <Input placeholder={lang === "es" ? "Agendamiento de citas médicas" : "Medical appointment booking"} {...register("name")} />
+            <Label htmlFor="createtemplatedialog-f1">{lang === "es" ? "Nombre *" : "Name *"}</Label>
+            <Input id="createtemplatedialog-f1" placeholder={lang === "es" ? "Agendamiento de citas médicas" : "Medical appointment booking"} {...register("name")} />
             {errors.name && <p className="text-xs text-red-500">{translateMessage(errors.name.message)}</p>}
           </div>
 
@@ -174,14 +174,14 @@ export function CreateTemplateDialog() {
           </div>
 
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Descripción corta *" : "Short description *"}</Label>
-            <Input placeholder={lang === "es" ? "Captura y califica leads desde WhatsApp automáticamente" : "Automatically captures and qualifies leads from WhatsApp"} {...register("description")} />
+            <Label htmlFor="createtemplatedialog-f2">{lang === "es" ? "Descripción corta *" : "Short description *"}</Label>
+            <Input id="createtemplatedialog-f2" placeholder={lang === "es" ? "Captura y califica leads desde WhatsApp automáticamente" : "Automatically captures and qualifies leads from WhatsApp"} {...register("description")} />
             {errors.description && <p className="text-xs text-red-500">{translateMessage(errors.description.message)}</p>}
           </div>
 
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Descripción detallada" : "Detailed description"}</Label>
-            <Textarea placeholder={lang === "es" ? "Explicación completa de qué hace el template..." : "Full explanation of what the template does..."} rows={3} {...register("longDescription")} />
+            <Label htmlFor="createtemplatedialog-f3">{lang === "es" ? "Descripción detallada" : "Detailed description"}</Label>
+            <Textarea id="createtemplatedialog-f3" placeholder={lang === "es" ? "Explicación completa de qué hace el template..." : "Full explanation of what the template does..."} rows={3} {...register("longDescription")} />
           </div>
 
           <DialogFooter>

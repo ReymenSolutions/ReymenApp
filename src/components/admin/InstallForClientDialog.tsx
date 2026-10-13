@@ -77,9 +77,9 @@ export function InstallForClientDialog({
 
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Cliente" : "Client"}</Label>
+            <Label htmlFor="installforclientdialog-f1">{lang === "es" ? "Cliente" : "Client"}</Label>
             <Select onValueChange={setSelectedOrg}>
-              <SelectTrigger>
+              <SelectTrigger id="installforclientdialog-f1">
                 <SelectValue placeholder={lang === "es" ? "Seleccionar cliente" : "Select client"} />
               </SelectTrigger>
               <SelectContent>
@@ -91,9 +91,9 @@ export function InstallForClientDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Versión" : "Version"}</Label>
+            <Label htmlFor="installforclientdialog-f2">{lang === "es" ? "Versión" : "Version"}</Label>
             <Select value={selectedVersion} onValueChange={setSelectedVersion}>
-              <SelectTrigger>
+              <SelectTrigger id="installforclientdialog-f2">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

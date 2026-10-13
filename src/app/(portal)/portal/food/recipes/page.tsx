@@ -1,3 +1,4 @@
+import { dayKey, getOrgTimezone } from "@/lib/business-day";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { hasModule, requireModule } from "@/lib/modules";
@@ -21,12 +22,6 @@ import { PosLockedNotice } from "@/components/portal/PosLockedNotice";
 import { FoodRecipeRecalcForm } from "@/components/portal/FoodRecipeRecalcForm";
 import { can } from "@/lib/permissions";
 
-function startOfToday(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
 export default async function FoodRecipesPage() {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
@@ -45,7 +40,7 @@ export default async function FoodRecipesPage() {
       orderBy: { name: "asc" },
     }),
     prisma.foodDishSale.findMany({
-      where: { organizationId: orgId, occurredAt: startOfToday() },
+      where: { organizationId: orgId, occurredAt: dayKey(new Date(), await getOrgTimezone(orgId)) },
       select: { variantId: true, quantity: true },
     }),
     getFoodDishCategories(orgId),

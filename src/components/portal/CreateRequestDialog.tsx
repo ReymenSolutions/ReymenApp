@@ -67,8 +67,8 @@ export function CreateRequestDialog() {
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label>{t.reqTitleLabel} *</Label>
-            <Input placeholder={t.reqTitleLabel} {...register("title")} />
+            <Label htmlFor="createrequestdialog-f1">{t.reqTitleLabel} *</Label>
+            <Input id="createrequestdialog-f1" placeholder={t.reqTitleLabel} {...register("title")} />
             {errors.title && <p className="text-xs text-red-500">{translateMessage(errors.title.message)}</p>}
           </div>
 
@@ -100,8 +100,8 @@ export function CreateRequestDialog() {
           </div>
 
           <div className="space-y-2">
-            <Label>{t.reqDescLabel} *</Label>
-            <Textarea
+            <Label htmlFor="createrequestdialog-f2">{t.reqDescLabel} *</Label>
+            <Textarea id="createrequestdialog-f2"
               placeholder={t.reqDescPlaceholder}
               rows={4}
               {...register("description")}

@@ -1,3 +1,4 @@
+import { getOrgTimezone, startOfLocalDay } from "@/lib/business-day";
 import { redirect } from "next/navigation";
 import { Bike, Clock, Receipt, AlertTriangle } from "lucide-react";
 import type { DeliveryOrder, DeliveryOrderStatus, DeliveryPlatform } from "@prisma/client";
@@ -48,19 +49,13 @@ const EXAMPLE = {
   items: [{ name: "Hamburguesa clásica", quantity: 2, modifiers: ["Sin cebolla"], notes: "Bien cocida" }],
 };
 
-function startOfToday(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
 export default async function FoodDeliveryPage() {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
   const orgId = session.user.organizationId;
   await requireModule(orgId, "FOOD_OPS");
 
-  const today = startOfToday();
+  const today = startOfLocalDay(new Date(), await getOrgTimezone(orgId));
   const [, lang, channels, active, todays, org] = await Promise.all([
     getServerT(),
     getServerLang(),

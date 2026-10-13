@@ -74,7 +74,7 @@ export function LeadNotesPanel({ leadId, initialNotes }: { leadId: string; initi
             <div key={note.id} className="rounded-md border border-slate-100 bg-slate-50 p-2.5">
               <p className="whitespace-pre-wrap text-sm text-slate-700">{note.content}</p>
               <div className="mt-1.5 flex items-center justify-between text-xs text-slate-400">
-                <span>{note.authorName ?? "—"} · {formatDateTime(note.createdAt)}</span>
+                <span>{note.authorName ?? "—"} · {formatDateTime(note.createdAt, lang)}</span>
                 {note.canDelete && (
                   <button onClick={() => handleDelete(note.id)} disabled={isPending} className="hover:text-red-500">
                     <Trash2 className="h-3.5 w-3.5" />

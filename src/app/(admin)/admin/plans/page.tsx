@@ -95,7 +95,7 @@ export default async function AdminPlansPage() {
               )}
               {p.revisions.length > 0 && (
                 <p className="border-t border-slate-100 pt-2 text-xs text-slate-400">
-                  {es ? "Último cambio" : "Last change"}: v{p.revisions[0].version} · {p.revisions[0].changedBy ?? (es ? "sistema" : "system")} · {formatDateTime(p.revisions[0].createdAt)}
+                  {es ? "Último cambio" : "Last change"}: v{p.revisions[0].version} · {p.revisions[0].changedBy ?? (es ? "sistema" : "system")} · {formatDateTime(p.revisions[0].createdAt, lang)}
                 </p>
               )}
             </CardContent>

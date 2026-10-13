@@ -70,8 +70,8 @@ export function FoodPriceCalculator({
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="space-y-2">
-          <Label>{lang === "es" ? "Platillo" : "Dish"}</Label>
-          <select
+          <Label htmlFor="foodpricecalculator-f1">{lang === "es" ? "Platillo" : "Dish"}</Label>
+          <select id="foodpricecalculator-f1"
             value={selectedDishId}
             onChange={(e) => setSelectedDishId(e.target.value)}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500"
@@ -85,14 +85,14 @@ export function FoodPriceCalculator({
 
         {selectedDishId === "manual" && (
           <div className="space-y-2">
-            <Label>{lang === "es" ? "Costo del platillo" : "Dish cost"}</Label>
-            <Input type="number" step="0.01" min="0" value={manualCost} onChange={(e) => setManualCost(e.target.value)} />
+            <Label htmlFor="foodpricecalculator-f2">{lang === "es" ? "Costo del platillo" : "Dish cost"}</Label>
+            <Input id="foodpricecalculator-f2" type="number" step="0.01" min="0" value={manualCost} onChange={(e) => setManualCost(e.target.value)} />
           </div>
         )}
 
         <div className="space-y-2">
-          <Label>{lang === "es" ? "% de costo objetivo" : "Target cost %"}</Label>
-          <Input type="number" step="1" min="1" max="90" value={targetPct} onChange={(e) => setTargetPct(e.target.value)} />
+          <Label htmlFor="foodpricecalculator-f3">{lang === "es" ? "% de costo objetivo" : "Target cost %"}</Label>
+          <Input id="foodpricecalculator-f3" type="number" step="1" min="1" max="90" value={targetPct} onChange={(e) => setTargetPct(e.target.value)} />
         </div>
 
         <div className="rounded-md bg-brand-50 p-3">

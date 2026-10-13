@@ -15,13 +15,13 @@ Estado de los 21 hallazgos de `ReymenApp_Auditoria_Maestra.md` (revisión `00e2d
 | AUD-009 | P1 | ✅ Corregido (#100) | event-id obligatorio en ventas POS + deduplicación por firma |
 | AUD-010 | P1 | ✅ Corregido (#100) | `stripeEventAt`: solo eventos más nuevos |
 | AUD-011 | P1 | ✅ Corregido (#100) | sin Resend no se registran enlaces en producción |
-| AUD-012 | P1 | 🟡 Herramientas listas; **falta configurar el destino externo** | `deploy/backup.sh` + `restore-test.sh`; definir `BACKUP_REMOTE` y probar una restauración |
+| AUD-012 | P1 | 🟡 Herramientas y guía listas; **falta tu paso**: crear el bucket y `BACKUP_REMOTE` (guía en `docs/DEPLOY.md`) | `deploy/backup.sh` (base + configuración cifrada), `restore-test.sh` |
 | AUD-021 | P1 | ✅ Corregido (#98) | reactivar cita repite el control de solapamiento |
 | AUD-013 | P2 | ✅ Corregido | admisión atómica (`pg_advisory_xact_lock`) + barrido global |
 | AUD-014 | P2 | ✅ Corregido (leads y usuarios) | `withPlanCapacity`; la instalación de plantillas conserva comprobación simple (abre sus propias transacciones) |
-| AUD-015 | P2 | 🟠 **Requiere decisión** | el día de negocio de Food usa la zona del servidor (UTC en contenedores). Corregirlo cambia la clave de `DishSale`/`ModifierSale` de datos existentes: necesita migración de datos y definir si la zona es por organización (`Organization.timezone`). No se cambió `TZ` a ciegas |
-| AUD-016 | P2 | 🟡 Parcial | idioma/tema ahora vienen de la base (sin volver a iniciar sesión); `formatDate*` aceptan idioma y las pantallas nuevas lo usan. Falta migrar el resto de llamadas |
-| AUD-017 | P2 | 🟡 Parcial | grupos de botones de módulos con `radiogroup`/`aria-labelledby`. Falta una pasada WCAG completa en navegador |
+| AUD-015 | P2 | ✅ Corregido | día de negocio por zona de cada organización (`business-day.ts`): ventas de hoy, gráfica por hora y diaria, conteos por platillo, captura manual, purga de ventas de prueba y pantallas de Food/Inicio/Panel. Los conteos existentes (guardados en UTC) siguen siendo válidos; el histórico no se reasigna |
+| AUD-016 | P2 | ✅ Corregido (portal) | idioma/tema desde la base; `formatDate*` aceptan idioma y todo el portal los usa. El Admin interno conserva fechas en español |
+| AUD-017 | P2 | 🟡 Mejorado | 85 etiquetas de formularios ahora asociadas a su control (`htmlFor`/`id`) y grupos de botones etiquetados. Falta una auditoría WCAG completa con lector de pantalla y los selectores de Radix |
 | AUD-018 | P2 | ✅ Corregido | tope por etapa en pipeline, ventana en agenda, tope en KB y exportación por lotes (50 000 filas) |
 | AUD-019 | P2 | ✅ Corregido | fallos de auditoría dejan señal en logs (sin metadata) |
-| AUD-020 | P2 | 🟡 Documentado | `docs/DEPLOY.md` con la topología y el checklist de reconstrucción; guarda una copia del compose `preview` fuera del servidor |
+| AUD-020 | P2 | 🟡 Cubierto operativamente | `backup.sh` respalda cifrada la configuración local (compose/.env/nginx); `docs/DEPLOY.md` tiene el checklist de reconstrucción |

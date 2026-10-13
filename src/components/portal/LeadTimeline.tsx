@@ -181,7 +181,7 @@ export function LeadTimeline({ events, hasMore, moreHref, lang, animateAfter }: 
                     {event.reason && <span className="text-slate-500"> · {t.reason}: {event.reason}</span>}
                   </div>
                 )}
-                <p className="text-xs text-slate-400">{formatDateTime(event.date)}</p>
+                <p className="text-xs text-slate-400">{formatDateTime(event.date, lang)}</p>
               </div>
             </li>
           );

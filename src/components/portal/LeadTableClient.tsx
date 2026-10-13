@@ -184,7 +184,7 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status, c
                     </td>
                   )}
                   {show("date") && (
-                    <td className="px-4 py-3 text-xs text-slate-500">{formatDate(lead.createdAt)}</td>
+                    <td className="px-4 py-3 text-xs text-slate-500">{formatDate(lead.createdAt, lang)}</td>
                   )}
                   {shownFields.map((f) => (
                     <td key={f.key} className="px-4 py-3 text-xs text-slate-600">

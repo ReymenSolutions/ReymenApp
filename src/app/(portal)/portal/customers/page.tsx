@@ -108,7 +108,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                       <p className="font-semibold text-slate-900">{formatMoney(Number(c.totalSpent))}</p>
                       <p className="text-xs text-slate-500">
                         {c.visitCount} {c.visitCount === 1 ? (es ? "visita" : "visit") : es ? "visitas" : "visits"}
-                        {c.lastVisitAt && ` · ${es ? "última" : "last"} ${formatDate(c.lastVisitAt)}`}
+                        {c.lastVisitAt && ` · ${es ? "última" : "last"} ${formatDate(c.lastVisitAt, es ? "es" : "en")}`}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">

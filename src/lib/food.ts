@@ -1,3 +1,4 @@
+import { dayKey, daysAgoKey, daysAgoStart, getOrgTimezone, localDateString, localHour } from "./business-day";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { hasModule } from "./modules";
@@ -34,17 +35,10 @@ export interface FoodSalesSummary {
   vsYesterdayTicketPct: number | null;
 }
 
-function startOfDay(d: Date): Date {
-  const copy = new Date(d);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
-}
-
-function daysAgo(n: number): Date {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return startOfDay(d);
-}
+// El "día" de Food es el de la zona horaria de la organización (ver business-day.ts): `instant` acota ventas y consumos
+// (momentos reales) y `key` acota los conteos diarios por platillo/opción (fecha local a las 00:00 UTC).
+type Since = { instant: Date; key: Date };
+const sinceDays = (n: number, tz: string): Since => ({ instant: daysAgoStart(n, tz), key: daysAgoKey(n, tz) });
 
 async function sumRange(organizationId: string, from: Date, to?: Date, branch?: BranchFilter) {
   const result = await prisma.foodSale.aggregate({
@@ -65,12 +59,13 @@ async function sumRange(organizationId: string, from: Date, to?: Date, branch?: 
 }
 
 export async function getFoodSalesSummary(organizationId: string, branch?: BranchFilter): Promise<FoodSalesSummary> {
+  const tz = await getOrgTimezone(organizationId);
   const [today, yesterday, last7Days, last30Days, previous30Days] = await Promise.all([
-    sumRange(organizationId, startOfDay(new Date()), undefined, branch),
-    sumRange(organizationId, daysAgo(1), startOfDay(new Date()), branch),
-    sumRange(organizationId, daysAgo(7), undefined, branch),
-    sumRange(organizationId, daysAgo(30), undefined, branch),
-    sumRange(organizationId, daysAgo(60), daysAgo(30), branch),
+    sumRange(organizationId, daysAgoStart(0, tz), undefined, branch),
+    sumRange(organizationId, daysAgoStart(1, tz), daysAgoStart(0, tz), branch),
+    sumRange(organizationId, daysAgoStart(7, tz), undefined, branch),
+    sumRange(organizationId, daysAgoStart(30, tz), undefined, branch),
+    sumRange(organizationId, daysAgoStart(60, tz), daysAgoStart(30, tz), branch),
   ]);
 
   const pctChange = (curr: number, prev: number): number | null =>
@@ -111,9 +106,10 @@ export interface FoodSalesByChannel {
 }
 
 export async function getFoodSalesByChannel(organizationId: string, branch?: BranchFilter): Promise<FoodSalesByChannel[]> {
+  const tz = await getOrgTimezone(organizationId);
   const rows = await prisma.foodSale.groupBy({
     by: ["channel"],
-    where: { organizationId, ...branchWhere(branch), occurredAt: { gte: daysAgo(30) } },
+    where: { organizationId, ...branchWhere(branch), occurredAt: { gte: daysAgoStart(30, tz) } },
     _sum: { grossAmount: true },
     _count: { _all: true },
   });
@@ -134,20 +130,21 @@ export async function getFoodSalesByChannel(organizationId: string, branch?: Bra
 // getCompanyCardStats en smartcard-company.ts para el desglose por tipo.
 
 export interface FoodHourlyBucket {
-  hour: number; // 0-23, hora local del servidor (mismo criterio que startOfDay/daysAgo arriba)
+  hour: number; // 0-23, hora local de la organización
   gross: number;
   count: number;
 }
 
 export async function getFoodHourlySales(organizationId: string, branch?: BranchFilter): Promise<FoodHourlyBucket[]> {
+  const tz = await getOrgTimezone(organizationId);
   const sales = await prisma.foodSale.findMany({
-    where: { organizationId, ...branchWhere(branch), occurredAt: { gte: startOfDay(new Date()) } },
+    where: { organizationId, ...branchWhere(branch), occurredAt: { gte: daysAgoStart(0, tz) } },
     select: { occurredAt: true, grossAmount: true },
   });
 
   const buckets = new Map<number, { gross: number; count: number }>();
   for (const sale of sales) {
-    const hour = sale.occurredAt.getHours();
+    const hour = localHour(sale.occurredAt, tz);
     const entry = buckets.get(hour) ?? { gross: 0, count: 0 };
     entry.gross += Number(sale.grossAmount);
     entry.count += 1;
@@ -218,19 +215,20 @@ export async function getFoodLowStockItems(organizationId: string, limit = 5, br
 // superiores con una serie real de los últimos N días, no inventada.
 
 export interface FoodDailyBucket {
-  date: string; // YYYY-MM-DD, hora local del servidor (mismo criterio que el resto del archivo)
+  date: string; // YYYY-MM-DD, día local de la organización
   gross: number;
   count: number;
 }
 
 export async function getFoodDailySales(organizationId: string, days = 7, branch?: BranchFilter): Promise<FoodDailyBucket[]> {
-  const from = daysAgo(days - 1);
+  const tz = await getOrgTimezone(organizationId);
+  const from = daysAgoStart(days - 1, tz);
   const sales = await prisma.foodSale.findMany({
     where: { organizationId, ...branchWhere(branch), occurredAt: { gte: from } },
     select: { occurredAt: true, grossAmount: true },
   });
 
-  const toKey = (d: Date) => startOfDay(d).toISOString().slice(0, 10);
+  const toKey = (d: Date) => localDateString(d, tz);
 
   const buckets = new Map<string, { gross: number; count: number }>();
   for (const sale of sales) {
@@ -242,7 +240,7 @@ export async function getFoodDailySales(organizationId: string, days = 7, branch
   }
 
   return Array.from({ length: days }, (_, i) => {
-    const key = toKey(daysAgo(days - 1 - i));
+    const key = toKey(daysAgoStart(days - 1 - i, tz));
     return { date: key, gross: buckets.get(key)?.gross ?? 0, count: buckets.get(key)?.count ?? 0 };
   });
 }
@@ -706,10 +704,10 @@ export async function getFoodBreakEven(organizationId: string): Promise<FoodBrea
     breakEvenUnits: v.marginAmount > 0 ? Math.ceil(fixedCostsMonthly / v.marginAmount) : null,
   }));
 
-  const since = daysAgo(30);
+  const since = sinceDays(30, await getOrgTimezone(organizationId));
   const variantSales = await prisma.foodDishSale.groupBy({
     by: ["variantId"],
-    where: { organizationId, occurredAt: { gte: since } },
+    where: { organizationId, occurredAt: { gte: since.key } },
     _sum: { quantity: true },
   });
 
@@ -783,27 +781,27 @@ async function getModifierOptionCosts(organizationId: string): Promise<Map<strin
  * Con sucursal (null = Principal, id = esa sucursal): se suman los consumos de receta de las ventas de
  * esa sucursal, que sí llevan la sucursal (los conteos diarios no).
  */
-async function variantUnitsSince(organizationId: string, from: Date, branch?: BranchFilter): Promise<{ variantId: string; quantity: number }[]> {
+async function variantUnitsSince(organizationId: string, from: Since, branch?: BranchFilter): Promise<{ variantId: string; quantity: number }[]> {
   if (branch === undefined) {
-    const rows = await prisma.foodDishSale.groupBy({ by: ["variantId"], where: { organizationId, occurredAt: { gte: from } }, _sum: { quantity: true } });
+    const rows = await prisma.foodDishSale.groupBy({ by: ["variantId"], where: { organizationId, occurredAt: { gte: from.key } }, _sum: { quantity: true } });
     return rows.map((r) => ({ variantId: r.variantId, quantity: r._sum.quantity ?? 0 }));
   }
   const rows = await prisma.foodRecipeUsage.groupBy({
     by: ["variantId"],
-    where: { organizationId, occurredAt: { gte: from }, variantId: { not: null }, saleBranchId: branch },
+    where: { organizationId, occurredAt: { gte: from.instant }, variantId: { not: null }, saleBranchId: branch },
     _sum: { units: true },
   });
   return rows.map((r) => ({ variantId: r.variantId!, quantity: Math.round(Number(r._sum.units ?? 0)) }));
 }
 
-async function optionUnitsSince(organizationId: string, from: Date, branch?: BranchFilter): Promise<{ optionId: string; quantity: number }[]> {
+async function optionUnitsSince(organizationId: string, from: Since, branch?: BranchFilter): Promise<{ optionId: string; quantity: number }[]> {
   if (branch === undefined) {
-    const rows = await prisma.foodModifierOptionSale.groupBy({ by: ["optionId"], where: { organizationId, occurredAt: { gte: from } }, _sum: { quantity: true } });
+    const rows = await prisma.foodModifierOptionSale.groupBy({ by: ["optionId"], where: { organizationId, occurredAt: { gte: from.key } }, _sum: { quantity: true } });
     return rows.map((r) => ({ optionId: r.optionId, quantity: r._sum.quantity ?? 0 }));
   }
   const rows = await prisma.foodRecipeUsage.groupBy({
     by: ["modifierOptionId"],
-    where: { organizationId, occurredAt: { gte: from }, modifierOptionId: { not: null }, saleBranchId: branch },
+    where: { organizationId, occurredAt: { gte: from.instant }, modifierOptionId: { not: null }, saleBranchId: branch },
     _sum: { units: true },
   });
   return rows.map((r) => ({ optionId: r.modifierOptionId!, quantity: Math.round(Number(r._sum.units ?? 0)) }));
@@ -811,11 +809,12 @@ async function optionUnitsSince(organizationId: string, from: Date, branch?: Bra
 
 export async function getFoodNetProfit(organizationId: string, period: FoodProfitPeriod, branch?: BranchFilter): Promise<FoodNetProfitResult> {
   const days = PERIOD_LABEL_DAYS[period];
-  const from = period === "today" ? startOfDay(new Date()) : daysAgo(days);
+  const tz = await getOrgTimezone(organizationId);
+  const from = sinceDays(period === "today" ? 0 : days, tz);
 
   const [salesAgg, variantSales, dishes, fixedCostsMonthly, optionSales, optionCosts] = await Promise.all([
     prisma.foodSale.aggregate({
-      where: { organizationId, ...branchWhere(branch), occurredAt: { gte: from } },
+      where: { organizationId, ...branchWhere(branch), occurredAt: { gte: from.instant } },
       _sum: { netAmount: true },
     }),
     variantUnitsSince(organizationId, from, branch),
@@ -947,7 +946,7 @@ export async function getFoodProfitRecommendations(organizationId: string, branc
   const variants = flattenVariants(dishes);
   if (variants.length === 0) return [];
 
-  const since = daysAgo(30);
+  const since = sinceDays(30, await getOrgTimezone(organizationId));
   const salesRows = await variantUnitsSince(organizationId, since, branch);
   const unitsByVariant = new Map(salesRows.map((r) => [r.variantId, r.quantity]));
 
@@ -1020,7 +1019,7 @@ export interface FoodLeastSoldItem {
 export async function getFoodLeastSoldDishes(organizationId: string, days = 30, limit = 5, branch?: BranchFilter): Promise<FoodLeastSoldItem[]> {
   const dishes = await getFoodDishesWithCost(organizationId, { activeOnly: true });
   const variants = flattenVariants(dishes);
-  const since = daysAgo(days);
+  const since = sinceDays(days, await getOrgTimezone(organizationId));
   const salesRows = await variantUnitsSince(organizationId, since, branch);
   const unitsByVariant = new Map(salesRows.map((r) => [r.variantId, r.quantity]));
 
@@ -1045,7 +1044,7 @@ export interface FoodTopSellingItem {
 }
 
 export async function getFoodTopSellingDishes(organizationId: string, days = 30, limit = 5, branch?: BranchFilter): Promise<FoodTopSellingItem[]> {
-  const since = daysAgo(days);
+  const since = sinceDays(days, await getOrgTimezone(organizationId));
   const salesRows = await variantUnitsSince(organizationId, since, branch);
   if (salesRows.length === 0) return [];
 
@@ -1135,7 +1134,7 @@ export async function processFoodPosOrder(payload: unknown, organizationId: stri
 
   const occurredAt = body.occurredAt ? new Date(body.occurredAt) : new Date();
   if (Number.isNaN(occurredAt.getTime())) throw new Error("occurredAt inválido");
-  const businessDay = startOfDay(occurredAt);
+  const businessDay = dayKey(occurredAt, await getOrgTimezone(organizationId));
 
   const variantIds = body.items.map((i) => i.variantId);
   const owned = await prisma.foodDishVariant.findMany({

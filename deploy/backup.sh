@@ -26,12 +26,33 @@ size="$(stat -c %s "$file")"
 if [ "$size" -lt 10240 ]; then echo "✗ El respaldo pesa $size bytes: algo salió mal." >&2; exit 1; fi
 echo "✓ Respaldo local: $file ($size bytes)"
 
+# Configuración del servidor (compose, .env, nginx): es lo único que NO está en el repositorio. Va CIFRADA (aes-256) porque
+# contiene secretos; la contraseña vive en /etc/reymen-backup.pass (modo 600) y debes guardarla también en tu gestor de contraseñas.
+config_file=""
+if [ -f /etc/reymen-backup.pass ]; then
+  config_file="$dir/config-$stamp.tar.gz.enc"
+  # shellcheck disable=SC2046
+  tar -czf - -C "$repo" $(cd "$repo" && ls docker/docker-compose.preview.yml .env .env.preview .env.n8n docker/nginx.conf 2>/dev/null) \
+    | openssl enc -aes-256-cbc -pbkdf2 -salt -pass file:/etc/reymen-backup.pass -out "$config_file"
+  echo "✓ Configuración cifrada: $config_file"
+else
+  echo "⚠ Falta /etc/reymen-backup.pass: la configuración del servidor (compose y .env) NO se respalda. Ver docs/DEPLOY.md." >&2
+fi
+
+ship() {
+  case "${BACKUP_REMOTE:-}" in
+    rclone:*) rclone copy "$1" "${BACKUP_REMOTE#rclone:}" ;;
+    scp:*) scp -q -o BatchMode=yes "$1" "${BACKUP_REMOTE#scp:}" ;;
+    *) return 1 ;;
+  esac
+}
 case "${BACKUP_REMOTE:-}" in
-  rclone:*) rclone copy "$file" "${BACKUP_REMOTE#rclone:}" && echo "✓ Copiado fuera del VPS (${BACKUP_REMOTE})" ;;
-  scp:*) scp -q -o BatchMode=yes "$file" "${BACKUP_REMOTE#scp:}" && echo "✓ Copiado fuera del VPS (${BACKUP_REMOTE})" ;;
+  rclone:*|scp:*)
+    ship "$file" && echo "✓ Respaldo copiado fuera del VPS (${BACKUP_REMOTE})"
+    if [ -n "$config_file" ]; then ship "$config_file" && echo "✓ Configuración copiada fuera del VPS"; fi ;;
   "") echo "⚠ BACKUP_REMOTE no está configurado: este respaldo vive SOLO en este servidor." >&2 ;;
   *) echo "✗ BACKUP_REMOTE no reconocido: usa rclone:<remoto>:<carpeta> o scp:usuario@host:/ruta/" >&2; exit 1 ;;
 esac
 
 # Rotación local: solo los diarios (los "antes-de-migrar-*" los gestiona update.sh).
-find "$dir" -name 'diario-*.dump' -mtime +"$keep_days" -delete
+find "$dir" \( -name 'diario-*.dump' -o -name 'config-*.tar.gz.enc' \) -mtime +"$keep_days" -delete

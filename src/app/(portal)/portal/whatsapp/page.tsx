@@ -150,7 +150,7 @@ export default async function WhatsAppCenterPage() {
                         </div>
                         <Badge variant="secondary">{conv._count.messages} {t.msgs}</Badge>
                       </div>
-                      <p className="mt-1 text-xs text-slate-400">{formatDate(conv.updatedAt)}</p>
+                      <p className="mt-1 text-xs text-slate-400">{formatDate(conv.updatedAt, lang)}</p>
                     </Link>
                   ))}
                 </div>
@@ -193,7 +193,7 @@ export default async function WhatsAppCenterPage() {
             )}
             <span className="text-xs text-slate-500">
               {lastProcessedWebhook?.processedAt
-                ? `${lang === "es" ? "Última actividad recibida" : "Last activity received"}: ${formatDateTime(lastProcessedWebhook.processedAt)}`
+                ? `${lang === "es" ? "Última actividad recibida" : "Last activity received"}: ${formatDateTime(lastProcessedWebhook.processedAt, lang)}`
                 : lang === "es"
                 ? "Aún no se ha recibido actividad"
                 : "No activity received yet"}
