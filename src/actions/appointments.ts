@@ -10,6 +10,7 @@ import { logAudit } from "@/lib/audit";
 import { recordMetric, METRIC_KEYS } from "@/lib/metrics";
 import type { AppointmentStatus } from "@prisma/client";
 import { UserError } from "@/lib/user-error";
+import { assertOrgLead } from "@/lib/org-guards";
 
 // Only these statuses represent a live, upcoming commitment that occupies a
 // slot. A CANCELLED or NO_SHOW appointment frees the slot back up; COMPLETED
@@ -41,6 +42,8 @@ async function bookSlot(
     start: Date;
     end: Date;
     excludeAppointmentId?: string;
+    /** Al reactivar una cita cancelada: el estado que se aplica en la misma transacción que la comprobación de solapamiento. */
+    reactivateAs?: AppointmentStatus;
   }
 ) {
   if (data.end <= data.start) throw new UserError("La hora de fin debe ser posterior a la de inicio");
@@ -91,7 +94,7 @@ async function bookSlot(
         if (data.excludeAppointmentId) {
           await tx.appointment.update({
             where: { id: data.excludeAppointmentId },
-            data: { startTime: data.start, endTime: data.end },
+            data: { startTime: data.start, endTime: data.end, ...(data.reactivateAs ? { status: data.reactivateAs } : {}) },
           });
         } else {
           await tx.appointment.create({
@@ -140,6 +143,7 @@ export async function createAppointment(data: z.infer<typeof createSchema>) {
   if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos inválidos");
 
   const organizationId = session.user.organizationId;
+  if (parsed.data.leadId) await assertOrgLead(organizationId, parsed.data.leadId);
   const start = new Date(parsed.data.startTime);
 
   let end: Date;
@@ -223,10 +227,23 @@ export async function updateAppointmentStatus(appointmentId: string, status: App
   });
   if (!apt) throw new UserError("Cita no encontrada");
 
-  await prisma.appointment.update({
-    where: { id: appointmentId },
-    data: { status },
-  });
+  // Volver a ocupar un horario (cancelada/no asistió → agendada/confirmada) exige el mismo control de solapamiento y de
+  // disponibilidad que una cita nueva; el cambio de estado va en la misma transacción para que no haya carrera.
+  if (BLOCKING_STATUSES.includes(status) && !BLOCKING_STATUSES.includes(apt.status)) {
+    await bookSlot(session.user.organizationId, {
+      title: apt.title,
+      serviceId: apt.serviceId ?? undefined,
+      start: apt.startTime,
+      end: apt.endTime,
+      excludeAppointmentId: apt.id,
+      reactivateAs: status,
+    });
+  } else {
+    await prisma.appointment.update({
+      where: { id: appointmentId },
+      data: { status },
+    });
+  }
 
   revalidatePath("/portal/appointments");
   return { success: true };

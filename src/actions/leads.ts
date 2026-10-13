@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { assertPlanCapacity } from "@/lib/plan-limits";
 import { phoneKey } from "@/lib/phone";
@@ -11,7 +12,7 @@ import { linkOrphanConversations, linkOrphanCustomers } from "@/lib/crm-link";
 import { assertModuleEnabled } from "@/lib/modules";
 import { findPotentialDuplicateLeads } from "@/lib/duplicate-detection";
 import { recordMetric, METRIC_KEYS } from "@/lib/metrics";
-import type { LeadStatus } from "@prisma/client";
+import type { LeadStatus, UserRole } from "@prisma/client";
 import { UserError } from "@/lib/user-error";
 
 const createLeadSchema = z.object({
@@ -25,6 +26,7 @@ const createLeadSchema = z.object({
 export async function createLead(formData: FormData) {
   const session = await auth();
   if (!session?.user.organizationId) throw new UserError("No autorizado");
+  if (!can(session.user.role as UserRole, "leads:create")) throw new UserError("No autorizado");
 
   const parsed = createLeadSchema.safeParse({
     name: formData.get("name"),
@@ -73,6 +75,7 @@ export async function createLead(formData: FormData) {
 export async function updateLeadStatus(leadId: string, status: LeadStatus) {
   const session = await auth();
   if (!session?.user.organizationId) throw new UserError("No autorizado");
+  if (!can(session.user.role as UserRole, "leads:update_status")) throw new UserError("No autorizado");
 
   await assertModuleEnabled(session.user.organizationId, "CRM");
 
@@ -106,6 +109,7 @@ export async function updateLeadStatus(leadId: string, status: LeadStatus) {
 export async function deleteLead(leadId: string) {
   const session = await auth();
   if (!session?.user.organizationId) throw new UserError("No autorizado");
+  if (!can(session.user.role as UserRole, "leads:delete")) throw new UserError("No autorizado");
 
   await assertModuleEnabled(session.user.organizationId, "CRM");
 
@@ -229,6 +233,7 @@ function asRecord(value: unknown): Record<string, string | number | boolean> {
 export async function mergeLeads(primaryLeadId: string, duplicateLeadId: string) {
   const session = await auth();
   if (!session?.user.organizationId) throw new UserError("No autorizado");
+  if (!can(session.user.role as UserRole, "leads:delete")) throw new UserError("No autorizado");
   await assertModuleEnabled(session.user.organizationId, "CRM");
   if (primaryLeadId === duplicateLeadId) throw new UserError("No puedes fusionar un lead consigo mismo");
 

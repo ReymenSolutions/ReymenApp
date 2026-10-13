@@ -10,6 +10,7 @@ import { logAudit } from "@/lib/audit";
 import { syncLeadStatusFromOpportunity } from "@/lib/lead-status-sync";
 import type { UserRole } from "@prisma/client";
 import { UserError } from "@/lib/user-error";
+import { assertOrgUser } from "@/lib/org-guards";
 
 async function requireOrgAndCrm() {
   const session = await auth();
@@ -43,6 +44,7 @@ export async function createOpportunity(data: z.infer<typeof createSchema>) {
     : (await prisma.pipelineStage.findFirst({ where: { organizationId: orgId }, orderBy: { order: "asc" } }))?.id;
 
   if (!pipelineStageId) throw new UserError("No hay etapas de pipeline configuradas");
+  if (parsed.ownerId) await assertOrgUser(orgId, parsed.ownerId);
 
   const opportunity = await prisma.opportunity.create({
     data: {
@@ -169,6 +171,7 @@ export async function updateOpportunity(data: z.infer<typeof updateSchema>) {
 
   const { opportunityId, estimatedCloseDate, nextActivityAt, ...rest } = updateSchema.parse(data);
   const opportunity = await assertOpportunityAccess(orgId, opportunityId);
+  if (rest.ownerId) await assertOrgUser(orgId, rest.ownerId);
 
   await prisma.opportunity.update({
     where: { id: opportunityId },
