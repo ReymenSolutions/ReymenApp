@@ -1152,6 +1152,10 @@ enum PlatformModule {
   // del POS, así que la captura manual de ventas (que las duplicaría o
   // reemplazaría) se bloquea. Requiere FOOD_OPS.
   REYMEN_POS
+  // Programa de lealtad por visitas con inteligencia por código postal
+  // (/portal/loyalty). Módulo propio: no requiere FOOD_OPS; si el negocio
+  // también tiene Food, la participación sobre ventas usa FoodSale.
+  LOYALTY
 }
 
 enum ModuleStatus {

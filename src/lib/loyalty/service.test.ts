@@ -7,6 +7,7 @@ import {
   findMemberIdByToken,
   getActiveProgram,
   getPublicCard,
+  resolvePublicProgram,
   redeemReward,
   registerVisit,
   saveProgram,
@@ -14,6 +15,7 @@ import {
 } from "./service";
 import { getLoyaltyAnalytics } from "./queries";
 import { resolvePeriod } from "./period";
+import { can } from "@/lib/permissions";
 
 const PROGRAM = {
   name: "Club Prueba",
@@ -34,7 +36,7 @@ const key = () => `test-key-${Date.now()}-${seq++}`;
 
 async function setupOrg(prefix: string) {
   const org = await createTestOrg(prefix);
-  await prisma.organizationModule.create({ data: { organizationId: org.id, module: "FOOD_OPS", status: "ACTIVE", source: "SUBSCRIBED" } });
+  await prisma.organizationModule.create({ data: { organizationId: org.id, module: "LOYALTY", status: "ACTIVE", source: "SUBSCRIBED" } });
   const staff = await createTestUser(org.id, "AGENT", `${prefix.toLowerCase().replace(/\W/g, "")}-staff`);
   await saveProgram(org.id, staff.id, PROGRAM);
   return { org, staff };
@@ -312,6 +314,32 @@ describe("REYMEN Loyalty — servicio", () => {
       } finally {
         await cleanupOrg(org.id);
       }
+    });
+  });
+  describe("módulo propio LOYALTY", () => {
+    it("la inscripción pública solo existe si la organización tiene LOYALTY activo (Food no basta)", async () => {
+      expect(await resolvePublicProgram(A.org.slug)).not.toBeNull();
+      const org = await createTestOrg("Loyalty Solo Food");
+      try {
+        await prisma.organizationModule.create({ data: { organizationId: org.id, module: "FOOD_OPS", status: "ACTIVE", source: "SUBSCRIBED" } });
+        const staff = await createTestUser(org.id, "OWNER", "loyaltysolofood-owner");
+        await saveProgram(org.id, staff.id, PROGRAM);
+        expect(await resolvePublicProgram(org.slug)).toBeNull();
+        await expect(
+          enrollMember(org.slug, { name: "Ana Ruiz", whatsapp: "81 5550 0999", postalCode: "64610", email: null, branchId: null, consent: true })
+        ).rejects.toThrow();
+        await prisma.organizationModule.update({ where: { organizationId_module: { organizationId: org.id, module: "FOOD_OPS" } }, data: { module: "LOYALTY" } });
+        expect(await resolvePublicProgram(org.slug)).not.toBeNull();
+      } finally {
+        await cleanupOrg(org.id);
+      }
+    });
+
+    it("configurar el programa pide loyalty:manage; la caja (Agente) solo opera", () => {
+      for (const role of ["OWNER", "ADMIN", "MANAGER"] as const) expect(can(role, "loyalty:manage")).toBe(true);
+      expect(can("AGENT", "loyalty:manage")).toBe(false);
+      expect(can("AGENT", "loyalty:operate")).toBe(true);
+      expect(can("VIEWER", "loyalty:operate")).toBe(false);
     });
   });
 });

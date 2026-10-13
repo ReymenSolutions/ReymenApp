@@ -166,7 +166,7 @@ export async function resolvePublicProgram(orgSlug: string) {
     select: { id: true, name: true, slug: true, logoUrl: true, isActive: true },
   });
   if (!org || !org.isActive) return null;
-  if (!(await hasModule(org.id, "FOOD_OPS"))) return null;
+  if (!(await hasModule(org.id, "LOYALTY"))) return null;
   const program = await getActiveProgram(org.id);
   if (!program) return null;
   return { org, program };

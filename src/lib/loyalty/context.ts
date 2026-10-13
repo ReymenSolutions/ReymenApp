@@ -1,5 +1,5 @@
-// Contexto común de las páginas /portal/food/loyalty/* (solo servidor):
-// sesión, gate del módulo Food, idioma, programa vigente, zona horaria y
+// Contexto común de las páginas /portal/loyalty/* (solo servidor):
+// sesión, gate del módulo LOYALTY, idioma, programa vigente, zona horaria y
 // sucursales. Así cada página no repite la misma media docena de consultas.
 
 import { cache } from "react";
@@ -19,7 +19,7 @@ export const getLoyaltyContext = cache(async () => {
   const session = await auth();
   if (!session?.user.organizationId) redirect("/login");
   const orgId = session.user.organizationId;
-  await requireModule(orgId, "FOOD_OPS");
+  await requireModule(orgId, "LOYALTY");
   const role = session.user.role as UserRole;
   const [lang, program, org, branches] = await Promise.all([
     getServerLang(),
@@ -36,7 +36,7 @@ export const getLoyaltyContext = cache(async () => {
     program,
     org,
     branches: branches.map((b) => ({ id: b.id, name: b.name })),
-    canManage: can(role, "food:manage"),
+    canManage: can(role, "loyalty:manage"),
     canOperate: can(role, "loyalty:operate"),
   };
 });

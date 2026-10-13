@@ -120,11 +120,15 @@ async function main() {
     update: { name: ORG_NAME, isActive: true },
     create: { name: ORG_NAME, slug: ORG_SLUG, industry: "Restaurante", n8nWebhookSecret: randomBytes(32).toString("hex"), timezone: "America/Mexico_City" },
   });
-  await prisma.organizationModule.upsert({
-    where: { organizationId_module: { organizationId: org.id, module: "FOOD_OPS" } },
-    update: { status: "ACTIVE" },
-    create: { organizationId: org.id, module: "FOOD_OPS", status: "ACTIVE", source: "ADMIN_GRANTED", notes: "Demo REYMEN Loyalty" },
-  });
+  // LOYALTY es el módulo de la demo; FOOD_OPS da las ventas totales del
+  // restaurante para calcular la participación de los clientes de lealtad.
+  for (const mod of ["LOYALTY", "FOOD_OPS"] as const) {
+    await prisma.organizationModule.upsert({
+      where: { organizationId_module: { organizationId: org.id, module: mod } },
+      update: { status: "ACTIVE" },
+      create: { organizationId: org.id, module: mod, status: "ACTIVE", source: "ADMIN_GRANTED", notes: "Demo REYMEN Loyalty" },
+    });
+  }
   const hash = await bcrypt.hash(DEMO_PASSWORD, 12);
   const owner = await prisma.user.upsert({
     where: { email: OWNER_EMAIL },
@@ -155,6 +159,9 @@ async function main() {
       scope: "ORGANIZATION",
       currentVersion: 1,
       referenceLabel: "Café Norte · Cumbres",
+      // Punto aproximado de la sucursal ficticia en Cumbres, Monterrey (mapa OpenStreetMap).
+      referenceLat: 25.7333,
+      referenceLng: -100.3925,
       isDemo: true,
       createdAt: new Date(now - (DAYS + 5) * DAY),
       versions: {

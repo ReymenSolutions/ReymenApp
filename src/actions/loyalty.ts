@@ -7,7 +7,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireFoodManager, requireLoyaltyOperator } from "@/lib/guards";
+import { requireLoyaltyManager, requireLoyaltyOperator } from "@/lib/guards";
 import { UserError } from "@/lib/user-error";
 import { MAIN_BRANCH_PARAM } from "@/lib/branches";
 import {
@@ -23,12 +23,12 @@ import { getCheckoutMember, searchMembersForCheckout, type CheckoutMember } from
 import { extractMemberToken } from "@/lib/loyalty/token";
 
 const LOYALTY_PATHS = [
-  "/portal/food/loyalty",
-  "/portal/food/loyalty/members",
-  "/portal/food/loyalty/visits",
-  "/portal/food/loyalty/map",
-  "/portal/food/loyalty/analytics",
-  "/portal/food/loyalty/program",
+  "/portal/loyalty",
+  "/portal/loyalty/members",
+  "/portal/loyalty/visits",
+  "/portal/loyalty/map",
+  "/portal/loyalty/analytics",
+  "/portal/loyalty/program",
 ];
 
 function revalidateLoyalty(extra: string[] = []) {
@@ -57,7 +57,7 @@ const programSchema = z.object({
 });
 
 export async function saveLoyaltyProgram(data: z.input<typeof programSchema>) {
-  const session = await requireFoodManager();
+  const session = await requireLoyaltyManager();
   const parsed = programSchema.safeParse(data);
   if (!parsed.success) throw new UserError("Revisa los datos del programa.");
   const d = parsed.data;
@@ -129,7 +129,7 @@ export async function registerLoyaltyVisit(data: z.input<typeof visitSchema>): P
     saleAmount: d.saleAmount === "" || d.saleAmount === undefined ? null : d.saleAmount,
     idempotencyKey: d.idempotencyKey,
   });
-  revalidateLoyalty([`/portal/food/loyalty/members/${d.memberId}`]);
+  revalidateLoyalty([`/portal/loyalty/members/${d.memberId}`]);
   return result;
 }
 
@@ -143,6 +143,6 @@ export async function redeemLoyaltyReward(data: { rewardId: string; branch?: str
     rewardId,
     branchId: parseBranch(data.branch),
   });
-  revalidateLoyalty([`/portal/food/loyalty/members/${reward.memberId}`]);
+  revalidateLoyalty([`/portal/loyalty/members/${reward.memberId}`]);
   return { rewardName: reward.rewardName };
 }
