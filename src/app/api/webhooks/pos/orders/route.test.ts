@@ -7,10 +7,12 @@ import { createTestOrg, cleanupOrg } from "@/test/helpers";
 
 const { POST } = await import("./route");
 
+let eventCounter = 0;
+// El POS siempre manda x-reymen-event-id (el endpoint lo exige); las pruebas que no lo prueban reciben uno único.
 function makeRequest(body: string, headers: Record<string, string>): NextRequest {
   return new NextRequest("http://localhost/api/webhooks/pos/orders", {
     method: "POST",
-    headers,
+    headers: { "x-reymen-event-id": `test-evt-${Date.now()}-${++eventCounter}`, ...headers },
     body,
   });
 }

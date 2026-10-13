@@ -37,6 +37,8 @@ model Organization {
   stripeCustomerId         String?   @unique
   stripeSubscriptionId     String?   @unique
   stripeSubscriptionStatus String?
+  // Momento (created) del último evento de Stripe aplicado: Stripe no garantiza el orden, uno viejo no debe pisar a uno nuevo.
+  stripeEventAt            DateTime?
   n8nWebhookSecret         String    @unique
   // Llave opcional, separada de n8nWebhookSecret, para que un POS externo
   // (Fase 17) lea GET /api/v1/food/menu sin tener que guardar en el
@@ -804,11 +806,16 @@ model WebhookEvent {
   // and short-circuit before ever calling a processor, independent of
   // whether that processor call would itself be safe to repeat.
   externalEventId String?
+  // Firma HMAC de la entrega: el header de idempotencia no va firmado, así que un reenvío idéntico con otro id se detecta por esto.
+  replayKey       String?
+  // Cuándo un worker tomó el evento (ingreso o reintento). Un PROCESSING viejo es un proceso que murió: se puede recuperar.
+  claimedAt       DateTime?
   createdAt       DateTime           @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id])
 
   @@unique([organizationId, source, externalEventId])
+  @@unique([organizationId, source, replayKey])
   @@index([organizationId, status])
   @@index([createdAt])
 }

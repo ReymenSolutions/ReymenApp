@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
           const subscriptionId =
             typeof session.subscription === "string" ? session.subscription : session.subscription.id;
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-          await applySubscriptionToOrg(orgId, subscription);
+          await applySubscriptionToOrg(orgId, subscription, event.created);
         }
         break;
       }
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
           where: { stripeCustomerId: subscription.customer as string },
           select: { id: true },
         });
-        if (org) await applySubscriptionToOrg(org.id, subscription);
+        if (org) await applySubscriptionToOrg(org.id, subscription, event.created);
         break;
       }
       case "customer.subscription.deleted": {
@@ -54,10 +54,12 @@ export async function POST(req: NextRequest) {
           select: { id: true },
         });
         if (org) {
-          await prisma.organization.update({
-            where: { id: org.id },
-            data: { plan: "starter", stripeSubscriptionId: null, stripeSubscriptionStatus: "canceled" },
+          // La baja de una suscripción vieja (otro id) o un evento atrasado no deben degradar a quien ya tiene otra vigente.
+          const downgraded = await prisma.organization.updateMany({
+            where: { id: org.id, stripeSubscriptionId: subscription.id, OR: [{ stripeEventAt: null }, { stripeEventAt: { lt: new Date(event.created * 1000) } }] },
+            data: { plan: "starter", stripeSubscriptionId: null, stripeSubscriptionStatus: "canceled", stripeEventAt: new Date(event.created * 1000) },
           });
+          if (downgraded.count === 0) break;
           const smartcardMemberLimit = await syncSmartcardMemberLimitForPlan(org.id, "starter");
           await logAudit({
             organizationId: org.id,
@@ -101,18 +103,23 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ received: true });
 }
 
-async function applySubscriptionToOrg(orgId: string, subscription: Stripe.Subscription) {
+async function applySubscriptionToOrg(orgId: string, subscription: Stripe.Subscription, eventCreatedSec: number) {
   const priceId = subscription.items.data[0]?.price.id;
   const plan = (await planForPriceId(priceId)) ?? "starter";
 
-  await prisma.organization.update({
-    where: { id: orgId },
+  // Stripe no garantiza el orden de entrega: solo se aplica un evento más nuevo que el último aplicado. Así un
+  // "updated" atrasado nunca restaura un plan anterior sobre uno más reciente.
+  const eventAt = new Date(eventCreatedSec * 1000);
+  const applied = await prisma.organization.updateMany({
+    where: { id: orgId, OR: [{ stripeEventAt: null }, { stripeEventAt: { lte: eventAt } }] },
     data: {
       plan,
       stripeSubscriptionId: subscription.id,
       stripeSubscriptionStatus: subscription.status,
+      stripeEventAt: eventAt,
     },
   });
+  if (applied.count === 0) return;
   // El fin del periodo actual de Stripe es el "pagado hasta" del cliente (nunca lo acorta: ver recordPayment).
   const periodEndSec = subscription.items.data[0]?.current_period_end;
   if (periodEndSec && (subscription.status === "active" || subscription.status === "trialing")) {

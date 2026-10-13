@@ -17,6 +17,8 @@ export const POST = createOrgWebhookHandler({
   rateLimitKey: "pos-orders",
   source: "pos",
   eventType: "order.completed",
+  // Sin id de evento un reenvío contaría la venta dos veces: el POS siempre lo manda (id de la orden en el POS).
+  requireEventId: true,
   process: processFoodPosOrder,
   // Sin el módulo "Reymen POS" no se aceptan ventas del POS. 403 con un code
   // propio: el POS las deja pendientes y las reenvía cuando se active.

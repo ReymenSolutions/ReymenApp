@@ -11,6 +11,8 @@ import { findLeadByPhone, linkOrphanConversations, linkOrphanCustomers } from ".
 import { findPotentialDuplicateLeads } from "./duplicate-detection";
 import { hasModule } from "./modules";
 import { processKitchenTicketReady, processShiftClosed } from "./pos-events";
+import { processFoodPosOrder } from "./food";
+import { processDeliveryOrder } from "./delivery";
 import { UserError } from "./user-error";
 import { sanitizeCustomFields } from "./custom-fields";
 import { getActiveCustomFields } from "./custom-fields-db";
@@ -395,7 +397,9 @@ export type WebhookEventType =
   | "appointment_reminder.sent"
   | "followup.sent"
   | "kitchen.ticket_ready"
-  | "shift.closed";
+  | "shift.closed"
+  | "order.completed"
+  | "delivery.order";
 
 /** Dispatches a stored WebhookEvent's payload to the processor matching its eventType. */
 export async function processWebhookEventPayload(
@@ -424,6 +428,16 @@ export async function processWebhookEventPayload(
       return;
     case "shift.closed":
       return processShiftClosed(payload, orgId);
+    case "order.completed": {
+      // El reintento no pasa por el precheck de la ruta: se vuelve a exigir aquí el mismo módulo.
+      const [pos, food] = await Promise.all([hasModule(orgId, "REYMEN_POS"), hasModule(orgId, "FOOD_OPS")]);
+      if (!pos || !food) throw new Error("Reymen POS no está activado para este negocio");
+      return processFoodPosOrder(payload, orgId);
+    }
+    case "delivery.order":
+      if (!(await hasModule(orgId, "FOOD_OPS"))) throw new Error("El módulo Food no está activo para esta organización");
+      await processDeliveryOrder(payload, orgId);
+      return;
     default:
       throw new Error(`Unknown webhook event type: ${eventType}`);
   }

@@ -8,6 +8,8 @@ interface IngestParams {
   payload: unknown;
   /** Caller-supplied idempotency key for this exact delivery (e.g. n8n's own execution/event ID). Null when the source doesn't provide one — that delivery is always processed, matching pre-idempotency behavior. */
   externalEventId: string | null;
+  /** Firma de la entrega: la misma entrega firmada reenviada (aunque cambie el header de id) se descarta como duplicado. */
+  replayKey?: string | null;
 }
 
 export type IngestResult<T> =
@@ -29,12 +31,17 @@ export async function ingestWebhookEvent<T>(
   process: () => Promise<T>
 ): Promise<IngestResult<T>> {
   const { organizationId, source, eventType, payload, externalEventId } = params;
+  const replayKey = params.replayKey || null;
 
   if (externalEventId) {
     const existing = await prisma.webhookEvent.findUnique({
       where: { organizationId_source_externalEventId: { organizationId, source, externalEventId } },
     });
     if (existing) return { outcome: "duplicate" };
+  }
+  if (replayKey) {
+    const replay = await prisma.webhookEvent.findUnique({ where: { organizationId_source_replayKey: { organizationId, source, replayKey } }, select: { id: true } });
+    if (replay) return { outcome: "duplicate" };
   }
 
   let webhookEvent: { id: string };
@@ -48,6 +55,8 @@ export async function ingestWebhookEvent<T>(
         status: "PROCESSING",
         attempts: 1,
         externalEventId,
+        replayKey,
+        claimedAt: new Date(),
       },
     });
   } catch (err) {

@@ -26,6 +26,12 @@ export async function sendEmail(input: SendEmailInput): Promise<{ sent: boolean 
   const resend = getClient();
 
   if (!resend) {
+    // En producción nunca se escribe el contenido en los logs: un enlace de recuperación o de invitación sería un
+    // secreto en texto plano en cualquier sistema que recoja logs. Solo se deja constancia de que no se envió.
+    if (process.env.NODE_ENV === "production") {
+      console.error(`[email] RESEND_API_KEY no está configurado: NO se envió "${input.subject}" (el contenido no se registra en producción)`);
+      return { sent: false };
+    }
     console.log(
       `\n[email:dev-fallback] RESEND_API_KEY not set — would have sent:\n` +
         `  to: ${input.to}\n  subject: ${input.subject}\n  ---\n${input.text ?? stripHtml(input.html)}\n  ---\n`
