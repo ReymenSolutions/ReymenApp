@@ -22,7 +22,7 @@ export function ActivityBar({ segments, L }: { segments: SegmentCounts; L: Loyal
       <ul className="mt-3 grid grid-cols-3 gap-2">
         {parts.map((p) => (
           <li key={p.key}>
-            <Link href={`/portal/food/loyalty/members${p.href}`} className="block rounded-lg border border-slate-100 p-2.5 hover:border-brand-200">
+            <Link href={`/portal/loyalty/members${p.href}`} className="block rounded-lg border border-slate-100 p-2.5 hover:border-brand-200">
               <span className="flex items-center gap-1.5 text-xs text-slate-500">
                 <span className={`h-2 w-2 rounded-full ${p.cls}`} aria-hidden="true" />
                 {p.label}
@@ -66,7 +66,7 @@ export function SegmentsList({ segments, L }: { segments: SegmentCounts; L: Loya
           <span className="flex items-center gap-3">
             <span className="text-sm font-semibold tabular-nums text-slate-900">{num(segments.segments[k])}</span>
             {SEGMENT_LINKS[k] && (
-              <Link href={`/portal/food/loyalty/members${SEGMENT_LINKS[k]}`} className="text-xs font-medium text-brand-600 hover:underline">
+              <Link href={`/portal/loyalty/members${SEGMENT_LINKS[k]}`} className="text-xs font-medium text-brand-600 hover:underline">
                 {L.segView}
               </Link>
             )}

@@ -53,7 +53,7 @@ describe("middleware", () => {
   });
 
   it("does not open look-alike paths: /lealtadx and the portal loyalty dashboard still need a session", async () => {
-    for (const path of ["/lealtadx/algo", "/portal/food/loyalty"]) {
+    for (const path of ["/lealtadx/algo", "/portal/loyalty"]) {
       const res = (await middleware(makeReq(path), {} as never)) as Response;
       expect(res.status).toBe(307);
     }

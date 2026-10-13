@@ -34,10 +34,15 @@ export const strings = {
     foodPurchases: "Compras",
     foodOperations: "Operación",
     foodDelivery: "Delivery",
-    foodLoyalty: "Lealtad",
     foodAnalytics: "Analítica",
     foodProfitability: "Rentabilidad",
     smartcard: "SmartCard",
+    loyaltySummary: "Resumen",
+    loyaltyProgram: "Programa",
+    loyaltyMembers: "Clientes",
+    loyaltyVisits: "Visitas",
+    loyaltyMap: "Mapa",
+    loyaltyAnalytics: "Analytics",
 
     // ── User menu ────────────────────────────────────────────
     notifications: "Notificaciones",
@@ -579,10 +584,15 @@ export const strings = {
     foodPurchases: "Purchases",
     foodOperations: "Operations",
     foodDelivery: "Delivery",
-    foodLoyalty: "Loyalty",
     foodAnalytics: "Analytics",
     foodProfitability: "Profitability",
     smartcard: "SmartCard",
+    loyaltySummary: "Overview",
+    loyaltyProgram: "Program",
+    loyaltyMembers: "Members",
+    loyaltyVisits: "Visits",
+    loyaltyMap: "Map",
+    loyaltyAnalytics: "Analytics",
 
     // ── User menu ────────────────────────────────────────────
     notifications: "Notifications",

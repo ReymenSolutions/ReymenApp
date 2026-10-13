@@ -151,7 +151,7 @@ export function ZonesTable({ zones }: { zones: ZoneStats[] }) {
           {zones.map((z) => (
             <tr key={z.postalCode}>
               <td className="py-2 pr-3 font-semibold text-slate-900">
-                <a href={`/portal/food/loyalty/members?cp=${z.postalCode}`} className="hover:text-brand-600 hover:underline">{z.postalCode}</a>
+                <a href={`/portal/loyalty/members?cp=${z.postalCode}`} className="hover:text-brand-600 hover:underline">{z.postalCode}</a>
               </td>
               <td className="py-2 pr-3 text-right tabular-nums">{num(z.members)}</td>
               <td className="py-2 pr-3 text-right tabular-nums text-slate-500">{z.memberShare}%</td>

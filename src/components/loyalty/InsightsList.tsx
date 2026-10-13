@@ -26,7 +26,7 @@ const TONE: Record<Insight["tone"], string> = {
 export function insightText(i: Insight, L: LoyaltyDict): { label: string; text: string; href?: string } {
   const v = i.values;
   const cp = i.postalCode ?? "";
-  const zoneHref = `/portal/food/loyalty/members?cp=${cp}`;
+  const zoneHref = `/portal/loyalty/members?cp=${cp}`;
   switch (i.kind) {
     case "leader_zone":
       return { label: L.insightLabelLeader, text: L.insightLeader(cp, pct(Number(v.share)).replace("%", ""), money(Number(v.ticket))), href: zoneHref };
@@ -37,13 +37,13 @@ export function insightText(i: Insight, L: LoyaltyDict): { label: string; text: 
     case "frequency_drop_zone":
       return { label: L.insightLabelFrequencyDrop, text: L.insightFrequencyDrop(cp, Number(v.members), num(Number(v.change))), href: zoneHref };
     case "opportunity_zone":
-      return { label: L.insightLabelOpportunity, text: L.insightOpportunity(cp, num(Number(v.distanceKm), 1), pct(Number(v.memberShare)).replace("%", "")), href: "/portal/food/loyalty/map" };
+      return { label: L.insightLabelOpportunity, text: L.insightOpportunity(cp, num(Number(v.distanceKm), 1), pct(Number(v.memberShare)).replace("%", "")), href: "/portal/loyalty/map" };
     case "one_away":
-      return { label: L.insightLabelOneAway, text: L.insightOneAway(Number(v.count)), href: "/portal/food/loyalty/members?progress=one_away" };
+      return { label: L.insightLabelOneAway, text: L.insightOneAway(Number(v.count)), href: "/portal/loyalty/members?progress=one_away" };
     case "rewards_waiting":
-      return { label: L.insightLabelRewardsWaiting, text: L.insightRewardsWaiting(Number(v.count)), href: "/portal/food/loyalty/members?reward=1" };
+      return { label: L.insightLabelRewardsWaiting, text: L.insightRewardsWaiting(Number(v.count)), href: "/portal/loyalty/members?reward=1" };
     case "reactivation":
-      return { label: L.insightLabelReactivation, text: L.insightReactivation(Number(v.count), Number(v.days)), href: "/portal/food/loyalty/members?status=at_risk" };
+      return { label: L.insightLabelReactivation, text: L.insightReactivation(Number(v.count), Number(v.days)), href: "/portal/loyalty/members?status=at_risk" };
   }
 }
 

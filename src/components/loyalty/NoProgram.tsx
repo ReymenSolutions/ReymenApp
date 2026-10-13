@@ -11,7 +11,7 @@ export function NoProgram({ L, canManage }: { L: LoyaltyDict; canManage: boolean
       <h2 className="mt-4 text-lg font-semibold text-slate-900">{L.noProgramTitle}</h2>
       <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">{canManage ? L.noProgramDesc : L.noProgramViewer}</p>
       {canManage && (
-        <Link href="/portal/food/loyalty/program" className="mt-5 inline-flex items-center rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
+        <Link href="/portal/loyalty/program" className="mt-5 inline-flex items-center rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
           {L.noProgramCta}
         </Link>
       )}
