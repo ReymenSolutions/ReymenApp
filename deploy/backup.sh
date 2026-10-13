@@ -54,5 +54,9 @@ case "${BACKUP_REMOTE:-}" in
   *) echo "✗ BACKUP_REMOTE no reconocido: usa rclone:<remoto>:<carpeta> o scp:usuario@host:/ruta/" >&2; exit 1 ;;
 esac
 
+# Aviso de "todo bien" a un monitor externo (p. ej. Healthchecks.io): si un día no llega, el monitor te avisa por correo.
+# Define HEALTHCHECK_BACKUP_URL en /etc/reymen-backup.env. Sin esto, un respaldo que deja de correr pasaría desapercibido.
+if [ -n "${HEALTHCHECK_BACKUP_URL:-}" ]; then curl -fsS -m 15 --retry 3 -o /dev/null "$HEALTHCHECK_BACKUP_URL" || echo "⚠ No se pudo avisar al monitor de respaldos" >&2; fi
+
 # Rotación local: solo los diarios (los "antes-de-migrar-*" los gestiona update.sh).
 find "$dir" \( -name 'diario-*.dump' -o -name 'config-*.tar.gz.enc' \) -mtime +"$keep_days" -delete

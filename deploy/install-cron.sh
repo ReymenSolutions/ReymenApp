@@ -30,6 +30,8 @@ APP_CONTAINER=$container
 # Avisos de vencimiento de suscripción: 8:00 hora de México (14:00 UTC)
 0 14 * * * root $runner billing >> /var/log/reymen/cron.log 2>&1
 # Respaldo diario de la base (9:30 UTC); configura BACKUP_REMOTE en /etc/reymen-backup.env para copiarlo fuera del VPS
+# Prueba de restauración el día 1 de cada mes (10:00 UTC): confirma que el último respaldo se puede restaurar
+0 10 1 * * root $repo/deploy/restore-test.sh >> /var/log/reymen/restore-test.log 2>&1
 30 9 * * * root DB_CONTAINER=\${DB_CONTAINER:-reymen-ai-ops-preview-postgres} $repo/deploy/backup.sh >> /var/log/reymen/backup.log 2>&1
 CRON
 chmod 644 /etc/cron.d/reymen-ai-ops

@@ -22,3 +22,10 @@
 
 ## Zona horaria
 El día de negocio de Food (ventas de hoy, gráfica por hora, conteos diarios por platillo) usa la zona de **cada organización** (`Organization.timezone`, por defecto `America/Mexico_City`), no la del servidor. Los conteos diarios guardan la fecha local a las 00:00 UTC; si el contenedor corría en UTC (lo normal) los datos anteriores ya tienen esa forma y no se migran. Verifica con `docker exec reymen-ai-ops-preview date +%Z` (debe decir `UTC`). Cada cliente se configura con su zona en Admin → Cliente.
+
+## Que te avisen si algo falla (Healthchecks.io, gratis)
+1. Crea una cuenta en healthchecks.io y dos *checks*: **respaldo diario** (Period 1 día, Grace 3 horas) y **prueba de restauración** (Period 1 mes, Grace 2 días). Configura tu correo en *Integrations*.
+2. Copia la *ping URL* de cada uno y agrégalas a `/etc/reymen-backup.env` (una por línea):
+   `HEALTHCHECK_BACKUP_URL=https://hc-ping.com/xxxxxxxx-...`
+   `HEALTHCHECK_RESTORE_URL=https://hc-ping.com/yyyyyyyy-...`
+3. Listo: el respaldo avisa al terminar bien; la prueba de restauración corre sola el día 1 de cada mes y avisa si salió bien o mal (`/fail`). Si un respaldo deja de correr, Healthchecks te escribe cuando pasa el plazo.

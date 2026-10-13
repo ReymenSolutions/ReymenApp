@@ -4,6 +4,12 @@
 #   sudo deploy/restore-test.sh [archivo.dump]
 set -euo pipefail
 
+[ -f /etc/reymen-backup.env ] && . /etc/reymen-backup.env
+# Monitor externo (Healthchecks.io): éxito = ping a la URL; fallo = ping a <URL>/fail (te llega un correo).
+ping_monitor() { [ -n "${HEALTHCHECK_RESTORE_URL:-}" ] && curl -fsS -m 15 --retry 3 -o /dev/null "${HEALTHCHECK_RESTORE_URL}$1" || true; }
+on_error() { echo "✗ La prueba de restauración FALLÓ" >&2; ping_monitor "/fail"; }
+trap on_error ERR
+
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 file="${1:-$(ls -t "$repo"/backups/*.dump | head -1)}"
 [ -f "$file" ] || { echo "✗ No hay respaldo que probar." >&2; exit 1; }
@@ -19,3 +25,4 @@ for t in '"Organization"' '"User"' '"Lead"' '"AuditLog"'; do
   echo "  $t: $n filas"
 done
 echo "✓ Restauración correcta de $(basename "$file")"
+ping_monitor ""
