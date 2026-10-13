@@ -29,3 +29,12 @@ El día de negocio de Food (ventas de hoy, gráfica por hora, conteos diarios po
    `HEALTHCHECK_BACKUP_URL=https://hc-ping.com/xxxxxxxx-...`
    `HEALTHCHECK_RESTORE_URL=https://hc-ping.com/yyyyyyyy-...`
 3. Listo: el respaldo avisa al terminar bien; la prueba de restauración corre sola el día 1 de cada mes y avisa si salió bien o mal (`/fail`). Si un respaldo deja de correr, Healthchecks te escribe cuando pasa el plazo.
+
+## Respaldo de SmartCard (Supabase Free → B2)
+El plan Free de Supabase **no hace respaldos** ni de la base ni de los archivos, y pausa el proyecto tras una semana sin actividad. `deploy/backup-smartcard.sh` copia a B2 la base (esquemas `public`, `auth`, `storage`) y todos los archivos del Storage.
+1. Supabase → *Project Settings → Storage → S3 Connection*: copia el **Endpoint** y la **Region**; en *S3 access keys → New access key* crea una (se muestra una sola vez). Estas llaves tienen acceso a todos los buckets: guárdalas solo en la VPS.
+2. Supabase → *Project Settings → Database → Connection string → Session pooler*: copia la cadena (la VPS no tiene IPv6, por eso el *pooler*). La clave de la base es la que definiste al crear el proyecto.
+3. En la VPS: `sudo rclone config` → `n` → nombre `supa` → tipo `s3` → proveedor `Other` → access key y secret del paso 1 → region del paso 1 → endpoint del paso 1 → el resto por defecto. Prueba: `sudo rclone lsd supa:` (debe listar tus buckets).
+4. Agrega a `/etc/reymen-backup.env` una línea: `SMARTCARD_DB_URL="<cadena del paso 2 con la clave real>"` (el archivo debe quedar en modo 600).
+5. Prueba: `sudo deploy/backup-smartcard.sh` (debe terminar con dos `✓`) y `sudo rclone ls b2:reymen-backups | grep smartcard`.
+6. `sudo deploy/install-cron.sh` lo agenda cada día a las 10:15 UTC.
