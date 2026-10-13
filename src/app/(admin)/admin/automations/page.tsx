@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { getModuleLabel } from "@/lib/modules";
 import { listBlueprints } from "@/lib/automation/blueprints";
+import { blueprintsCovering } from "@/lib/automation/coverage";
 import { getServerLang } from "@/lib/i18n-server";
 
 const CATEGORY_LABELS = {
@@ -36,7 +37,7 @@ async function getData() {
 
 type CatalogItem =
   | { kind: "blueprint"; key: string; name: string; description: string; category: string; meta: string; instances: { orgId: string; orgName: string; state: "paused" | "dry" | "live" }[] }
-  | { kind: "template"; key: string; name: string; description: string; category: string; meta: string; installs: number };
+  | { kind: "template"; key: string; name: string; description: string; category: string; meta: string; installs: number; coveredBy: string[] };
 
 export default async function AdminAutomationsPage() {
   const [{ automations, orgs, blueprintInstances, templates }, lang] = await Promise.all([getData(), getServerLang()]);
@@ -57,7 +58,7 @@ export default async function AdminAutomationsPage() {
         .filter((i) => i.blueprintKey === b.key)
         .map((i) => ({ orgId: i.organization.id, orgName: i.organization.name, state: i.status !== "ACTIVE" ? "paused" : i.dryRun ? "dry" : "live" })),
     })),
-    ...templates.map((tpl): CatalogItem => ({ kind: "template", key: `tpl:${tpl.id}`, name: `${tpl.iconEmoji} ${tpl.name}`, description: tpl.description, category: tpl.category, meta: `${es ? "Industria" : "Industry"}: ${tpl.industry}`, installs: tpl._count.installations })),
+    ...templates.map((tpl): CatalogItem => ({ kind: "template", key: `tpl:${tpl.id}`, name: `${tpl.iconEmoji} ${tpl.name}`, description: tpl.description, category: tpl.category, meta: `${es ? "Industria" : "Industry"}: ${tpl.industry}`, installs: tpl._count.installations, coveredBy: blueprintsCovering(tpl.category).map((b) => b.name) })),
   ];
   const categories = [...new Set(items.map((i) => i.category))].sort((a, b) => (labels[a] ?? a).localeCompare(labels[b] ?? b));
 
@@ -107,6 +108,11 @@ export default async function AdminAutomationsPage() {
                             </Link>
                           ))}
                         </div>
+                      )}
+                      {item.kind === "template" && item.coveredBy.length > 0 && (
+                        <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                          {es ? `Esta plantilla decide a quién escribir y ya existe como blueprint (${item.coveredBy.join(", ")}). Para clientes con Reymen POS usa el blueprint —con simulación, consentimiento y enfriamiento—; la plantilla queda para quien no lo tiene.` : `This template decides whom to message and already exists as a blueprint (${item.coveredBy.join(", ")}). For clients with Reymen POS use the blueprint —with simulation, consent and cooldown—; the template is for those without it.`}
+                        </p>
                       )}
                       {item.kind === "template" && (
                         <Link href="/admin/templates" className="mt-2 inline-block text-xs font-medium text-brand-700 hover:underline">

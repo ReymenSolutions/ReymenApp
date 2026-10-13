@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { getAutomationConfigForm, saveAutomationConfig, type AutomationConfigForm } from "@/actions/admin/automation-config";
+import { getAutomationConfigForm, saveAutomationConfig, type AutomationConfigForm, type SaveAutomationConfigResult } from "@/actions/admin/automation-config";
 import type { ConfigFieldError } from "@/lib/automation/config-form";
 import { usePreferences } from "@/context/preferences";
 import { getErrorMessage } from "@/lib/user-error";
@@ -40,6 +40,7 @@ const COPY = {
       required: "Obligatorio",
     },
     none: "Sin definir",
+    ownerCan: "El dueño puede editarlo",
   },
   en: {
     title: (name: string) => `Configure: ${name}`,
@@ -67,10 +68,19 @@ const COPY = {
       required: "Required",
     },
     none: "Not set",
+    ownerCan: "The owner can edit it",
   },
 };
 
 type Values = Record<string, string | number | null>;
+
+/** De dónde carga y adónde guarda: por defecto el Admin; el portal del dueño pasa sus propias acciones (solo campos editables). */
+export type ConfigApi = {
+  load: (automationId: string) => Promise<AutomationConfigForm>;
+  save: (automationId: string, config: Record<string, unknown>) => Promise<SaveAutomationConfigResult>;
+  /** En el portal del dueño se explica por qué solo ve algunos parámetros. */
+  ownerNote?: string;
+};
 
 /** Presentación del valor de fábrica de un campo (para "De fábrica: 14 días"). */
 function formatValue(f: ConfigFieldView, value: string | number | null | undefined, lang: "es" | "en", t: (typeof COPY)["es"]) {
@@ -81,7 +91,7 @@ function formatValue(f: ConfigFieldView, value: string | number | null | undefin
 }
 
 /** Pantalla de parámetros de una automatización (blueprint o plantilla n8n): se genera desde su declaración. */
-export function AutomationConfigDialog({ orgId, automationId, onClose }: { orgId: string; automationId: string | null; onClose: () => void }) {
+export function AutomationConfigDialog({ orgId, automationId, onClose, api }: { orgId: string; automationId: string | null; onClose: () => void; api?: ConfigApi }) {
   const { lang: rawLang } = usePreferences();
   const lang = rawLang === "en" ? "en" : "es";
   const t = COPY[lang];
@@ -95,7 +105,7 @@ export function AutomationConfigDialog({ orgId, automationId, onClose }: { orgId
     let cancelled = false;
     setForm(null);
     setErrors({});
-    getAutomationConfigForm({ orgId, automationId })
+    (api ? api.load(automationId) : getAutomationConfigForm({ orgId, automationId }))
       .then((f) => {
         if (cancelled) return;
         setForm(f);
@@ -126,7 +136,7 @@ export function AutomationConfigDialog({ orgId, automationId, onClose }: { orgId
     if (!form || !dirty || pending) return;
     start(async () => {
       try {
-        const res = await saveAutomationConfig({ orgId, automationId: form.automationId, config: values });
+        const res = api ? await api.save(form.automationId, values) : await saveAutomationConfig({ orgId, automationId: form.automationId, config: values });
         if (!res.success) {
           setErrors(res.errors);
           return;
@@ -169,6 +179,7 @@ export function AutomationConfigDialog({ orgId, automationId, onClose }: { orgId
                 {t.tz}: <strong>{form.timezone}</strong>. {t.tzHint}
               </span>
             </div>
+            {api?.ownerNote && <p className="rounded-md bg-slate-50 p-2.5 text-xs text-slate-600">{api.ownerNote}</p>}
             {form.live && <p role="note" className="rounded-md border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800">{t.liveWarn}</p>}
 
             {CONFIG_GROUPS.map((group) => {
@@ -192,6 +203,7 @@ export function AutomationConfigDialog({ orgId, automationId, onClose }: { orgId
                             <label htmlFor={id} className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-slate-900">
                               {f.label[lang]}
                               {!isDefault && <Badge variant="info" className="text-[10px]">{t.changed}</Badge>}
+                              {!api && f.ownerEditable && <Badge variant="secondary" className="text-[10px]">{t.ownerCan}</Badge>}
                             </label>
                             <p className="text-xs text-slate-500">{f.help[lang]}</p>
                             <p className="mt-0.5 text-[11px] text-slate-400">

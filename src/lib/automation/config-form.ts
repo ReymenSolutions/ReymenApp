@@ -49,6 +49,11 @@ export function configFields(source: ConfigSource) {
   return describeConfig(source.compiled);
 }
 
+/** Parámetros que el dueño del negocio puede editar desde su portal (los marcados `ownerEditable`); el resto es del admin. */
+export function ownerEditableFields(source: ConfigSource) {
+  return configFields(source).filter((f) => f.ownerEditable);
+}
+
 export type ConfigUpdate = { ok: true; after: Record<string, unknown>; before: Record<string, unknown>; changed: string[] } | { ok: false; errors: Record<string, ConfigFieldError> };
 
 /**

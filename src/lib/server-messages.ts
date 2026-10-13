@@ -265,6 +265,8 @@ const EN: Record<string, string> = {
   "Fecha no válida": "Invalid date",
   "Revisa el monto del pago": "Check the payment amount",
   "Los meses del pago no son válidos": "The payment months are not valid",
+  "Esta automatización no tiene parámetros que puedas ajustar": "This automation has no settings you can adjust",
+  "No tienes permiso para cambiar ese parámetro": "You are not allowed to change that setting",
   "Ya existe un usuario con ese email": "A user with that email already exists",
   "Ya existe una categoría con ese nombre": "A category with that name already exists",
   "Zona horaria inválida": "Invalid time zone",
