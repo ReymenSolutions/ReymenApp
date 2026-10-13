@@ -13,9 +13,10 @@ import { DEFAULT_REFERENCE, offsetToLatLng, zonePosition, type GeoPoint } from "
 import type { GeoZone } from "./GeoZoneMap";
 import { money, num, pct } from "@/lib/loyalty/format";
 
-// Rampa tipo semáforo, menos → más: verde, verde lima, amarillo, naranja, rojo.
-// El rojo marca dónde se concentra más la métrica elegida (los puntos críticos).
-const RAMP = ["#16a34a", "#84cc16", "#facc15", "#f97316", "#dc2626"];
+// Rampa tipo semáforo, menos → más: rojo, naranja, amarillo, verde lima, verde.
+// El rojo marca las zonas con menos de la métrica elegida (los puntos críticos
+// a atender); el verde, las que mejor van.
+const RAMP = ["#dc2626", "#f97316", "#facc15", "#84cc16", "#16a34a"];
 // Los anillos de estado usan tonos fuera de la rampa para no confundirse con ella
 // y siempre van con ícono y texto, nunca solo color.
 const STRONG = "#1e3a8a"; // azul marino, anillo sólido
