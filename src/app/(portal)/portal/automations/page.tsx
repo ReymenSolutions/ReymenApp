@@ -15,6 +15,8 @@ import { Zap, ArrowRight, Activity } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { FeedbackCases } from "@/components/portal/FeedbackCases";
 import { can } from "@/lib/permissions";
+import { listOwnerEditableCounts } from "@/actions/automation-config";
+import { OwnerAutomationConfig } from "@/components/portal/OwnerAutomationConfig";
 import { EXECUTION_LABEL, SKIP_REASON, describeAction } from "@/lib/automation/labels";
 import { getAttributionSummary, ATTRIBUTION_WINDOW_DAYS } from "@/lib/automation/attribution";
 import type { UserRole } from "@prisma/client";
@@ -56,12 +58,13 @@ export default async function PortalAutomationsPage() {
   if (!session?.user.organizationId) return redirect("/login");
   await requireModule(session.user.organizationId, "AUTOMATIONS");
 
-  const [t, automations, activity, feedbackCases, attribution] = await Promise.all([
+  const [t, automations, activity, feedbackCases, attribution, editable] = await Promise.all([
     getServerT(),
     getAutomations(session.user.organizationId),
     getSmartActivity(session.user.organizationId),
     getOpenFeedback(session.user.organizationId),
     getAttributionSummary(session.user.organizationId, 30),
+    listOwnerEditableCounts(),
   ]);
 
   return (
@@ -104,6 +107,7 @@ export default async function PortalAutomationsPage() {
                 </div>
               </CardHeader>
               <CardContent>
+                {editable[auto.id] && <div className="mb-3"><OwnerAutomationConfig automationId={auto.id} /></div>}
                 <div className="flex items-center justify-between text-xs text-slate-500 mb-3">
                   {auto.blueprintKey ? (
                     <span>

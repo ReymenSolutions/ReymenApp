@@ -45,8 +45,8 @@ export const UNIT = {
 /** Campos reutilizados por varios blueprints (mismo texto, misma presentación). */
 export const COMMON = {
   channel: { group: "channel", kind: "select", label: { es: "Canal de envío", en: "Sending channel" }, help: { es: "Por dónde se escribe al cliente.", en: "How the customer is contacted." }, options: { whatsapp: { es: "WhatsApp", en: "WhatsApp" }, sms: { es: "SMS", en: "SMS" } } },
-  quietStart: { group: "channel", kind: "hour", label: { es: "No molestar desde las", en: "Do not disturb from" }, help: { es: "Hora local del negocio en que empieza el silencio. Nada se envía entre esta hora y la siguiente.", en: "Local business time when quiet hours start. Nothing is sent between this hour and the next." } },
-  quietEnd: { group: "channel", kind: "hour", label: { es: "No molestar hasta las", en: "Do not disturb until" }, help: { es: "Hora local del negocio en que termina el silencio.", en: "Local business time when quiet hours end." } },
+  quietStart: { ownerEditable: true, group: "channel", kind: "hour", label: { es: "No molestar desde las", en: "Do not disturb from" }, help: { es: "Hora local del negocio en que empieza el silencio. Nada se envía entre esta hora y la siguiente.", en: "Local business time when quiet hours start. Nothing is sent between this hour and the next." } },
+  quietEnd: { ownerEditable: true, group: "channel", kind: "hour", label: { es: "No molestar hasta las", en: "Do not disturb until" }, help: { es: "Hora local del negocio en que termina el silencio.", en: "Local business time when quiet hours end." } },
 } satisfies Record<string, ConfigFieldMeta>;
 
 export type ConfigFieldView = {
