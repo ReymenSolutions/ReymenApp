@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  ChevronDown, Home, ListChecks, LayoutDashboard, Users, Zap, BarChart3, Settings, MessageSquare, Calendar, FileText, LogOut, Bot, Upload, GitBranch, Rocket, UtensilsCrossed, CreditCard, Contact, X, Gift, SlidersHorizontal, ScanLine, Map as MapIcon, LineChart,
+  ChevronDown, Home, ListChecks, LayoutDashboard, Users, Zap, BarChart3, Settings, MessageSquare, Calendar, FileText, LogOut, Bot, Upload, GitBranch, Rocket, UtensilsCrossed, CreditCard, Contact, X, Gift,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import type { PlatformModule } from "@prisma/client";
@@ -44,12 +44,7 @@ function useNavItems() {
     signOut: t.signOut,
     food: t.food,
     smartcard: t.smartcard,
-    loyaltySummary: t.loyaltySummary,
-    loyaltyProgram: t.loyaltyProgram,
-    loyaltyMembers: t.loyaltyMembers,
-    loyaltyVisits: t.loyaltyVisits,
-    loyaltyMap: t.loyaltyMap,
-    loyaltyAnalytics: t.loyaltyAnalytics,
+    loyalty: t.loyalty,
   };
 }
 
@@ -61,21 +56,14 @@ function useNavItems() {
 // Menú por secciones, en el orden en que un negocio piensa su día: lo suyo
 // (negocio), sus clientes, cómo se comunica, cómo le va y su cuenta. Una
 // sección sin entradas visibles (módulos no contratados) no se dibuja.
-// Lealtad (módulo LOYALTY) tiene su propia sección con sus seis pantallas.
-type NavSectionKey = "main" | "business" | "loyalty" | "customers" | "communication" | "results" | "account";
+type NavSectionKey = "main" | "business" | "customers" | "communication" | "results" | "account";
 
-const NAV_ITEMS: { href: string; key: keyof ReturnType<typeof useNavItems>; icon: React.ElementType; section: NavSectionKey; module?: PlatformModule; alsoActiveFor?: string[]; exact?: boolean }[] = [
+const NAV_ITEMS: { href: string; key: keyof ReturnType<typeof useNavItems>; icon: React.ElementType; section: NavSectionKey; module?: PlatformModule; alsoActiveFor?: string[] }[] = [
   { href: "/portal/home", key: "home", icon: Home, section: "main" },
 
   { href: "/portal/food", key: "food", icon: UtensilsCrossed, section: "business", module: "FOOD_OPS" },
   { href: "/portal/smartcard", key: "smartcard", icon: CreditCard, section: "business", module: "NFC_QR" },
-
-  { href: "/portal/loyalty", key: "loyaltySummary", icon: Gift, section: "loyalty", module: "LOYALTY", exact: true },
-  { href: "/portal/loyalty/program", key: "loyaltyProgram", icon: SlidersHorizontal, section: "loyalty", module: "LOYALTY" },
-  { href: "/portal/loyalty/members", key: "loyaltyMembers", icon: Users, section: "loyalty", module: "LOYALTY" },
-  { href: "/portal/loyalty/visits", key: "loyaltyVisits", icon: ScanLine, section: "loyalty", module: "LOYALTY" },
-  { href: "/portal/loyalty/map", key: "loyaltyMap", icon: MapIcon, section: "loyalty", module: "LOYALTY" },
-  { href: "/portal/loyalty/analytics", key: "loyaltyAnalytics", icon: LineChart, section: "loyalty", module: "LOYALTY" },
+  { href: "/portal/loyalty", key: "loyalty", icon: Gift, section: "business", module: "LOYALTY" },
 
   { href: "/portal/today", key: "today", icon: ListChecks, section: "customers", module: "CRM" },
   { href: "/portal/leads", key: "leads", icon: Users, section: "customers", module: "CRM" },
@@ -98,13 +86,12 @@ const NAV_ITEMS: { href: string; key: keyof ReturnType<typeof useNavItems>; icon
 const SECTION_TITLES: Record<NavSectionKey, { es: string; en: string } | null> = {
   main: null,
   business: { es: "Mi negocio", en: "My business" },
-  loyalty: { es: "Lealtad", en: "Loyalty" },
   customers: { es: "Clientes", en: "Customers" },
   communication: { es: "Comunicación", en: "Communication" },
   results: { es: "Resultados", en: "Results" },
   account: { es: "Mi cuenta", en: "My account" },
 };
-const SECTION_ORDER: NavSectionKey[] = ["main", "business", "loyalty", "customers", "communication", "results", "account"];
+const SECTION_ORDER: NavSectionKey[] = ["main", "business", "customers", "communication", "results", "account"];
 
 interface PortalSidebarProps {
   orgName: string;
@@ -135,9 +122,9 @@ export function PortalSidebar({ orgName, orgLogoUrl: initialLogoUrl, enabledModu
       /* sin almacenamiento: todo abierto */
     }
   }, []);
-  const matchesItem = (item: (typeof NAV_ITEMS)[number]) =>
-    (item.exact ? pathname === item.href : pathname.startsWith(item.href)) || (item.alsoActiveFor?.some((p) => pathname.startsWith(p)) ?? false);
-  const activeSection = NAV_ITEMS.find((item) => visibleNavItems.includes(item) && matchesItem(item))?.section;
+  const activeSection = NAV_ITEMS.find(
+    (item) => visibleNavItems.includes(item) && (pathname.startsWith(item.href) || (item.alsoActiveFor?.some((p) => pathname.startsWith(p)) ?? false))
+  )?.section;
   useEffect(() => {
     if (activeSection) setClosedSections((closed) => (closed.includes(activeSection) ? closed.filter((k) => k !== activeSection) : closed));
   }, [pathname, activeSection]);
@@ -220,7 +207,8 @@ export function PortalSidebar({ orgName, orgLogoUrl: initialLogoUrl, enabledModu
             const items = visibleNavItems.filter((item) => item.section === section);
             if (items.length === 0) return null;
             const title = SECTION_TITLES[section];
-            const isItemActive = matchesItem;
+            const isItemActive = (item: (typeof items)[number]) =>
+              pathname.startsWith(item.href) || (item.alsoActiveFor?.some((p) => pathname.startsWith(p)) ?? false);
             const open = !title || !closedSections.includes(section);
             return (
               <div key={section} className={cn("space-y-1", section !== "main" && "pt-3")}>
