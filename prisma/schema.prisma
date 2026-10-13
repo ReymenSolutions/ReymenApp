@@ -27,6 +27,9 @@ model Organization {
   customMonthlyPriceMxn    Decimal?  @db.Decimal(10, 2)
   // Tope de agentes IA activos pactado con este cliente (plan Custom). Null = el de su plan (Plan.maxAiAgents).
   aiAgentsCapOverride      Int?
+  // Hasta cuándo está pagada la suscripción (próximo vencimiento). Null = este cliente aún no se factura por la plataforma:
+  // no hay avisos ni estado de pago. Lo fija un pago registrado (manual o de Stripe) o un admin.
+  billingPeriodEnd         DateTime?
   // IANA timezone name (e.g. "America/Mexico_City") — used to render
   // appointment times and to evaluate AvailabilityRule/reminder windows in
   // the org's local time rather than the server's.
@@ -101,6 +104,8 @@ model Organization {
   aiBudgetSetting         AiBudgetSetting?
   aiBudgetAdjustments     AiBudgetAdjustment[]
   aiBudgetAlerts          AiBudgetAlert[]
+  billingPayments         BillingPayment[]
+  billingNotices          BillingNotice[]
   branches                Branch[]
   branchDishes            BranchDish[]
   branchVariantPrices     BranchVariantPrice[]
@@ -2398,6 +2403,43 @@ model AiBudgetAlert {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, cycleStart, threshold])
+}
+
+// ─── COBRO DE SUSCRIPCIÓN ────────────────────────────────────────────────────────────────────────────────────────
+
+// Pagos de la suscripción mensual (transferencia, efectivo, Stripe…). Solo se agregan; un error se compensa con otro registro.
+model BillingPayment {
+  id             String   @id @default(cuid())
+  organizationId String
+  amountMxn      Decimal  @db.Decimal(10, 2)
+  /// STRIPE | TRANSFER | CASH | OTHER
+  method         String
+  periodStart    DateTime
+  periodEnd      DateTime
+  /// Referencia externa (factura de Stripe, folio de transferencia): hace idempotente el registro.
+  externalRef    String?
+  note           String?
+  recordedById   String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, externalRef])
+  @@index([organizationId, createdAt])
+}
+
+// Un aviso de vencimiento por tipo y vencimiento: la llave única evita mandar el mismo aviso dos veces.
+model BillingNotice {
+  id             String   @id @default(cuid())
+  organizationId String
+  periodEnd      DateTime
+  /// D7 | D3 | D1 | OVERDUE | OVERDUE_5
+  kind           String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, periodEnd, kind])
 }
 
 // ─── CATÁLOGO DE PLANES ──────────────────────────────────────────────────────

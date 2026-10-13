@@ -5,6 +5,10 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { CreateClientDialog } from "@/components/admin/CreateClientDialog";
 import { ClientRow } from "@/components/admin/ClientRow";
+import Link from "next/link";
+import { listCollections } from "@/actions/admin/billing";
+import { getServerLang } from "@/lib/i18n-server";
+import { formatDate } from "@/lib/utils";
 
 async function getClients() {
   return prisma.organization.findMany({
@@ -16,7 +20,8 @@ async function getClients() {
 }
 
 export default async function AdminClientsPage() {
-  const [t, clients] = await Promise.all([getServerT(), getClients()]);
+  const [t, clients, collections, lang] = await Promise.all([getServerT(), getClients(), listCollections(), getServerLang()]);
+  const es = lang === "es";
 
   return (
     <div>
@@ -25,6 +30,24 @@ export default async function AdminClientsPage() {
         description={`${clients.length} ${t.adminOrgsRegistered}`}
         actions={<CreateClientDialog />}
       />
+
+      {collections.length > 0 && (
+        <Card className="mb-4 border-amber-200 bg-amber-50/60">
+          <CardContent className="space-y-2 p-4">
+            <p className="text-sm font-semibold text-slate-900">{es ? "Cobranza" : "Collections"}: {collections.filter((c) => c.state === "OVERDUE").length} {es ? "vencidos" : "overdue"} · {collections.filter((c) => c.state === "DUE_SOON").length} {es ? "por vencer" : "due soon"}</p>
+            <ul className="divide-y divide-amber-100 rounded-lg border border-amber-100 bg-white/70">
+              {collections.map((c) => (
+                <li key={c.orgId} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                  <Link href={`/admin/clients/${c.orgId}#suscripcion`} className="min-w-0 truncate font-medium text-slate-900 hover:underline">{c.name}</Link>
+                  <span className={`flex-shrink-0 text-xs ${c.state === "OVERDUE" ? "font-medium text-red-700" : "text-slate-600"}`}>
+                    {c.state === "OVERDUE" ? (es ? `vencido hace ${c.daysOver} d` : `overdue ${c.daysOver} d`) : es ? `vence en ${c.daysLeft} d` : `due in ${c.daysLeft} d`} · {formatDate(c.dueAt)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       {clients.length === 0 ? (
         <Card>

@@ -26,6 +26,8 @@ import { getOrganizationModules } from "@/actions/admin/modules";
 import { TemplateConfigButton } from "@/components/admin/TemplateConfigButton";
 import { AiBudgetPanel } from "@/components/admin/AiBudgetPanel";
 import { getOrgAiBudget } from "@/actions/admin/ai-budget";
+import { BillingAdminPanel } from "@/components/admin/BillingAdminPanel";
+import { getOrgBilling } from "@/actions/admin/billing";
 import { listProviders } from "@/lib/ai/providers";
 import { formatDate } from "@/lib/utils";
 import type { PlatformModule } from "@prisma/client";
@@ -107,6 +109,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
   ]);
   if (!client) notFound();
   const aiBudget = await getOrgAiBudget({ orgId: clientId });
+  const billing = await getOrgBilling({ orgId: clientId });
   // Plantillas instaladas cuya versión declara parámetros: tienen pantalla de configuración.
   const configurableAutomationIds = new Set(client.templateInstallations.filter((i) => i.status === "ACTIVE" && i.automationId && i.version.configSpec).map((i) => i.automationId as string));
 
@@ -350,6 +353,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
             <ConsumptionChart data={consumption} />
           </CardContent>
         </Card>
+
+        <BillingAdminPanel orgId={client.id} view={billing} />
 
         {hasModule("AI_WHATSAPP") && <AiBudgetPanel orgId={client.id} view={aiBudget} providers={listProviders().map((p) => p.name)} />}
 

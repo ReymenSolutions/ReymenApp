@@ -18,6 +18,8 @@ import { getPlan, monthlyPriceMxn, planDescription, planName } from "@/lib/plans
 import { accentTone } from "@/lib/plan-accent";
 import { getModuleLabel } from "@/lib/modules";
 import { isStripeConfigured } from "@/lib/stripe";
+import { getBillingView } from "@/lib/billing";
+import { SubscriptionStatus } from "@/components/portal/SubscriptionStatus";
 import type { UserRole } from "@prisma/client";
 import { CustomFieldsPanel } from "@/components/portal/CustomFieldsPanel";
 import { MAX_CUSTOM_FIELDS } from "@/lib/custom-fields";
@@ -58,6 +60,7 @@ export default async function PortalSettingsPage() {
   const canManageBilling = can(session.user.role as UserRole, "settings:manage");
   const canManagePipeline = can(session.user.role as UserRole, "pipeline:manage");
   const plan = await getPlan(org.plan);
+  const billing = await getBillingView(org.id);
   const planModules = plan.modules;
   const stripeEnabled = isStripeConfigured();
   const hasActiveSubscription =
@@ -123,6 +126,7 @@ export default async function PortalSettingsPage() {
             <p className="text-xs text-slate-400">
               {lang === "es" ? "Tu plan incluye" : "Your plan includes"}: {planModules.map((m) => getModuleLabel(lang)[m]).join(", ")}
             </p>
+            {canManageBilling && <SubscriptionStatus view={billing} lang={lang} />}
             {stripeEnabled && canManageBilling ? (
               <BillingActions hasActiveSubscription={hasActiveSubscription} />
             ) : (
