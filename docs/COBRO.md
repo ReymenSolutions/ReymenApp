@@ -15,7 +15,7 @@ Funciona **sin Stripe** y se activa solo cuando configures Stripe.
 ## Avisos
 Un correo por tipo y vencimiento (llave única): 7, 3 y 1 días antes; al vencer; y a los 5 días de atraso. Si el cron estuvo parado se manda solo el aviso vigente. Los atrasos también avisan a los admins de Reymen. Con cobro automático de Stripe activo se omiten los avisos previos (solo el de atraso).
 
-Se disparan con un cron diario:
+Se disparan con un cron diario (`deploy/install-cron.sh` lo instala en el VPS junto con el reloj de automatizaciones y el reintento de webhooks). A mano:
 
 ```bash
 curl -fsS -X POST https://TU_DOMINIO/api/cron/billing -H "Authorization: Bearer $CRON_SECRET"
