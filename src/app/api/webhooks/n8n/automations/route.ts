@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isWebhookAuthorized } from "@/lib/webhook-validator";
+import { isOrgActive } from "@/lib/org-guards";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { processAutomationEvent } from "@/lib/webhook-processors";
 import { ingestWebhookEvent } from "@/lib/webhook-ingest";
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const orgId = automation.organizationId;
+  if (!(await isOrgActive(orgId))) return NextResponse.json({ error: "Organization suspended" }, { status: 403 });
 
   const result = await ingestWebhookEvent(
     { organizationId: orgId, source: "n8n", eventType: "automation.event", payload: parsedBody, externalEventId },

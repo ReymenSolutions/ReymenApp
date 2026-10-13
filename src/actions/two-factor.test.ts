@@ -67,13 +67,13 @@ describe("two-factor actions", () => {
 
   it("rejects confirming enrollment with a wrong code", async () => {
     authMock.mockResolvedValue(fakeSession({ id: adminId, role: "SUPER_ADMIN", organizationId: null }));
-    await start2FAEnrollment();
+    await start2FAEnrollment("adminPass123");
     await expect(confirm2FAEnrollment("000000")).rejects.toThrow(/inválido/i);
   });
 
   it("disable requires the correct password", async () => {
     authMock.mockResolvedValue(fakeSession({ id: adminId, role: "SUPER_ADMIN", organizationId: null }));
-    const { secret } = await start2FAEnrollment();
+    const { secret } = await start2FAEnrollment("adminPass123");
     await confirm2FAEnrollment(codeFor(secret));
 
     await expect(disable2FA("wrong-password")).rejects.toThrow(/incorrecta/i);
@@ -85,5 +85,30 @@ describe("two-factor actions", () => {
     const user = await prisma.user.findUniqueOrThrow({ where: { id: adminId } });
     expect(user.totpSecret).toBeNull();
     expect(user.totpBackupCodeHashes).toHaveLength(0);
+  });
+
+  it("AUD-005: reiniciar la inscripción no desactiva el factor activo ni se permite sin contraseña", async () => {
+    authMock.mockResolvedValue(fakeSession({ id: adminId, role: "SUPER_ADMIN", organizationId: null }));
+    const { secret } = await start2FAEnrollment("adminPass123");
+    await confirm2FAEnrollment(codeFor(secret));
+    const before = await prisma.user.findUniqueOrThrow({ where: { id: adminId } });
+    expect(before.totpEnabled).toBe(true);
+
+    await expect(start2FAEnrollment()).rejects.toThrow(/incorrecta/i);
+    await expect(start2FAEnrollment("mala")).rejects.toThrow(/incorrecta/i);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: adminId } })).totpEnabled).toBe(true);
+
+    // Con la contraseña correcta se prepara un secreto nuevo, pero el factor activo sigue valiendo hasta confirmar.
+    const next = await start2FAEnrollment("adminPass123");
+    const mid = await prisma.user.findUniqueOrThrow({ where: { id: adminId } });
+    expect(mid.totpEnabled).toBe(true);
+    expect(mid.totpSecret).toBe(before.totpSecret);
+    expect(mid.totpPendingSecret).toBe(next.secret);
+    expect(mid.totpBackupCodeHashes).toEqual(before.totpBackupCodeHashes);
+    await expect(confirm2FAEnrollment("000000")).rejects.toThrow(/inválido/i);
+    await confirm2FAEnrollment(codeFor(next.secret));
+    const after = await prisma.user.findUniqueOrThrow({ where: { id: adminId } });
+    expect(after.totpSecret).toBe(next.secret);
+    expect(after.totpPendingSecret).toBeNull();
   });
 });

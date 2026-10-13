@@ -7,6 +7,8 @@ import { prisma } from "./prisma";
 import { checkRateLimit } from "./rate-limit";
 import { verifyTotpCode } from "./totp";
 import { authConfig } from "./auth.config";
+import { validateSession } from "./session-guard";
+import type { Session } from "next-auth";
 import { clientIp, loginIpRateLimit } from "./client-ip";
 export { isAdmin, isClientRole } from "./roles";
 
@@ -50,7 +52,7 @@ const loginSchema = z.object({
   totpCode: z.string().optional(),
 });
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+const nextAuth = NextAuth({
   ...authConfig,
   adapter: PrismaAdapter(prisma),
   providers: [
@@ -116,8 +118,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           organizationId: user.organizationId,
           theme: user.theme,
           language: user.language,
+          sessionVersion: user.sessionVersion,
         };
       },
     }),
   ],
 });
+
+export const { handlers, signIn, signOut } = nextAuth;
+
+/**
+ * `auth()` para el código de servidor: la sesión del JWT más una comprobación contra la base (usuario activo, organización
+ * activa, contraseña no cambiada) y el rol vigente. El middleware, que corre en el edge, sigue leyendo solo el JWT.
+ */
+export const auth = (async (...args: unknown[]) => {
+  const session = await (nextAuth.auth as (...a: unknown[]) => Promise<Session | null>)(...args);
+  // `auth(handler)` (envoltorio de ruta) devuelve una función, no una sesión.
+  if (typeof session === "function" || args.length > 0) return session;
+  return validateSession(session);
+}) as typeof nextAuth.auth;

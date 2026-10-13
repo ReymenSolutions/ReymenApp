@@ -28,11 +28,13 @@ export async function authenticateOrgRequest(
 
     const org = await prisma.organization.findUnique({
       where: { id: paramOrgId },
-      select: { id: true, n8nWebhookSecret: true, foodPosReadKey: true },
+      select: { id: true, isActive: true, n8nWebhookSecret: true, foodPosReadKey: true },
     });
 
+    // Una organización suspendida no abre ninguna llave: ni la que firma ni la de solo lectura del POS.
     const authorized =
       !!org &&
+      org.isActive &&
       (secretsMatch(apiKey, org.n8nWebhookSecret) ||
         (!!options.allowFoodPosReadKey && !!org.foodPosReadKey && secretsMatch(apiKey, org.foodPosReadKey)));
 

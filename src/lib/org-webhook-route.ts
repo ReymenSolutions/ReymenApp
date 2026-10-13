@@ -45,12 +45,15 @@ export function createOrgWebhookHandler<T>(options: OrgWebhookOptions<T>) {
     // requests into it. x-reymen-orgid is just an identifier here, not itself
     // a credential.
     const org = orgId
-      ? await prisma.organization.findUnique({ where: { id: orgId }, select: { id: true, n8nWebhookSecret: true } })
+      ? await prisma.organization.findUnique({ where: { id: orgId }, select: { id: true, isActive: true, n8nWebhookSecret: true } })
       : null;
 
     if (!org || !isWebhookAuthorized(rawBody, signature, plainSecret, org.n8nWebhookSecret, timestamp)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    // Ya autenticada la firma, una organización suspendida no ingresa eventos (el emisor puede reintentar al reactivarla).
+    if (!org.isActive) return NextResponse.json({ error: "Organization suspended" }, { status: 403 });
 
     const rateLimit = await checkRateLimit(`webhook:${options.rateLimitKey}:${orgId}`, { limit: 120, windowMs: 60 * 1000 });
     if (!rateLimit.allowed) {
