@@ -34,10 +34,7 @@ export async function GET() {
   }
 
   const [leads, customFields] = await Promise.all([
-    prisma.lead.findMany({
-      where: { organizationId: session.user.organizationId, deletedAt: null },
-      orderBy: { createdAt: "desc" },
-    }),
+    fetchLeadsForExport(session.user.organizationId),
     getActiveCustomFields(session.user.organizationId),
   ]);
 
@@ -61,6 +58,29 @@ export async function GET() {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,
+      ...(leads.length >= EXPORT_MAX_ROWS ? { "X-Export-Truncated": "true" } : {}),
     },
   });
+}
+
+/** Tope de filas de una exportación: más allá, se pide acotar o dividir (la respuesta lo indica en `X-Export-Truncated`). */
+const EXPORT_MAX_ROWS = 50_000;
+const EXPORT_BATCH = 2_000;
+
+/** Lee los leads por lotes (cursor) en vez de cargar la tabla entera de una vez. */
+async function fetchLeadsForExport(organizationId: string) {
+  const out: Awaited<ReturnType<typeof prisma.lead.findMany>> = [];
+  let cursor: string | undefined;
+  while (out.length < EXPORT_MAX_ROWS) {
+    const batch = await prisma.lead.findMany({
+      where: { organizationId, deletedAt: null },
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+      take: EXPORT_BATCH,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    });
+    out.push(...batch);
+    if (batch.length < EXPORT_BATCH) break;
+    cursor = batch[batch.length - 1].id;
+  }
+  return out;
 }

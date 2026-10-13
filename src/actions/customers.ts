@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
-import { assertPlanCapacity } from "@/lib/plan-limits";
+import { withPlanCapacity } from "@/lib/plan-limits";
 import { assertModuleEnabled } from "@/lib/modules";
 import { recordMetric, METRIC_KEYS } from "@/lib/metrics";
 import { linkOrphanConversations } from "@/lib/crm-link";
@@ -39,18 +39,19 @@ export async function createLeadFromCustomer(customerId: string) {
     return { success: true, leadId: existing.id, created: false };
   }
 
-  await assertPlanCapacity(orgId, "leads");
-  const lead = await prisma.lead.create({
-    data: {
-      organizationId: orgId,
-      name: customer.name?.trim() || customer.phone,
-      phone: customer.phone,
-      phoneKey: customer.phoneKey,
-      source: "pos",
-      status: "WON",
-      doNotContact: !customer.consentAccepted,
-    },
-  });
+  const lead = await withPlanCapacity(orgId, "leads", (tx) =>
+    tx.lead.create({
+      data: {
+        organizationId: orgId,
+        name: customer.name?.trim() || customer.phone,
+        phone: customer.phone,
+        phoneKey: customer.phoneKey,
+        source: "pos",
+        status: "WON",
+        doNotContact: !customer.consentAccepted,
+      },
+    })
+  );
   await prisma.customer.update({ where: { id: customer.id }, data: { leadId: lead.id } });
   await linkOrphanConversations(orgId, lead.id, lead.phone);
   await logAudit({ organizationId: orgId, userId: session.user.id, action: "lead.create_from_customer", resource: "Lead", resourceId: lead.id, metadata: { customerId, doNotContact: lead.doNotContact } });

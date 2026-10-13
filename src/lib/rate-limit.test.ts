@@ -49,4 +49,12 @@ describe("checkRateLimit", () => {
     const result = await checkRateLimit(key, { limit: 3, windowMs: 60_000 });
     expect(result.allowed).toBe(true);
   });
+
+  it("AUD-013: peticiones simultáneas no se cuelan por encima del límite", async () => {
+    const key = `rl-concurrent-${Date.now()}`;
+    const results = await Promise.all(Array.from({ length: 12 }, () => checkRateLimit(key, { limit: 5, windowMs: 60_000 })));
+    expect(results.filter((r) => r.allowed)).toHaveLength(5);
+    expect(results.filter((r) => !r.allowed)).toHaveLength(7);
+    await prisma.rateLimitHit.deleteMany({ where: { key } });
+  });
 });

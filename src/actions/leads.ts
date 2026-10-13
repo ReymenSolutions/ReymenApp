@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
-import { assertPlanCapacity } from "@/lib/plan-limits";
+import { withPlanCapacity } from "@/lib/plan-limits";
 import { phoneKey } from "@/lib/phone";
 import { linkOrphanConversations, linkOrphanCustomers } from "@/lib/crm-link";
 import { assertModuleEnabled } from "@/lib/modules";
@@ -39,16 +39,17 @@ export async function createLead(formData: FormData) {
   if (!parsed.success) throw new UserError("Datos inválidos");
 
   await assertModuleEnabled(session.user.organizationId, "CRM");
-  await assertPlanCapacity(session.user.organizationId, "leads");
-
-  const lead = await prisma.lead.create({
-    data: {
-      ...parsed.data,
-      email: parsed.data.email || null,
-      phoneKey: phoneKey(parsed.data.phone),
-      organizationId: session.user.organizationId,
-    },
-  });
+  const organizationId = session.user.organizationId;
+  const lead = await withPlanCapacity(organizationId, "leads", (tx) =>
+    tx.lead.create({
+      data: {
+        ...parsed.data,
+        email: parsed.data.email || null,
+        phoneKey: phoneKey(parsed.data.phone),
+        organizationId,
+      },
+    })
+  );
   await linkOrphanConversations(session.user.organizationId, lead.id, lead.phone);
   await linkOrphanCustomers(session.user.organizationId, lead.id, lead.phone);
 

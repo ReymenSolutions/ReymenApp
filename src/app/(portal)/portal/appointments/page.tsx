@@ -17,6 +17,12 @@ import type { UserRole } from "@prisma/client";
 
 const RESCHEDULABLE_STATUSES = ["SCHEDULED", "CONFIRMED"];
 
+/** Ventana de la agenda: 2 meses atrás a 1 año adelante (fuera del render para no llamar a Date.now() en él). */
+function agendaWindow() {
+  const now = Date.now();
+  return { gte: new Date(now - 60 * 86_400_000), lt: new Date(now + 365 * 86_400_000) };
+}
+
 export default async function PortalAppointmentsPage() {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
@@ -27,8 +33,10 @@ export default async function PortalAppointmentsPage() {
     getServerLang(),
     prisma.organization.findUniqueOrThrow({ where: { id: orgId }, select: { timezone: true } }),
     prisma.appointment.findMany({
-      where: { organizationId: orgId },
+      // Ventana acotada (2 meses atrás, 1 año adelante) y tope: la agenda no debe cargar todo el historial.
+      where: { organizationId: orgId, startTime: agendaWindow() },
       orderBy: { startTime: "asc" },
+      take: 1000,
     }),
     prisma.service.findMany({
       where: { organizationId: orgId, isActive: true },

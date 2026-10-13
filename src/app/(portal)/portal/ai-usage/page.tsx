@@ -36,19 +36,19 @@ export default async function AiUsagePage() {
       <div className="space-y-4">
         {u.paused && (
           <p role="alert" className="rounded-card border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            {es ? `Usaste toda la capacidad de IA de este ciclo, así que tus agentes están en pausa y las conversaciones pasan a tu equipo. Se reanudan solos el ${formatDate(u.renewsAt)} o en cuanto amplíes tu capacidad. Tu configuración y tus conversaciones no se pierden.` : `You've used all of this cycle's AI capacity, so your agents are paused and conversations go to your team. They resume on their own on ${formatDate(u.renewsAt)} or as soon as you add capacity. Your settings and conversations are safe.`}
+            {es ? `Usaste toda la capacidad de IA de este ciclo, así que tus agentes están en pausa y las conversaciones pasan a tu equipo. Se reanudan solos el ${formatDate(u.renewsAt, lang)} o en cuanto amplíes tu capacidad. Tu configuración y tus conversaciones no se pierden.` : `You've used all of this cycle's AI capacity, so your agents are paused and conversations go to your team. They resume on their own on ${formatDate(u.renewsAt, lang)} or as soon as you add capacity. Your settings and conversations are safe.`}
           </p>
         )}
         {!u.paused && (u.status === "WARN_75" || u.status === "CRITICAL_90") && (
           <p role="status" className="rounded-card border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-            {es ? `Ya usaste el ${u.usedPercent} % de tu capacidad de IA de este ciclo. Si la agotas, tus agentes se pausan hasta el ${formatDate(u.renewsAt)}.` : `You've used ${u.usedPercent}% of this cycle's AI capacity. If it runs out, your agents pause until ${formatDate(u.renewsAt)}.`}
+            {es ? `Ya usaste el ${u.usedPercent} % de tu capacidad de IA de este ciclo. Si la agotas, tus agentes se pausan hasta el ${formatDate(u.renewsAt, lang)}.` : `You've used ${u.usedPercent}% of this cycle's AI capacity. If it runs out, your agents pause until ${formatDate(u.renewsAt, lang)}.`}
           </p>
         )}
 
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">{es ? "Capacidad de este ciclo" : "This cycle's capacity"}</CardTitle>
-            <p className="text-xs text-slate-500">{es ? "Plan" : "Plan"} {planName} · {es ? "se renueva el" : "renews on"} {formatDate(u.renewsAt)}</p>
+            <p className="text-xs text-slate-500">{es ? "Plan" : "Plan"} {planName} · {es ? "se renueva el" : "renews on"} {formatDate(u.renewsAt, lang)}</p>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -59,7 +59,7 @@ export default async function AiUsagePage() {
               <div className={`h-full ${TONE[u.status]}`} style={{ width: `${u.usedPercent}%` }} />
             </div>
             {u.alerts.length > 0 && (
-              <p className="text-xs text-slate-500">{es ? "Avisos de este ciclo" : "Notices this cycle"}: {u.alerts.map((a) => `${a.threshold} % (${formatDate(a.at)})`).join(" · ")}</p>
+              <p className="text-xs text-slate-500">{es ? "Avisos de este ciclo" : "Notices this cycle"}: {u.alerts.map((a) => `${a.threshold} % (${formatDate(a.at, lang)})`).join(" · ")}</p>
             )}
           </CardContent>
         </Card>
@@ -83,7 +83,7 @@ export default async function AiUsagePage() {
               <ul className="divide-y divide-slate-100 rounded-lg border border-slate-100">
                 {u.history.map((h) => (
                   <li key={h.cycleStart.toISOString()} className="flex items-center gap-3 px-3 py-2 text-sm">
-                    <span className="w-44 flex-shrink-0 text-slate-600">{formatDate(h.cycleStart)} → {formatDate(h.cycleEnd)}</span>
+                    <span className="w-44 flex-shrink-0 text-slate-600">{formatDate(h.cycleStart, lang)} → {formatDate(h.cycleEnd, lang)}</span>
                     <span className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100"><span className={`block h-full ${h.usedPercent >= 100 ? TONE.EXHAUSTED : h.usedPercent >= 75 ? TONE.WARN_75 : TONE.OK}`} style={{ width: `${h.usedPercent}%` }} /></span>
                     <span className="w-12 text-right font-medium text-slate-900">{h.usedPercent} %</span>
                   </li>

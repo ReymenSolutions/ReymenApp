@@ -4,7 +4,7 @@ import { prisma } from "./prisma";
 import { logAudit } from "./audit";
 import { sendEmail } from "./email";
 import { teamInviteEmail } from "./email-templates";
-import { assertPlanCapacity } from "./plan-limits";
+import { withPlanCapacity } from "./plan-limits";
 import { appUrl } from "./app-url";
 import { UserError } from "./user-error";
 
@@ -28,20 +28,20 @@ export async function createOrgUserRecord(input: {
   const existing = await prisma.user.findUnique({ where: { email: input.email } });
   if (existing) throw new UserError("Ya existe un usuario con ese email");
 
-  await assertPlanCapacity(input.organizationId, "users");
-
   const passwordHash = await bcrypt.hash(input.password, 12);
 
   const [user, org] = await Promise.all([
-    prisma.user.create({
-      data: {
-        name: input.name,
-        email: input.email,
-        passwordHash,
-        role: input.role,
-        organizationId: input.organizationId,
-      },
-    }),
+    withPlanCapacity(input.organizationId, "users", (tx) =>
+      tx.user.create({
+        data: {
+          name: input.name,
+          email: input.email,
+          passwordHash,
+          role: input.role,
+          organizationId: input.organizationId,
+        },
+      })
+    ),
     prisma.organization.findUnique({ where: { id: input.organizationId }, select: { name: true } }),
   ]);
 

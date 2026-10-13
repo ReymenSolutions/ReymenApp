@@ -50,6 +50,7 @@ async function installTemplateCore(
     throw new UserError("Este template ya está instalado");
   }
 
+  // La instalación abre sus propias transacciones, por eso aquí no se envuelve en withPlanCapacity (ver plan-limits.ts).
   await assertPlanCapacity(orgId, "automations");
 
   return applyTemplateInstall({

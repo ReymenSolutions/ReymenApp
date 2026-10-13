@@ -20,8 +20,8 @@ export function SubscriptionStatus({ view, lang }: { view: BillingView; lang: st
       </div>
       <p className="text-sm text-slate-600">
         {view.state === "OVERDUE"
-          ? es ? `Venció el ${formatDate(view.dueAt)} (${view.daysOver} ${view.daysOver === 1 ? "día" : "días"} de atraso).` : `Expired on ${formatDate(view.dueAt)} (${view.daysOver} day${view.daysOver === 1 ? "" : "s"} overdue).`
-          : es ? `Pagada hasta el ${formatDate(view.dueAt)}.` : `Paid through ${formatDate(view.dueAt)}.`}{" "}
+          ? es ? `Venció el ${formatDate(view.dueAt, lang)} (${view.daysOver} ${view.daysOver === 1 ? "día" : "días"} de atraso).` : `Expired on ${formatDate(view.dueAt, lang)} (${view.daysOver} day${view.daysOver === 1 ? "" : "s"} overdue).`
+          : es ? `Pagada hasta el ${formatDate(view.dueAt, lang)}.` : `Paid through ${formatDate(view.dueAt, lang)}.`}{" "}
         {es ? "Mensualidad" : "Monthly"}: ${view.amountMxn.toLocaleString("en-US")} MXN.
       </p>
       {view.state !== "ACTIVE" && !view.stripeSubscription && (
@@ -31,7 +31,7 @@ export function SubscriptionStatus({ view, lang }: { view: BillingView; lang: st
         <ul className="divide-y divide-slate-100 text-xs text-slate-600">
           {view.payments.slice(0, 3).map((p) => (
             <li key={p.id} className="flex justify-between gap-2 py-1">
-              <span>{formatDate(p.createdAt)} · {METHOD[p.method as keyof typeof METHOD]?.[es ? "es" : "en"] ?? p.method}</span>
+              <span>{formatDate(p.createdAt, lang)} · {METHOD[p.method as keyof typeof METHOD]?.[es ? "es" : "en"] ?? p.method}</span>
               <span className="font-medium text-slate-900">${p.amountMxn.toLocaleString("en-US")} MXN</span>
             </li>
           ))}

@@ -181,6 +181,7 @@ PRs fusionados en `main` (#1–#28):
   sudo -u emilianorm -H git -C /home/emilianorm/reymen-ai-ops-preview remote set-url origin https://github.com/ReymenSolutions/ReymenApp.git
   ```
   GitHub redirige el nombre viejo, pero conviene actualizarlo.
+- Despliegue completo, reconstrucción del servidor y respaldos: `docs/DEPLOY.md`. Seguimiento de la auditoría maestra: `docs/AUDITORIA_SEGUIMIENTO.md`.
 - **Cron del VPS:** `sudo /home/emilianorm/reymen-ai-ops-preview/deploy/install-cron.sh` (idempotente) instala en `/etc/cron.d/reymen-ai-ops` el reloj de automatizaciones (cada 5 min), el reintento de webhooks (cada 10 min) y los avisos de cobro (diario 8:00 MX). Llama a los endpoints desde dentro del contenedor y lee `CRON_SECRET` de su entorno; si falta, el script lo dice. Log: `/var/log/reymen/cron.log`.
 - [?] No se confirmó qué versión está desplegada hoy. En la última captura del usuario faltaban #24–#26, así que hay que correr el `update.sh` de ReymenApp.
 

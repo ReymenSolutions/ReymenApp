@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import type { UserRole } from "@prisma/client";
+import { invalidateSessionCache } from "@/lib/session-guard";
 import { UserError } from "@/lib/user-error";
 
 export async function updateAvatar(imageData: string) {
@@ -91,6 +92,7 @@ export async function updatePreferences(data: { theme?: string; language?: strin
       ...(data.language !== undefined && { language: data.language }),
     },
   });
+  invalidateSessionCache(session.user.id);
 
   return { success: true };
 }
