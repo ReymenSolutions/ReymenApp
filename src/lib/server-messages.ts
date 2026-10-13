@@ -223,7 +223,9 @@ const EN: Record<string, string> = {
   "Ya existe un usuario con ese email": "A user with that email already exists",
   "Ya existe una categoría con ese nombre": "A category with that name already exists",
   "Zona horaria inválida": "Invalid time zone",
-  // Lealtad (Reymen Food)
+  // Lealtad
+  "Revisa el código postal y la ubicación.": "Check the postal code and the location.",
+  "Marca la ubicación en el mapa.": "Mark the location on the map.",
   "Cliente no encontrado.": "Customer not found.",
   "Demasiados intentos. Intenta de nuevo en unos minutos.": "Too many attempts. Try again in a few minutes.",
   "El código postal debe tener 5 dígitos.": "The postal code must have 5 digits.",

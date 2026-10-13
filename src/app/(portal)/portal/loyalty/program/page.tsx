@@ -5,6 +5,7 @@ import { getAppUrl } from "@/lib/app-url";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProgramForm, type ProgramFormValues } from "@/components/loyalty/ProgramForm";
 import { PublicLinks, type PublicLink } from "@/components/loyalty/PublicLinks";
+import { LocationsEditor } from "@/components/loyalty/LocationsEditor";
 
 export default async function LoyaltyProgramPage() {
   const ctx = await getLoyaltyContext();
@@ -61,6 +62,16 @@ export default async function LoyaltyProgramPage() {
         <CardContent>
           <ProgramForm initial={initial} branches={ctx.branches} businessName={ctx.org.name} isNew={!program} readOnly={!ctx.canManage} />
           {program && <p className="mt-4 text-xs text-slate-400">{L.versionNote(program.currentVersion)}</p>}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{L.locationsTitle}</CardTitle>
+          <p className="text-sm text-slate-500">{L.locationsHint}</p>
+        </CardHeader>
+        <CardContent>
+          <LocationsEditor locations={ctx.locations} readOnly={!ctx.canManage} />
         </CardContent>
       </Card>
 

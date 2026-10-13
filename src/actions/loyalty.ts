@@ -21,6 +21,7 @@ import {
 } from "@/lib/loyalty/service";
 import { getCheckoutMember, searchMembersForCheckout, type CheckoutMember } from "@/lib/loyalty/queries";
 import { extractMemberToken } from "@/lib/loyalty/token";
+import { saveLocation } from "@/lib/loyalty/locations";
 
 const LOYALTY_PATHS = [
   "/portal/loyalty",
@@ -75,6 +76,24 @@ export async function saveLoyaltyProgram(data: z.input<typeof programSchema>) {
   });
   revalidateLoyalty();
   return { version: result.version, ruleChanged: result.ruleChanged, created: result.created };
+}
+
+// ─── Ubicación de las sucursales (mapa y distancias) ───────────────────
+
+const locationSchema = z.object({
+  branchKey: z.string().trim().min(1).max(40),
+  postalCode: z.string().trim().max(10),
+  lat: z.coerce.number(),
+  lng: z.coerce.number(),
+});
+
+export async function saveLoyaltyLocation(data: z.input<typeof locationSchema>) {
+  const session = await requireLoyaltyManager();
+  const parsed = locationSchema.safeParse(data);
+  if (!parsed.success) throw new UserError("Revisa el código postal y la ubicación.");
+  const saved = await saveLocation(session.user.organizationId, session.user.id, parsed.data);
+  revalidateLoyalty();
+  return { postalCode: saved.postalCode, lat: saved.latitude, lng: saved.longitude };
 }
 
 // ─── Caja ───────────────────────────────────────────────────────────────

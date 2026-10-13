@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { offsetToLatLng, zoneDistanceKm, normalizePostalCode, DEMO_ZONE_POSITIONS } from "./postal-zones";
+import { DEMO_ANCHOR, DEMO_ZONE_POSITIONS, distanceKm, isValidPoint, normalizePostalCode, offsetToLatLng, zoneDistanceKm, zonePoint } from "./postal-zones";
 
 describe("postal-zones", () => {
-  it("convierte km este/norte a coordenadas alrededor de la sucursal", () => {
+  it("convierte km este/norte a coordenadas alrededor de un punto", () => {
     const ref = { lat: 25.7333, lng: -100.3925 };
     expect(offsetToLatLng(ref, { eastKm: 0, northKm: 0 })).toEqual(ref);
     const north = offsetToLatLng(ref, { eastKm: 0, northKm: 1 });
@@ -13,12 +13,24 @@ describe("postal-zones", () => {
     expect(east.lng - ref.lng).toBeCloseTo(0.00998, 4);
   });
 
-  it("todas las zonas demo quedan a menos de 7 km de la sucursal", () => {
-    for (const cp of Object.keys(DEMO_ZONE_POSITIONS)) expect(zoneDistanceKm(cp)!).toBeLessThan(7);
-    expect(zoneDistanceKm("99999")).toBeNull();
+  it("la distancia haversine coincide con el desplazamiento en km", () => {
+    const p = offsetToLatLng(DEMO_ANCHOR, { eastKm: 3, northKm: 4 });
+    expect(distanceKm(DEMO_ANCHOR, p)).toBeCloseTo(5, 1);
   });
 
-  it("normaliza códigos postales de 5 dígitos", () => {
+  it("mide cada CP contra el punto de venta más cercano", () => {
+    for (const cp of Object.keys(DEMO_ZONE_POSITIONS)) expect(zoneDistanceKm(cp, [DEMO_ANCHOR])!).toBeLessThan(7);
+    expect(zoneDistanceKm("99999", [DEMO_ANCHOR])).toBeNull();
+    expect(zoneDistanceKm("64610", [])).toBeNull();
+    const far = { lat: 25.0, lng: -100.0 };
+    expect(zoneDistanceKm("64610", [far, DEMO_ANCHOR])).toBe(zoneDistanceKm("64610", [DEMO_ANCHOR]));
+    expect(zonePoint("64610")).not.toBeNull();
+  });
+
+  it("valida coordenadas y códigos postales", () => {
+    expect(isValidPoint(25.7, -100.4)).toBe(true);
+    expect(isValidPoint(95, 0)).toBe(false);
+    expect(isValidPoint(Number.NaN, 0)).toBe(false);
     expect(normalizePostalCode(" 64 610 ")).toBe("64610");
     expect(normalizePostalCode("6461")).toBeNull();
   });

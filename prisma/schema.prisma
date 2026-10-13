@@ -107,6 +107,7 @@ model Organization {
   loyaltyMembers          LoyaltyMember[]
   loyaltyVisits           LoyaltyVisit[]
   loyaltyRewards          LoyaltyReward[]
+  loyaltyLocations        LoyaltyLocation[]
 
   @@index([slug])
 }
@@ -1254,6 +1255,7 @@ model Branch {
   loyaltyMembers        LoyaltyMember[] @relation("LoyaltyMemberEnrollmentBranch")
   loyaltyVisits         LoyaltyVisit[]  @relation("LoyaltyVisitBranch")
   loyaltyRedemptions    LoyaltyReward[] @relation("LoyaltyRewardRedeemedBranch")
+  loyaltyLocation       LoyaltyLocation[]
 
   @@index([organizationId])
 }
@@ -2005,6 +2007,8 @@ enum LoyaltyVisitStatus {
 enum LoyaltyRewardStatus {
   AVAILABLE
   REDEEMED
+  // Anulada porque se canceló en el POS la venta que la desbloqueó (antes de canjearse).
+  VOIDED
 }
 
 model LoyaltyProgram {
@@ -2169,4 +2173,27 @@ model LoyaltyReward {
   @@index([organizationId, status])
   @@index([organizationId, earnedAt])
   @@index([organizationId, redeemedAt])
+}
+
+// Ubicación de cada punto de venta para el mapa de Lealtad: su código postal
+// y un pin (lat/lng) que el negocio fija en el mapa. branchKey es el id de la
+// sucursal o "main" para la Principal implícita (branchId null), así el
+// índice único funciona también para ella. Vive en Lealtad para no tocar el
+// modelo Branch de Food.
+model LoyaltyLocation {
+  id             String   @id @default(cuid())
+  organizationId String
+  branchKey      String
+  branchId       String?
+  postalCode     String
+  latitude       Float
+  longitude      Float
+  updatedById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branch       Branch?      @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, branchKey])
 }

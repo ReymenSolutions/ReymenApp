@@ -8,7 +8,7 @@
 // o columnas compactas; los cálculos viven aquí para poder probarlos.
 
 import { averageTicket, progressOf, roundMoney } from "./cycle";
-import { zoneDistanceKm } from "./postal-zones";
+import { zoneDistanceKm, type GeoPoint } from "./postal-zones";
 
 // ─── Porcentajes que suman exactamente 100 ─────────────────────────────
 
@@ -87,7 +87,8 @@ export const NEARBY_KM = 2.5;
  *  - opportunity: zona cercana (≤ NEARBY_KM) con % de clientes menor a la
  *    mitad del promedio de las zonas cercanas (baja penetración).
  */
-export function summarizeZones(rows: ZoneRow[]): ZoneSummary {
+/** `origins`: puntos de venta ubicados; la distancia de cada CP es al más cercano. */
+export function summarizeZones(rows: ZoneRow[], origins: GeoPoint[] = []): ZoneSummary {
   const clean = rows.filter((r) => r.members > 0 || r.visits > 0);
   const memberShares = sharesPct(clean.map((r) => r.members));
   const salesShares = sharesPct(clean.map((r) => r.sales));
@@ -116,7 +117,7 @@ export function summarizeZones(rows: ZoneRow[]): ZoneSummary {
     avgTicket: averageTicket(r.sales, r.visitsWithAmount),
     frequency: r.members > 0 ? round2(r.visits / r.members) : 0,
     salesPerMember: r.members > 0 ? roundMoney(r.sales / r.members) : 0,
-    distanceKm: zoneDistanceKm(r.postalCode),
+    distanceKm: zoneDistanceKm(r.postalCode, origins),
     labels: [],
   }));
 

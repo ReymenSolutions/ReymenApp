@@ -23,6 +23,7 @@ import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../src/lib/prisma";
 import { applyVisit } from "../src/lib/loyalty/cycle";
+import { DEMO_ANCHOR, offsetToLatLng } from "../src/lib/loyalty/postal-zones";
 
 const ORG_SLUG = "cafe-norte-demo";
 const ORG_NAME = "Café Norte";
@@ -143,6 +144,21 @@ async function main() {
   const cumbres =
     (await prisma.branch.findFirst({ where: { organizationId: org.id, name: "Cumbres" } })) ??
     (await prisma.branch.create({ data: { organizationId: org.id, name: "Cumbres" } }));
+
+  // Ubicación de los dos puntos de venta (Programa → Ubicación de las sucursales).
+  // Ficticios: Cumbres en el ancla de la demo y la Principal unos 4 km al suroeste.
+  const demoLocations = [
+    { branchKey: cumbres.id, branchId: cumbres.id as string | null, postalCode: "64610", point: DEMO_ANCHOR },
+    { branchKey: "main", branchId: null, postalCode: "64650", point: offsetToLatLng(DEMO_ANCHOR, { eastKm: -2.8, northKm: -2.9 }) },
+  ];
+  for (const l of demoLocations) {
+    const data = { postalCode: l.postalCode, latitude: l.point.lat, longitude: l.point.lng };
+    await prisma.loyaltyLocation.upsert({
+      where: { organizationId_branchKey: { organizationId: org.id, branchKey: l.branchKey } },
+      update: data,
+      create: { organizationId: org.id, branchKey: l.branchKey, branchId: l.branchId, ...data },
+    });
+  }
 
   // ─── Limpieza de una corrida anterior (solo datos de esta demo) ─────
   await prisma.loyaltyProgram.deleteMany({ where: { organizationId: org.id } });

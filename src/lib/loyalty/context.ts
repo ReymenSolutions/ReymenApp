@@ -14,6 +14,7 @@ import { pickDict } from "@/lib/i18n-dict";
 import { loyaltyStrings } from "@/lib/i18n-loyalty";
 import { listBranches } from "@/lib/branches";
 import { getActiveProgram } from "./service";
+import { listLocations } from "./locations";
 
 export const getLoyaltyContext = cache(async () => {
   const session = await auth();
@@ -27,6 +28,8 @@ export const getLoyaltyContext = cache(async () => {
     prisma.organization.findUniqueOrThrow({ where: { id: orgId }, select: { id: true, name: true, slug: true, timezone: true } }),
     listBranches(orgId, { activeOnly: true }),
   ]);
+  const activeBranches = branches.map((b) => ({ id: b.id, name: b.name }));
+  const locations = await listLocations(orgId, org.name, activeBranches);
   return {
     session,
     orgId,
@@ -35,7 +38,9 @@ export const getLoyaltyContext = cache(async () => {
     L: pickDict(loyaltyStrings, lang),
     program,
     org,
-    branches: branches.map((b) => ({ id: b.id, name: b.name })),
+    branches: activeBranches,
+    /** Principal + sucursales con su ubicación para el mapa (null = sin fijar). */
+    locations,
     canManage: can(role, "loyalty:manage"),
     canOperate: can(role, "loyalty:operate"),
   };

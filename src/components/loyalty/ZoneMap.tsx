@@ -9,7 +9,8 @@ import { usePreferences } from "@/context/preferences";
 import { pickDict } from "@/lib/i18n-dict";
 import { loyaltyStrings, type LoyaltyDict } from "@/lib/i18n-loyalty";
 import { MAP_METRICS, zoneMetricValue, type MapMetric, type ZoneLabel, type ZoneStats } from "@/lib/loyalty/metrics";
-import { DEFAULT_REFERENCE, offsetToLatLng, zonePosition, type GeoPoint } from "@/lib/loyalty/postal-zones";
+import { DEFAULT_REFERENCE, zonePoint, type GeoPoint } from "@/lib/loyalty/postal-zones";
+import type { LoyaltyLocationView } from "@/lib/loyalty/locations-shared";
 import type { GeoZone } from "./GeoZoneMap";
 import { money, num, pct } from "@/lib/loyalty/format";
 
@@ -81,16 +82,16 @@ export function ZoneLabelBadge({ label, L }: { label: ZoneLabel; L: LoyaltyDict 
 
 export function ZoneMap({
   zones,
-  referenceLabel,
-  referenceLat,
-  referenceLng,
+  locations,
+  focusKey,
   compact = false,
   initialMetric = "members",
 }: {
   zones: ZoneStats[];
-  referenceLabel: string | null;
-  referenceLat?: number | null;
-  referenceLng?: number | null;
+  /** Puntos de venta (Principal + sucursales); los que tienen pin se dibujan. */
+  locations: LoyaltyLocationView[];
+  /** Sucursal elegida en el filtro ("main" o id); sin valor = todas. */
+  focusKey?: string;
   compact?: boolean;
   initialMetric?: MapMetric;
 }) {
@@ -100,12 +101,15 @@ export function ZoneMap({
   // En el mapa completo se abre con la zona de más ventas seleccionada, para que el panel no empiece vacío.
   const [selected, setSelected] = useState<string | null>(compact ? null : (zones[0]?.postalCode ?? null));
 
-  const hasReference = referenceLat != null && referenceLng != null;
-  const reference: GeoPoint = hasReference ? { lat: referenceLat, lng: referenceLng } : DEFAULT_REFERENCE;
+  const sites = locations.filter((l): l is LoyaltyLocationView & { point: GeoPoint } => l.point !== null);
+  const visibleSites = focusKey ? sites.filter((l) => l.key === focusKey) : sites;
+  const focusSite = visibleSites[0] ?? null;
+  const hasReference = focusSite !== null;
+  const reference: GeoPoint = focusSite?.point ?? DEFAULT_REFERENCE;
 
   const { geoZones, unplaced } = useMemo(() => {
-    const withPos = zones.map((z) => ({ z, pos: zonePosition(z.postalCode) }));
-    const onMap = withPos.filter((w) => w.pos !== null) as { z: ZoneStats; pos: { eastKm: number; northKm: number } }[];
+    const withPos = zones.map((z) => ({ z, point: zonePoint(z.postalCode) }));
+    const onMap = withPos.filter((w): w is { z: ZoneStats; point: GeoPoint } => w.point !== null);
     const values = onMap.map((w) => zoneMetricValue(w.z, metric));
     const max = Math.max(0, ...values);
     const geoZones: GeoZone[] = onMap.map((w, i) => {
@@ -126,7 +130,7 @@ export function ZoneMap({
         `</div>`;
       return {
         postalCode: z.postalCode,
-        point: offsetToLatLng(reference, w.pos),
+        point: w.point,
         radiusM: Math.round(R_MIN_M + (R_MAX_M - R_MIN_M) * Math.sqrt(Math.max(0, t))),
         fill: RAMP[step],
         strong,
@@ -136,9 +140,7 @@ export function ZoneMap({
       };
     });
     return { geoZones, unplaced: withPos.length - onMap.length };
-    // reference es estable mientras no cambien sus coordenadas
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zones, metric, L, reference.lat, reference.lng]);
+  }, [zones, metric, L]);
 
   const active = selected ? zones.find((z) => z.postalCode === selected) ?? null : null;
 
@@ -180,7 +182,7 @@ export function ZoneMap({
           <GeoZoneMap
             zones={geoZones}
             reference={reference}
-            referenceLabel={referenceLabel ?? L.mapBranch}
+            sites={visibleSites.map((l) => ({ key: l.key, label: l.label, point: l.point }))}
             selected={selected}
             onSelect={(cp) => setSelected((cur) => (cur === cp ? null : cp))}
             height={compact ? 360 : 520}
@@ -210,7 +212,7 @@ export function ZoneMap({
             <span className="flex items-center gap-1">
               <span className="h-2.5 w-2.5 rounded-full bg-slate-900" aria-hidden="true" /> {L.mapBranch}
             </span>
-            <span>{L.mapRings}</span>
+            {visibleSites.length === 1 ? <span>{L.mapRings}</span> : visibleSites.length > 1 ? <span>{L.mapManySites}</span> : null}
           </div>
         </div>
 

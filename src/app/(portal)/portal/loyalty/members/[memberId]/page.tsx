@@ -130,7 +130,9 @@ export default async function LoyaltyMemberPage({ params }: { params: Promise<{ 
                       <p className="text-xs text-slate-500">
                         {r.status === "AVAILABLE"
                           ? `${L.rewardEarnedAt(relativeDay(r.earnedAt, lang))} · ${L.rewardAvailable}`
-                          : L.rewardRedeemedAt(shortDate(r.redeemedAt, lang, tz), r.redeemedBranch ?? L.mainBranch)}
+                          : r.status === "VOIDED"
+                            ? L.rewardVoided
+                            : L.rewardRedeemedAt(shortDate(r.redeemedAt, lang, tz), r.redeemedBranch ?? L.mainBranch)}
                       </p>
                       <p className="text-[11px] text-slate-400">{L.rewardRuleSnapshot(r.visitGoal, r.programVersion)}</p>
                     </div>

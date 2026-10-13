@@ -9,6 +9,7 @@ import {
   type MemberLite,
   type ZoneRow,
 } from "./metrics";
+import { DEMO_ANCHOR } from "./postal-zones";
 
 const DAY = 86_400_000;
 const NOW = new Date("2026-10-12T18:00:00Z");
@@ -34,7 +35,13 @@ const ROWS: ZoneRow[] = [
 ];
 
 describe("summarizeZones", () => {
-  const s = summarizeZones(ROWS);
+  it("sin puntos de venta ubicados no hay distancias ni zonas de oportunidad", () => {
+    const blind = summarizeZones(ROWS);
+    expect(blind.zones.every((z) => z.distanceKm === null)).toBe(true);
+    expect(blind.zones.some((z) => z.labels.includes("opportunity"))).toBe(false);
+  });
+
+  const s = summarizeZones(ROWS, [DEMO_ANCHOR]);
 
   it("las participaciones de clientes y de ventas suman 100", () => {
     expect(s.zones.reduce((a, z) => a + z.memberShare, 0)).toBeCloseTo(100, 6);
@@ -130,7 +137,7 @@ describe("segmentCounts", () => {
 
 describe("buildInsights", () => {
   it("deriva insights de las métricas, con el CP y los números que los sostienen", () => {
-    const summary = summarizeZones(ROWS);
+    const summary = summarizeZones(ROWS, [DEMO_ANCHOR]);
     const segments = segmentCounts([member({ cycleVisits: 9 }), member({ cycleVisits: 9 })], { goal: 10, newSince: NOW, now: NOW });
     const insights = buildInsights({ summary, segments, availableRewards: 3 });
     const kinds = insights.map((i) => i.kind);

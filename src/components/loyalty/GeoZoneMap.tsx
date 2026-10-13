@@ -34,10 +34,16 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
 }
 
+export interface GeoSite {
+  key: string;
+  label: string;
+  point: GeoPoint;
+}
+
 export default function GeoZoneMap({
   zones,
   reference,
-  referenceLabel,
+  sites,
   selected,
   onSelect,
   height,
@@ -45,8 +51,10 @@ export default function GeoZoneMap({
   scrollHint,
 }: {
   zones: GeoZone[];
+  /** Centro del mapa y de los anillos de distancia (la sucursal enfocada). */
   reference: GeoPoint;
-  referenceLabel: string;
+  /** Puntos de venta ubicados; los anillos de distancia se dibujan si es uno solo. */
+  sites: GeoSite[];
   selected: string | null;
   onSelect: (postalCode: string) => void;
   height: number;
@@ -54,6 +62,7 @@ export default function GeoZoneMap({
   scrollHint: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const sitesKey = sites.map((s) => `${s.key}:${s.point.lat},${s.point.lng}:${s.label}`).join("|");
   const mapRef = useRef<L.Map | null>(null);
   const zonesLayerRef = useRef<L.LayerGroup | null>(null);
   const fitRef = useRef<L.LatLngBounds | null>(null);
@@ -82,41 +91,46 @@ export default function GeoZoneMap({
     map.on("mouseout", () => map.scrollWheelZoom.disable());
 
     const base = L.layerGroup().addTo(map);
-    for (const km of RINGS_KM) {
-      L.circle([reference.lat, reference.lng], {
-        radius: km * 1000,
-        color: "#64748b",
-        weight: 1.25,
-        dashArray: "5 6",
-        fill: false,
-        interactive: false,
-      }).addTo(base);
-      // Etiqueta del anillo en su borde norte.
-      const north = L.latLng(reference.lat + km / 110.574, reference.lng);
-      L.marker(north, {
-        interactive: false,
+    // Anillos solo con una sucursal enfocada: con varias se confundirían.
+    if (sites.length === 1) {
+      for (const km of RINGS_KM) {
+        L.circle([reference.lat, reference.lng], {
+          radius: km * 1000,
+          color: "#64748b",
+          weight: 1.25,
+          dashArray: "5 6",
+          fill: false,
+          interactive: false,
+        }).addTo(base);
+        // Etiqueta del anillo en su borde norte.
+        const north = L.latLng(reference.lat + km / 110.574, reference.lng);
+        L.marker(north, {
+          interactive: false,
+          keyboard: false,
+          icon: L.divIcon({
+            className: "",
+            html: `<span class="rounded bg-white/90 px-1 text-[10px] font-medium text-slate-500 shadow-sm">${km} km</span>`,
+            iconSize: [36, 14],
+            iconAnchor: [18, 7],
+          }),
+        }).addTo(base);
+      }
+    }
+    for (const site of sites) {
+      L.marker([site.point.lat, site.point.lng], {
         keyboard: false,
+        zIndexOffset: 1000,
+        title: site.label,
         icon: L.divIcon({
           className: "",
-          html: `<span class="rounded bg-white/90 px-1 text-[10px] font-medium text-slate-500 shadow-sm">${km} km</span>`,
-          iconSize: [36, 14],
-          iconAnchor: [18, 7],
+          html: `<span class="flex h-6 w-6 items-center justify-center rounded-full border-[3px] border-white bg-slate-900 shadow-md"><span class="h-2 w-2 rounded-full bg-white"></span></span>`,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12],
         }),
-      }).addTo(base);
+      })
+        .bindTooltip(escapeHtml(site.label), { permanent: true, direction: "bottom", offset: [0, 10], className: "loyalty-branch-label" })
+        .addTo(base);
     }
-    L.marker([reference.lat, reference.lng], {
-      keyboard: false,
-      zIndexOffset: 1000,
-      title: referenceLabel,
-      icon: L.divIcon({
-        className: "",
-        html: `<span class="flex h-6 w-6 items-center justify-center rounded-full border-[3px] border-white bg-slate-900 shadow-md"><span class="h-2 w-2 rounded-full bg-white"></span></span>`,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-      }),
-    })
-      .bindTooltip(escapeHtml(referenceLabel), { permanent: true, direction: "bottom", offset: [0, 10], className: "loyalty-branch-label" })
-      .addTo(base);
 
     zonesLayerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
@@ -130,7 +144,9 @@ export default function GeoZoneMap({
       zonesLayerRef.current = null;
       fitRef.current = null;
     };
-  }, [reference.lat, reference.lng, referenceLabel]);
+    // sitesKey resume la lista de puntos de venta (sus coordenadas y nombres).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reference.lat, reference.lng, sitesKey]);
 
   // Zonas: se redibujan al cambiar la métrica o la selección.
   useEffect(() => {
@@ -181,11 +197,14 @@ export default function GeoZoneMap({
     // Encuadre inicial: todas las zonas y la sucursal (solo la primera vez).
     if (!fitRef.current && zones.length > 0) {
       const bounds = L.latLngBounds([[reference.lat, reference.lng]]);
+      for (const site of sites) bounds.extend([site.point.lat, site.point.lng]);
       for (const z of zones) bounds.extend(L.latLng(z.point.lat, z.point.lng).toBounds(z.radiusM * 2.2));
       fitRef.current = bounds;
       map.fitBounds(bounds, { padding: [24, 24] });
     }
-  }, [zones, selected, reference.lat, reference.lng]);
+    // sites se resume en sitesKey: si cambia, el mapa base se rehízo y hay que redibujar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zones, selected, reference.lat, reference.lng, sitesKey]);
 
   return (
     <div className="relative isolate">

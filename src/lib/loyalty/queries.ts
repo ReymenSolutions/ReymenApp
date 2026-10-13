@@ -9,6 +9,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { BranchFilter } from "@/lib/branches";
 import { averageTicket, progressOf, roundMoney } from "./cycle";
+import { MAIN_LOCATION_KEY } from "./locations-shared";
 import { activityCutoffs, activityStatus, buildInsights, pctOf, segmentCounts, summarizeZones, type MemberLite, type ZoneRow } from "./metrics";
 import type { Period } from "./period";
 import { trendPct } from "./period";
@@ -101,10 +102,10 @@ export async function getLoyaltyAnalytics(args: {
       prisma.loyaltyMember.count({ where: { ...memberWhere, createdAt: { gte: period.from, lt: period.to } } }),
       prisma.loyaltyMember.count({ where: { ...memberWhere, createdAt: { gte: period.prevFrom, lt: period.prevTo } } }),
       prisma.loyaltyReward.count({ where: { organizationId: org, programId, status: "AVAILABLE", member: memberBranchWhere(branch) } }),
-      prisma.loyaltyReward.count({ where: { organizationId: org, programId, member: memberBranchWhere(branch) } }),
+      prisma.loyaltyReward.count({ where: { organizationId: org, programId, status: { not: "VOIDED" }, member: memberBranchWhere(branch) } }),
       prisma.loyaltyReward.count({ where: { organizationId: org, programId, status: "REDEEMED", member: memberBranchWhere(branch) } }),
       prisma.loyaltyReward.count({
-        where: { organizationId: org, programId, earnedAt: { gte: period.from, lt: period.to }, ...(branch === undefined ? {} : { earnedVisit: { branchId: branch } }) },
+        where: { organizationId: org, programId, status: { not: "VOIDED" }, earnedAt: { gte: period.from, lt: period.to }, ...(branch === undefined ? {} : { earnedVisit: { branchId: branch } }) },
       }),
       prisma.loyaltyReward.count({
         where: { organizationId: org, programId, status: "REDEEMED", redeemedAt: { gte: period.from, lt: period.to }, ...(branch === undefined ? {} : { redeemedBranchId: branch }) },
@@ -144,7 +145,7 @@ export async function getLoyaltyAnalytics(args: {
       SELECT ${localDay("r", "earnedAt")} AS day, COUNT(*) AS n
       FROM "LoyaltyReward" r
       LEFT JOIN "LoyaltyVisit" v ON v."id" = r."earnedVisitId"
-      WHERE r."organizationId" = ${org} AND r."programId" = ${programId}
+      WHERE r."organizationId" = ${org} AND r."programId" = ${programId} AND r."status" <> 'VOIDED'
         AND r."earnedAt" >= ${period.from} AND r."earnedAt" < ${period.to}${vb}
       GROUP BY 1`,
     prisma.$queryRaw<{ day: string; n: bigint }[]>`
@@ -202,7 +203,15 @@ export async function getLoyaltyAnalytics(args: {
     z.visitsWithAmount = num(r.with_amount);
   }
   for (const r of prevVisitZones) zoneOf(r.postal_code).prevVisits = num(r.visits);
-  const zones = summarizeZones([...zoneMap.values()]);
+  // Distancias: al punto de venta ubicado más cercano (solo los del filtro de sucursal).
+  const locationRows = await prisma.loyaltyLocation.findMany({
+    where: { organizationId: org, ...(branch === undefined ? {} : { branchKey: branch ?? MAIN_LOCATION_KEY }) },
+    select: { latitude: true, longitude: true },
+  });
+  const zones = summarizeZones(
+    [...zoneMap.values()],
+    locationRows.map((l) => ({ lat: l.latitude, lng: l.longitude }))
+  );
 
   // ── Segmentos (columnas compactas por miembro) ──
   const lites = await getMemberLites(org, programId, branch);

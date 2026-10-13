@@ -71,7 +71,7 @@ export default async function LoyaltyOverviewPage({ searchParams }: { searchPara
             <Link href="/portal/loyalty/map" className="text-xs font-medium text-brand-600 hover:underline">{L.openMap}</Link>
           </CardHeader>
           <CardContent>
-            <ZoneMap zones={a.zones.zones} referenceLabel={program.referenceLabel} referenceLat={program.referenceLat} referenceLng={program.referenceLng} compact initialMetric="sales" />
+            <ZoneMap zones={a.zones.zones} locations={ctx.locations} focusKey={branch === undefined ? undefined : (branch ?? "main")} compact initialMetric="sales" />
           </CardContent>
         </Card>
         <Card>

@@ -34,7 +34,7 @@ export default async function LoyaltyMapPage({ searchParams }: { searchParams: P
           <p className="text-sm text-slate-500">{L.mapSubtitle}</p>
         </CardHeader>
         <CardContent>
-          <ZoneMap zones={a.zones.zones} referenceLabel={program.referenceLabel} referenceLat={program.referenceLat} referenceLng={program.referenceLng} initialMetric="members" />
+          <ZoneMap zones={a.zones.zones} locations={ctx.locations} focusKey={branch === undefined ? undefined : (branch ?? "main")} initialMetric="members" />
         </CardContent>
       </Card>
 
