@@ -5,16 +5,20 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatDate(date: Date | string) {
-  return new Intl.DateTimeFormat("es-MX", {
+/** Idioma de la interfaz → configuración regional de fechas y montos (por defecto español de México, como antes). */
+export type UiLang = "es" | "en" | (string & {});
+const localeOf = (lang?: UiLang) => (lang === "en" ? "en-US" : "es-MX");
+
+export function formatDate(date: Date | string, lang?: UiLang) {
+  return new Intl.DateTimeFormat(localeOf(lang), {
     day: "2-digit",
     month: "short",
     year: "numeric",
   }).format(new Date(date));
 }
 
-export function formatDateTime(date: Date | string) {
-  return new Intl.DateTimeFormat("es-MX", {
+export function formatDateTime(date: Date | string, lang?: UiLang) {
+  return new Intl.DateTimeFormat(localeOf(lang), {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -24,8 +28,8 @@ export function formatDateTime(date: Date | string) {
 }
 
 /** Same as formatDateTime, but rendered in a specific IANA timezone (e.g. the organization's Agenda timezone) rather than the server's local time. */
-export function formatDateTimeInTz(date: Date | string, timezone: string) {
-  return new Intl.DateTimeFormat("es-MX", {
+export function formatDateTimeInTz(date: Date | string, timezone: string, lang?: UiLang) {
+  return new Intl.DateTimeFormat(localeOf(lang), {
     day: "2-digit",
     month: "short",
     year: "numeric",

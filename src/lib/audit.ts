@@ -25,7 +25,9 @@ export async function logAudit(params: AuditParams): Promise<void> {
         metadata: params.metadata ? (params.metadata as Prisma.InputJsonValue) : undefined,
       },
     });
-  } catch {
-    // Audit failures must never break the main operation
+  } catch (error) {
+    // Un fallo de auditoría nunca rompe la operación principal, pero tampoco se pierde en silencio: queda una señal en los
+    // logs del servidor (sin metadata, que puede traer datos del cliente) para detectar que la bitácora dejó de escribir.
+    console.error(`[audit] no se pudo registrar "${params.action}" (${params.resource}${params.resourceId ? `:${params.resourceId}` : ""}, org ${params.organizationId ?? "-"}):`, error instanceof Error ? error.message : error);
   }
 }

@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { notifyAdmins } from "./admin-notifications";
 import { automationFailureEmail } from "./email-templates";
-import { assertPlanCapacity } from "./plan-limits";
+import { withPlanCapacity } from "./plan-limits";
 import { recordMetric, METRIC_KEYS } from "./metrics";
 import { appUrl } from "./app-url";
 import { phoneKey } from "./phone";
@@ -82,23 +82,23 @@ export async function processLeadEvent(payload: unknown, orgId: string): Promise
     return;
   }
 
-  await assertPlanCapacity(orgId, "leads");
-
   let created: { id: string };
   try {
-    created = await prisma.lead.create({
-      data: {
-        organizationId: orgId,
-        name: body.name,
-        email: body.email,
-        phone: body.phone,
-        phoneKey: phoneKey(body.phone),
-        source: body.source ?? "n8n",
-        externalId: body.externalId,
-        metadata: (body.metadata as Prisma.InputJsonValue) ?? undefined,
-        customFields: Object.keys(customFields).length ? customFields : undefined,
-      },
-    });
+    created = await withPlanCapacity(orgId, "leads", (tx) =>
+      tx.lead.create({
+        data: {
+          organizationId: orgId,
+          name: body.name,
+          email: body.email,
+          phone: body.phone,
+          phoneKey: phoneKey(body.phone),
+          source: body.source ?? "n8n",
+          externalId: body.externalId,
+          metadata: (body.metadata as Prisma.InputJsonValue) ?? undefined,
+          customFields: Object.keys(customFields).length ? customFields : undefined,
+        },
+      })
+    );
   } catch (err) {
     // Two concurrent deliveries with the same externalId both passed the
     // check above — the unique constraint on (organizationId, externalId)
@@ -248,23 +248,24 @@ async function resolveLeadForConversation(
   if (!isInbound || !label) return null;
   if (!(await hasModule(orgId, "CRM"))) return null;
 
+  let lead: { id: string };
   try {
-    await assertPlanCapacity(orgId, "leads");
+    lead = await withPlanCapacity(orgId, "leads", (tx) =>
+      tx.lead.create({
+        data: {
+          organizationId: orgId,
+          name: label,
+          phone: key ? body.contactPhone : null,
+          phoneKey: key,
+          email: body.contactEmail ?? null,
+          source: body.channel,
+        },
+      })
+    );
   } catch (err) {
     if (err instanceof UserError) return null;
     throw err;
   }
-
-  const lead = await prisma.lead.create({
-    data: {
-      organizationId: orgId,
-      name: label,
-      phone: key ? body.contactPhone : null,
-      phoneKey: key,
-      email: body.contactEmail ?? null,
-      source: body.channel,
-    },
-  });
   if (key) await linkOrphanCustomers(orgId, lead.id, body.contactPhone);
   await recordMetric(orgId, METRIC_KEYS.LEADS_CAPTURED);
   return lead.id;

@@ -12,6 +12,9 @@ import { PipelineBoard } from "@/components/portal/PipelineBoard";
 import { GitBranch } from "lucide-react";
 import type { UserRole } from "@prisma/client";
 
+/** Oportunidades que se cargan por etapa (las más recientemente actualizadas). */
+const OPPORTUNITIES_PER_STAGE = 200;
+
 export default async function PortalPipelinePage() {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
@@ -26,8 +29,11 @@ export default async function PortalPipelinePage() {
       where: { organizationId: orgId },
       orderBy: { order: "asc" },
       include: {
+        // Tope por etapa: un tablero con miles de tarjetas no se puede renderizar; se muestran las más recientes.
+        _count: { select: { opportunities: true } },
         opportunities: {
           orderBy: { updatedAt: "desc" },
+          take: OPPORTUNITIES_PER_STAGE,
           include: {
             lead: { select: { id: true, name: true, phone: true } },
             owner: { select: { id: true, name: true, email: true } },
@@ -43,14 +49,15 @@ export default async function PortalPipelinePage() {
   ]);
 
   const stageOptions = stages.map((s) => ({ id: s.id, name: s.name }));
-  const totalOpportunities = stages.reduce((sum, s) => sum + s.opportunities.length, 0);
+  const totalOpportunities = stages.reduce((sum, s) => sum + s._count.opportunities, 0);
+  const truncated = stages.some((s) => s._count.opportunities > s.opportunities.length);
   const canManage = can(session.user.role as UserRole, "opportunities:manage");
 
   return (
     <div>
       <PageHeader
         title={t.pipelineTitle}
-        description={`${totalOpportunities} ${t.pipelineDesc}`}
+        description={`${totalOpportunities} ${t.pipelineDesc}${truncated ? (lang === "es" ? ` · mostrando las ${OPPORTUNITIES_PER_STAGE} más recientes de cada etapa` : ` · showing the ${OPPORTUNITIES_PER_STAGE} most recent in each stage`) : ""}`}
         actions={stages.length > 0 ? <CreateOpportunityDialog stages={stageOptions} users={users} /> : undefined}
       />
       <CrmTabs />

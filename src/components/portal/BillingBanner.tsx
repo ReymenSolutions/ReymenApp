@@ -8,7 +8,7 @@ export function BillingBanner({ status, lang }: { status: BillingStatus; lang: s
   if ((status.state !== "DUE_SOON" && status.state !== "OVERDUE") || !status.dueAt) return null;
   const es = lang !== "en";
   const overdue = status.state === "OVERDUE";
-  const date = formatDate(status.dueAt);
+  const date = formatDate(status.dueAt, lang);
   const msg = overdue
     ? es ? `Tu suscripción venció el ${date}. Regulariza tu pago para evitar que se suspenda el servicio.` : `Your subscription expired on ${date}. Settle your payment to avoid a service suspension.`
     : status.daysLeft !== null && status.daysLeft <= 1

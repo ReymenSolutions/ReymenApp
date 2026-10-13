@@ -178,12 +178,14 @@ export function OrganizationModulesPanel({
 
           <div className="space-y-4 py-2">
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{lang === "es" ? "Estado" : "Status"}</label>
-              <div className="flex flex-wrap gap-2">
+              <span id="mod-status-label" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{lang === "es" ? "Estado" : "Status"}</span>
+              <div role="radiogroup" aria-labelledby="mod-status-label" className="flex flex-wrap gap-2">
                 {(["ACTIVE", "SUSPENDED", "CANCELLED", "NOT_ENABLED"] as const).map((s) => (
                   <button
                     key={s}
                     type="button"
+                    role="radio"
+                    aria-checked={status === s}
                     onClick={() => setStatus(s)}
                     className={`flex-1 rounded-md border-2 px-3 py-2 text-xs font-medium transition-colors ${
                       status === s ? "border-brand-500 bg-brand-50 text-brand-700" : "border-slate-200 text-slate-600 hover:border-slate-300"
@@ -203,12 +205,14 @@ export function OrganizationModulesPanel({
               </p>
             ) : (<>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{lang === "es" ? "Origen" : "Source"}</label>
-              <div className="flex gap-2">
+              <span id="mod-source-label" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{lang === "es" ? "Origen" : "Source"}</span>
+              <div role="radiogroup" aria-labelledby="mod-source-label" className="flex gap-2">
                 {(["SUBSCRIBED", "ADMIN_GRANTED"] as const).map((s) => (
                   <button
                     key={s}
                     type="button"
+                    role="radio"
+                    aria-checked={source === s}
                     onClick={() => setSource(s)}
                     className={`flex-1 rounded-md border-2 px-3 py-2 text-xs font-medium transition-colors ${
                       source === s ? "border-brand-500 bg-brand-50 text-brand-700" : "border-slate-200 text-slate-600 hover:border-slate-300"

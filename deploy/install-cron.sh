@@ -8,7 +8,7 @@ if [ "$(id -u)" -ne 0 ]; then echo "✗ Córrelo con sudo." >&2; exit 1; fi
 
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 runner="$repo/deploy/cron-run.sh"
-chmod +x "$runner"
+chmod +x "$runner" "$repo/deploy/backup.sh" "$repo/deploy/restore-test.sh"
 container="${APP_CONTAINER:-reymen-ai-ops-preview}"
 
 if ! docker exec "$container" sh -c 'test -n "$CRON_SECRET"'; then
@@ -29,11 +29,13 @@ APP_CONTAINER=$container
 */10 * * * * root $runner retry >> /var/log/reymen/cron.log 2>&1
 # Avisos de vencimiento de suscripción: 8:00 hora de México (14:00 UTC)
 0 14 * * * root $runner billing >> /var/log/reymen/cron.log 2>&1
+# Respaldo diario de la base (9:30 UTC); configura BACKUP_REMOTE en /etc/reymen-backup.env para copiarlo fuera del VPS
+30 9 * * * root DB_CONTAINER=\${DB_CONTAINER:-reymen-ai-ops-preview-postgres} $repo/deploy/backup.sh >> /var/log/reymen/backup.log 2>&1
 CRON
 chmod 644 /etc/cron.d/reymen-ai-ops
 
 cat > /etc/logrotate.d/reymen-ai-ops <<'LOG'
-/var/log/reymen/cron.log {
+/var/log/reymen/*.log {
   weekly
   rotate 4
   compress

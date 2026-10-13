@@ -23,6 +23,7 @@ async function getArticles(orgId: string) {
   return prisma.knowledgeBase.findMany({
     where: { organizationId: orgId },
     orderBy: [{ category: "asc" }, { updatedAt: "desc" }],
+    take: 500,
   });
 }
 

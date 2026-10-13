@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 // caché de segundos para no pagar una consulta por cada llamada) y toma el rol y la organización VIGENTES, no los del token.
 
 const TTL_MS = 15_000;
-type Snapshot = { at: number; ok: boolean; role: string; organizationId: string | null; sessionVersion: number };
+type Snapshot = { at: number; ok: boolean; role: string; organizationId: string | null; sessionVersion: number; theme: string; language: string };
 const cache = new Map<string, Snapshot>();
 
 /** Olvida lo cacheado de un usuario (se llama al cambiar su contraseña, rol o estado en esta instancia). */
@@ -20,10 +20,10 @@ async function snapshot(userId: string): Promise<Snapshot> {
   if (hit && Date.now() - hit.at < TTL_MS) return hit;
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { isActive: true, role: true, organizationId: true, sessionVersion: true, organization: { select: { isActive: true } } },
+    select: { isActive: true, role: true, organizationId: true, sessionVersion: true, theme: true, language: true, organization: { select: { isActive: true } } },
   });
   const ok = !!user && user.isActive && (user.organizationId === null || user.organization?.isActive !== false);
-  const snap: Snapshot = { at: Date.now(), ok, role: user?.role ?? "", organizationId: user?.organizationId ?? null, sessionVersion: user?.sessionVersion ?? 0 };
+  const snap: Snapshot = { at: Date.now(), ok, role: user?.role ?? "", organizationId: user?.organizationId ?? null, sessionVersion: user?.sessionVersion ?? 0, theme: user?.theme ?? "light", language: user?.language ?? "es" };
   cache.set(userId, snap);
   return snap;
 }
@@ -44,5 +44,8 @@ export async function validateSession(session: Session | null): Promise<Session 
   if ((session.user.sessionVersion ?? 0) !== snap.sessionVersion) return null;
   session.user.role = snap.role as Session["user"]["role"];
   session.user.organizationId = snap.organizationId;
+  // Idioma y tema vienen de la base: cambiarlos en el perfil surte efecto sin tener que volver a iniciar sesión.
+  session.user.theme = snap.theme;
+  session.user.language = snap.language;
   return session;
 }
