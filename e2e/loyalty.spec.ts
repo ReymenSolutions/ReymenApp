@@ -63,7 +63,7 @@ test("public signup creates a Customer-linked opaque card with no marketing cons
   const member = await prisma.loyaltyMember.findFirstOrThrow({ where: { organizationId: orgId }, include: { customer: true } });
   expect(member.customerId).toBeTruthy(); expect(member.customer?.consentAccepted).toBe(false);
 });
-test("mobile dark English pages render real data without horizontal overflow", async ({ page, context }) => {
+test("mobile dark English pages render real data without horizontal overflow", async ({ page, context }, testInfo) => {
   await prisma.user.update({ where: { email }, data: { theme: "dark", language: "en" } });
   await context.addCookies([{ name: "reymen-theme", value: "dark", url: "http://127.0.0.1:3000" }, { name: "reymen-lang", value: "en", url: "http://127.0.0.1:3000" }]);
   await page.setViewportSize({ width: 390, height: 844 });
@@ -79,7 +79,7 @@ test("mobile dark English pages render real data without horizontal overflow", a
   }
   await expect(page.locator("html")).toHaveClass(/dark/);
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
-  await page.screenshot({ path: "/workspace/.onboarding/logs/loyalty-mobile-dark.png", fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath("loyalty-mobile-dark.png"), fullPage: true });
 });
 test("suspension hides navigation, blocks routes and public cards, preserves members", async ({ page }) => {
   await prisma.organizationModule.update({ where: { organizationId_module: { organizationId: orgId, module: "LOYALTY" } }, data: { status: "SUSPENDED" } });
