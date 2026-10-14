@@ -1209,7 +1209,7 @@ export async function processFoodPosOrder(payload: unknown, organizationId: stri
     // Hechos para el motor de automatizaciones: se escriben en esta misma transacción (si la venta se
     // revierte, no quedan) y con llave única (un reintento del POS no los duplica).
     const subjectRef = externalOrderId ?? sale.id;
-    const saleFact = { saleId: sale.id, orderId: externalOrderId, customerId, branchId: sale.branchId, grossAmount: body.grossAmount!, netAmount: body.netAmount!, discountAmount };
+    const saleFact = { saleId: sale.id, orderId: externalOrderId, customerId, branchId: sale.branchId, grossAmount: body.grossAmount!, netAmount: body.netAmount!, discountAmount, cancelsSaleId: sale.cancelsSaleId };
     await emitDomainEvent(tx, {
       organizationId,
       type: isCancel ? "sale.cancelled" : "sale.completed",

@@ -1,3 +1,4 @@
+import { hasModule } from "@/lib/modules";
 import { createHmac } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { createWebhookSignature, secretsMatch } from "@/lib/webhook-validator";
@@ -60,13 +61,26 @@ export async function dispatchPendingExecutions(opts: { now?: Date; limit?: numb
     take: opts.limit ?? DISPATCH_BATCH,
     include: {
       automation: { select: { id: true, blueprintKey: true, blueprintVersion: true, dryRun: true, status: true } },
-      domainEvent: { select: { id: true, type: true, correlationId: true } },
+      domainEvent: { select: { id: true, type: true, correlationId: true, payload: true } },
     },
   });
 
   for (const ex of pending) {
     // Si entre tanto se volvió a simulación o se pausó, no se envía.
     if (ex.automation.dryRun || ex.automation.status !== "ACTIVE") continue;
+    // Loyalty notifications can wait in the outbox: re-check consent, license,
+    // and reward availability at delivery, not only when the event was evaluated.
+    if (ex.automation.blueprintKey === "loyalty_reward_unlocked") {
+      const payload = ex.domainEvent.payload as { customerId?: string; rewardId?: string } | null;
+      const customer = payload?.customerId ? await prisma.customer.findFirst({ where: { id: payload.customerId, organizationId: ex.organizationId } }) : null;
+      const reward = payload?.rewardId ? await prisma.loyaltyReward.findFirst({ where: { id: payload.rewardId, organizationId: ex.organizationId, status: "AVAILABLE", missingVisits: 0 } }) : null;
+      const org = await prisma.organization.findUnique({ where: { id: ex.organizationId }, select: { isActive: true } });
+      const reason = !org?.isActive || !(await hasModule(ex.organizationId, "LOYALTY")) || !(await hasModule(ex.organizationId, "AUTOMATIONS")) ? "module_disabled" : !customer?.consentAccepted ? "no_consent" : !reward ? "reward_unavailable" : null;
+      if (reason) {
+        await prisma.automationExecution.update({ where: { id: ex.id }, data: { status: "SKIPPED", skipReason: reason } });
+        continue;
+      }
+    }
     // El plazo cuenta desde cuando debía salir (un mensaje programado a 2 h no caduca por esperar).
     const sendAfter = (ex.action as { sendAfter?: string } | null)?.sendAfter;
     const base = sendAfter ? Math.max(ex.createdAt.getTime(), new Date(sendAfter).getTime()) : ex.createdAt.getTime();

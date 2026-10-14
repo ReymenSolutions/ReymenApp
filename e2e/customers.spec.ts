@@ -49,10 +49,8 @@ test.describe("clientes del negocio", () => {
     await expect(page.getByText(/ningún cliente coincide/i)).toBeVisible();
     await page.goto("/portal/customers");
 
-    await expect(async () => {
-      await page.getByRole("button", { name: /crear contacto/i }).click();
-      await page.waitForURL(/\/portal\/leads\/[^/]+$/, { timeout: 4000 });
-    }).toPass();
+    await page.getByRole("button", { name: /crear contacto/i }).click();
+    await expect(page).toHaveURL(/\/portal\/leads\/[^/]+$/, { timeout: 15_000 });
     await expect(page.getByText("Marta Compradora").first()).toBeVisible();
 
     await page.goto("/portal/customers");

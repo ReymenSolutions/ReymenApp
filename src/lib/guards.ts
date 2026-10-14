@@ -32,3 +32,21 @@ export async function requireFoodManager() {
   await assertModuleEnabled(session.user.organizationId, "FOOD_OPS");
   return session;
 }
+
+/** Lealtad: configurar el programa. Requiere loyalty:manage y el módulo LOYALTY. */
+export async function requireLoyaltyManager() {
+  const session = await requireOrgPermission("loyalty:manage");
+  await assertModuleEnabled(session.user.organizationId, "LOYALTY");
+  return session;
+}
+
+/**
+ * Caja de Lealtad: registrar visitas y canjear recompensas. Sesión de la
+ * organización con loyalty:operate (incluye al Agente, que es quien cobra) y
+ * el módulo LOYALTY activo.
+ */
+export async function requireLoyaltyOperator() {
+  const session = await requireOrgPermission("loyalty:operate");
+  await assertModuleEnabled(session.user.organizationId, "LOYALTY");
+  return session;
+}

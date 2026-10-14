@@ -82,7 +82,7 @@ describe("blueprints (admin)", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ status: "ACTIVE", dryRun: true, trigger: "customer.created", blueprintVersion: 1, type: "blueprint" });
 
-    const [row] = await getOrganizationBlueprints(org.id);
+    const row = (await getOrganizationBlueprints(org.id)).find(b => b.key === "welcome_new_customer")!;
     expect(row.instance).toMatchObject({ dryRun: true, status: "ACTIVE" });
   });
 

@@ -1,3 +1,4 @@
+import { UserError } from "./user-error";
 import { prisma } from "./prisma";
 import { rebuildCustomerStats } from "./customers";
 import { dayKey, dayKeyFromString, getOrgTimezone, startOfLocalDay } from "./business-day";
@@ -145,6 +146,9 @@ export async function purgePosSales(organizationId: string, from: string, to: st
   return prisma.$transaction(
     async (tx) => {
       const { sales, usages, stockBack, summary } = await collect(tx, organizationId, range);
+      if (await tx.loyaltyVisit.count({ where: { organizationId, saleId: { in: sales.map(s => s.id) } } })) {
+        throw new UserError("Hay ventas vinculadas al historial de Lealtad. Cancélalas desde el POS; no se pueden purgar.");
+      }
       // Con Reymen POS los platillos vendidos solo vienen del POS (la captura
       // manual está bloqueada), así que se pueden recalcular desde sus ventas.
       const usesPos = !!(await tx.organizationModule.findFirst({ where: { organizationId, module: "REYMEN_POS", status: "ACTIVE" }, select: { id: true } }));
