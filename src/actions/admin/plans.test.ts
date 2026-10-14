@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { createTestOrg, createTestUser, cleanupOrg, fakeSession } from "@/test/helpers";
 
+vi.mock("@/lib/exchange-rate", () => ({ getMxnPerUsdRate: vi.fn().mockResolvedValue({ rate: 20, source: "env", date: null }) }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/admin-notifications", () => ({ notifyAdmins: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/email", () => ({ sendEmail: vi.fn().mockResolvedValue({ sent: true }) }));
@@ -87,12 +88,13 @@ describe("Admin → Planes: lo que se edita se actualiza en todo lo conectado", 
 
   it("el presupuesto de IA, el límite de SmartCard y los módulos salen del plan editado", async () => {
     admin();
-    await updatePlan(KEY, { ...base, modules: ["CRM", "AUTOMATIONS"], aiBudgetMxn: 321, maxUsers: 7 });
+    await updatePlan(KEY, { ...base, modules: ["CRM", "AUTOMATIONS", "LOYALTY"], aiBudgetMxn: 321, maxUsers: 7 });
     expect((await getBudgetState(org.id)).baseMxn).toBe(321);
     expect(await planMemberLimit(KEY)).toBe(7);
     await prisma.organizationModule.updateMany({ where: { organizationId: org.id, module: "AUTOMATIONS" }, data: { status: "SUSPENDED" } });
     const sync = await syncModulesToPlan(org.id);
     expect(sync.activatedModules).toContain("AUTOMATIONS");
+    expect(sync.activatedModules).toContain("LOYALTY");
   });
 
   it("el precio de Stripe del plan se toma del catálogo (y reconoce el plan al revés)", async () => {

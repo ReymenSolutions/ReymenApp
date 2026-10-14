@@ -9,13 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { createPlan, updatePlan, type PlanRow } from "@/actions/admin/plans";
-import { getModuleLabel } from "@/lib/modules";
+import { ALL_MODULES, getModuleLabel } from "@/lib/modules";
 import { usePreferences } from "@/context/preferences";
 import { getErrorMessage } from "@/lib/user-error";
 import type { PlatformModule } from "@prisma/client";
 import { ACCENT_TONES, PLAN_ACCENTS, type PlanAccent } from "@/lib/plan-accent";
 
-const MODULES: PlatformModule[] = ["CRM", "AI_WHATSAPP", "AUTOMATIONS", "FOOD_OPS", "REYMEN_POS", "NFC_QR", "MARKETING_ADS"];
+const MODULES = ALL_MODULES;
 
 type Form = {
   key: string; name: string; nameEn: string; description: string; descriptionEn: string; priceMxn: string;

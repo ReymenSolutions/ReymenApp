@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  ChevronDown, Home, ListChecks, LayoutDashboard, Users, Zap, BarChart3, Settings, MessageSquare, Calendar, FileText, LogOut, Bot, Upload, GitBranch, Rocket, UtensilsCrossed, CreditCard, Contact, X,
+  ChevronDown, Home, ListChecks, LayoutDashboard, Users, Zap, BarChart3, Settings, MessageSquare, Calendar, FileText, LogOut, Bot, Upload, GitBranch, Rocket, UtensilsCrossed, CreditCard, Contact, X, Gift,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import type { PlatformModule } from "@prisma/client";
@@ -46,6 +46,7 @@ function useNavItems() {
     signOut: t.signOut,
     food: t.food,
     smartcard: t.smartcard,
+    loyalty: t.loyalty,
   };
 }
 
@@ -64,6 +65,7 @@ const NAV_ITEMS: { href: string; key: keyof ReturnType<typeof useNavItems>; icon
 
   { href: "/portal/food", key: "food", icon: UtensilsCrossed, section: "business", module: "FOOD_OPS" },
   { href: "/portal/smartcard", key: "smartcard", icon: CreditCard, section: "business", module: "NFC_QR" },
+  { href: "/portal/loyalty", key: "loyalty", icon: Gift, section: "business", module: "LOYALTY" },
 
   // Con el módulo CRM, lo de clientes vive en UNA entrada "CRM" con pestañas (Hoy, Inbox, Leads, Pipeline,
   // Clientes del negocio). Sin CRM se conservan las entradas sueltas que sí aplican.

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import type { Prisma } from "@prisma/client";
+import { PlatformModule, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
 import { requireAdmin } from "@/lib/guards";
@@ -13,7 +13,6 @@ import { PLAN_ACCENTS } from "@/lib/plan-accent";
 
 // ─── Admin → Planes: el catálogo comercial se edita aquí y se actualiza en todo lo conectado ───────────────────────
 
-const MODULES = ["CRM", "AI_WHATSAPP", "AUTOMATIONS", "NFC_QR", "MARKETING_ADS", "FOOD_OPS", "REYMEN_POS"] as const;
 const limit = z.preprocess((v) => (v === "" || v === undefined ? null : v), z.coerce.number().int().min(0).max(10_000_000).nullable());
 const money = z.coerce.number().min(0).max(1_000_000);
 
@@ -28,7 +27,7 @@ const planFields = z.object({
   maxAutomations: limit,
   aiBudgetMxn: money,
   maxAiAgents: limit,
-  modules: z.array(z.enum(MODULES)).max(MODULES.length),
+  modules: z.array(z.nativeEnum(PlatformModule)).max(Object.values(PlatformModule).length),
   features: z.array(z.object({ es: z.string().trim().min(1).max(120), en: z.string().trim().min(1).max(120) })).max(14),
   stripePriceId: z.string().trim().max(120).nullable().optional(),
   accent: z.enum(PLAN_ACCENTS).default("slate"),

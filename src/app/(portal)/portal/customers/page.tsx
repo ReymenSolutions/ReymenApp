@@ -32,6 +32,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const query = q?.trim() ?? "";
   const es = (await getServerLang()) === "es";
   const crm = await hasModule(orgId, "CRM");
+  const loyalty = await hasModule(orgId, "LOYALTY");
   const canEdit = can(session.user.role, "food:manage");
   const canCreateLead = crm && can(session.user.role, "leads:create");
 
@@ -49,7 +50,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
       orderBy: [{ lastVisitAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
-      include: { lead: { select: { id: true, name: true, deletedAt: true } } },
+      include: { lead: { select: { id: true, name: true, deletedAt: true } }, loyaltyMembers: { where: { organizationId: orgId }, select: { id: true }, take: 1 } },
     }),
     prisma.customer.count({ where }),
     prisma.customer.aggregate({ where: { organizationId: orgId }, _sum: { totalSpent: true }, _count: { _all: true } }),
@@ -118,6 +119,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                         <Badge variant="secondary" className="text-[10px]">{es ? "Sin consentimiento" : "No consent"}</Badge>
                       )}
                     </div>
+                    {loyalty && c.loyaltyMembers[0] && <Link href={`/portal/loyalty/members/${c.loyaltyMembers[0].id}`} className="text-sm font-medium text-brand-700 hover:underline">{es ? "Ver lealtad →" : "View loyalty →"}</Link>}
                     {crm && (
                       <div className="w-full sm:w-auto">
                         {lead ? (

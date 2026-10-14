@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { MAIN_BRANCH_PARAM } from "./branch-param";
 
 /** Máximo de sucursales adicionales (activas o archivadas) por organización. */
 export const MAX_BRANCHES = 20;
@@ -11,7 +12,7 @@ export const MAX_BRANCHES = 20;
  */
 export type BranchFilter = string | null | undefined;
 
-export const MAIN_BRANCH_PARAM = "main";
+export { MAIN_BRANCH_PARAM };
 
 export function cleanBranchName(name: string): string {
   return name.replace(/\s+/g, " ").trim().slice(0, 60);
