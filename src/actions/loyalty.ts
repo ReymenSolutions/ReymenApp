@@ -35,7 +35,7 @@ const LOYALTY_PATHS = [
 ];
 
 function revalidateLoyalty(extra: string[] = []) {
-  for (const p of [...LOYALTY_PATHS, ...extra]) revalidatePath(p);
+  for (const p of [...LOYALTY_PATHS, "/portal/customers", ...extra]) revalidatePath(p);
 }
 
 /** "main" o "" → sucursal principal (null); cualquier otro valor se valida en service.ts. */
