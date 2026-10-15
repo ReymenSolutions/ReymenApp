@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 
 const prisma = new PrismaClient();
-const TEST_EMAIL = "e2e-customers@example.com";
+const TEST_EMAIL = `e2e-customers-${randomBytes(8).toString("hex")}@example.com`;
 const TEST_PASSWORD = "CustomersE2E123";
 
 test.describe("clientes del negocio", () => {
