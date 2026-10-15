@@ -17,7 +17,7 @@ describe("formatNumber", () => {
 });
 
 describe("AnimatedNumber", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
   it("con movimiento reducido muestra el valor final de inmediato", () => {
     mockReducedMotion(true);
@@ -34,7 +34,7 @@ describe("AnimatedNumber", () => {
     expect(screen.getByText("200", { selector: ".sr-only" })).toBeInTheDocument();
   });
 
-  it("sube desde 0 al montar y al cambiar el dato interpola desde el valor anterior", () => {
+  it("conserva el valor inicial sin saltar a cero y anima cambios posteriores", () => {
     mockReducedMotion(false);
     let now = 0;
     const frames: FrameRequestCallback[] = [];
@@ -49,10 +49,9 @@ describe("AnimatedNumber", () => {
     const shown = (c: HTMLElement) => c.querySelector("[aria-hidden]")!.textContent;
 
     const { container, rerender } = render(<AnimatedNumber value={100} duration={100} />);
+    expect(frames).toHaveLength(0);
     step(50);
-    const mid = Number(shown(container));
-    expect(mid).toBeGreaterThan(0);
-    expect(mid).toBeLessThan(100);
+    expect(shown(container)).toBe("100");
     step(200);
     expect(shown(container)).toBe("100");
 
@@ -64,4 +63,18 @@ describe("AnimatedNumber", () => {
     step(400);
     expect(shown(container)).toBe("300");
   });
+  it("keeps the current number when reduced motion is switched off", () => {
+    let reduced = true;
+    let notify = () => {};
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("matchMedia", () => ({ matches: reduced, addEventListener: (_: string, cb: () => void) => { notify = cb; }, removeEventListener: () => {} }));
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => frames.push(cb));
+    vi.stubGlobal("cancelAnimationFrame", () => {});
+    const { container, rerender } = render(<AnimatedNumber value={10} />);
+    rerender(<AnimatedNumber value={50} />);
+    act(() => frames.splice(0).forEach(cb => cb(performance.now())));
+    act(() => { reduced = false; notify(); });
+    expect(container.querySelector("[aria-hidden]")).toHaveTextContent("50");
+  });
+
 });
