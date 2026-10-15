@@ -146,6 +146,7 @@ test("mobile navigation reserves the back gesture and remains visible across rep
 });
 
 test("suspension hides navigation, blocks routes and public cards, preserves members", async ({ page }) => {
+  const previousMembers = await prisma.loyaltyMember.findMany({ where: { organizationId: orgId }, select: { id: true }, orderBy: { id: "asc" } });
   await prisma.organizationModule.update({ where: { organizationId_module: { organizationId: orgId, module: "LOYALTY" } }, data: { status: "SUSPENDED" } });
   await login(page);
   await expect(page.locator('a[href="/portal/loyalty"]')).toHaveCount(0);
@@ -153,5 +154,5 @@ test("suspension hides navigation, blocks routes and public cards, preserves mem
   const member = await prisma.loyaltyMember.findFirstOrThrow({ where: { organizationId: orgId } });
   await page.goto(`/lealtad/${slug}/tarjeta/${member.publicToken}`);
   await expect(page.getByText("Hola, Ana")).toHaveCount(0);
-  expect(await prisma.loyaltyMember.count({ where: { organizationId: orgId } })).toBe(1);
+  expect(await prisma.loyaltyMember.findMany({ where: { organizationId: orgId }, select: { id: true }, orderBy: { id: "asc" } })).toEqual(previousMembers);
 });
