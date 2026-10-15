@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { requireModule } from "@/lib/modules";
@@ -61,6 +60,7 @@ export default async function SmartcardPage() {
   const result = await resolveSmartcardMembership(session.user.organizationId, session.user.email);
 
   if (!result.ok) {
+    if (result.reason === "query_failed") throw new Error("Unable to load SmartCard membership");
     const lang = await getServerLang();
     return (
       <section className="mx-auto w-full max-w-6xl">
@@ -68,7 +68,6 @@ export default async function SmartcardPage() {
         <p className="mt-4 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800">
           {FAILURE_MESSAGES[lang][result.reason]}
         </p>
-        {result.reason === "query_failed" && <Link href="/portal/smartcard" className="mt-4 inline-flex min-h-11 items-center rounded-lg border border-slate-200 px-4 text-sm">{lang === "es" ? "Reintentar" : "Retry"}</Link>}
       </section>
     );
   }
