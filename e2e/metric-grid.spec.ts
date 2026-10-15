@@ -15,10 +15,13 @@ for (const width of [320, 375, 390, 430, 768, 1024, 1440]) {
       const children = [...grid.children];
       const last = children.at(-1)!.getBoundingClientRect();
       const alone = children.filter(child => Math.abs(child.getBoundingClientRect().top - last.top) < 1).length === 1;
+      const columns = getComputedStyle(grid).gridTemplateColumns.split(" ").length;
+      const actualRows = new Set(children.map(child => Math.round(child.getBoundingClientRect().top))).size;
+      const expectedRows = Math.ceil(children.length / columns);
       const width = grid.getBoundingClientRect().width;
-      return { alone, fills: Math.abs(last.width - width) < 1, overflow: grid.scrollWidth > width + 1 };
+      return { actualRows, expectedRows, alone, fills: Math.abs(last.width - width) < 1, overflow: grid.scrollWidth > width + 1 };
     }));
-    expect(layout.every(row => !row.overflow && (!row.alone || row.fills))).toBe(true);
+    expect(layout.every(row => !row.overflow && row.actualRows === row.expectedRows && (!row.alone || row.fills))).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
   });
 }
