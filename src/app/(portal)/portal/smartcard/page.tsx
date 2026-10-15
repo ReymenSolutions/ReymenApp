@@ -53,27 +53,29 @@ export default async function SmartcardPage() {
   // haya quedado desfasado antes (solo escribe si no coincide).
   const org = await prisma.organization.findUnique({
     where: { id: session.user.organizationId },
-    select: { plan: true },
+    select: { plan: true, timezone: true },
   });
   if (org) await syncSmartcardMemberLimitForPlan(session.user.organizationId, org.plan);
 
   const result = await resolveSmartcardMembership(session.user.organizationId, session.user.email);
 
   if (!result.ok) {
+    if (result.reason === "query_failed") throw new Error("Unable to load SmartCard membership");
+    const lang = await getServerLang();
     return (
-      <main className="mx-auto max-w-3xl p-8">
+      <section className="mx-auto w-full max-w-6xl">
         <h1 className="text-2xl font-semibold">SmartCard</h1>
         <p className="mt-4 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          {FAILURE_MESSAGES[await getServerLang()][result.reason]}
+          {FAILURE_MESSAGES[lang][result.reason]}
         </p>
-      </main>
+      </section>
     );
   }
 
   const [roster, cardStats, destinationTypes] = await Promise.all([
     getCompanyRoster(result.membership.companyId, result.membership.userId),
-    getCompanyCardStats(result.membership.companyId),
-    getActiveDestinationTypes(),
+    getCompanyCardStats(result.membership.companyId, { throwOnError: true }),
+    getActiveDestinationTypes({ throwOnError: true }),
   ]);
 
   return (
@@ -82,6 +84,7 @@ export default async function SmartcardPage() {
       roster={roster}
       cardStats={cardStats}
       destinationTypes={destinationTypes}
+      timeZone={org?.timezone ?? "America/Mexico_City"}
     />
   );
 }

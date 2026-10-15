@@ -114,6 +114,7 @@ export default async function PortalLeadsPage({
         }
       />
       <CrmTabs />
+      <p className="mb-5 rounded-lg bg-slate-50 p-4 text-sm text-slate-600 dark:bg-slate-900 dark:text-slate-300">{lang === "es" ? "Aquí das seguimiento a conversaciones y personas interesadas. Para consultar compras y recompensas de alguien que ya está registrado, abre Clientes." : "Follow up with contacts and interested people here. Open Customers to see a registered customer’s purchases and rewards."}</p>
 
       {totalUnfiltered === 0 ? (
         <Card>

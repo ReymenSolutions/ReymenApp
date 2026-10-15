@@ -50,3 +50,15 @@ En móvil, abrir/cerrar menú y navegar atrás varias veces; el gesto desde el b
 queda reservado al navegador, el menú se abre con el botón. La vista Cocina no
 cambia; la bandeja flotante se retira del modo de caja. Se incluyen skeletons,
 error con reintento y preservación de scroll. Validar también en iPhone real.
+
+## Identificación en caja y ficha de clientes
+
+El POS consulta al cliente al completar su teléfono y muestra nombre, consentimiento
+registrado, programa elegido y recompensas. Es una consulta, no una nueva visita.
+La compra sigue generando la visita mediante el evento existente al sincronizarse.
+El consentimiento anterior no se sustituye si el cajero no cambia la casilla.
+
+En CRM, Clientes reúne compras y Lealtad; Contactos sirve para seguimiento comercial.
+La ficha de cada cliente muestra cinco movimientos por página y visitas de Lealtad
+en apartados desplegables. Se conserva todo el historial, incluidas compras antiguas;
+no existe borrado ni filtro de retención a los 30 días. No requiere migraciones.

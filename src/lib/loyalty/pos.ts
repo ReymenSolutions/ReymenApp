@@ -1,5 +1,6 @@
 // Read-only POS lookup. Accrual is handled by the DomainEvent consumer.
 import type { Prisma } from "@prisma/client";
+import { hasModule } from "@/lib/modules";
 import { prisma } from "@/lib/prisma";
 import { phoneKey } from "@/lib/phone";
 import { normalizePhoneMx } from "@/lib/customers";
@@ -61,7 +62,7 @@ async function memberView(db: Db, memberId: string, goal: number): Promise<PosMe
       name: true,
       whatsapp: true,
       cycleVisits: true,
-      rewards: { where: { status: "AVAILABLE" }, orderBy: { earnedAt: "asc" }, select: { id: true, rewardName: true, rewardDescription: true } },
+      rewards: { where: { status: "AVAILABLE", missingVisits: 0, posRedemptions: { none: { status: { in: ["RESERVED", "COMMITTED"] } } } }, orderBy: { earnedAt: "asc" }, select: { id: true, rewardName: true, rewardDescription: true } },
     },
   });
   return {
@@ -87,4 +88,19 @@ export async function lookupMemberForPos(organizationId: string, req: PosLoyalty
     program: { name: program.name, rewardName: program.rule.rewardName, visitGoal: program.rule.visitGoal },
     member: await memberView(prisma, found.id, program.rule.visitGoal),
   };
+}
+
+/** Authenticated device lookup; never returns the private card token. */
+export async function lookupCustomerForPos(organizationId: string, rawPhone: unknown) {
+  const phone = normalizePhoneMx(rawPhone);
+  const key = phone ? phoneKey(phone) : null;
+  if (!phone || !key) return { status: "invalid_request" as const };
+  const customer = await prisma.customer.findUnique({
+    where: { organizationId_phoneKey: { organizationId, phoneKey: key } },
+    select: { name: true, postalCode: true, consentAccepted: true },
+  });
+  if (!customer) return { status: "not_found" as const };
+  const loyalty = await hasModule(organizationId, "LOYALTY")
+    ? await lookupMemberForPos(organizationId, { phone }) : { status: "module_disabled" as const };
+  return { status: "found" as const, customer, loyalty };
 }

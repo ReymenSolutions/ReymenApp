@@ -183,7 +183,7 @@ export async function getCompanyRoster(
   const supabase = getSmartcardAdminClient();
   if (!supabase) return [];
 
-  const [{ data: members }, { data: roles }] = await Promise.all([
+  const [{ data: members, error: membersError }, { data: roles, error: rolesError }] = await Promise.all([
     supabase
       .from("company_users")
       .select("id, user_id, role_id, status")
@@ -191,6 +191,8 @@ export async function getCompanyRoster(
       .order("created_at", { ascending: true }),
     supabase.from("roles").select("id, code"),
   ]);
+
+  if (membersError || rolesError) throw new Error("Unable to load SmartCard team");
 
   const roleCodeById = new Map((roles ?? []).map((r) => [r.id, r.code as string]));
 
@@ -264,7 +266,7 @@ export interface DestinationTypeOption {
  * requires_url/requires_profile server-side, never trusts the client for
  * that). Added 2026-09-29 for self-service card editing.
  */
-export async function getActiveDestinationTypes(): Promise<DestinationTypeOption[]> {
+export async function getActiveDestinationTypes({ throwOnError = false }: { throwOnError?: boolean } = {}): Promise<DestinationTypeOption[]> {
   const supabase = getSmartcardAdminClient();
   if (!supabase) return [];
 
@@ -276,6 +278,7 @@ export async function getActiveDestinationTypes(): Promise<DestinationTypeOption
 
   if (error) {
     console.error("[smartcard-company] Error listando destination_types:", error.message);
+    if (throwOnError) throw new Error("Unable to load SmartCard destinations");
     return [];
   }
 
@@ -315,9 +318,12 @@ const EMPTY_STATS: CompanyCardStats = { totalCards: 0, totalEvents: 0, byType: {
  * is_bot rows are excluded — that flag exists in the schema specifically
  * to keep non-human traffic out of stats like these.
  */
-export async function getCompanyCardStats(companyId: string): Promise<CompanyCardStats> {
+export async function getCompanyCardStats(companyId: string, { throwOnError = false }: { throwOnError?: boolean } = {}): Promise<CompanyCardStats> {
   const supabase = getSmartcardAdminClient();
-  if (!supabase) return EMPTY_STATS;
+  if (!supabase) {
+    if (throwOnError) throw new Error("SmartCard is not configured");
+    return EMPTY_STATS;
+  }
 
   const { data: clients, error: clientsError } = await supabase
     .from("clients")
@@ -325,6 +331,7 @@ export async function getCompanyCardStats(companyId: string): Promise<CompanyCar
     .eq("company_id", companyId);
   if (clientsError) {
     console.error("[smartcard-company] Error listando clients:", clientsError.message);
+    if (throwOnError) throw new Error("Unable to load SmartCard statistics");
     return EMPTY_STATS;
   }
   if (!clients?.length) return EMPTY_STATS;
@@ -339,6 +346,7 @@ export async function getCompanyCardStats(companyId: string): Promise<CompanyCar
     .is("deleted_at", null);
   if (cardsError) {
     console.error("[smartcard-company] Error listando cards:", cardsError.message);
+    if (throwOnError) throw new Error("Unable to load SmartCard statistics");
     return EMPTY_STATS;
   }
   if (!cards?.length) return { ...EMPTY_STATS, totalCards: 0 };
@@ -353,6 +361,7 @@ export async function getCompanyCardStats(companyId: string): Promise<CompanyCar
     .limit(5000);
   if (eventsError) {
     console.error("[smartcard-company] Error listando events:", eventsError.message);
+    if (throwOnError) throw new Error("Unable to load SmartCard activity");
     return { totalCards: cards.length, totalEvents: 0, byType: {}, cards: [] };
   }
 

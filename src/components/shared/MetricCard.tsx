@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 interface MetricCardProps {
   title: string;
-  /** Un número se anima (sube desde 0 al cargar y se interpola al cambiar); un texto ya formateado se muestra tal cual. */
+  /** Un número se anima (conserva el valor inicial y se interpola al cambiar); un texto ya formateado se muestra tal cual. */
   value: string | number;
   /** Formato de la cifra cuando `value` es un número: moneda, porcentaje, decimales. */
   format?: NumberFormat;
@@ -30,7 +30,7 @@ export function MetricCard({ title, value, format, description, icon: Icon, tren
   const hero = variant === "hero";
   return (
     <Card
-      className={cn("reveal relative overflow-hidden", hero && "border-transparent bg-gradient-to-br from-brand-500 via-brand-600 to-brand-800 text-white shadow-pop", className)}
+      className={cn("relative overflow-hidden", hero && "border-transparent bg-gradient-to-br from-brand-500 via-brand-600 to-brand-800 text-white shadow-pop", className)}
       style={{ "--i": index } as React.CSSProperties}
     >
       {hero && <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-[rgb(255_255_255/0.1)] blur-2xl" />}
@@ -38,7 +38,7 @@ export function MetricCard({ title, value, format, description, icon: Icon, tren
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className={cn("text-xs font-medium", hero ? "text-brand-100" : "text-slate-500")}>{title}</p>
-            <p className={cn("mt-1.5 font-semibold tabular-nums tracking-tight", hero ? "text-3xl sm:text-4xl text-white" : "text-2xl text-slate-900")}>
+            <p className={cn("mt-1.5 break-words font-semibold tabular-nums tracking-tight", hero ? "text-3xl sm:text-4xl text-white" : "text-2xl text-slate-900")}>
               {typeof value === "number" ? <AnimatedNumber value={value} format={format} /> : value}
             </p>
             {trend && (

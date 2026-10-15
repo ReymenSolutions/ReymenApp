@@ -1,9 +1,10 @@
 "use client";
 
-import { Fragment, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Loader2, CreditCard, Users, Activity, Pencil, QrCode } from "lucide-react";
 import { toast } from "sonner";
+import { MetricGrid } from "@/components/shared/MetricGrid";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -86,12 +87,30 @@ const EVENT_TYPE_LABELS_EN: Record<string, string> = {
 const INVITABLE_ROLES = ["admin", "manager", "staff", "agent"];
 
 function StatTile({ label, value }: { label: string; value: number }) {
+  const { lang } = usePreferences();
   return (
     <div className="rounded-md border border-slate-100 bg-slate-50 px-3 py-3">
-      <div className="text-2xl font-semibold text-slate-900">{value.toLocaleString()}</div>
+      <div className="break-words text-2xl font-semibold tabular-nums text-slate-900">{value.toLocaleString(lang === "es" ? "es-MX" : "en-US")}</div>
       <div className="mt-0.5 text-xs text-slate-500">{label}</div>
     </div>
   );
+}
+
+function EventBreakdown({ counts, labels, lang }: { counts: Record<string, number>; labels: Record<string, string>; lang: string }) {
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const max = Math.max(0, ...entries.map(([, count]) => count));
+  if (!entries.length) return <p className="text-sm text-slate-500">{lang === "es" ? "Todavía no hay actividad." : "No activity yet."}</p>;
+  return <MetricGrid as="ul" columns={2} density="comfortable">
+    {entries.map(([type, count]) => <li key={type} className="min-w-0 rounded-lg bg-slate-50 p-3">
+      <div className="mb-2 flex items-start justify-between gap-3 text-sm">
+        <span className="min-w-0 break-words text-slate-600">{labels[type] ?? type.replaceAll("_", " ")}</span>
+        <span className="shrink-0 font-semibold tabular-nums text-slate-900">{count.toLocaleString(lang === "es" ? "es-MX" : "en-US")}</span>
+      </div>
+      <div aria-hidden="true" className="h-1.5 rounded-full bg-slate-200">
+        <div className="h-full rounded-full bg-brand-500" style={{ width: `${max ? Math.max(0, Math.min(100, count / max * 100)) : 0}%` }} />
+      </div>
+    </li>)}
+  </MetricGrid>;
 }
 
 /**
@@ -126,19 +145,19 @@ export function SmartcardPanel({
   roster,
   cardStats,
   destinationTypes,
+  timeZone = "America/Mexico_City",
 }: {
   membership: SmartcardMembership;
   roster: CompanyRosterEntry[];
   cardStats: CompanyCardStats;
   destinationTypes: DestinationTypeOption[];
+  timeZone?: string;
 }) {
   const { lang } = usePreferences();
   const MODULE_LABELS = lang === "es" ? MODULE_LABELS_ES : MODULE_LABELS_EN;
   const ROLE_LABELS = lang === "es" ? ROLE_LABELS_ES : ROLE_LABELS_EN;
   const EVENT_TYPE_LABELS = lang === "es" ? EVENT_TYPE_LABELS_ES : EVENT_TYPE_LABELS_EN;
 
-  const byTypeEntries = Object.entries(cardStats.byType).sort((a, b) => b[1] - a[1]);
-  const maxTypeCount = byTypeEntries.length > 0 ? byTypeEntries[0][1] : 0;
   const avgEventsPerCard = cardStats.totalCards > 0 ? Math.round(cardStats.totalEvents / cardStats.totalCards) : 0;
 
   const [name, setName] = useState("");
@@ -274,9 +293,9 @@ export function SmartcardPanel({
   }
 
   return (
-    <main className="mx-auto max-w-3xl space-y-6 p-8">
+    <section aria-label="SmartCard" className="mx-auto w-full min-w-0 max-w-6xl space-y-4 [overflow-wrap:anywhere]">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">SmartCard</h1>
+        <h1 className="break-words text-2xl font-semibold tabular-nums text-slate-900">SmartCard</h1>
         <p className="mt-1 text-sm text-slate-500">
           {lang === "es" ? "Empresa" : "Company"}: {membership.companyName} ·{" "}
           {lang === "es" ? "tu rol" : "your role"}: {ROLE_LABELS[membership.roleCode] ?? membership.roleCode}
@@ -284,11 +303,11 @@ export function SmartcardPanel({
       </div>
 
       <Card>
-        <CardHeader className="flex-row items-center gap-2">
+        <CardHeader className="p-3 sm:p-4 flex-row items-center gap-2">
           <CreditCard className="h-4 w-4 text-slate-400" />
           <CardTitle>{lang === "es" ? "Módulos contratados" : "Contracted modules"}</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
           {membership.modules.length === 0 ? (
             <p className="rounded-md bg-slate-50 px-3 py-3 text-sm text-slate-500">
               {lang === "es"
@@ -296,9 +315,9 @@ export function SmartcardPanel({
                 : "This company doesn't have any module enabled yet. Contact Reymen to activate a plan."}
             </p>
           ) : (
-            <ul className="divide-y divide-slate-100 text-sm">
+            <ul className="flex flex-wrap gap-2 text-sm">
               {membership.modules.map((m) => (
-                <li key={m} className="px-1 py-2">
+                <li key={m} className="rounded-full bg-slate-50 px-3 py-1 text-slate-700">
                   {MODULE_LABELS[m] ?? m}
                 </li>
               ))}
@@ -308,11 +327,11 @@ export function SmartcardPanel({
       </Card>
 
       <Card>
-        <CardHeader className="flex-row items-center gap-2">
+        <CardHeader className="p-3 sm:p-4 flex-row items-center gap-2">
           <Activity className="h-4 w-4 text-slate-400" />
           <CardTitle>{lang === "es" ? "Estadísticas de tarjetas" : "Card statistics"}</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
           {cardStats.totalCards === 0 ? (
             <p className="rounded-md bg-slate-50 px-3 py-3 text-sm text-slate-500">
               {lang === "es"
@@ -321,179 +340,60 @@ export function SmartcardPanel({
             </p>
           ) : (
             <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <MetricGrid>
                 <StatTile label={lang === "es" ? "Tarjetas" : "Cards"} value={cardStats.totalCards} />
                 <StatTile label={lang === "es" ? "Eventos totales" : "Total events"} value={cardStats.totalEvents} />
                 <StatTile
                   label={lang === "es" ? "Promedio por tarjeta" : "Average per card"}
                   value={avgEventsPerCard}
                 />
-              </div>
+              </MetricGrid>
 
-              {byTypeEntries.length > 0 && (
-                <div>
-                  <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-                    {lang === "es" ? "Por tipo de evento" : "By event type"}
-                  </h3>
-                  <ul className="space-y-2">
-                    {byTypeEntries.map(([type, count]) => (
-                      <li key={type} className="flex items-center gap-3 text-sm">
-                        <span className="w-36 shrink-0 truncate text-slate-600" title={EVENT_TYPE_LABELS[type] ?? type}>
-                          {EVENT_TYPE_LABELS[type] ?? type}
-                        </span>
-                        <span className="h-2 flex-1 rounded-full bg-slate-100">
-                          <span
-                            className="block h-2 rounded-full bg-blue-500"
-                            style={{ width: `${maxTypeCount > 0 ? Math.max(4, (count / maxTypeCount) * 100) : 0}%` }}
-                          />
-                        </span>
-                        <span className="w-10 shrink-0 text-right font-medium text-slate-700">{count}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              <div>
+                <h3 className="mb-3 text-sm font-semibold text-slate-900">{lang === "es" ? "Actividad por tipo de evento" : "Activity by event type"}</h3>
+                <EventBreakdown counts={cardStats.byType} labels={EVENT_TYPE_LABELS} lang={lang} />
+              </div>
 
               <div>
                 <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
                   {lang === "es" ? "Por tarjeta" : "By card"}
                 </h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[560px] text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-400">
-                        <th className="py-2 pr-3 font-medium">{lang === "es" ? "Tarjeta" : "Card"}</th>
-                        <th className="py-2 pr-3 font-medium">{lang === "es" ? "Titular de la tarjeta" : "Card holder"}</th>
-                        <th className="py-2 pr-3 font-medium">{lang === "es" ? "Estado" : "Status"}</th>
-                        <th className="py-2 pr-3 text-right font-medium">{lang === "es" ? "Eventos" : "Events"}</th>
-                        <th className="py-2 pr-3 font-medium">{lang === "es" ? "Última actividad" : "Last activity"}</th>
-                        <th className="py-2 pr-3 font-medium" />
-                        {canEditCards && <th className="py-2 font-medium" />}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {cardStats.cards.map((c) => {
-                        const isProfileCard = c.destinationType === "PROFILE" && !!c.profileId;
-                        const isExpanded = expandedCardId === c.cardId;
-                        const cardByTypeEntries = Object.entries(c.byType).sort((a, b) => b[1] - a[1]);
-                        const cardMaxTypeCount = cardByTypeEntries.length > 0 ? cardByTypeEntries[0][1] : 0;
-                        return (
-                          <Fragment key={c.cardId}>
-                            <tr>
-                              <td className="py-2 pr-3 font-mono text-xs text-slate-700">{c.cardCode}</td>
-                              <td className="py-2 pr-3 text-slate-600">{c.clientName}</td>
-                              <td className="py-2 pr-3">
-                                <Badge variant="secondary" className="text-xs">
-                                  {c.status}
-                                </Badge>
-                              </td>
-                              <td className="py-2 pr-3 text-right font-medium text-slate-700">{c.totalEvents}</td>
-                              <td className="py-2 pr-3 text-slate-500">
-                                {c.lastActivityAt
-                                  ? new Date(c.lastActivityAt).toLocaleDateString(lang === "es" ? "es-MX" : "en-US", {
-                                      year: "numeric",
-                                      month: "short",
-                                      day: "numeric",
-                                    })
-                                  : lang === "es"
-                                    ? "Sin actividad"
-                                    : "No activity"}
-                              </td>
-                              <td className="py-2 pr-3 text-right">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 px-2 text-xs text-slate-500 hover:text-slate-900"
-                                  disabled={c.totalEvents === 0}
-                                  onClick={() => setExpandedCardId(isExpanded ? null : c.cardId)}
-                                >
-                                  {isExpanded
-                                    ? lang === "es"
-                                      ? "Ocultar"
-                                      : "Hide"
-                                    : lang === "es"
-                                      ? "Ver detalle"
-                                      : "View detail"}
-                                </Button>
-                              </td>
-                              {canEditCards && (
-                                <td className="py-2 text-right">
-                                  <div className="flex justify-end gap-1">
-                                    {isProfileCard ? (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-7 px-2 text-xs text-slate-500 hover:text-slate-900"
-                                        onClick={() => setEditingProfileId(c.profileId)}
-                                      >
-                                        <Pencil className="h-3.5 w-3.5" />
-                                        {lang === "es" ? "Editar perfil" : "Edit profile"}
-                                      </Button>
-                                    ) : (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-7 px-2 text-xs text-slate-500 hover:text-slate-900"
-                                        onClick={() => openEditCard(c)}
-                                      >
-                                        <Pencil className="h-3.5 w-3.5" />
-                                        {lang === "es" ? "Editar" : "Edit"}
-                                      </Button>
-                                    )}
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 px-2 text-xs text-slate-500 hover:text-slate-900"
-                                      disabled={downloadingQrCardId === c.cardId}
-                                      onClick={() => handleDownloadQr(c)}
-                                    >
-                                      {downloadingQrCardId === c.cardId ? (
-                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                      ) : (
-                                        <QrCode className="h-3.5 w-3.5" />
-                                      )}
-                                      QR
-                                    </Button>
-                                  </div>
-                                </td>
-                              )}
-                            </tr>
-                            {isExpanded && (
-                              <tr>
-                                <td colSpan={canEditCards ? 6 : 5} className="bg-slate-50 px-3 py-3">
-                                  {cardByTypeEntries.length === 0 ? (
-                                    <p className="text-xs text-slate-500">
-                                      {lang === "es" ? "Sin eventos para esta tarjeta." : "No events for this card."}
-                                    </p>
-                                  ) : (
-                                    <ul className="max-w-md space-y-1.5">
-                                      {cardByTypeEntries.map(([type, count]) => (
-                                        <li key={type} className="flex items-center gap-3 text-xs">
-                                          <span className="w-32 shrink-0 truncate text-slate-600" title={EVENT_TYPE_LABELS[type] ?? type}>
-                                            {EVENT_TYPE_LABELS[type] ?? type}
-                                          </span>
-                                          <span className="h-1.5 flex-1 rounded-full bg-slate-200">
-                                            <span
-                                              className="block h-1.5 rounded-full bg-blue-500"
-                                              style={{
-                                                width: `${cardMaxTypeCount > 0 ? Math.max(4, (count / cardMaxTypeCount) * 100) : 0}%`,
-                                              }}
-                                            />
-                                          </span>
-                                          <span className="w-8 shrink-0 text-right font-medium text-slate-700">{count}</span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  )}
-                                </td>
-                              </tr>
-                            )}
-                          </Fragment>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <MetricGrid columns={2} density="comfortable">
+                  {cardStats.cards.map((c) => {
+                    const isExpanded = expandedCardId === c.cardId;
+                    const isProfileCard = c.destinationType === "PROFILE" && !!c.profileId;
+                    const statusLabels: Record<string, string> = lang === "es"
+                      ? { active: "Activa", inactive: "Inactiva", suspended: "Suspendida", disabled: "Deshabilitada", pending: "Pendiente", blocked: "Bloqueada" }
+                      : { active: "Active", inactive: "Inactive", suspended: "Suspended", disabled: "Disabled", pending: "Pending", blocked: "Blocked" };
+                    return <article key={c.cardId} className="rounded-xl border border-slate-200 p-3 sm:p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h4 className="font-semibold text-slate-900">{c.clientName}</h4>
+                          <p className="mt-1 break-all font-mono text-xs text-slate-500">{c.cardCode}</p>
+                        </div>
+                        <Badge variant="secondary">{statusLabels[c.status.toLowerCase()] ?? c.status}</Badge>
+                      </div>
+                      <dl className="my-3 space-y-1 text-sm">
+                        <div className="flex flex-wrap justify-between gap-x-3"><dt className="text-slate-500">{lang === "es" ? "Eventos" : "Events"}</dt><dd className="font-semibold tabular-nums">{c.totalEvents.toLocaleString(lang === "es" ? "es-MX" : "en-US")}</dd></div>
+                        <div className="flex flex-wrap justify-between gap-x-3"><dt className="text-slate-500">{lang === "es" ? "Última actividad" : "Last activity"}</dt><dd>{c.lastActivityAt ? new Date(c.lastActivityAt).toLocaleDateString(lang === "es" ? "es-MX" : "en-US", { year: "numeric", month: "short", day: "numeric", timeZone }) : lang === "es" ? "Sin actividad" : "No activity"}</dd></div>
+                      </dl>
+                      <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-2">
+                        <Button variant="outline" size="sm" className="min-h-11" aria-expanded={isExpanded} aria-controls={`card-events-${c.cardId}`} onClick={() => setExpandedCardId(isExpanded ? null : c.cardId)}>
+                          {isExpanded ? lang === "es" ? "Ocultar actividad" : "Hide activity" : lang === "es" ? "Ver actividad" : "View activity"}
+                        </Button>
+                        {canEditCards && <>
+                          <Button variant="ghost" size="sm" className="min-h-11" onClick={() => isProfileCard ? setEditingProfileId(c.profileId) : openEditCard(c)}>
+                            <Pencil className="h-4 w-4 shrink-0" />{isProfileCard ? lang === "es" ? "Editar perfil" : "Edit profile" : lang === "es" ? "Editar" : "Edit"}
+                          </Button>
+                          <Button variant="ghost" size="sm" className="min-h-11" disabled={downloadingQrCardId === c.cardId} onClick={() => handleDownloadQr(c)} aria-label={lang === "es" ? `Descargar QR de ${c.cardCode}` : `Download QR for ${c.cardCode}`}>
+                            {downloadingQrCardId === c.cardId ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : <QrCode className="h-4 w-4" />}QR
+                          </Button>
+                        </>}
+                      </div>
+                      {isExpanded && <div id={`card-events-${c.cardId}`} className="mt-3 border-t border-slate-100 pt-3"><EventBreakdown counts={c.byType} labels={EVENT_TYPE_LABELS} lang={lang} /></div>}
+                    </article>;
+                  })}
+                </MetricGrid>
               </div>
             </div>
           )}
@@ -501,7 +401,7 @@ export function SmartcardPanel({
       </Card>
 
       <Card>
-        <CardHeader className="flex-row items-center justify-between">
+        <CardHeader className="p-3 sm:p-4 flex-row flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-slate-400" />
             <CardTitle>{lang === "es" ? "Equipo" : "Team"}</CardTitle>
@@ -510,7 +410,7 @@ export function SmartcardPanel({
             {seatCount} / {maxTeamMembers ?? "∞"} {lang === "es" ? "integrantes" : "members"}
           </span>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
           <p className="mb-4 text-sm text-slate-500">
             {lang === "es"
               ? "Por privacidad no se listan nombres aquí. "
@@ -702,6 +602,6 @@ export function SmartcardPanel({
         onOpenChange={(open) => !open && setEditingProfileId(null)}
         lang={lang}
       />
-    </main>
+    </section>
   );
 }

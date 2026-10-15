@@ -1,3 +1,4 @@
+import { MetricGrid } from "@/components/shared/MetricGrid";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, BarChart3, Building2, CreditCard, IdCard, Plus, Users } from "lucide-react";
 import { requireAdmin } from "@/lib/guards";
@@ -92,7 +93,7 @@ export default async function AdminSmartcardPage() {
         }
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <MetricGrid columns={5} className="mb-6">
         {tiles.map(({ href, label, value, icon: Icon }) => (
           <Link key={href} href={href} className="group rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:border-brand-300">
             <div className="flex items-center justify-between text-slate-400 group-hover:text-brand-600">
@@ -103,7 +104,7 @@ export default async function AdminSmartcardPage() {
             <p className="text-sm text-slate-500">{label}</p>
           </Link>
         ))}
-      </div>
+      </MetricGrid>
 
       <Card>
         <CardHeader className="flex-row items-center justify-between">
