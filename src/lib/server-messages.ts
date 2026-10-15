@@ -6,6 +6,19 @@
 // su versión en español). Un mensaje que no esté aquí se muestra tal cual.
 
 const EN: Record<string, string> = {
+  "Intenta de nuevo en un minuto.": "Try again in a minute.",
+  "Selecciona un programa activo de este negocio.": "Select an active program from this business.",
+  "Programa no encontrado.": "Program not found.",
+  "Revisa el teléfono del cliente.": "Check the customer phone number.",
+  "El canje no corresponde a esta cuenta.": "The redemption does not belong to this order.",
+  "La venta ya fue recibida; cancélala desde el POS.": "The sale was already received; cancel it from the POS.",
+  "Esta cuenta ya terminó su canje. Inicia una cuenta nueva.": "This order already finished its redemption. Start a new order.",
+  "Revisa el valor de la recompensa.": "Check the reward value.",
+  "El cliente debe elegir un programa.": "The customer must choose a program.",
+  "Programa no disponible.": "Program unavailable.",
+  "Tarjeta no encontrada.": "Card not found.",
+  "Esta venta ya fue recibida.": "This sale was already received.",
+
   "Esta recompensa solo se canjea en la sucursal del programa.": "This reward can only be redeemed at the program branch.",
   "Esta recompensa ya fue canjeada o anulada.": "This reward has already been redeemed or voided.",
   "Hay ventas vinculadas al historial de Lealtad. Cancélalas desde el POS; no se pueden purgar.": "Some sales are linked to Loyalty history. Cancel them from the POS; they cannot be purged.",

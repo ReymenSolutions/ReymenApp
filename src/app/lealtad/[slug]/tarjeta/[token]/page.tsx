@@ -1,3 +1,5 @@
+import { prisma } from "@/lib/prisma";
+import { MemberProgramChoice } from "@/components/loyalty/MemberProgramChoice";
 import type { Metadata } from "next";
 import QRCode from "qrcode";
 import { Gift, PartyPopper, Smartphone, Wallet } from "lucide-react";
@@ -23,6 +25,7 @@ export default async function LoyaltyCardPage({ params }: { params: Promise<{ sl
   if (!card) return <PublicMessage text={L.cardNotFound} />;
 
   const { org, program, member } = card;
+  const programs = await prisma.loyaltyProgram.findMany({ where: { organizationId: org.id, status: "ACTIVE" }, select: { id: true, name: true } });
   const p = progressOf(member.cycleVisits, program.rule.visitGoal);
   const url = `${getAppUrl()}${memberCardPath(org.slug, token)}`;
   const qr = await QRCode.toDataURL(url, { margin: 1, width: 320, errorCorrectionLevel: "M" });
@@ -31,6 +34,7 @@ export default async function LoyaltyCardPage({ params }: { params: Promise<{ sl
 
   return (
     <PublicShell businessName={org.name} logoUrl={org.logoUrl}>
+      <MemberProgramChoice slug={slug} token={token} current={program.id} selected={member.isSelected} programs={programs} lang={lang} />
       {/* Tarjeta */}
       <div className="bg-gradient-to-br from-brand-900 to-brand-950 px-6 pb-6 pt-5 text-white">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-orange-300">{program.name}</p>

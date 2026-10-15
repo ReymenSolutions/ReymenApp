@@ -6,6 +6,7 @@ const prisma = new PrismaClient();
 const password = "LoyaltyLocalTest123!";
 const email = `e2e-loyalty-${Date.now()}@example.test`;
 let orgId: string, slug: string;
+let loginCookies: Awaited<ReturnType<import("@playwright/test").BrowserContext["cookies"]>> | undefined;
 test.describe.configure({ mode: "serial" });
 test.setTimeout(90_000);
 test.beforeAll(async () => {
@@ -25,11 +26,17 @@ test.afterAll(async () => {
   await prisma.$disconnect();
 });
 async function login(page: import("@playwright/test").Page) {
+  if (loginCookies) {
+    await page.context().addCookies(loginCookies);
+    await page.goto("/portal/dashboard");
+    return;
+  }
   await page.goto("/login");
   await page.locator('input[type="email"]').fill(email);
   await page.locator('input[type="password"]').fill(password);
   await page.locator('button[type="submit"]').click();
   await page.waitForURL(/\/portal\//);
+  loginCookies = await page.context().cookies();
 }
 test("entitlement gates navigation and direct route", async ({ page }) => {
   await login(page);
@@ -63,8 +70,27 @@ test("public signup creates a Customer-linked opaque card with no marketing cons
   const member = await prisma.loyaltyMember.findFirstOrThrow({ where: { organizationId: orgId }, include: { customer: true } });
   expect(member.customerId).toBeTruthy(); expect(member.customer?.consentAccepted).toBe(false);
 });
+test("business creates another program and a member chooses it from their card", async ({ page }) => {
+  await login(page);
+  await page.goto("/portal/loyalty/program?new=1");
+  await page.locator("#p-name").fill("Segundo Club");
+  await page.locator("#p-goal").fill("4");
+  await page.locator("#p-rname").fill("Otra recompensa");
+  await page.locator('form button[type="submit"]').first().click();
+  await expect.poll(() => prisma.loyaltyProgram.count({ where: { organizationId: orgId } })).toBe(2);
+  const second = await prisma.loyaltyProgram.findFirstOrThrow({ where: { organizationId: orgId, name: "Segundo Club" } });
+  const first = await prisma.loyaltyMember.findFirstOrThrow({ where: { organizationId: orgId } });
+  await page.goto(`/lealtad/${slug}/tarjeta/${first.publicToken}`);
+  await page.locator("#member-program").selectOption(second.id);
+  await page.getByRole("button", { name: /Elegir programa|Choose program/ }).click();
+  await expect.poll(() => prisma.loyaltyMember.count({ where: { organizationId: orgId, programId: second.id, isSelected: true } })).toBe(1);
+  await expect(page.getByText("Segundo Club", { exact: true }).last()).toBeVisible();
+  expect((await prisma.loyaltyMember.findUniqueOrThrow({ where: { id: first.id } })).isSelected).toBe(false);
+});
+
 test("mobile dark English pages render real data without horizontal overflow", async ({ page, context }, testInfo) => {
   await prisma.user.update({ where: { email }, data: { theme: "dark", language: "en" } });
+  loginCookies = undefined; // Refresh JWT preference claims after changing the fixture.
   await context.addCookies([{ name: "reymen-theme", value: "dark", url: "http://127.0.0.1:3000" }, { name: "reymen-lang", value: "en", url: "http://127.0.0.1:3000" }]);
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page);
@@ -81,7 +107,46 @@ test("mobile dark English pages render real data without horizontal overflow", a
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await page.screenshot({ path: testInfo.outputPath("loyalty-mobile-dark.png"), fullPage: true });
 });
+test("mobile navigation reserves the back gesture and remains visible across repeated tab changes", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page);
+  await page.goto("/portal/loyalty");
+  for (let i = 0; i < 3; i++) {
+    await page.getByRole("button", { name: /^(menu|menú)$/i }).click();
+    await expect(page.locator("aside")).toHaveClass(/translate-x-0/);
+    await page.locator('aside a[href="/portal/loyalty"]').click();
+    await expect(page.locator("aside")).toHaveClass(/-translate-x-full/);
+    await page.locator('nav a[href="/portal/loyalty/program"]').click();
+    await expect(page.locator("#p-name")).toBeVisible();
+    await page.goBack();
+    await expect(page.getByRole("heading", { name: /REYMEN Loyalty/i })).toBeVisible();
+    await expect(page.locator("aside")).toHaveClass(/-translate-x-full/);
+  }
+  await page.evaluate(() => {
+    for (const [type, x] of [["touchstart", 10], ["touchmove", 160], ["touchend", 160]] as const) {
+      const event = new Event(type, { bubbles: true });
+      Object.defineProperty(event, "touches", { value: type === "touchend" ? [] : [{ clientX: x, clientY: 300 }] });
+      document.dispatchEvent(event);
+    }
+  });
+  await expect(page.locator("aside")).toHaveClass(/-translate-x-full/);
+  // Delay RSC navigation to exercise loading while the module shell stays present.
+  await page.route("**/portal/loyalty/**", async route => {
+    if (route.request().headers()["rsc"]) await new Promise(resolve => setTimeout(resolve, 500));
+    await route.continue();
+  });
+  for (const path of ["members", "program", "map", "analytics", "visits"]) {
+    await page.locator(`nav a[href="/portal/loyalty/${path}"]`).click();
+    await expect(page.getByRole("heading", { name: /REYMEN Loyalty/i })).toBeVisible();
+    await expect(page.locator("main")).not.toHaveText("");
+  }
+  await page.reload();
+  await expect(page.getByRole("heading", { name: /REYMEN Loyalty/i })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
 test("suspension hides navigation, blocks routes and public cards, preserves members", async ({ page }) => {
+  const previousMembers = await prisma.loyaltyMember.findMany({ where: { organizationId: orgId }, select: { id: true }, orderBy: { id: "asc" } });
   await prisma.organizationModule.update({ where: { organizationId_module: { organizationId: orgId, module: "LOYALTY" } }, data: { status: "SUSPENDED" } });
   await login(page);
   await expect(page.locator('a[href="/portal/loyalty"]')).toHaveCount(0);
@@ -89,5 +154,5 @@ test("suspension hides navigation, blocks routes and public cards, preserves mem
   const member = await prisma.loyaltyMember.findFirstOrThrow({ where: { organizationId: orgId } });
   await page.goto(`/lealtad/${slug}/tarjeta/${member.publicToken}`);
   await expect(page.getByText("Hola, Ana")).toHaveCount(0);
-  expect(await prisma.loyaltyMember.count({ where: { organizationId: orgId } })).toBe(1);
+  expect(await prisma.loyaltyMember.findMany({ where: { organizationId: orgId }, select: { id: true }, orderBy: { id: "asc" } })).toEqual(previousMembers);
 });

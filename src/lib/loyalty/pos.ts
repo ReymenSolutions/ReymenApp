@@ -26,15 +26,16 @@ export function parsePosLoyalty(raw: unknown): PosLoyaltyRequest | null {
 }
 
 /** Miembro del programa por QR/token o, si no hay, por WhatsApp. Solo de esta organización. */
-async function findMember(db: Db, organizationId: string, programId: string, req: PosLoyaltyRequest) {
+async function findMember(db: Db, organizationId: string, _programId: string, req: PosLoyaltyRequest) {
   const token = req.code ? extractMemberToken(req.code) : null;
   if (token) {
-    return db.loyaltyMember.findFirst({ where: { organizationId, programId, publicToken: token }, select: { id: true } });
+    const owner = await db.loyaltyMember.findFirst({ where: { organizationId, publicToken: token }, select: { customerId: true } });
+    return owner?.customerId ? db.loyaltyMember.findFirst({ where: { organizationId, customerId: owner.customerId, isSelected: true }, select: { id: true, programId: true } }) : null;
   }
   const phone = req.phone ? normalizePhoneMx(req.phone) : null;
   const key = phone ? phoneKey(phone) : null;
   if (key) {
-    return db.loyaltyMember.findFirst({ where: { organizationId, programId, whatsappKey: key }, select: { id: true } });
+    return db.loyaltyMember.findFirst({ where: { organizationId, isSelected: true, whatsappKey: key }, select: { id: true, programId: true } });
   }
   return null;
 }
@@ -75,11 +76,12 @@ async function memberView(db: Db, memberId: string, goal: number): Promise<PosMe
 /** Consulta de caja: ¿quién es y cómo va? No registra nada. */
 export async function lookupMemberForPos(organizationId: string, req: PosLoyaltyRequest | null): Promise<PosLookupResult> {
   if (!req || (!req.code && !req.phone)) return { status: "invalid_request" };
-  const program = await getActiveProgram(organizationId);
+  let program = await getActiveProgram(organizationId);
   if (!program) return { status: "no_program" };
-  if (program.status !== "ACTIVE") return { status: "program_paused" };
   const found = await findMember(prisma, organizationId, program.id, req);
   if (!found) return { status: "not_enrolled" };
+  program = await getActiveProgram(organizationId, found.programId);
+  if (!program || program.status !== "ACTIVE") return { status: "program_paused" };
   return {
     status: "found",
     program: { name: program.name, rewardName: program.rule.rewardName, visitGoal: program.rule.visitGoal },

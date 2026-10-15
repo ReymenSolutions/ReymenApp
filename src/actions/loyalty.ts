@@ -5,6 +5,7 @@
 // lado del servidor) → mutar con el organizationId de la SESIÓN (nunca del
 // formulario) → auditar (dentro de service.ts) → revalidatePath.
 
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { reconcileLoyaltyMember } from "@/lib/loyalty/reconcile";
 import { revalidatePath } from "next/cache";
@@ -47,6 +48,9 @@ function parseBranch(raw: string | null | undefined): string | null {
 // ─── Programa ───────────────────────────────────────────────────────────
 
 const programSchema = z.object({
+  programId: z.string().min(1).optional(),
+  createNew: z.boolean().optional(),
+  rewardValue: z.number().positive().max(100000).nullable().optional(),
   name: z.string().trim().min(2).max(80),
   description: z.string().trim().max(500).optional(),
   status: z.enum(["ACTIVE", "PAUSED"]),
@@ -65,6 +69,7 @@ export async function saveLoyaltyProgram(data: z.input<typeof programSchema>) {
   if (!parsed.success) throw new UserError("Revisa los datos del programa.");
   const d = parsed.data;
   const result = await saveProgram(session.user.organizationId, session.user.id, {
+    programId: d.programId, createNew: d.createNew, rewardValue: d.rewardValue,
     name: d.name,
     description: d.description || null,
     status: d.status,
@@ -186,4 +191,28 @@ export async function retryLoyaltyEvents() {
     await tx.auditLog.create({ data: { organizationId, userId: session.user.id, action: "loyalty.events_retry", resource: "DomainEvent", metadata: { count: result.count } } });
     return result;
   });
+}
+
+
+export async function selectPrimaryLoyaltyProgram(programId: string) {
+  const session = await requireLoyaltyManager();
+  const organizationId = session.user.organizationId;
+  await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Organization" WHERE id = ${organizationId} FOR UPDATE`;
+    const program = await tx.loyaltyProgram.findFirst({ where: { id: programId, organizationId, status: "ACTIVE" } });
+    if (!program) throw new UserError("Selecciona un programa activo de este negocio.");
+    await tx.loyaltyProgram.updateMany({ where: { organizationId, isPrimary: true }, data: { isPrimary: false } });
+    await tx.loyaltyProgram.update({ where: { id: program.id }, data: { isPrimary: true } });
+    await tx.auditLog.create({ data: { organizationId, userId: session.user.id, action: "loyalty.program_primary", resource: "LoyaltyProgram", resourceId: program.id } });
+  });
+  revalidateLoyalty();
+}
+
+
+export async function viewLoyaltyProgram(programId: string) {
+  const session = await requireLoyaltyOperator();
+  const program = await prisma.loyaltyProgram.findFirst({ where: { id: programId, organizationId: session.user.organizationId }, select: { id: true } });
+  if (!program) throw new UserError("Programa no encontrado.");
+  (await cookies()).set("loyalty-view-program", program.id, { httpOnly: true, sameSite: "lax", path: "/portal/loyalty", secure: process.env.NODE_ENV === "production" });
+  revalidateLoyalty();
 }

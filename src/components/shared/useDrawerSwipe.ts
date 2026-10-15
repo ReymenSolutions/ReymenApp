@@ -2,31 +2,23 @@
 
 import { useCallback, useEffect, useRef } from "react";
 
-// Gesto para el menú lateral en pantallas chicas: deslizar hacia la derecha desde el borde izquierdo lo abre y deslizarlo
-// hacia la izquierda lo cierra. El gesto solo cuenta si es claramente horizontal, para no confundirse con el desplazamiento
-// vertical ni con el de "jalar para actualizar". Un toque fantasma sobre el fondo justo al abrir no lo cierra.
-
-const EDGE_PX = 28; // zona del borde donde empieza el gesto de abrir
-const OPEN_DISTANCE = 56;
+// El borde izquierdo pertenece al historial nativo (Safari/iOS).
+// El menú se abre con su botón; solo conservamos el gesto de cerrar.
 const CLOSE_DISTANCE = 56;
-const LOCK_MS = 400; // tras abrir, ignora cierres por toque (el "clic" que el navegador genera al soltar el dedo)
 const MOBILE_QUERY = "(max-width: 1023px)";
 
 export function useDrawerSwipe({ open, setOpen }: { open: boolean; setOpen: (open: boolean) => void }) {
-  const openedAt = useRef(0);
   const openRef = useRef(open);
   useEffect(() => {
     openRef.current = open;
   }, [open]);
 
   const doOpen = useCallback(() => {
-    openedAt.current = Date.now();
     setOpen(true);
   }, [setOpen]);
 
-  /** Cierre del menú (fondo, enlaces, botón): ignora el que llega pegado a una apertura. */
+  /** Cierre inmediato para enlaces, fondo y botón. */
   const close = useCallback(() => {
-    if (Date.now() - openedAt.current < LOCK_MS) return;
     setOpen(false);
   }, [setOpen]);
 
@@ -34,7 +26,7 @@ export function useDrawerSwipe({ open, setOpen }: { open: boolean; setOpen: (ope
     if (typeof window === "undefined") return;
     let startX = 0;
     let startY = 0;
-    let tracking: "open" | "close" | null = null;
+    let tracking: "close" | null = null;
     let done = false;
 
     const onStart = (e: TouchEvent) => {
@@ -44,8 +36,7 @@ export function useDrawerSwipe({ open, setOpen }: { open: boolean; setOpen: (ope
       const t = e.touches[0];
       startX = t.clientX;
       startY = t.clientY;
-      if (!openRef.current && startX <= EDGE_PX) tracking = "open";
-      else if (openRef.current) tracking = "close";
+      if (openRef.current) tracking = "close";
     };
     const onMove = (e: TouchEvent) => {
       if (!tracking || done || e.touches.length !== 1) return;
@@ -56,10 +47,7 @@ export function useDrawerSwipe({ open, setOpen }: { open: boolean; setOpen: (ope
         tracking = null;
         return;
       }
-      if (tracking === "open" && dx > OPEN_DISTANCE) {
-        done = true;
-        doOpen();
-      } else if (tracking === "close" && dx < -CLOSE_DISTANCE && Date.now() - openedAt.current >= LOCK_MS) {
+      if (tracking === "close" && dx < -CLOSE_DISTANCE) {
         done = true;
         setOpen(false);
       }
@@ -78,7 +66,7 @@ export function useDrawerSwipe({ open, setOpen }: { open: boolean; setOpen: (ope
       document.removeEventListener("touchend", onEnd);
       document.removeEventListener("touchcancel", onEnd);
     };
-  }, [doOpen, setOpen]);
+  }, [setOpen]);
 
   return { open: doOpen, close };
 }

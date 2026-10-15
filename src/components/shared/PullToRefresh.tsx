@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 /**
  * "Desliza hacia abajo para actualizar" en celular. El contenido se desplaza
@@ -14,7 +14,6 @@ import { useRouter } from "next/navigation";
 const THRESHOLD = 72; // px jalados para actualizar
 const MAX_PULL = 120;
 const HOLD = 56; // dónde se queda el indicador mientras actualiza
-const MIN_SPIN_MS = 650; // que la animación se alcance a ver aunque la respuesta sea inmediata
 
 /** Resistencia tipo goma: cada vez cuesta más jalar. */
 function resist(dy: number): number {
@@ -23,6 +22,7 @@ function resist(dy: number): number {
 
 export function PullToRefresh({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
   const rootRef = useRef<HTMLDivElement>(null);
   const [pull, setPull] = useState(0);
@@ -30,7 +30,6 @@ export function PullToRefresh({ children }: { children: React.ReactNode }) {
   const [refreshing, setRefreshing] = useState(false);
   const pullRef = useRef(0);
   const refreshingRef = useRef(false);
-  const startedAt = useRef(0);
 
   const setPullBoth = (v: number) => {
     pullRef.current = v;
@@ -40,26 +39,23 @@ export function PullToRefresh({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(() => {
     refreshingRef.current = true;
     setRefreshing(true);
-    startedAt.current = Date.now();
     pullRef.current = HOLD;
     setPull(HOLD);
     startTransition(() => router.refresh());
   }, [router]);
 
-  // Termina cuando llegaron los datos nuevos (y pasó el mínimo de la animación).
+  // Mantiene el contenido visible y termina con la transición real, sin demoras artificiales.
   useEffect(() => {
     if (!refreshing || isPending) return;
-    const t = setTimeout(
-      () => {
-        refreshingRef.current = false;
-        setRefreshing(false);
-        pullRef.current = 0;
-        setPull(0);
-      },
-      Math.max(0, MIN_SPIN_MS - (Date.now() - startedAt.current)),
-    );
-    return () => clearTimeout(t);
+    refreshingRef.current = false;
+    setRefreshing(false);
+    pullRef.current = 0;
+    setPull(0);
   }, [refreshing, isPending]);
+  useEffect(() => {
+    refreshingRef.current = false; pullRef.current = 0;
+    setRefreshing(false); setDragging(false); setPull(0);
+  }, [pathname]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -69,7 +65,7 @@ export function PullToRefresh({ children }: { children: React.ReactNode }) {
     let startX = 0;
 
     const onStart = (e: TouchEvent) => {
-      if (refreshingRef.current || e.touches.length !== 1 || scroller.scrollTop > 0) {
+      if (refreshingRef.current || e.touches.length !== 1 || e.touches[0].clientX <= 28 || (e.target as Element)?.closest?.("input,textarea,select,button,[contenteditable=true]") || scroller.scrollTop > 0) {
         startY = null;
         return;
       }
@@ -77,7 +73,7 @@ export function PullToRefresh({ children }: { children: React.ReactNode }) {
       startX = e.touches[0].clientX;
     };
     const onMove = (e: TouchEvent) => {
-      if (startY === null) return;
+      if (startY === null || e.touches.length !== 1) return;
       const dy = e.touches[0].clientY - startY;
       const dx = Math.abs(e.touches[0].clientX - startX);
       // Hacia arriba, de lado (carruseles, pestañas) o ya con scroll: no es un "jalar".
@@ -99,17 +95,18 @@ export function PullToRefresh({ children }: { children: React.ReactNode }) {
       else setPullBoth(0);
     };
 
+    const onCancel = () => { startY = null; setDragging(false); setPullBoth(0); };
     scroller.addEventListener("touchstart", onStart, { passive: true });
     scroller.addEventListener("touchmove", onMove, { passive: false });
     scroller.addEventListener("touchend", onEnd);
-    scroller.addEventListener("touchcancel", onEnd);
+    scroller.addEventListener("touchcancel", onCancel);
     return () => {
       scroller.removeEventListener("touchstart", onStart);
       scroller.removeEventListener("touchmove", onMove);
       scroller.removeEventListener("touchend", onEnd);
-      scroller.removeEventListener("touchcancel", onEnd);
+      scroller.removeEventListener("touchcancel", onCancel);
     };
-  }, [refresh]);
+  }, [refresh, pathname]);
 
   const progress = Math.min(1, pull / THRESHOLD);
   const ready = progress >= 1;
@@ -118,7 +115,7 @@ export function PullToRefresh({ children }: { children: React.ReactNode }) {
   const C = 2 * Math.PI * R;
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="relative motion-reduce:[&_*]:!transition-none">
       <div
         aria-hidden={!refreshing}
         role={refreshing ? "status" : undefined}

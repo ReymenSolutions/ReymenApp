@@ -370,6 +370,7 @@ export async function getMemberProfile(organizationId: string, memberId: string,
   const m = await prisma.loyaltyMember.findFirst({
     where: { id: memberId, organizationId },
     include: {
+      program: { select: { currentVersion: true, versions: { select: { version: true, visitGoal: true } } } },
       enrollmentBranch: { select: { name: true } },
       customer: { select: { lead: { select: { id: true, deletedAt: true } } } },
       rewards: {
@@ -400,7 +401,7 @@ export async function getMemberProfile(organizationId: string, memberId: string,
     totalVisits: m.totalVisits,
     cycleNumber: m.cycleNumber,
     deficitVisits: m.deficitVisits,
-    progress: progressOf(m.cycleVisits, goal),
+    progress: progressOf(m.cycleVisits, m.program.versions.find(v => v.version === m.program.currentVersion)?.visitGoal ?? goal),
     totalSpent,
     avgTicket: averageTicket(totalSpent, m.visitsWithAmount),
     status: activityStatus(m.lastVisitAt, m.createdAt, now),
@@ -431,10 +432,13 @@ export async function getMemberProfile(organizationId: string, memberId: string,
 
 /** Lo que la caja necesita ver para confirmar identidad y registrar la visita. */
 export async function getCheckoutMember(organizationId: string, memberId: string, goal: number) {
+  const original = await prisma.loyaltyMember.findFirst({ where: { id: memberId, organizationId }, select: { customerId: true } });
+  if (!original) return null;
   const m = await prisma.loyaltyMember.findFirst({
-    where: { id: memberId, organizationId },
+    where: { organizationId, ...(original.customerId ? { customerId: original.customerId, isSelected: true } : { id: memberId }) },
     select: {
       id: true,
+      program: { select: { currentVersion: true, versions: { select: { version: true, visitGoal: true } } } },
       name: true,
       whatsapp: true,
       postalCode: true,
@@ -452,7 +456,7 @@ export async function getCheckoutMember(organizationId: string, memberId: string
     name: m.name,
     maskedWhatsapp: maskPhone(m.whatsapp),
     postalCode: m.postalCode,
-    progress: progressOf(m.cycleVisits, goal),
+    progress: progressOf(m.cycleVisits, m.program.versions.find(v => v.version === m.program.currentVersion)?.visitGoal ?? goal),
     totalVisits: m.totalVisits,
     avgTicket: averageTicket(Number(m.totalSpent), m.visitsWithAmount),
     lastVisitAt: m.lastVisitAt,
@@ -463,14 +467,14 @@ export async function getCheckoutMember(organizationId: string, memberId: string
 export type CheckoutMember = NonNullable<Awaited<ReturnType<typeof getCheckoutMember>>>;
 
 /** Búsqueda rápida en caja por nombre o últimos dígitos del WhatsApp (sin QR a la mano). */
-export async function searchMembersForCheckout(organizationId: string, programId: string, q: string) {
+export async function searchMembersForCheckout(organizationId: string, _programId: string, q: string) {
   const text = q.trim();
   if (text.length < 2) return [];
   const digits = text.replace(/\D/g, "");
   const or: Prisma.LoyaltyMemberWhereInput[] = [{ name: { contains: text, mode: "insensitive" } }];
   if (digits.length >= 4) or.push({ whatsappKey: { endsWith: digits.slice(-10) } });
   const rows = await prisma.loyaltyMember.findMany({
-    where: { organizationId, programId, OR: or },
+    where: { organizationId, isSelected: true, OR: or },
     orderBy: [{ lastVisitAt: { sort: "desc", nulls: "last" } }],
     take: 8,
     select: { id: true, name: true, whatsapp: true, postalCode: true },

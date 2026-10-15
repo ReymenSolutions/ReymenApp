@@ -169,7 +169,7 @@ export function PortalSidebar({ orgName, orgLogoUrl: initialLogoUrl, enabledModu
 
       <aside
         className={cn(
-          "sidebar fixed inset-y-0 left-0 z-40 flex h-screen w-64 flex-col border-r border-brand-950 bg-gradient-to-b from-brand-900 to-brand-950 transition-transform duration-200 ease-in-out",
+          "sidebar fixed inset-y-0 left-0 z-40 flex h-dvh w-64 flex-col border-r border-brand-950 bg-gradient-to-b from-brand-900 to-brand-950 transition-transform duration-200 ease-in-out motion-reduce:transition-none",
           "lg:static lg:z-auto lg:translate-x-0 lg:transition-none",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}

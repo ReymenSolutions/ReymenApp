@@ -17,6 +17,9 @@ import { ProgressDots } from "./ProgressBar";
 type RewardType = "FREE_ITEM" | "DISCOUNT_PERCENT" | "DISCOUNT_AMOUNT" | "CUSTOM";
 
 export interface ProgramFormValues {
+  programId?: string;
+  createNew?: boolean;
+  rewardValue?: number | null;
   name: string;
   description: string;
   status: "ACTIVE" | "PAUSED";
@@ -117,14 +120,21 @@ export function ProgramForm({
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="p-rtype">{L.rewardType}</Label>
-                <select id="p-rtype" className={SELECT} value={v.rewardType} onChange={(e) => set("rewardType", e.target.value as RewardType)}>
+                <select id="p-rtype" className={SELECT} value={v.rewardType} onChange={(e) => setV((old) => ({ ...old, rewardType: e.target.value as RewardType, rewardValue: null }))}>
                   <option value="FREE_ITEM">{L.rewardTypeFreeItem}</option>
                   <option value="DISCOUNT_PERCENT">{L.rewardTypePercent}</option>
                   <option value="DISCOUNT_AMOUNT">{L.rewardTypeAmount}</option>
                   <option value="CUSTOM">{L.rewardTypeCustom}</option>
                 </select>
               </div>
-              <div className="space-y-1.5 sm:col-span-2">
+              {(v.rewardType === "DISCOUNT_PERCENT" || v.rewardType === "DISCOUNT_AMOUNT") && (
+              <div className="space-y-1.5">
+                <Label htmlFor="p-value">{lang === "es" ? "Valor para canje en POS (% o MXN)" : "POS redemption value (% or MXN)"}</Label>
+                <Input id="p-value" type="number" min="0.01" max={v.rewardType === "DISCOUNT_PERCENT" ? 100 : 100000} step="0.01" value={v.rewardValue ?? ""} onChange={(e) => set("rewardValue", e.target.value ? Number(e.target.value) : null)} />
+                <p className="text-xs text-slate-500">{lang === "es" ? "Sin valor, la recompensa solo permite canje manual. Aplica a recompensas nuevas." : "Without a value, rewards can only be redeemed manually. Applies to new rewards."}</p>
+              </div>
+            )}
+            <div className="space-y-1.5 sm:col-span-2">
                 <Label htmlFor="p-rname">{L.rewardName}</Label>
                 <Input id="p-rname" required minLength={2} maxLength={60} value={v.rewardName} onChange={(e) => set("rewardName", e.target.value)} placeholder={L.rewardNamePh} />
               </div>

@@ -33,10 +33,10 @@ export function generateMemberToken(): string {
 
 // ─── Programa ───────────────────────────────────────────────────────────
 
-export async function getActiveProgram(organizationId: string) {
+export async function getActiveProgram(organizationId: string, programId?: string) {
   const program = await prisma.loyaltyProgram.findFirst({
-    where: { organizationId },
-    orderBy: { createdAt: "desc" },
+    where: { organizationId, ...(programId ? { id: programId } : {}) },
+    orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }],
     include: { branch: { select: { id: true, name: true } } },
   });
   if (!program) return null;
@@ -50,6 +50,9 @@ export async function getActiveProgram(organizationId: string) {
 export type LoyaltyProgramWithRule = NonNullable<Awaited<ReturnType<typeof getActiveProgram>>>;
 
 export interface ProgramInput {
+  programId?: string;
+  createNew?: boolean;
+  rewardValue?: number | null;
   name: string;
   description: string | null;
   status: "ACTIVE" | "PAUSED";
@@ -70,6 +73,7 @@ export interface ProgramInput {
  */
 export async function saveProgram(organizationId: string, userId: string | null, input: ProgramInput) {
   const visitGoal = normalizeGoal(input.visitGoal);
+  if (input.rewardValue != null && (!Number.isFinite(input.rewardValue) || input.rewardValue <= 0 || (input.rewardType === "DISCOUNT_PERCENT" ? input.rewardValue > 100 : input.rewardType === "DISCOUNT_AMOUNT" ? input.rewardValue > MAX_SALE_AMOUNT : true))) throw new UserError("Revisa el valor de la recompensa.");
   if (input.scope === "BRANCH") {
     if (!input.branchId) throw new UserError("Elige la sucursal del programa.");
     const branch = await prisma.branch.findFirst({ where: { id: input.branchId, organizationId }, select: { id: true } });
@@ -79,12 +83,15 @@ export async function saveProgram(organizationId: string, userId: string | null,
 
   const result = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM "Organization" WHERE id = ${organizationId} FOR UPDATE`;
-    const current = await tx.loyaltyProgram.findFirst({ where: { organizationId }, orderBy: { createdAt: "desc" } });
+    const current = input.createNew ? null : await tx.loyaltyProgram.findFirst({ where: { organizationId, ...(input.programId ? { id: input.programId } : {}) }, orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }] });
+    if (input.programId && !current) throw new UserError("Programa no encontrado.");
+    const hasProgram = await tx.loyaltyProgram.count({ where: { organizationId } });
     const existing = current ? { ...current, rule: await tx.loyaltyProgramVersion.findUniqueOrThrow({ where: { programId_version: { programId: current.id, version: current.currentVersion } } }) } : null;
     if (!existing) {
       const program = await tx.loyaltyProgram.create({
         data: {
           organizationId,
+          isPrimary: hasProgram === 0,
           name: input.name,
           description: input.description,
           status: input.status,
@@ -97,6 +104,7 @@ export async function saveProgram(organizationId: string, userId: string | null,
               version: 1,
               visitGoal,
               rewardType: input.rewardType,
+              rewardValue: input.rewardValue ?? null,
               rewardName: input.rewardName,
               rewardDescription: input.rewardDescription,
               rewardHeadline: input.rewardHeadline,
@@ -112,6 +120,7 @@ export async function saveProgram(organizationId: string, userId: string | null,
     const ruleChanged =
       r.visitGoal !== visitGoal ||
       r.rewardType !== input.rewardType ||
+      Number(r.rewardValue ?? 0) !== Number(input.rewardValue ?? 0) ||
       r.rewardName !== input.rewardName ||
       (r.rewardDescription ?? null) !== input.rewardDescription ||
       (r.rewardHeadline ?? null) !== input.rewardHeadline;
@@ -124,6 +133,7 @@ export async function saveProgram(organizationId: string, userId: string | null,
           version,
           visitGoal,
           rewardType: input.rewardType,
+          rewardValue: input.rewardValue ?? null,
           rewardName: input.rewardName,
           rewardDescription: input.rewardDescription,
           rewardHeadline: input.rewardHeadline,
@@ -152,6 +162,7 @@ export async function saveProgram(organizationId: string, userId: string | null,
 // ─── Inscripción pública ────────────────────────────────────────────────
 
 export interface EnrollInput {
+  programId?: string;
   name: string;
   whatsapp: string;
   postalCode: string;
@@ -164,20 +175,20 @@ export interface EnrollInput {
 export type EnrollResult = { status: "created"; token: string } | { status: "already_enrolled" };
 
 /** Negocio + programa que atienden la página pública /lealtad/<slug>. Null si no aplica. */
-export async function resolvePublicProgram(orgSlug: string) {
+export async function resolvePublicProgram(orgSlug: string, programId?: string) {
   const org = await prisma.organization.findUnique({
     where: { slug: orgSlug },
     select: { id: true, name: true, slug: true, logoUrl: true, isActive: true },
   });
   if (!org || !org.isActive) return null;
   if (!(await hasModule(org.id, "LOYALTY"))) return null;
-  const program = await getActiveProgram(org.id);
+  const program = await getActiveProgram(org.id, programId);
   if (!program) return null;
   return { org, program };
 }
 
 export async function enrollMember(orgSlug: string, input: EnrollInput, now: Date = new Date()): Promise<EnrollResult> {
-  const resolved = await resolvePublicProgram(orgSlug);
+  const resolved = await resolvePublicProgram(orgSlug, input.programId);
   if (!resolved) throw new UserError("Este programa de lealtad no está disponible.");
   const { org, program } = resolved;
   if (program.status !== "ACTIVE") throw new UserError("El programa de lealtad está en pausa por ahora.");
@@ -202,8 +213,8 @@ export async function enrollMember(orgSlug: string, input: EnrollInput, now: Dat
 
   // Ya inscrito: no se devuelve su tarjeta. Si se devolviera, cualquiera que
   // escribiera el número de otra persona obtendría su tarjeta.
-  const already = await prisma.loyaltyMember.findUnique({
-    where: { programId_whatsappKey: { programId: program.id, whatsappKey: key } },
+  const already = await prisma.loyaltyMember.findFirst({
+    where: { organizationId: org.id, whatsappKey: key },
     select: { id: true },
   });
   if (already) return { status: "already_enrolled" };
@@ -250,8 +261,9 @@ export async function getPublicCard(orgSlug: string, token: string) {
   const resolved = await resolvePublicProgram(orgSlug);
   if (!resolved) return null;
   const member = await prisma.loyaltyMember.findFirst({
-    where: { publicToken: token, organizationId: resolved.org.id, programId: resolved.program.id },
+    where: { publicToken: token, organizationId: resolved.org.id },
     select: {
+      programId: true, isSelected: true,
       name: true,
       cycleVisits: true,
       deficitVisits: true,
@@ -267,10 +279,13 @@ export async function getPublicCard(orgSlug: string, token: string) {
     },
   });
   if (!member) return null;
+  const program = await getActiveProgram(resolved.org.id, member.programId);
+  if (!program) return null;
   return {
     org: resolved.org,
-    program: resolved.program,
+    program,
     member: {
+      isSelected: member.isSelected,
       name: member.name.split(/\s+/)[0],
       deficitVisits: member.deficitVisits,
       cycleVisits: member.cycleVisits,
@@ -351,7 +366,14 @@ export async function registerVisit(input: RegisterVisitInput): Promise<Register
     if (!sale) throw new UserError("Venta no encontrada");
   }
 
-  const result = await prisma.$transaction((tx) => registerVisitInTx(tx, { ...input, saleAmount }, now));
+  const result = await prisma.$transaction(async (tx) => {
+    const original = await tx.loyaltyMember.findFirst({ where: { id: input.memberId, organizationId } });
+    if (!original) throw new UserError("Cliente no encontrado.");
+    if (original.customerId) await tx.$queryRaw`SELECT id FROM "Customer" WHERE id = ${original.customerId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+    const selected = original.customerId ? await tx.loyaltyMember.findFirst({ where: { organizationId, customerId: original.customerId, isSelected: true } }) : original;
+    if (!selected) throw new UserError("El cliente debe elegir un programa.");
+    return registerVisitInTx(tx, { ...input, memberId: selected.id, saleAmount }, now);
+  });
 
   if (!result.replay) {
     await logAudit({
@@ -393,7 +415,7 @@ export async function redeemReward(input: { organizationId: string; userId: stri
     if (program.status !== "ACTIVE") throw new UserError("El programa de lealtad está en pausa.");
     if (program.scope === "BRANCH" && program.branchId !== input.branchId) throw new UserError("Esta recompensa solo se canjea en la sucursal del programa.");
     const res = await tx.loyaltyReward.updateMany({
-      where: { id: input.rewardId, organizationId: input.organizationId, status: "AVAILABLE", missingVisits: 0 },
+      where: { id: input.rewardId, organizationId: input.organizationId, status: "AVAILABLE", missingVisits: 0, posRedemptions: { none: { status: "RESERVED" } } },
       data: { status: "REDEEMED", redeemedAt: now, redeemedById: input.userId, redeemedBranchId: input.branchId },
     });
     if (!res.count) throw new UserError("Esta recompensa ya fue canjeada o anulada.");
@@ -408,8 +430,10 @@ export async function redeemReward(input: { organizationId: string; userId: stri
 
 /** Busca por token del QR dentro de la organización de la sesión (nunca de otra). */
 export async function findMemberIdByToken(organizationId: string, token: string): Promise<string | null> {
-  const m = await prisma.loyaltyMember.findFirst({ where: { organizationId, publicToken: token }, select: { id: true } });
-  return m?.id ?? null;
+  const m = await prisma.loyaltyMember.findFirst({ where: { organizationId, publicToken: token }, select: { id: true, customerId: true } });
+  if (!m) return null;
+  if (!m.customerId) return m.id;
+  return (await prisma.loyaltyMember.findFirst({ where: { organizationId, customerId: m.customerId, isSelected: true }, select: { id: true } }))?.id ?? null;
 }
 
 /**
@@ -499,6 +523,7 @@ export async function registerVisitInTx(
         cycleNumber: outcome.countedInCycle,
         visitGoal: rule.visitGoal,
         rewardType: rule.rewardType,
+        rewardValue: rule.rewardValue,
         rewardName: rule.rewardName,
         rewardDescription: rule.rewardDescription,
         earnedAt: now,
@@ -524,4 +549,25 @@ export async function registerVisitInTx(
     reward,
     totalVisits: updated.totalVisits,
   };
+}
+
+/** The opaque personal card is required; a phone number alone never changes another member's choice. */
+export async function chooseMemberProgram(orgSlug: string, token: string, programId: string) {
+  const resolved = await resolvePublicProgram(orgSlug, programId);
+  if (!resolved || resolved.program.status !== "ACTIVE") throw new UserError("Programa no disponible.");
+  const organizationId = resolved.org.id;
+  return prisma.$transaction(async (tx) => {
+    const owner = await tx.loyaltyMember.findFirst({ where: { organizationId, publicToken: token } });
+    if (!owner?.customerId) throw new UserError("Tarjeta no encontrada.");
+    await tx.$queryRaw`SELECT id FROM "Customer" WHERE id = ${owner.customerId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+    await tx.loyaltyMember.updateMany({ where: { organizationId, customerId: owner.customerId, isSelected: true }, data: { isSelected: false } });
+    const member = await tx.loyaltyMember.upsert({ where: { programId_customerId: { programId, customerId: owner.customerId } },
+      update: { isSelected: true }, create: {
+        organizationId, programId, customerId: owner.customerId, isSelected: true,
+        name: owner.name, whatsapp: owner.whatsapp, whatsappKey: owner.whatsappKey, postalCode: owner.postalCode, email: owner.email,
+        publicToken: generateMemberToken(), consentAt: owner.consentAt, consentTextVersion: owner.consentTextVersion,
+      } });
+    await tx.auditLog.create({ data: { organizationId, action: "loyalty.member_program", resource: "LoyaltyMember", resourceId: member.id, metadata: { programId } } });
+    return { token: member.publicToken };
+  });
 }

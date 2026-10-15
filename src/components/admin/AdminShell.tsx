@@ -4,7 +4,8 @@ import { Suspense } from "react";
 import { NavigationProgress } from "@/components/shared/NavigationProgress";
 import { ScrollMemory } from "@/components/shared/ScrollMemory";
 import { PullToRefresh } from "@/components/shared/PullToRefresh";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { useDrawerSwipe } from "@/components/shared/useDrawerSwipe";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { TopBar } from "@/components/shared/TopBar";
@@ -26,11 +27,20 @@ interface AdminShellProps {
 // sidebars themselves being intentionally parallel, not shared).
 export function AdminShell({ adminName, orgLogoUrl, personalImageUrl, hasOrganization, children }: AdminShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  // Deslizar desde el borde izquierdo abre el menú y deslizarlo hacia la izquierda lo cierra (en pantallas chicas).
+  const pathname = usePathname();
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
+  useEffect(() => {
+    const close = () => setMobileOpen(false);
+    const escape = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    window.addEventListener("popstate", close);
+    window.addEventListener("keydown", escape);
+    return () => { window.removeEventListener("popstate", close); window.removeEventListener("keydown", escape); };
+  }, []);
+  // El gesto de regreso del navegador conserva el borde izquierdo.
   const drawer = useDrawerSwipe({ open: mobileOpen, setOpen: setMobileOpen });
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50">
+    <div className="flex h-dvh overflow-hidden bg-slate-50">
       <AdminSidebar
         adminName={adminName}
         orgLogoUrl={orgLogoUrl}
@@ -41,7 +51,7 @@ export function AdminShell({ adminName, orgLogoUrl, personalImageUrl, hasOrganiz
       />
       <div className="flex flex-1 flex-col min-h-0 min-w-0">
         <TopBar onMenuClick={drawer.open} />
-        <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto overscroll-y-contain p-4 sm:p-6">
+        <main className={`flex-1 min-w-0 overflow-x-hidden ${mobileOpen ? "overflow-y-hidden lg:overflow-y-auto" : "overflow-y-auto"} overscroll-y-contain p-4 sm:p-6`}>
           <ScrollMemory />
           <Suspense fallback={null}>
             <NavigationProgress />

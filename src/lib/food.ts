@@ -1098,6 +1098,7 @@ export interface FoodPosOrderPayload {
   // Todo lo siguiente es opcional: un POS viejo que no lo manda se comporta igual que antes.
   orderId?: string; // id de la orden en el POS; en una cancelación, el de la orden original
   customer?: { phone: string; name?: string; consent?: { accepted: boolean; textVersion?: string; at?: string } };
+  cancelled?: boolean;
   discount?: { amount: number; reason?: string };
   branchId?: string; // sucursal de Reymen donde se vendió; ausente o desconocida = principal
 }
@@ -1181,10 +1182,10 @@ export async function processFoodPosOrder(payload: unknown, organizationId: stri
       : null;
   await prisma.$transaction(async (tx) => {
     // Una cancelación hereda el cliente de la orden original si el POS no lo repite.
-    const isCancel = body.grossAmount! < 0;
+    const isCancel = body.cancelled === true || body.grossAmount! < 0;
     const original =
       isCancel && externalOrderId
-        ? await tx.foodSale.findFirst({ where: { organizationId, externalOrderId, grossAmount: { gt: 0 } }, orderBy: { createdAt: "desc" }, select: { id: true, customerId: true, branchId: true } })
+        ? await tx.foodSale.findFirst({ where: { organizationId, externalOrderId, grossAmount: { gte: 0 }, isCancellation: false, cancelsSaleId: null }, orderBy: { createdAt: "desc" }, select: { id: true, customerId: true, branchId: true } })
         : null;
     const upserted = customerInput ? await upsertCustomer(tx, organizationId, customerInput) : null;
     const customerId = upserted ? upserted.id : (original?.customerId ?? null);
@@ -1194,6 +1195,7 @@ export async function processFoodPosOrder(payload: unknown, organizationId: stri
         occurredAt,
         channel: body.channel ?? "POS",
         grossAmount: body.grossAmount!,
+        isCancellation: isCancel,
         netAmount: body.netAmount!,
         source: "POS",
         externalOrderId,
@@ -1204,12 +1206,13 @@ export async function processFoodPosOrder(payload: unknown, organizationId: stri
         discountReason,
       },
     });
-    if (customerId) await applySaleToCustomer(tx, customerId, { grossAmount: body.grossAmount!, occurredAt });
+    if (customerId) await applySaleToCustomer(tx, customerId, { grossAmount: body.grossAmount!, occurredAt, isCancellation: isCancel });
 
     // Hechos para el motor de automatizaciones: se escriben en esta misma transacción (si la venta se
     // revierte, no quedan) y con llave única (un reintento del POS no los duplica).
     const subjectRef = externalOrderId ?? sale.id;
-    const saleFact = { saleId: sale.id, orderId: externalOrderId, customerId, branchId: sale.branchId, grossAmount: body.grossAmount!, netAmount: body.netAmount!, discountAmount, cancelsSaleId: sale.cancelsSaleId };
+    const selectedLoyaltyMember = customerId ? await tx.loyaltyMember.findFirst({ where: { organizationId, customerId, isSelected: true }, select: { id: true } }) : null;
+    const saleFact = { loyaltyMemberId: selectedLoyaltyMember?.id ?? null, saleId: sale.id, orderId: externalOrderId, customerId, branchId: sale.branchId, grossAmount: body.grossAmount!, netAmount: body.netAmount!, discountAmount, cancelsSaleId: sale.cancelsSaleId };
     await emitDomainEvent(tx, {
       organizationId,
       type: isCancel ? "sale.cancelled" : "sale.completed",

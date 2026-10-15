@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 // Contexto común de las páginas /portal/loyalty/* (solo servidor):
 // sesión, gate del módulo LOYALTY, idioma, programa vigente, zona horaria y
 // sucursales. Así cada página no repite la misma media docena de consultas.
@@ -22,9 +23,10 @@ export const getLoyaltyContext = cache(async () => {
   const orgId = session.user.organizationId;
   await requireModule(orgId, "LOYALTY");
   const role = session.user.role as UserRole;
+  const viewed = (await cookies()).get("loyalty-view-program")?.value;
   const [lang, program, org, branches] = await Promise.all([
     getServerLang(),
-    getActiveProgram(orgId),
+    (async () => (viewed ? await getActiveProgram(orgId, viewed) : null) ?? await getActiveProgram(orgId))(),
     prisma.organization.findUniqueOrThrow({ where: { id: orgId }, select: { id: true, name: true, slug: true, timezone: true } }),
     listBranches(orgId, { activeOnly: true }),
   ]);

@@ -20,6 +20,7 @@ export function ScrollMemory() {
   const pathname = usePathname();
   const current = useRef(pathname);
   const popped = useRef(false);
+  const restoring = useRef(false);
 
   useEffect(() => {
     const el = main();
@@ -28,6 +29,7 @@ export function ScrollMemory() {
       popped.current = true;
     };
     const onScroll = () => {
+      if (restoring.current) return;
       try {
         sessionStorage.setItem(KEY + current.current, String(el.scrollTop));
       } catch {
@@ -57,19 +59,28 @@ export function ScrollMemory() {
     }
     // Se fija la ruta nueva antes de mover el scroll para no pisar la anterior.
     current.current = pathname;
+    restoring.current = false;
     if (saved <= 0) {
       el.scrollTop = 0;
       return;
     }
-    // El contenido puede tardar en pintarse: se reintenta unos cuadros.
-    let tries = 0;
-    let raf = 0;
+    // Espera cambios reales de tamaño mientras Suspense termina de renderizar.
+    restoring.current = true;
+    const content = el.firstElementChild;
+    const stop = () => { restoring.current = false; observer?.disconnect(); mutations?.disconnect(); };
     const apply = () => {
       el.scrollTop = saved;
-      if (Math.abs(el.scrollTop - saved) > 2 && tries++ < 20) raf = requestAnimationFrame(apply);
+      if (Math.abs(el.scrollTop - saved) <= 2) stop();
     };
+    const observer = new ResizeObserver(apply);
+    observer.observe(el);
+    if (content) observer.observe(content);
+    const mutations = new MutationObserver(apply);
+    mutations.observe(el, { childList: true, subtree: true });
+    el.addEventListener("touchstart", stop, { passive: true });
+    el.addEventListener("wheel", stop, { passive: true });
     apply();
-    return () => cancelAnimationFrame(raf);
+    return () => { stop(); el.removeEventListener("touchstart", stop); el.removeEventListener("wheel", stop); };
   }, [pathname]);
 
   return null;
