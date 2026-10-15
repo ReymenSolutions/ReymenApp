@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { isWebhookAuthorized } from "@/lib/webhook-validator";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { hasModule } from "@/lib/modules";
-import { lookupMemberForPos, parsePosLoyalty } from "@/lib/loyalty/pos";
+import { lookupCustomerForPos, lookupMemberForPos, parsePosLoyalty } from "@/lib/loyalty/pos";
 
 // Authenticated POS lookup and quote/reserve/release contract. Reservations are
 // audited and idempotent by organization/order; sales settle through domain events.
@@ -33,6 +33,12 @@ export async function POST(req: NextRequest) {
     body = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  if (body && typeof body === "object" && "action" in body && body.action === "lookup") {
+    if (!(await hasModule(orgId, "REYMEN_POS"))) return NextResponse.json({ error: "POS no habilitado" }, { status: 403 });
+    const result = await lookupCustomerForPos(orgId, "phone" in body ? body.phone : null);
+    return NextResponse.json(result, { status: result.status === "invalid_request" ? 400 : 200, headers: { "Cache-Control": "no-store" } });
   }
 
   if (!(body && typeof body === "object" && "action" in body && body.action === "release") && !(await hasModule(orgId, "LOYALTY"))) {

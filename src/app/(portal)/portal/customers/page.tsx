@@ -52,11 +52,8 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
       take: PAGE_SIZE,
       include: { lead: { select: { id: true, name: true, deletedAt: true } }, loyaltyMembers: {
         where: { organizationId: orgId, ...(loyalty ? {} : { id: { in: [] } }) },
-        select: { id: true, totalVisits: true, totalSpent: true, visits: {
-          where: { organizationId: orgId },
-          orderBy: [{ occurredAt: "desc" }, { id: "desc" }], take: 5,
-          select: { id: true, occurredAt: true, saleAmount: true, saleId: true, status: true },
-        } },
+        orderBy: [{ isSelected: "desc" }, { createdAt: "asc" }],
+        select: { id: true },
       } },
     }),
     prisma.customer.count({ where }),
@@ -70,16 +67,20 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   return (
     <div>
       <PageHeader
-        title={es ? "Clientes del negocio" : "Business customers"}
-        description={es ? "Clientes registrados desde el POS o Lealtad, enlazados al CRM por teléfono. El gasto del POS y los importes de Lealtad se muestran por separado." : "Customers registered through the POS or Loyalty, linked to CRM by phone. POS spending and Loyalty amounts are shown separately."}
+        title={es ? "Clientes" : "Customers"}
+        description={es ? "Aquí encuentras a las personas registradas en tu caja o en Lealtad. Abre su historial para consultar sus compras y recompensas." : "Find people registered at checkout or in Loyalty. Open their history to see purchases and rewards."}
       />
       <CrmTabs />
+      <div className="mb-5 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:grid-cols-2 dark:border-slate-700 dark:bg-slate-900">
+        <p><strong>{es ? "Clientes" : "Customers"}</strong><br />{es ? "Personas que compran contigo o ya tienen una tarjeta de Lealtad. Aquí consultas sus compras." : "People who buy from you or have a Loyalty card. See their purchases here."}</p>
+        <p><strong>{es ? "Contactos" : "Contacts"}</strong><br />{es ? "Personas con las que conversas o a quienes das seguimiento, aunque todavía no hayan comprado. Un cliente también puede tener un contacto." : "People you talk to or follow up with, even before they buy. A customer can also have a contact record."}</p>
+      </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard title={es ? "Clientes" : "Customers"} value={totals._count._all} icon={Contact} />
-        <MetricCard title={es ? "Han vuelto al POS (2+ visitas)" : "Returning to POS (2+ visits)"} value={repeat} icon={Repeat} />
+        <MetricCard title={es ? "Clientes que regresaron" : "Returning customers"} value={repeat} icon={Repeat} />
         <MetricCard title={es ? "Aceptaron contacto" : "Accepted contact"} value={withConsent} icon={ShieldCheck} />
-        <MetricCard title={es ? "Gasto en POS" : "POS spending"} value={formatMoney(Number(totals._sum.totalSpent ?? 0))} icon={DollarSign} />
+        <MetricCard title={es ? "Compras acumuladas" : "Lifetime purchases"} value={formatMoney(Number(totals._sum.totalSpent ?? 0))} icon={DollarSign} />
       </div>
 
       <form className="mb-4 flex max-w-md gap-2" action="/portal/customers">
@@ -89,6 +90,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
           placeholder={es ? "Buscar por nombre o teléfono…" : "Search by name or phone…"}
           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500"
         />
+        <button className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white">{es ? "Buscar" : "Search"}</button>
       </form>
 
       <Card>
@@ -108,7 +110,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                 return (
                   <li key={c.id} className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6">
                     <div className="min-w-[12rem] flex-1">
-                      <p className="text-sm font-medium text-slate-900">{c.name ?? (es ? "Sin nombre" : "No name")}</p>
+                      <Link href={`/portal/customers/${c.id}`} className="text-base font-semibold text-brand-700 hover:underline">{c.name ?? (es ? "Sin nombre" : "No name")}</Link>
                       <p className="text-xs text-slate-500">{c.phone}</p>
                       <CustomerBirthday customerId={c.id} month={c.birthMonth} day={c.birthDay} consent={c.consentAccepted} canEdit={canEdit} />
                     </div>
@@ -127,35 +129,8 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                         <Badge variant="secondary" className="text-[10px]">{es ? "Sin consentimiento" : "No consent"}</Badge>
                       )}
                     </div>
+                    <Link href={`/portal/customers/${c.id}`} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white">{es ? "Ver compras y recompensas" : "View purchases and rewards"}</Link>
                     {loyalty && c.loyaltyMembers[0] && <Link href={`/portal/loyalty/members/${c.loyaltyMembers[0].id}`} className="text-sm font-medium text-brand-700 hover:underline">{es ? "Ver lealtad →" : "View loyalty →"}</Link>}
-                    {loyalty && c.loyaltyMembers.map((member) => (
-                      <details key={member.id} className="w-full rounded-md border border-slate-200 p-3 text-sm dark:border-slate-700">
-                        <summary className="cursor-pointer font-medium">
-                          {es ? "Actividad de Lealtad" : "Loyalty activity"}: {member.totalVisits} {member.totalVisits === 1 ? (es ? "visita confirmada" : "confirmed visit") : (es ? "visitas confirmadas" : "confirmed visits")} · {formatMoney(Number(member.totalSpent))}
-                        </summary>
-                        <p className="mt-2 text-xs text-slate-500">
-                          {es ? "Importes registrados en Lealtad; no se suman al gasto del POS. Las visitas vinculadas al POS pueden corresponder a compras ya incluidas arriba." : "Amounts recorded in Loyalty; not added to POS spending. POS-linked visits may correspond to purchases already included above."}
-                        </p>
-                        <p className="mt-3 font-medium">{es ? "Últimas 5 visitas" : "Latest 5 visits"}</p>
-                        {member.visits.length === 0 ? <p>{es ? "Sin visitas registradas" : "No visits recorded"}</p> : (
-                          <ul className="mt-2 space-y-2">
-                            {member.visits.map((visit) => (
-                              <li key={visit.id} className="flex flex-wrap gap-x-3 gap-y-1">
-                                <span>{formatDate(visit.occurredAt, es ? "es" : "en")}</span>
-                                <span>{visit.saleId ? (es ? "Vinculada al POS" : "POS-linked") : (es ? "Registro manual" : "Manual entry")}</span>
-                                <span>{visit.saleAmount === null ? (es ? "Sin monto" : "No amount") : formatMoney(Number(visit.saleAmount))}</span>
-                                <Badge variant={visit.status === "VOIDED" ? "secondary" : "success"}>
-                                  {visit.status === "VOIDED" ? (es ? "Anulada" : "Voided") : (es ? "Confirmada" : "Confirmed")}
-                                </Badge>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                        <Link href={`/portal/loyalty/members/${member.id}`} className="mt-3 inline-block font-medium text-brand-700 hover:underline">
-                          {es ? "Ver perfil de Lealtad →" : "View Loyalty profile →"}
-                        </Link>
-                      </details>
-                    ))}
                     {crm && (
                       <div className="w-full sm:w-auto">
                         {lead ? (

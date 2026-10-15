@@ -27,6 +27,7 @@ test.describe("clientes del negocio", () => {
 
   test.afterAll(async () => {
     if (!orgId) return;
+    await prisma.foodSale.deleteMany({ where: { organizationId: orgId } });
     await prisma.loyaltyProgram.deleteMany({ where: { organizationId: orgId } });
     await prisma.lead.deleteMany({ where: { organizationId: orgId } });
     await prisma.customer.deleteMany({ where: { organizationId: orgId } });
@@ -78,6 +79,7 @@ test.describe("clientes del negocio", () => {
     await page.click('button[type="submit"]');
     await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 15_000 });
     await page.goto("/portal/customers");
+    await page.getByRole("link", { name: "Ver compras y recompensas" }).click();
     const activity = page.locator("details").filter({ hasText: "Actividad de Lealtad" });
     await expect(activity.locator("summary")).toContainText("1 visita confirmada");
     await expect(activity.locator("summary")).toContainText("150.00");
@@ -85,7 +87,7 @@ test.describe("clientes del negocio", () => {
     await expect(activity.getByText("Registro manual", { exact: true })).toHaveCount(2);
     await expect(activity.getByText("Anulada", { exact: true })).toBeVisible();
     await expect(activity.getByText("Confirmada", { exact: true })).toBeVisible();
-    await expect(page.getByText("3 visitas")).toBeVisible();
+    await expect(page.getByText("Visitas registradas en caja")).toBeVisible();
     const unchanged = await prisma.customer.findUniqueOrThrow({ where: { id: customer.id } });
     expect(Number(unchanged.totalSpent)).toBe(1250);
     expect(unchanged.visitCount).toBe(3);
@@ -95,6 +97,35 @@ test.describe("clientes del negocio", () => {
     await page.reload();
     await expect(page.locator("details")).toHaveCount(0);
     await expect(page.getByRole("link", { name: /ver lealtad/i })).toHaveCount(0);
+  });
+
+  test("customer profile shows only this customer’s purchases and works on mobile", async ({ page }) => {
+    const customer = await prisma.customer.findFirstOrThrow({ where: { organizationId: orgId, phoneKey: "5599990001" } });
+    const other = await prisma.customer.create({ data: { organizationId: orgId, name: "Otro cliente", phone: "+525599990002", phoneKey: "5599990002" } });
+    await prisma.foodSale.createMany({ data: [
+      { organizationId: orgId, customerId: customer.id, grossAmount: 250, netAmount: 250, externalOrderId: "customer-purchase" },
+      { organizationId: orgId, customerId: customer.id, grossAmount: -50, netAmount: -50, isCancellation: true },
+      { organizationId: orgId, customerId: other.id, grossAmount: 777, netAmount: 777 },
+      ...[1, 2, 3, 4, 5].map(n => ({ organizationId: orgId, customerId: customer.id, grossAmount: 100 + n, netAmount: 100 + n, occurredAt: new Date(Date.now() - (40 + n) * 86400000) })),
+    ] });
+    await page.goto("/login");
+    await page.fill('input[type="email"]', TEST_EMAIL);
+    await page.fill('input[type="password"]', TEST_PASSWORD);
+    await page.click('button[type="submit"]');
+    await page.waitForURL(/\/portal\//);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/portal/customers/${customer.id}`);
+    await expect(page.getByRole("heading", { name: "Marta Compradora" })).toBeVisible();
+    await expect(page.locator("#purchases")).toContainText("250.00");
+    await expect(page.locator("#purchases")).toContainText("Devolución / cancelación");
+    await expect(page.locator("#purchases")).not.toContainText("777.00");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    expect(await page.locator("#purchases li").count()).toBe(5);
+    await page.getByRole("link", { name: "Siguientes →" }).click();
+    await expect(page.locator("#purchases")).toContainText("105.00");
+    expect(await prisma.foodSale.count({ where: { organizationId: orgId, customerId: customer.id } })).toBe(7);
+    await page.goto("/portal/customers/not-a-customer");
+    await expect(page.getByRole("heading", { name: "Marta Compradora" })).toHaveCount(0);
   });
 
 });

@@ -207,3 +207,35 @@ describe("Loyalty durable event integration", () => {
   });
 
 });
+
+describe("POS customer recognition", () => {
+  it("finds the customer by normalized phone, preserves consent and shows automatically earned rewards without a QR", async () => {
+    const b = await setup();
+    await prisma.customer.update({ where: { id: b.member.customerId! }, data: { consentAccepted: true, postalCode: "06400" } });
+    const query = async () => {
+      const response = await lookup(request("/api/webhooks/pos/loyalty", b.org, { action: "lookup", phone: "+52 81 5550 0001" }));
+      expect(response.status).toBe(200);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      return response.json();
+    };
+    expect(await query()).toMatchObject({ status: "found", customer: { consentAccepted: true, postalCode: "06400" }, loyalty: { status: "found", member: { progress: { current: 0 } } } });
+    await consumeLoyaltyEvent(await b.sale("phone-one", 0));
+    await consumeLoyaltyEvent(await b.sale("phone-two", 10));
+    const result = await query();
+    expect(result.loyalty.member.rewardsAvailable).toHaveLength(1);
+    expect(JSON.stringify(result)).not.toContain(b.member.publicToken);
+    expect(result.customer.consentAccepted).toBe(true);
+    expect((await b.state()).visits.every(v => v.saleId !== null)).toBe(true);
+  });
+  it("isolates customers by organization and can identify a customer without Loyalty enabled", async () => {
+    const b = await setup();
+    await prisma.organizationModule.delete({ where: { organizationId_module: { organizationId: b.org.id, module: "LOYALTY" } } });
+    const response = await lookup(request("/api/webhooks/pos/loyalty", b.org, { action: "lookup", phone: b.phone }));
+    expect(await response.json()).toMatchObject({ status: "found", loyalty: { status: "module_disabled" } });
+    const other = await createTestOrg("Customer lookup isolation"); orgs.push(other.id);
+    await prisma.organizationModule.create({ data: { organizationId: other.id, module: "REYMEN_POS" } });
+    expect(await (await lookup(request("/api/webhooks/pos/loyalty", other, { action: "lookup", phone: b.phone }))).json()).toEqual({ status: "not_found" });
+    await prisma.organizationModule.delete({ where: { organizationId_module: { organizationId: other.id, module: "REYMEN_POS" } } });
+    expect((await lookup(request("/api/webhooks/pos/loyalty", other, { action: "lookup", phone: b.phone }))).status).toBe(403);
+  });
+});
