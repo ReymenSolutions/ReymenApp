@@ -100,7 +100,7 @@ function EventBreakdown({ counts, labels, lang }: { counts: Record<string, numbe
   const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
   const max = Math.max(0, ...entries.map(([, count]) => count));
   if (!entries.length) return <p className="text-sm text-slate-500">{lang === "es" ? "Todavía no hay actividad." : "No activity yet."}</p>;
-  return <MetricGrid as="ul" columns={2}>
+  return <MetricGrid as="ul" columns={2} density="comfortable">
     {entries.map(([type, count]) => <li key={type} className="min-w-0 rounded-lg bg-slate-50 p-3">
       <div className="mb-2 flex items-start justify-between gap-3 text-sm">
         <span className="min-w-0 break-words text-slate-600">{labels[type] ?? type.replaceAll("_", " ")}</span>
