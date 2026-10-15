@@ -1,3 +1,5 @@
+import { posRedemption, redemptionSchema } from "@/lib/loyalty/redemption";
+import { UserError } from "@/lib/user-error";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isWebhookAuthorized } from "@/lib/webhook-validator";
@@ -5,17 +7,9 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { hasModule } from "@/lib/modules";
 import { lookupMemberForPos, parsePosLoyalty } from "@/lib/loyalty/pos";
 
-// Consulta de Lealtad desde la caja de Reymen POS: el cajero escanea el QR de
-// la tarjeta del cliente (o escribe su WhatsApp) y el POS pregunta aquí su
-// progreso y sus recompensas disponibles ANTES de cobrar. No registra nada:
-// la visita se registra asincrónicamente a partir de sale.completed y Customer.
-// Este endpoint nunca autoriza canjes ni descuentos.
-//
-// Misma autenticación que las órdenes: firma HMAC del cuerpo crudo con un
-// timestamp fresco, contra el secreto PROPIO de la organización. Al ser una
-// consulta, no se registra como evento ni se deduplica.
-//
-// Cuerpo: { "code": "<QR o token>" } o { "phone": "81 5550 0001" }.
+// Authenticated POS lookup and quote/reserve/release contract. Reservations are
+// audited and idempotent by organization/order; sales settle through domain events.
+// The legacy {code} or {phone} lookup remains read-only.
 export async function POST(req: NextRequest) {
   const signature = req.headers.get("x-reymen-signature") ?? "";
   const timestamp = req.headers.get("x-reymen-timestamp") ?? "";
@@ -33,9 +27,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } });
   }
 
-  if (!(await hasModule(orgId, "LOYALTY"))) {
-    return NextResponse.json({ error: "Lealtad no está activada para este negocio.", code: "loyalty_module_disabled" }, { status: 403 });
-  }
 
   let body: unknown;
   try {
@@ -44,6 +35,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
+  if (!(body && typeof body === "object" && "action" in body && body.action === "release") && !(await hasModule(orgId, "LOYALTY"))) {
+    return NextResponse.json({ error: "Lealtad no está activada para este negocio.", code: "loyalty_module_disabled" }, { status: 403 });
+  }
+
+  if (body && typeof body === "object" && "action" in body) {
+    if (body.action !== "release" && !(await hasModule(orgId, "REYMEN_POS"))) return NextResponse.json({ error: "POS no habilitado" }, { status: 403 });
+    const parsed = redemptionSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: "Datos de canje inválidos" }, { status: 400 });
+    try { return NextResponse.json(await posRedemption(orgId, parsed.data), { headers: { "Cache-Control": "no-store" } }); }
+    catch (e) { if (e instanceof UserError) return NextResponse.json({ error: e.message }, { status: 409 }); throw e; }
+  }
   const result = await lookupMemberForPos(orgId, parsePosLoyalty(body));
   return NextResponse.json(result, { status: result.status === "invalid_request" ? 400 : 200 });
 }

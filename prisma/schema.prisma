@@ -1319,6 +1319,7 @@ model OrganizationModule {
 // páginas que aparentan estar conectadas a algo real.
 
 model FoodSale {
+  isCancellation Boolean @default(false)
   id              String         @id @default(cuid())
   organizationId  String
   // Fecha del negocio a la que pertenece la venta -- no necesariamente el
@@ -1444,6 +1445,7 @@ model Customer {
   id                 String    @id @default(cuid())
   organizationId     String
   // E.164 (+52...) y su llave de últimos 10 dígitos (ver src/lib/phone.ts).
+  postalCode String?
   phone              String
   phoneKey           String
   name               String?
@@ -2574,6 +2576,7 @@ enum LoyaltyRewardStatus {
 }
 
 model LoyaltyProgram {
+  isPrimary Boolean @default(false)
   id             String               @id @default(cuid())
   organizationId String
   scope          LoyaltyProgramScope  @default(ORGANIZATION)
@@ -2605,6 +2608,7 @@ model LoyaltyProgram {
 
 /// Regla del programa en el tiempo. Nunca se edita una versión: se crea la siguiente.
 model LoyaltyProgramVersion {
+  rewardValue Decimal? @db.Decimal(12, 2)
   id                String            @id @default(cuid())
   organizationId    String
   programId         String
@@ -2627,6 +2631,7 @@ model LoyaltyProgramVersion {
 }
 
 model LoyaltyMember {
+  isSelected Boolean @default(true)
   id                 String    @id @default(cuid())
   organizationId     String
   programId          String
@@ -2708,6 +2713,8 @@ model LoyaltyVisit {
 
 /// Recompensa ganada al completar un ciclo. Snapshot de la regla con la que se ganó; el canje no borra nada.
 model LoyaltyReward {
+  rewardValue Decimal? @db.Decimal(12, 2)
+  posRedemptions LoyaltyPosRedemption[]
   id                String              @id @default(cuid())
   organizationId    String
   programId         String
@@ -2777,4 +2784,22 @@ model LoyaltyEventReceipt {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   @@unique([organizationId, eventId])
   @@index([organizationId, outcome, createdAt])
+}
+
+
+model LoyaltyPosRedemption {
+  id String @id @default(cuid())
+  organizationId String
+  orderId String
+  rewardId String
+  deviceId String
+  customerId String
+  amountCents Int
+  subtotalCents Int
+  status String @default("RESERVED")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  reward LoyaltyReward @relation(fields: [rewardId], references: [id], onDelete: Restrict)
+  @@unique([organizationId, orderId])
+  @@index([rewardId, status])
 }

@@ -14,7 +14,7 @@ import { loyaltyStrings } from "@/lib/i18n-loyalty";
 import { memberCardPath } from "@/lib/loyalty/token";
 
 /** Formulario público de inscripción: nombre, WhatsApp y CP (correo opcional). Pensado para el celular. */
-export function EnrollForm({ orgSlug, businessName, branch }: { orgSlug: string; businessName: string; branch: string | null }) {
+export function EnrollForm({ orgSlug, businessName, branch, programId }: { programId?: string; orgSlug: string; businessName: string; branch: string | null }) {
   const router = useRouter();
   const { lang } = usePreferences();
   const L = pickDict(loyaltyStrings, lang);
@@ -29,7 +29,7 @@ export function EnrollForm({ orgSlug, businessName, branch }: { orgSlug: string;
     setLoading(true);
     setError(null);
     try {
-      const res = await enrollInLoyaltyProgram({ orgSlug, ...form, email: form.email || undefined, branch: branch ?? undefined });
+      const res = await enrollInLoyaltyProgram({ orgSlug, programId, ...form, email: form.email || undefined, branch: branch ?? undefined });
       if (res.status === "created") {
         router.push(memberCardPath(orgSlug, res.token));
         return;

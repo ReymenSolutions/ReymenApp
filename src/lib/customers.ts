@@ -19,6 +19,7 @@ export function normalizePhoneMx(raw: unknown): string | null {
 export interface PosCustomerInput {
   phone: string;
   name?: string;
+  postalCode?: string;
   consent?: { accepted: boolean; textVersion?: string; at?: string };
   /** Día y mes de cumpleaños (opcional). Solo se guarda si el cliente aceptó el contacto. */
   birthday?: Birthday;
@@ -43,7 +44,8 @@ export function parsePosCustomer(raw: unknown): (PosCustomerInput & { phone: str
     }
   }
   const birthday = parseBirthday(c.birthday) ?? undefined;
-  return { phone, name, consent, birthday };
+  const postalCode = typeof c.postalCode === "string" && /^\d{5}$/.test(c.postalCode.trim()) ? c.postalCode.trim() : undefined;
+  return { phone, name, consent, birthday, postalCode };
 }
 
 /**
@@ -62,18 +64,20 @@ export async function upsertCustomer(tx: Tx, organizationId: string, input: PosC
   const existed = !!current;
   // El cumpleaños es un dato personal: solo se guarda si el cliente aceptó el contacto (ahora o antes).
   const consented = input.consent ? input.consent.accepted : (current?.consentAccepted ?? false);
+  const postal = input.postalCode ? { postalCode: input.postalCode } : {};
   const birth = input.birthday && consented ? { birthMonth: input.birthday.month, birthDay: input.birthday.day } : {};
   const customer = await tx.customer.upsert({
     where: { organizationId_phoneKey: { organizationId, phoneKey: key } },
-    create: { organizationId, phone: input.phone, phoneKey: key, name: input.name ?? null, leadId: lead?.id ?? null, ...consent, ...birth },
-    update: { ...(input.name ? { name: input.name } : {}), ...(lead ? { leadId: lead.id } : {}), ...consent, ...birth },
+    create: { organizationId, phone: input.phone, phoneKey: key, name: input.name ?? null, leadId: lead?.id ?? null, ...consent, ...birth, ...postal },
+    update: { ...(input.name ? { name: input.name } : {}), ...(lead ? { leadId: lead.id } : {}), ...consent, ...birth, ...postal },
   });
+  if (input.postalCode) await tx.loyaltyMember.updateMany({ where: { organizationId, customerId: customer.id }, data: { postalCode: input.postalCode } });
   return { ...customer, created: !existed };
 }
 
 /** Suma (o resta, en una cancelación) una venta a las estadísticas del cliente. */
-export async function applySaleToCustomer(tx: Tx, customerId: string, sale: { grossAmount: number; occurredAt: Date }) {
-  const cancel = sale.grossAmount < 0;
+export async function applySaleToCustomer(tx: Tx, customerId: string, sale: { grossAmount: number; occurredAt: Date; isCancellation?: boolean }) {
+  const cancel = sale.isCancellation || sale.grossAmount < 0;
   const c = await tx.customer.update({
     where: { id: customerId },
     data: {
@@ -93,9 +97,9 @@ export async function applySaleToCustomer(tx: Tx, customerId: string, sale: { gr
 /** Recalcula las estadísticas de estos clientes desde sus ventas (por ejemplo después de borrar ventas de prueba). */
 export async function rebuildCustomerStats(tx: Tx, organizationId: string, customerIds: string[]) {
   for (const id of new Set(customerIds)) {
-    const sales = await tx.foodSale.findMany({ where: { organizationId, customerId: id }, select: { grossAmount: true, occurredAt: true } });
-    const visits = sales.filter((s) => Number(s.grossAmount) > 0);
-    const cancels = sales.filter((s) => Number(s.grossAmount) < 0).length;
+    const sales = await tx.foodSale.findMany({ where: { organizationId, customerId: id }, select: { grossAmount: true, occurredAt: true, isCancellation: true } });
+    const visits = sales.filter((s) => !s.isCancellation && Number(s.grossAmount) >= 0);
+    const cancels = sales.filter((s) => s.isCancellation || Number(s.grossAmount) < 0).length;
     const dates = visits.map((s) => s.occurredAt.getTime());
     await tx.customer.update({
       where: { id },

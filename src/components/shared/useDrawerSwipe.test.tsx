@@ -35,10 +35,10 @@ describe("gesto del menú lateral", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it("deslizar hacia la derecha desde el borde izquierdo abre el menú", () => {
+  it("reserva el gesto del borde para el historial nativo", () => {
     render(<Harness />);
     swipe([10, 300], [140, 310]);
-    expect(state()).toBe("open");
+    expect(state()).toBe("closed");
   });
 
   it("no se abre con un deslizamiento que no empieza en el borde, que es muy corto o que es vertical", () => {
@@ -51,21 +51,17 @@ describe("gesto del menú lateral", () => {
     expect(state()).toBe("closed");
   });
 
-  it("no se cierra de inmediato tras abrirse (toque fantasma sobre el fondo), pero sí después", () => {
+  it("el botón abre y un enlace puede cerrar inmediatamente", () => {
     render(<Harness />);
-    swipe([10, 300], [140, 300]);
+    act(() => { screen.getByText("abrir").click(); });
     expect(state()).toBe("open");
-    act(() => { screen.getByText("cerrar").click(); }); // el clic que el navegador genera al soltar el dedo
-    expect(state()).toBe("open");
-    act(() => { vi.advanceTimersByTime(500); });
     act(() => { screen.getByText("cerrar").click(); });
     expect(state()).toBe("closed");
   });
 
   it("deslizar hacia la izquierda con el menú abierto lo cierra", () => {
     render(<Harness />);
-    swipe([10, 300], [140, 300]);
-    act(() => { vi.advanceTimersByTime(500); });
+    act(() => { screen.getByText("abrir").click(); });
     swipe([200, 300], [90, 305]);
     expect(state()).toBe("closed");
   });

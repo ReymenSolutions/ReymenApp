@@ -12,9 +12,10 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { clientIp } from "@/lib/client-ip";
 import { UserError } from "@/lib/user-error";
 import { phoneKey } from "@/lib/phone";
-import { enrollMember, type EnrollResult } from "@/lib/loyalty/service";
+import { chooseMemberProgram, enrollMember, type EnrollResult } from "@/lib/loyalty/service";
 
 const enrollSchema = z.object({
+  programId: z.string().max(100).optional(),
   orgSlug: z.string().min(1).max(120),
   name: z.string().max(120),
   whatsapp: z.string().max(40),
@@ -40,6 +41,7 @@ export async function enrollInLoyaltyProgram(data: z.input<typeof enrollSchema>)
   }
 
   return enrollMember(d.orgSlug, {
+    programId: d.programId,
     name: d.name,
     whatsapp: d.whatsapp,
     postalCode: d.postalCode,
@@ -47,4 +49,14 @@ export async function enrollInLoyaltyProgram(data: z.input<typeof enrollSchema>)
     branchId: d.branch || null,
     consent: d.consent,
   });
+}
+
+
+export async function selectMyLoyaltyProgram(data: { slug: string; token: string; programId: string }) {
+  const d = z.object({ slug: z.string().min(1).max(120), token: z.string().regex(/^[A-Za-z0-9_-]{24}$/), programId: z.string().min(1).max(100) }).parse(data);
+  const h = await headers();
+  const ip = clientIp(new Request("http://local", { headers: h })) ?? "unknown";
+  const limit = await checkRateLimit(`loyalty-choice:${ip}`, { limit: 20, windowMs: 60000 });
+  if (!limit.allowed) throw new UserError("Intenta de nuevo en un minuto.");
+  return chooseMemberProgram(d.slug, d.token, d.programId);
 }
