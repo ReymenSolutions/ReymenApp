@@ -1,8 +1,8 @@
 /** Read-only counts: no customer names, phones, credentials or data mutations. */
-const { PrismaClient } = require('@prisma/client');
+import { PrismaClient } from '@prisma/client';
 const search = process.argv[2]?.trim();
 if (!search) {
-  console.error('Uso: node diagnose-loyalty.cjs nombre-del-negocio');
+  console.error('Uso: node diagnose-loyalty.mjs nombre-del-negocio');
   process.exit(1);
 }
 const prisma = new PrismaClient();
