@@ -1,7 +1,7 @@
 import { settlePosRedemption } from "./redemption";
 import { prisma } from "@/lib/prisma";
 import { type StoredDomainEvent } from "@/lib/domain-events";
-import { LoyaltyRuleError, registerVisitInTx } from "./service";
+import { LoyaltyRuleError, registerVisitInTx, VISIT_COOLDOWN_MINUTES } from "./service";
 import { adjustSaleVisitAmount, voidSaleVisit } from "./reconcile";
 
 /** No network calls and no dependency from the POS ingestion transaction.
@@ -72,7 +72,7 @@ async function applyLoyaltyEvent(event: StoredDomainEvent, recovery: boolean): P
     try {
       const result = await registerVisitInTx(tx, { organizationId, memberId: member.id, employeeUserId: null, branchId: original.branchId,
         saleId: original.id, saleAmount: Number(original.grossAmount), idempotencyKey,
-        posCooldownMinutes: recovery ? 0 : (Number.isInteger(payload.loyaltyVisitCooldownMinutes) && Number(payload.loyaltyVisitCooldownMinutes) >= 0 && Number(payload.loyaltyVisitCooldownMinutes) <= 525600 ? Number(payload.loyaltyVisitCooldownMinutes) : undefined) }, event.occurredAt);
+        posCooldownMinutes: recovery ? 0 : (Number.isInteger(payload.loyaltyVisitCooldownMinutes) && Number(payload.loyaltyVisitCooldownMinutes) >= 0 && Number(payload.loyaltyVisitCooldownMinutes) <= 525600 ? Number(payload.loyaltyVisitCooldownMinutes) : VISIT_COOLDOWN_MINUTES) }, event.occurredAt);
       if (remaining.lt(original.grossAmount)) await adjustSaleVisitAmount(tx, organizationId, original.id, remaining, event.id);
       await record(result.replay ? "replay" : "earned");
       return !result.replay;

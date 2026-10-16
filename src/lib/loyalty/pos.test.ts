@@ -306,6 +306,11 @@ describe("configurable POS visit interval", () => {
     const noWait = await b.sale("interval-disabled", 2);
     await consumeLoyaltyEvent(noWait); await consumeLoyaltyEvent(noWait);
     expect((await b.state()).totalVisits).toBe(2);
+    const oldPending = await b.sale("legacy-pending-policy", 3);
+    const oldPayload = { ...(oldPending.payload as Record<string, never>) }; delete oldPayload.loyaltyVisitCooldownMinutes;
+    const legacy = await prisma.domainEvent.update({ where: { id: oldPending.id }, data: { payload: oldPayload } });
+    await consumeLoyaltyEvent(legacy);
+    expect((await b.state()).totalVisits).toBe(2); // old pending events retain the former three-minute rule
     expect(await getVisitPolicy(b.org.id)).toMatchObject({ enabled: false, minutes: 1440, unit: "days" });
     await expect(registerVisit({ organizationId: b.org.id, memberId: b.member.id, employeeUserId: b.staff.id, branchId: null, saleAmount: null, idempotencyKey: "manual-still-protected", now: b.at(2) })).rejects.toMatchObject({ code: "cooldown" });
     await expect(setVisitPolicy(b.org.id, { enabled: true, value: 366, unit: "days" }, { deviceId: "box", employeeId: "admin" })).rejects.toThrow();
