@@ -88,6 +88,33 @@ test("business creates another program and a member chooses it from their card",
   expect((await prisma.loyaltyMember.findUniqueOrThrow({ where: { id: first.id } })).isSelected).toBe(false);
 });
 
+test("admin browses historical programs without changing the customer's selected program", async ({ page }) => {
+  await login(page);
+  const programs = await prisma.loyaltyProgram.findMany({ where: { organizationId: orgId }, orderBy: { createdAt: "asc" } });
+  const memberships = await prisma.loyaltyMember.findMany({ where: { organizationId: orgId }, orderBy: { createdAt: "asc" } });
+  const old = memberships.find(m => m.programId === programs[0].id)!;
+  const selected = memberships.find(m => m.isSelected)!;
+  const before = await prisma.loyaltyMember.findMany({ where: { organizationId: orgId }, select: { id: true, isSelected: true, totalVisits: true }, orderBy: { id: "asc" } });
+  await page.goto("/portal/loyalty/members");
+  await page.getByLabel("Consultar clientes y visitas de").selectOption(selected.programId);
+  await expect(page.getByRole("status").filter({ hasText: "Estás viendo" })).toContainText("Segundo Club");
+  await page.goto(`/portal/loyalty/members/${old.id}`);
+  await expect(page.getByText("Café de regalo", { exact: true })).toBeVisible();
+  const choices = page.getByRole("region", { name: "Programas de este cliente" });
+  await expect(choices.getByRole("link")).toHaveCount(2);
+  await choices.getByRole("link", { name: /Segundo Club/ }).click();
+  await expect(page).toHaveURL(new RegExp(`/members/${selected.id}$`));
+  await expect(page.getByText("Otra recompensa", { exact: true })).toBeVisible();
+  await page.getByRole("region", { name: "Programas de este cliente" }).getByRole("link", { name: /Club E2E/ }).click();
+  await expect(page).toHaveURL(new RegExp(`/members/${old.id}$`));
+  await page.goto("/portal/loyalty/visits");
+  await page.getByLabel("Consultar clientes y visitas de").selectOption(programs[0].id);
+  await expect(page.getByRole("status").filter({ hasText: "Estás viendo" })).toContainText("Club E2E");
+  expect(await prisma.loyaltyMember.findMany({ where: { organizationId: orgId }, select: { id: true, isSelected: true, totalVisits: true }, orderBy: { id: "asc" } })).toEqual(before);
+  await page.goto("/portal/loyalty/members/nonexistent-other-organization-member");
+  await expect(page.getByText("404")).toBeVisible();
+});
+
 test("mobile dark English pages render real data without horizontal overflow", async ({ page, context }, testInfo) => {
   await prisma.user.update({ where: { email }, data: { theme: "dark", language: "en" } });
   loginCookies = undefined; // Refresh JWT preference claims after changing the fixture.

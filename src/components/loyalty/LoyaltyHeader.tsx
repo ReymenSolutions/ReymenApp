@@ -1,3 +1,4 @@
+import { LoyaltyListOnly } from "./LoyaltyProgramBrowser";
 import Link from "next/link";
 import { Sparkles, ScanLine, FlaskConical } from "lucide-react";
 import type { LoyaltyDict } from "@/lib/i18n-loyalty";
@@ -9,12 +10,14 @@ export function LoyaltyHeader({
   programName,
   isDemo,
   showRegister,
+  paused = false,
 }: {
   L: LoyaltyDict;
   orgName: string;
   programName: string | null;
   isDemo: boolean;
   showRegister: boolean;
+  paused?: boolean;
 }) {
   return (
     <div className="mb-4 overflow-hidden rounded-xl border border-slate-200 bg-gradient-to-br from-brand-900 via-brand-800 to-brand-950 px-6 py-6 text-white sm:px-8">
@@ -31,12 +34,14 @@ export function LoyaltyHeader({
               {programName}
             </span>
           )}
+          <LoyaltyListOnly>
           {isDemo && (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/20 px-3 py-1 text-xs font-semibold text-amber-100 ring-1 ring-amber-300/40" title={L.demoNote}>
               <FlaskConical className="h-3.5 w-3.5" />
               {L.demoBadge}
             </span>
           )}
+          {paused && <p className="text-sm text-amber-100">{L.pausedBanner}</p>}
           {showRegister && (
             <Link
               href="/portal/loyalty/visits"
@@ -46,6 +51,7 @@ export function LoyaltyHeader({
               {L.registerVisitCta}
             </Link>
           )}
+          </LoyaltyListOnly>
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { getOrgTimezone, localDateString } from "@/lib/business-day";
 import { prisma } from "@/lib/prisma";
 import { createTestOrg, createTestUser, fakeSession, cleanupOrg } from "@/test/helpers";
 
@@ -140,7 +141,7 @@ describe("inventario por sucursal", () => {
     await inv.recalculateFoodRecipeUsage(new Date(Date.now() - 3600_000).toISOString());
     expect(await principal()).toBeLessThan(p0);
     expect(await branchQty(centro.id)).toBeLessThan(c0);
-    const day = new Date().toLocaleDateString("en-CA");
+    const day = localDateString(new Date(), await getOrgTimezone(org.id));
     const beforePurge = { p: await principal(), c: await branchQty(centro.id) };
     await purgePosSales(org.id, day, day);
     expect(await principal()).toBeGreaterThan(beforePurge.p);

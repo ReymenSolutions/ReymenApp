@@ -227,6 +227,21 @@ describe("POS customer recognition", () => {
     expect(result.customer.consentAccepted).toBe(true);
     expect((await b.state()).visits.every(v => v.saleId !== null)).toBe(true);
   });
+  it("persists a birthday captured at checkout and returns it on the next lookup without erasing omitted values", async () => {
+    const b = await setup();
+    const variant = await prisma.foodDishVariant.findFirstOrThrow({ where: { organizationId: b.org.id } });
+    const sell = (orderId: string, customer: unknown) => orders(request("/api/webhooks/pos/orders", b.org, {
+      orderId, occurredAt: new Date().toISOString(), grossAmount: 150, netAmount: 150 / 1.16, customer, items: [{ variantId: variant.id, quantity: 1 }],
+    }));
+    expect((await sell("birthday-first", { phone: b.phone, consent: { accepted: true }, birthday: { month: 2, day: 29 }, postalCode: "06400" })).status).toBe(200);
+    expect(await prisma.customer.findUniqueOrThrow({ where: { id: b.member.customerId! } })).toMatchObject({ birthDay: 29, birthMonth: 2, postalCode: "06400" });
+    expect((await sell("birthday-next", { phone: b.phone })).status).toBe(200);
+    const query = () => lookup(request("/api/webhooks/pos/loyalty", b.org, { action: "lookup", phone: b.phone }));
+    expect(await (await query()).json()).toMatchObject({ status: "found", customer: { birthDay: 29, birthMonth: 2, postalCode: "06400", consentAccepted: true } });
+    expect((await sell("birthday-revoked", { phone: b.phone, consent: { accepted: false }, birthday: { month: 5, day: 1 } })).status).toBe(200);
+    expect(await (await query()).json()).toMatchObject({ customer: { birthDay: null, birthMonth: null, consentAccepted: false } });
+    expect(await prisma.customer.findUniqueOrThrow({ where: { id: b.member.customerId! } })).toMatchObject({ birthDay: 29, birthMonth: 2 });
+  });
   it("isolates customers by organization and can identify a customer without Loyalty enabled", async () => {
     const b = await setup();
     await prisma.organizationModule.delete({ where: { organizationId_module: { organizationId: b.org.id, module: "LOYALTY" } } });

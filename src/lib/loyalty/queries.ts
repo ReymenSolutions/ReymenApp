@@ -388,6 +388,13 @@ export async function getMemberProfile(organizationId: string, memberId: string,
   const totalSpent = Number(m.totalSpent);
   return {
     id: m.id,
+    programId: m.programId,
+    isSelected: m.isSelected,
+    programs: await prisma.loyaltyMember.findMany({
+      where: { organizationId, ...(m.customerId ? { customerId: m.customerId } : { id: m.id }) },
+      orderBy: [{ isSelected: "desc" }, { createdAt: "asc" }],
+      select: { id: true, programId: true, isSelected: true, totalVisits: true, program: { select: { name: true, status: true } } },
+    }),
     name: m.name,
     whatsapp: m.whatsapp,
     email: m.email,
