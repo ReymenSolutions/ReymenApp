@@ -1,3 +1,5 @@
+import { after } from "next/server";
+import { syncCustomerContacts } from "@/lib/customer-contacts";
 import { NextResponse } from "next/server";
 import { createOrgWebhookHandler } from "@/lib/org-webhook-route";
 import { processFoodPosOrder } from "@/lib/food";
@@ -19,7 +21,14 @@ export const POST = createOrgWebhookHandler({
   eventType: "order.completed",
   // Sin id de evento un reenvío contaría la venta dos veces: el POS siempre lo manda (id de la orden en el POS).
   requireEventId: true,
-  process: processFoodPosOrder,
+  process: async (payload, organizationId) => {
+    const result = await processFoodPosOrder(payload, organizationId);
+    after(async () => {
+      try { await syncCustomerContacts(organizationId); }
+      catch { console.error("[customer-contacts] automatic sync deferred to periodic retry"); }
+    });
+    return result;
+  },
   // Sin el módulo "Reymen POS" no se aceptan ventas del POS. 403 con un code
   // propio: el POS las deja pendientes y las reenvía cuando se active.
   precheck: async (organizationId) => {

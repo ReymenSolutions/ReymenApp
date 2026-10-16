@@ -6,10 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
-import { withPlanCapacity } from "@/lib/plan-limits";
+import { ensureCustomerContact } from "@/lib/customer-contacts";
 import { assertModuleEnabled } from "@/lib/modules";
-import { recordMetric, METRIC_KEYS } from "@/lib/metrics";
-import { linkOrphanConversations } from "@/lib/crm-link";
 import { UserError } from "@/lib/user-error";
 import { parseBirthday } from "@/lib/birthday";
 
@@ -25,40 +23,11 @@ export async function createLeadFromCustomer(customerId: string) {
   const orgId = session.user.organizationId;
   await assertModuleEnabled(orgId, "CRM");
 
-  const customer = await prisma.customer.findFirst({ where: { id: customerId, organizationId: orgId } });
-  if (!customer) throw new UserError("Cliente no encontrado");
-  if (customer.leadId) {
-    const linked = await prisma.lead.findFirst({ where: { id: customer.leadId, organizationId: orgId, deletedAt: null }, select: { id: true } });
-    if (linked) return { success: true, leadId: linked.id, created: false };
-  }
-  // Ya hay un contacto con ese teléfono (por ejemplo, creado después de la compra): solo se enlaza.
-  const existing = await prisma.lead.findFirst({ where: { organizationId: orgId, phoneKey: customer.phoneKey, deletedAt: null }, orderBy: { createdAt: "asc" }, select: { id: true } });
-  if (existing) {
-    await prisma.customer.update({ where: { id: customer.id }, data: { leadId: existing.id } });
-    revalidatePath("/portal/customers");
-    return { success: true, leadId: existing.id, created: false };
-  }
-
-  const lead = await withPlanCapacity(orgId, "leads", (tx) =>
-    tx.lead.create({
-      data: {
-        organizationId: orgId,
-        name: customer.name?.trim() || customer.phone,
-        phone: customer.phone,
-        phoneKey: customer.phoneKey,
-        source: "pos",
-        status: "WON",
-        doNotContact: !customer.consentAccepted,
-      },
-    })
-  );
-  await prisma.customer.update({ where: { id: customer.id }, data: { leadId: lead.id } });
-  await linkOrphanConversations(orgId, lead.id, lead.phone);
-  await logAudit({ organizationId: orgId, userId: session.user.id, action: "lead.create_from_customer", resource: "Lead", resourceId: lead.id, metadata: { customerId, doNotContact: lead.doNotContact } });
-  await recordMetric(orgId, METRIC_KEYS.LEADS_CAPTURED);
+  const result = await ensureCustomerContact(orgId, customerId, { manual: true, userId: session.user.id });
+  if (!result) throw new UserError("Cliente no encontrado");
   revalidatePath("/portal/customers");
   revalidatePath("/portal/leads");
-  return { success: true, leadId: lead.id, created: true };
+  return { success: true, ...result };
 }
 
 /**
