@@ -20,6 +20,7 @@ describe("loyalty server action authorization", () => {
     await expect(actions.saveLoyaltyProgram(program)).rejects.toThrow(/habilitado/);
     await expect(actions.searchLoyaltyMembers("Ana")).rejects.toThrow(/habilitado/);
     await expect(actions.retryLoyaltyEvents()).rejects.toThrow(/habilitado/);
+    await expect(actions.recoverLoyaltyPosVisits("x")).rejects.toThrow(/habilitado/);
   });
   it("owner configures; viewer cannot mutate; cashier operates but cannot configure or recover events", async () => {
     await prisma.organizationModule.create({ data: { organizationId: org.id, module: "LOYALTY" } });
@@ -32,6 +33,7 @@ describe("loyalty server action authorization", () => {
     authMock.mockResolvedValue(fakeSession({ ...owner, role: "AGENT" }));
     await expect(actions.saveLoyaltyProgram(program)).rejects.toThrow(/autorizado/);
     await expect(actions.retryLoyaltyEvents()).rejects.toThrow(/autorizado/);
+    await expect(actions.recoverLoyaltyPosVisits("x")).rejects.toThrow(/autorizado/);
     expect(await actions.searchLoyaltyMembers("Ana")).toEqual([]);
   });
   it("suspension blocks existing sessions and preserves program history", async () => {

@@ -325,6 +325,8 @@ export interface RegisterVisitInput {
   /** Generada por la pantalla de caja al abrir el formulario; un reenvío con la misma llave no duplica. */
   idempotencyKey: string;
   saleId?: string | null;
+  /** Internal server-derived sale policy; never read from POS customer input. */
+  posCooldownMinutes?: number;
   now?: Date;
 }
 
@@ -487,11 +489,14 @@ export async function registerVisitInTx(
   if (program.scope === "BRANCH" && program.branchId !== input.branchId) {
     throw new LoyaltyRuleError("branch_not_in_program", "Este programa solo acumula visitas en su sucursal.");
   }
-  const nearby = await tx.loyaltyVisit.findFirst({ where: { organizationId, memberId: member.id, status: "CONFIRMED", occurredAt: {
-    gt: new Date(now.getTime() - VISIT_COOLDOWN_MINUTES * 60_000), lt: new Date(now.getTime() + VISIT_COOLDOWN_MINUTES * 60_000),
-  } } });
-  if (nearby) {
-    throw new LoyaltyRuleError("cooldown", "Este cliente acaba de registrar una visita. Espera unos minutos para registrar otra.");
+  const policy = input.saleId && input.posCooldownMinutes === undefined
+    ? await tx.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { loyaltyVisitCooldownEnabled: true, loyaltyVisitCooldownMinutes: true } }) : null;
+  const cooldown = input.saleId ? (input.posCooldownMinutes ?? (policy?.loyaltyVisitCooldownEnabled ? policy.loyaltyVisitCooldownMinutes : 0)) : VISIT_COOLDOWN_MINUTES;
+  if (cooldown > 0) {
+    const nearby = await tx.loyaltyVisit.findFirst({ where: { organizationId, memberId: member.id, status: "CONFIRMED", occurredAt: {
+      gt: new Date(now.getTime() - cooldown * 60_000), lt: new Date(now.getTime() + cooldown * 60_000),
+    } } });
+    if (nearby) throw new LoyaltyRuleError("cooldown", input.saleId ? "Esta compra está dentro del intervalo configurado entre visitas." : "Este cliente acaba de registrar una visita. Espera unos minutos para registrar otra.");
   }
 
   const deficit = await tx.loyaltyReward.findFirst({ where: { organizationId, memberId: member.id, missingVisits: { gt: 0 } }, orderBy: { cycleNumber: "asc" } });

@@ -5,6 +5,7 @@
 // lado del servidor) → mutar con el organizationId de la SESIÓN (nunca del
 // formulario) → auditar (dentro de service.ts) → revalidatePath.
 
+import { recoverLegacyPosVisits } from "@/lib/loyalty/recovery";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { reconcileLoyaltyMember } from "@/lib/loyalty/reconcile";
@@ -215,4 +216,13 @@ export async function viewLoyaltyProgram(programId: string) {
   if (!program) throw new UserError("Programa no encontrado.");
   (await cookies()).set("loyalty-view-program", program.id, { httpOnly: true, sameSite: "lax", path: "/portal/loyalty", secure: process.env.NODE_ENV === "production" });
   revalidateLoyalty();
+}
+
+/** Explicit repair of POS visits skipped by the former fixed interval. */
+export async function recoverLoyaltyPosVisits(memberId: string) {
+  const session = await requireLoyaltyManager();
+  const id = z.string().min(1).max(40).parse(memberId);
+  const result = await recoverLegacyPosVisits(session.user.organizationId, id, session.user.id);
+  revalidateLoyalty([`/portal/loyalty/members/${id}`]);
+  return result;
 }
