@@ -6,6 +6,8 @@
 // su versión en español). Un mensaje que no esté aquí se muestra tal cual.
 
 const EN: Record<string, string> = {
+  "Activa el programa de Lealtad antes de recuperar las visitas.": "Activate the Loyalty program before recovering visits.",
+  "Esta compra está dentro del intervalo configurado entre visitas.": "This purchase is within the configured interval between visits.",
   "Intenta de nuevo en un minuto.": "Try again in a minute.",
   "Selecciona un programa activo de este negocio.": "Select an active program from this business.",
   "Programa no encontrado.": "Program not found.",
