@@ -1,3 +1,4 @@
+import { posRewards, posRewardsSchema } from "@/lib/loyalty/pos-rewards";
 import { getVisitPolicy, setVisitPolicy, visitPolicySchema } from "@/lib/loyalty/visit-policy";
 import { posRedemption, redemptionSchema } from "@/lib/loyalty/redemption";
 import { UserError } from "@/lib/user-error";
@@ -43,6 +44,14 @@ export async function POST(req: NextRequest) {
     const parsed = visitPolicySchema.safeParse(input.policy);
     if (!parsed.success || input.actorRole !== "admin" || typeof input.employeeId !== "string" || !input.employeeId || typeof input.deviceId !== "string" || !input.deviceId) return NextResponse.json({ error: "Configuración o autorización inválida" }, { status: 400 });
     return NextResponse.json(await setVisitPolicy(orgId, parsed.data, { deviceId: input.deviceId, employeeId: input.employeeId }), { headers: { "Cache-Control": "no-store" } });
+  }
+
+  if (body && typeof body === "object" && "action" in body && (body.action === "rewards.list" || body.action === "reward.redeem")) {
+    if (!(await hasModule(orgId, "REYMEN_POS")) || !(await hasModule(orgId, "LOYALTY"))) return NextResponse.json({ error: "POS o Lealtad no habilitado" }, { status: 403 });
+    const parsed = posRewardsSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: "Datos de canje inválidos" }, { status: 400 });
+    try { return NextResponse.json(await posRewards(orgId, parsed.data), { headers: { "Cache-Control": "no-store" } }); }
+    catch (e) { if (e instanceof UserError) return NextResponse.json({ error: e.message }, { status: 409 }); throw e; }
   }
 
   if (body && typeof body === "object" && "action" in body && body.action === "lookup") {

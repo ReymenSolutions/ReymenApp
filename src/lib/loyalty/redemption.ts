@@ -56,7 +56,7 @@ export async function posRedemption(organizationId: string, input: RedemptionInp
       rewardValue: { not: null }, rewardType: { in: ["DISCOUNT_AMOUNT", "DISCOUNT_PERCENT"] },
       program: { organizationId, status: "ACTIVE", OR: [{ scope: "ORGANIZATION" }, { branchId: input.branchId ?? null, scope: "BRANCH" }] },
       posRedemptions: { none: { status: { in: ["RESERVED", "COMMITTED"] } } },
-      ...(input.action === "reserve" ? { id: input.rewardId ?? "" } : {}),
+      ...(input.action === "reserve" || input.rewardId ? { id: input.rewardId ?? "" } : {}),
     }, orderBy: [{ earnedAt: "asc" }, { id: "asc" }] });
     if (!reward) return { status: "no_reward" as const };
     await tx.$queryRaw`SELECT id FROM "LoyaltyMember" WHERE id = ${reward.memberId} AND "organizationId" = ${organizationId} FOR UPDATE`;

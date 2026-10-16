@@ -1,9 +1,13 @@
 // @vitest-environment node
 import { afterAll, describe, expect, it } from "vitest";
+import { NextRequest } from "next/server";
+import { POST as posRewardsRoute } from "@/app/api/webhooks/pos/loyalty/route";
+import { createWebhookSignature } from "@/lib/webhook-validator";
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { createTestOrg, createTestUser, cleanupOrg } from "@/test/helpers";
 import { saveProgram, enrollMember, registerVisit, redeemReward, chooseMemberProgram, getPublicCard } from "./service";
+import { posRewards } from "./pos-rewards";
 import { posRedemption, settlePosRedemption, rewardDiscountCents } from "./redemption";
 import { emitDomainEvent } from "@/lib/domain-events";
 import { consumeLoyaltyEvent } from "./events";
@@ -101,5 +105,84 @@ describe("POS reward reservation", () => {
     await chooseMemberProgram(a.org.slug, a.member.publicToken, second.programId);
     await consumeLoyaltyEvent(await prisma.domainEvent.findFirstOrThrow({ where: { organizationId: a.org.id, dedupeKey: "selection-sale" } }));
     expect((await prisma.loyaltyVisit.findFirstOrThrow({ where: { saleId: sale.id } })).memberId).toBe(a.member.id);
+  });
+});
+
+describe("manual rewards from POS", () => {
+  it("lists separate free Lattes, redeems once across retries and keeps the other reward available", async () => {
+    const a = await setup();
+    await prisma.loyaltyReward.update({ where: { id: a.reward.id }, data: { rewardType: "FREE_ITEM", rewardValue: null, rewardName: "Latte gratis" } });
+    const second = await prisma.loyaltyReward.create({ data: { organizationId: a.org.id, memberId: a.member.id, programId: a.member.programId, programVersion: 1, visitGoal: 2, cycleNumber: 2, rewardName: "Latte gratis", rewardType: "FREE_ITEM", status: "AVAILABLE" } });
+    const base = { deviceId: "box", phone: a.member.whatsapp, branchId: null };
+    const before = await posRewards(a.org.id, { ...base, action: "rewards.list" });
+    expect(before.rewards).toHaveLength(2);
+    expect(before.rewards?.every(r => r.kind === "manual")).toBe(true);
+    const request = { ...base, action: "reward.redeem" as const, rewardId: a.reward.id, requestId: randomUUID(), employeeId: "cashier", actorRole: "cashier" as const };
+    const both = await Promise.all([posRewards(a.org.id, request), posRewards(a.org.id, request)]);
+    expect(both.every(r => r.status === "redeemed")).toBe(true);
+    expect(await prisma.auditLog.count({ where: { organizationId: a.org.id, action: "loyalty.reward_redeem", resourceId: a.reward.id } })).toBe(1);
+    expect((await posRewards(a.org.id, { ...base, action: "rewards.list" })).rewards?.map(r => r.id)).toEqual([second.id]);
+    await expect(posRewards(a.org.id, { ...request, requestId: randomUUID() })).rejects.toThrow();
+    await expect(redeemReward({ organizationId: a.org.id, userId: a.user.id, rewardId: a.reward.id, branchId: null })).rejects.toThrow();
+  });
+  it("requires cashier proof and correct customer, keeps discounts on the sale-reservation path", async () => {
+    const a = await setup();
+    const base = { action: "reward.redeem" as const, deviceId: "box", phone: a.member.whatsapp, rewardId: a.reward.id, requestId: randomUUID() };
+    await expect(posRewards(a.org.id, base)).rejects.toThrow(/PIN/);
+    await expect(posRewards(a.org.id, { ...base, employeeId: "cashier", actorRole: "cashier" })).rejects.toThrow(/descuento/);
+    const c = await prisma.customer.create({ data: { organizationId: a.org.id, phone: "+528155512346", phoneKey: "8155512346" } });
+    await expect(posRewards(a.org.id, { ...base, phone: c.phone, employeeId: "cashier", actorRole: "cashier" })).rejects.toThrow(/encontrada/);
+    expect((await posRewards(a.org.id, { action: "rewards.list", deviceId: "box", phone: c.phone })).rewards).toEqual([]);
+    const b = await setup();
+    await expect(posRewards(b.org.id, { ...base, employeeId: "cashier", actorRole: "cashier", phone: b.member.whatsapp })).rejects.toThrow();
+    expect((await prisma.loyaltyReward.findUniqueOrThrow({ where: { id: a.reward.id } })).status).toBe("AVAILABLE");
+  });
+  it("uses each earned reward name, preserving pending Lattes when the program changes to Matcha", async () => {
+    const a = await setup();
+    await prisma.loyaltyReward.update({ where: { id: a.reward.id }, data: { rewardType: "FREE_ITEM", rewardValue: null, rewardName: "Latte gratis" } });
+    await saveProgram(a.org.id, a.user.id, { ...a.input, programId: a.member.programId, rewardType: "FREE_ITEM", rewardValue: null, rewardName: "Matcha gratis" });
+    for (const n of [0, 1]) await registerVisit({ organizationId: a.org.id, employeeUserId: a.user.id, memberId: a.member.id, branchId: null, saleAmount: 100, idempotencyKey: `matcha-${n}`, now: new Date(Date.now() + 1800000 + n * 600000) });
+    const result = await posRewards(a.org.id, { action: "rewards.list", phone: a.member.whatsapp, deviceId: "box" });
+    expect(result.rewards?.map(r => r.name)).toEqual(["Latte gratis", "Matcha gratis"]);
+    expect(result.rewards?.every(r => r.kind === "manual")).toBe(true);
+  });
+  it("authenticates the endpoint, requires active modules and binds a gift to its program branch", async () => {
+    const a = await setup();
+    const branch = await prisma.branch.create({ data: { organizationId: a.org.id, name: "Centro" } });
+    await prisma.loyaltyProgram.update({ where: { id: a.member.programId }, data: { scope: "BRANCH", branchId: branch.id } });
+    await prisma.loyaltyReward.update({ where: { id: a.reward.id }, data: { rewardType: "FREE_ITEM", rewardValue: null } });
+    const call = (body: object, signed = true) => {
+      const raw = JSON.stringify(body), timestamp = String(Date.now());
+      return posRewardsRoute(new NextRequest("http://localhost/api/webhooks/pos/loyalty", { method: "POST", body: raw, headers: { "x-reymen-orgid": a.org.id, "x-reymen-timestamp": timestamp, "x-reymen-signature": signed ? createWebhookSignature(raw, a.org.n8nWebhookSecret, timestamp) : "invalid" } }));
+    };
+    const list = { action: "rewards.list", phone: a.member.whatsapp, deviceId: "box" };
+    expect((await call(list, false)).status).toBe(401);
+    expect((await (await call(list)).json()).rewards).toEqual([]);
+    expect((await (await call({ ...list, branchId: branch.id })).json()).rewards).toHaveLength(1);
+    const redeem = { action: "reward.redeem", phone: a.member.whatsapp, deviceId: "box", rewardId: a.reward.id, employeeId: "cashier", actorRole: "cashier", requestId: randomUUID() };
+    expect((await call(redeem)).status).toBe(409);
+    expect((await call({ ...redeem, actorRole: "waiter", branchId: branch.id })).status).toBe(400);
+    await prisma.organizationModule.update({ where: { organizationId_module: { organizationId: a.org.id, module: "LOYALTY" } }, data: { status: "SUSPENDED" } });
+    expect((await call({ ...redeem, branchId: branch.id })).status).toBe(403);
+    await prisma.organizationModule.update({ where: { organizationId_module: { organizationId: a.org.id, module: "LOYALTY" } }, data: { status: "ACTIVE" } });
+    expect((await call({ ...redeem, branchId: branch.id })).status).toBe(200);
+  });
+  it("serializes simultaneous gift redemption from App and POS", async () => {
+    const a = await setup();
+    await prisma.loyaltyReward.update({ where: { id: a.reward.id }, data: { rewardType: "FREE_ITEM", rewardValue: null } });
+    const results = await Promise.allSettled([
+      posRewards(a.org.id, { action: "reward.redeem", phone: a.member.whatsapp, deviceId: "box", rewardId: a.reward.id, requestId: randomUUID(), employeeId: "cashier", actorRole: "cashier" }),
+      redeemReward({ organizationId: a.org.id, userId: a.user.id, rewardId: a.reward.id, branchId: null }),
+    ]);
+    expect(results.filter(r => r.status === "fulfilled")).toHaveLength(1);
+    expect(await prisma.auditLog.count({ where: { organizationId: a.org.id, action: "loyalty.reward_redeem", resourceId: a.reward.id } })).toBe(1);
+  });
+  it("allows explicitly selecting a later discount without consuming the older reward", async () => {
+    const a = await setup();
+    const reward = await prisma.loyaltyReward.create({ data: { organizationId: a.org.id, memberId: a.member.id, programId: a.member.programId, programVersion: 1, visitGoal: 2, cycleNumber: 2, rewardName: "$20", rewardType: "DISCOUNT_AMOUNT", rewardValue: 20, status: "AVAILABLE", earnedAt: new Date(Date.now() + 10000000) } });
+    const base = { action: "quote" as const, deviceId: "box", phone: a.member.whatsapp, subtotalCents: 10000, orderId: randomUUID() };
+    expect(await posRedemption(a.org.id, base)).toMatchObject({ rewardId: a.reward.id });
+    expect(await posRedemption(a.org.id, { ...base, rewardId: reward.id })).toMatchObject({ rewardId: reward.id, amountCents: 2000 });
+    expect((await prisma.loyaltyReward.findUniqueOrThrow({ where: { id: a.reward.id } })).status).toBe("AVAILABLE");
   });
 });
