@@ -18,6 +18,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   if (!orgId) return;
   await prisma.loyaltyProgram.deleteMany({ where: { organizationId: orgId } });
+  await prisma.foodSale.deleteMany({ where: { organizationId: orgId } });
   await prisma.customer.deleteMany({ where: { organizationId: orgId } });
   await prisma.auditLog.deleteMany({ where: { organizationId: orgId } });
   await prisma.organizationModule.deleteMany({ where: { organizationId: orgId } });
@@ -113,6 +114,28 @@ test("admin browses historical programs without changing the customer's selected
   expect(await prisma.loyaltyMember.findMany({ where: { organizationId: orgId }, select: { id: true, isSelected: true, totalVisits: true }, orderBy: { id: "asc" } })).toEqual(before);
   await page.goto("/portal/loyalty/members/nonexistent-other-organization-member");
   await expect(page.getByText("404")).toBeVisible();
+});
+
+test("owner recovers two legacy skipped POS purchases from a member profile only once", async ({ page }) => {
+  const member = await prisma.loyaltyMember.findFirstOrThrow({ where: { organizationId: orgId, isSelected: true }, include: { program: true } });
+  const at = new Date();
+  const firstSale = await prisma.foodSale.create({ data: { organizationId: orgId, customerId: member.customerId, source: "POS", externalOrderId: "recovery-ui-first", grossAmount: 150, netAmount: 150 / 1.16, occurredAt: at } });
+  await prisma.loyaltyVisit.create({ data: { organizationId: orgId, programId: member.programId, memberId: member.id, saleId: firstSale.id, saleAmount: 150, occurredAt: at, idempotencyKey: "pos:recovery-ui-first", programVersion: member.program.currentVersion, cycleNumber: 1 } });
+  await prisma.loyaltyMember.update({ where: { id: member.id }, data: { totalVisits: 1, cycleVisits: 1, visitsWithAmount: 1, totalSpent: 150, firstVisitAt: at, lastVisitAt: at } });
+  for (let n = 1; n <= 2; n++) {
+    const occurredAt = new Date(at.getTime() + n * 1000);
+    const sale = await prisma.foodSale.create({ data: { organizationId: orgId, customerId: member.customerId, source: "POS", externalOrderId: `recovery-ui-${n}`, grossAmount: 150, netAmount: 150 / 1.16, occurredAt } });
+    const event = await prisma.domainEvent.create({ data: { organizationId: orgId, type: "sale.completed", subjectType: "sale", subjectId: sale.id, occurredAt, payload: { loyaltyMemberId: member.id, customerId: member.customerId }, dedupeKey: `recovery-ui-${n}`, status: "PROCESSED", processedAt: at } });
+    await prisma.loyaltyEventReceipt.create({ data: { organizationId: orgId, eventId: event.id, eventType: event.type, saleId: sale.id, outcome: "cooldown" } });
+  }
+  await login(page);
+  await page.goto(`/portal/loyalty/members/${member.id}`);
+  await page.getByRole("button", { name: "Recuperar compras omitidas", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "2 visitas recuperadas" })).toBeVisible();
+  await expect.poll(async () => (await prisma.loyaltyMember.findUniqueOrThrow({ where: { id: member.id } })).totalVisits).toBe(3);
+  await page.getByRole("button", { name: "Recuperar compras omitidas", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "0 visitas recuperadas" })).toBeVisible();
+  expect((await prisma.loyaltyMember.findUniqueOrThrow({ where: { id: member.id } })).totalVisits).toBe(3);
 });
 
 test("mobile dark English pages render real data without horizontal overflow", async ({ page, context }, testInfo) => {

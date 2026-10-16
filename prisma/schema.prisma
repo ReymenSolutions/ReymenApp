@@ -62,6 +62,9 @@ model Organization {
   // costo del platillo ÷ este %). 30% es el punto de partida típico de la
   // industria restaurantera; editable por organización.
   foodTargetCostPct        Int       @default(30)
+  // Intervalo entre visitas originadas en compras del POS (compartido por todas las cajas).
+  loyaltyVisitCooldownEnabled Boolean @default(true)
+  loyaltyVisitCooldownMinutes Int @default(3)
   createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt
 

@@ -1212,7 +1212,8 @@ export async function processFoodPosOrder(payload: unknown, organizationId: stri
     // revierte, no quedan) y con llave única (un reintento del POS no los duplica).
     const subjectRef = externalOrderId ?? sale.id;
     const selectedLoyaltyMember = customerId ? await tx.loyaltyMember.findFirst({ where: { organizationId, customerId, isSelected: true }, select: { id: true } }) : null;
-    const saleFact = { loyaltyMemberId: selectedLoyaltyMember?.id ?? null, saleId: sale.id, orderId: externalOrderId, customerId, branchId: sale.branchId, grossAmount: body.grossAmount!, netAmount: body.netAmount!, discountAmount, cancelsSaleId: sale.cancelsSaleId };
+    const visitPolicy = await tx.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { loyaltyVisitCooldownEnabled: true, loyaltyVisitCooldownMinutes: true } });
+    const saleFact = { loyaltyVisitCooldownMinutes: visitPolicy.loyaltyVisitCooldownEnabled ? visitPolicy.loyaltyVisitCooldownMinutes : 0, loyaltyMemberId: selectedLoyaltyMember?.id ?? null, saleId: sale.id, orderId: externalOrderId, customerId, branchId: sale.branchId, grossAmount: body.grossAmount!, netAmount: body.netAmount!, discountAmount, cancelsSaleId: sale.cancelsSaleId };
     await emitDomainEvent(tx, {
       organizationId,
       type: isCancel ? "sale.cancelled" : "sale.completed",

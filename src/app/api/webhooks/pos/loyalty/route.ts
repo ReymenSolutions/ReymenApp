@@ -1,3 +1,4 @@
+import { getVisitPolicy, setVisitPolicy, visitPolicySchema } from "@/lib/loyalty/visit-policy";
 import { posRedemption, redemptionSchema } from "@/lib/loyalty/redemption";
 import { UserError } from "@/lib/user-error";
 import { NextRequest, NextResponse } from "next/server";
@@ -33,6 +34,15 @@ export async function POST(req: NextRequest) {
     body = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  if (body && typeof body === "object" && "action" in body && (body.action === "policy.read" || body.action === "policy.write")) {
+    if (!(await hasModule(orgId, "REYMEN_POS")) || !(await hasModule(orgId, "LOYALTY"))) return NextResponse.json({ error: "POS o Lealtad no habilitado" }, { status: 403 });
+    if (body.action === "policy.read") return NextResponse.json(await getVisitPolicy(orgId), { headers: { "Cache-Control": "no-store" } });
+    const input = body as Record<string, unknown>;
+    const parsed = visitPolicySchema.safeParse(input.policy);
+    if (!parsed.success || input.actorRole !== "admin" || typeof input.employeeId !== "string" || !input.employeeId || typeof input.deviceId !== "string" || !input.deviceId) return NextResponse.json({ error: "Configuración o autorización inválida" }, { status: 400 });
+    return NextResponse.json(await setVisitPolicy(orgId, parsed.data, { deviceId: input.deviceId, employeeId: input.employeeId }), { headers: { "Cache-Control": "no-store" } });
   }
 
   if (body && typeof body === "object" && "action" in body && body.action === "lookup") {
