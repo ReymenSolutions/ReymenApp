@@ -23,10 +23,10 @@ export const POST = createOrgWebhookHandler({
   requireEventId: true,
   process: async (payload, organizationId) => {
     const result = await processFoodPosOrder(payload, organizationId);
-    after(async () => {
+    try { after(async () => {
       try { await syncCustomerContacts(organizationId); }
       catch { console.error("[customer-contacts] automatic sync deferred to periodic retry"); }
-    });
+    }); } catch { console.error("[customer-contacts] scheduling deferred to periodic retry"); }
     return result;
   },
   // Sin el módulo "Reymen POS" no se aceptan ventas del POS. 403 con un code
