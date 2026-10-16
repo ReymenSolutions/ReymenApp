@@ -1,3 +1,4 @@
+import { getActiveProgram } from "@/lib/loyalty/service";
 import { LoyaltyMaintenance } from "@/components/loyalty/LoyaltyMaintenance";
 import { hasModule } from "@/lib/modules";
 import Link from "next/link";
@@ -17,11 +18,12 @@ import { RedeemRewardButton } from "@/components/loyalty/RedeemRewardButton";
 
 export default async function LoyaltyMemberPage({ params }: { params: Promise<{ memberId: string }> }) {
   const ctx = await getLoyaltyContext();
-  const { L, program, lang } = ctx;
-  if (!program) return <NoProgram L={L} canManage={ctx.canManage} />;
+  const { L, lang } = ctx;
   const { memberId } = await params;
-  const m = await getMemberProfile(ctx.orgId, memberId, program.rule.visitGoal);
+  const m = await getMemberProfile(ctx.orgId, memberId, ctx.program?.rule.visitGoal ?? 1);
   if (!m) notFound();
+  const program = await getActiveProgram(ctx.orgId, m.programId);
+  if (!program) return <NoProgram L={L} canManage={ctx.canManage} />;
 
   const crm = await hasModule(ctx.orgId, "CRM");
   const tz = ctx.org.timezone;
@@ -51,7 +53,7 @@ export default async function LoyaltyMemberPage({ params }: { params: Promise<{ 
             <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", statusCls)}>{statusLabel}</span>
           </div>
         </div>
-        {ctx.canOperate && program.status === "ACTIVE" && (
+        {ctx.canOperate && m.isSelected && program.status === "ACTIVE" && (
           <Link href={`/portal/loyalty/visits?member=${m.id}`} className="inline-flex items-center gap-2 self-start rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 sm:self-auto">
             <ScanLine className="h-4 w-4" aria-hidden="true" />
             {L.registerVisitCta}
@@ -59,6 +61,19 @@ export default async function LoyaltyMemberPage({ params }: { params: Promise<{ 
         )}
       </div>
 
+      <section aria-label={lang === "es" ? "Programas de este cliente" : "Customer programs"} className="mb-5 rounded-xl border border-slate-200 bg-white p-4">
+        <h2 className="font-semibold">{lang === "es" ? "Programas de este cliente" : "Customer programs"}</h2>
+        <p className="mt-1 text-sm text-slate-500">{lang === "es" ? "Selecciona un programa para consultar su progreso, visitas y recompensas. Esta consulta no cambia el programa elegido por el cliente para acumular visitas." : "Choose a program to view its progress, visits and rewards. Browsing does not change the customer's selected program for new visits."}</p>
+        <nav className="mt-3 flex flex-wrap gap-2">
+          {m.programs.map(membership => <Link key={membership.id} href={`/portal/loyalty/members/${membership.id}`} aria-current={membership.id === m.id ? "page" : undefined} className={cn("min-w-0 rounded-lg border px-3 py-2 text-sm", membership.id === m.id ? "border-brand-500 bg-brand-50 text-brand-900" : "border-slate-200")}>
+            <span className="font-semibold">{membership.program.name}</span>
+            <span className="block text-xs">{membership.totalVisits} {lang === "es" ? "visitas" : "visits"}{membership.isSelected ? (lang === "es" ? " · Elegido para acumular" : " · Selected for new visits") : ""}{membership.program.status === "PAUSED" ? (lang === "es" ? " · Pausado" : " · Paused") : ""}</span>
+          </Link>)}
+        </nav>
+        <p className="mt-3 text-sm font-medium">{lang === "es" ? "Viendo: " : "Viewing: "}{program.name}</p>
+      </section>
+
+      {program.status === "PAUSED" && <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{L.pausedBanner}</p>}
       {crm && m.leadId && <Link href={`/portal/leads/${m.leadId}`} className="mb-4 block text-sm font-medium text-brand-700 hover:underline">{lang === "es" ? "Ver contacto del CRM →" : "View CRM contact →"}</Link>}
       {m.deficitVisits > 0 && <p role="status" className="mb-4 rounded-lg bg-amber-50 p-4 text-amber-900 dark:bg-amber-950 dark:text-amber-100">{lang === "es" ? `Visitas por compensar tras cancelaciones: ${m.deficitVisits}. Las próximas visitas completan los ciclos afectados antes de generar nuevas recompensas.` : `Visits to replace after cancellations: ${m.deficitVisits}. Future visits complete affected cycles before earning new rewards.`}</p>}
       {ctx.canManage && <LoyaltyMaintenance memberId={m.id} lang={lang} />}

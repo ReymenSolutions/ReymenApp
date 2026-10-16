@@ -24,11 +24,12 @@ export const getLoyaltyContext = cache(async () => {
   await requireModule(orgId, "LOYALTY");
   const role = session.user.role as UserRole;
   const viewed = (await cookies()).get("loyalty-view-program")?.value;
-  const [lang, program, org, branches] = await Promise.all([
+  const [lang, program, org, branches, programs] = await Promise.all([
     getServerLang(),
     (async () => (viewed ? await getActiveProgram(orgId, viewed) : null) ?? await getActiveProgram(orgId))(),
     prisma.organization.findUniqueOrThrow({ where: { id: orgId }, select: { id: true, name: true, slug: true, timezone: true } }),
     listBranches(orgId, { activeOnly: true }),
+    prisma.loyaltyProgram.findMany({ where: { organizationId: orgId }, orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }], select: { id: true, name: true, status: true, _count: { select: { members: true, visits: true } } } }),
   ]);
   const activeBranches = branches.map((b) => ({ id: b.id, name: b.name }));
   const locations = await listLocations(orgId, org.name, activeBranches);
@@ -39,6 +40,7 @@ export const getLoyaltyContext = cache(async () => {
     lang,
     L: pickDict(loyaltyStrings, lang),
     program,
+    programs,
     org,
     branches: activeBranches,
     /** Principal + sucursales con su ubicación para el mapa (null = sin fijar). */

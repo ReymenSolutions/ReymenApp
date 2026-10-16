@@ -1,4 +1,4 @@
-import { PauseCircle } from "lucide-react";
+import { LoyaltyProgramBrowser } from "@/components/loyalty/LoyaltyProgramBrowser";
 import { getLoyaltyContext } from "@/lib/loyalty/context";
 import { LoyaltyHeader } from "@/components/loyalty/LoyaltyHeader";
 import { LoyaltyTabs } from "@/components/loyalty/LoyaltyTabs";
@@ -14,17 +14,13 @@ export default async function LoyaltyLayout({ children }: { children: React.Reac
       <LoyaltyHeader
         L={L}
         orgName={ctx.org.name}
-        programName={program?.name ?? null}
+        programName={null}
         isDemo={program?.isDemo ?? false}
+        paused={program?.status === "PAUSED"}
         showRegister={!!program && ctx.canOperate}
       />
       <LoyaltyTabs />
-      {program?.status === "PAUSED" && (
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          <PauseCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          {L.pausedBanner}
-        </div>
-      )}
+      {ctx.canOperate && <LoyaltyProgramBrowser programs={ctx.programs} selectedId={program?.id ?? ""} lang={ctx.lang} />}
       {children}
     </div>
   );
