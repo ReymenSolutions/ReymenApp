@@ -402,7 +402,8 @@ export async function registerVisit(input: RegisterVisitInput): Promise<Register
 
 // ─── Caja: canjear recompensa ───────────────────────────────────────────
 
-export async function redeemReward(input: { organizationId: string; userId: string; rewardId: string; branchId: string | null; now?: Date }) {
+export async function redeemReward(input: { organizationId: string; userId?: string; rewardId: string; branchId: string | null; now?: Date; pos?: { requestId: string; deviceId: string; employeeId: string; customerId: string } }) {
+  if (!input.userId && !input.pos) throw new UserError("Sin permisos");
   const now = input.now ?? new Date();
   if (input.branchId) {
     const branch = await prisma.branch.findFirst({ where: { id: input.branchId, organizationId: input.organizationId }, select: { id: true } });
@@ -413,6 +414,13 @@ export async function redeemReward(input: { organizationId: string; userId: stri
     if (!existing) throw new UserError("Recompensa no encontrada.");
     await tx.$queryRaw`SELECT id FROM "LoyaltyMember" WHERE id = ${existing.memberId} AND "organizationId" = ${input.organizationId} FOR UPDATE`;
     const member = await tx.loyaltyMember.findFirstOrThrow({ where: { id: existing.memberId, organizationId: input.organizationId } });
+    if (input.pos) {
+      if (member.customerId !== input.pos.customerId) throw new UserError("Recompensa no encontrada.");
+      const prior = await tx.domainEvent.findUnique({ where: { organizationId_dedupeKey: { organizationId: input.organizationId, dedupeKey: `loyalty.reward_redeemed:${existing.id}` } } });
+      const payload = prior?.payload as Record<string, unknown> | undefined;
+      if (payload?.posRequestId === input.pos.requestId && payload?.deviceId === input.pos.deviceId && payload?.employeeId === input.pos.employeeId) return existing;
+      if ((existing.rewardType === "DISCOUNT_AMOUNT" || existing.rewardType === "DISCOUNT_PERCENT") && Number(existing.rewardValue) > 0) throw new UserError("Aplica esta recompensa como descuento al cobrar.");
+    }
     const program = await tx.loyaltyProgram.findFirstOrThrow({ where: { id: member.programId, organizationId: input.organizationId } });
     if (program.status !== "ACTIVE") throw new UserError("El programa de lealtad está en pausa.");
     if (program.scope === "BRANCH" && program.branchId !== input.branchId) throw new UserError("Esta recompensa solo se canjea en la sucursal del programa.");
@@ -421,9 +429,9 @@ export async function redeemReward(input: { organizationId: string; userId: stri
       data: { status: "REDEEMED", redeemedAt: now, redeemedById: input.userId, redeemedBranchId: input.branchId },
     });
     if (!res.count) throw new UserError("Esta recompensa ya fue canjeada o anulada.");
-    await tx.auditLog.create({ data: { organizationId: input.organizationId, userId: input.userId, action: "loyalty.reward_redeem", resource: "LoyaltyReward", resourceId: existing.id, metadata: { memberId: member.id, branchId: input.branchId } } });
+    await tx.auditLog.create({ data: { organizationId: input.organizationId, userId: input.userId, action: "loyalty.reward_redeem", resource: "LoyaltyReward", resourceId: existing.id, metadata: { memberId: member.id, branchId: input.branchId, ...(input.pos ? { deviceId: input.pos.deviceId, employeeId: input.pos.employeeId, posRequestId: input.pos.requestId } : {}) } } });
     await emitDomainEvent(tx, { organizationId: input.organizationId, type: "loyalty.reward_redeemed", subjectType: "loyalty_member", subjectId: member.id, occurredAt: now,
-      payload: { customerId: member.customerId, rewardId: existing.id }, dedupeKey: `loyalty.reward_redeemed:${existing.id}` });
+      payload: { customerId: member.customerId, rewardId: existing.id, ...(input.pos ? { posRequestId: input.pos.requestId, deviceId: input.pos.deviceId, employeeId: input.pos.employeeId } : {}) }, dedupeKey: `loyalty.reward_redeemed:${existing.id}` });
     return existing;
   });
 }

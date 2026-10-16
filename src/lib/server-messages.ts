@@ -6,6 +6,8 @@
 // su versión en español). Un mensaje que no esté aquí se muestra tal cual.
 
 const EN: Record<string, string> = {
+  "Confirma el PIN del cajero para canjear.": "Confirm the cashier PIN to redeem.",
+  "Aplica esta recompensa como descuento al cobrar.": "Apply this reward as a discount at checkout.",
   "Activa el programa de Lealtad antes de recuperar las visitas.": "Activate the Loyalty program before recovering visits.",
   "Esta compra está dentro del intervalo configurado entre visitas.": "This purchase is within the configured interval between visits.",
   "Intenta de nuevo en un minuto.": "Try again in a minute.",
