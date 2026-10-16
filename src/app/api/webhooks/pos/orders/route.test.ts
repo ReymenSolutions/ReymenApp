@@ -1,5 +1,7 @@
 // @vitest-environment node
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+// Next's request lifetime is supplied by its HTTP server, absent in direct route tests.
+vi.mock("next/server", async (original) => ({ ...await original<typeof import("next/server")>(), after: vi.fn() }));
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createWebhookSignature } from "@/lib/webhook-validator";
