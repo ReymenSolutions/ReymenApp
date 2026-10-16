@@ -1,6 +1,7 @@
 // Datos de DEMOSTRACIÓN para REYMEN Loyalty (branch feature/food-loyalty-demo).
 //
-//   npx tsx prisma/seed-loyalty-demo.ts
+//   ALLOW_LOYALTY_DEMO_SEED=cafe-norte-demo npx tsx prisma/seed-loyalty-demo.ts
+// Solo en una base de desarrollo. Se bloquea en NODE_ENV=production y ante datos ajenos a la demo.
 //
 // Crea (o recrea) un restaurante ficticio, "Café Norte", con su sucursal
 // Cumbres, el programa "Club Café Norte" (10 visitas → bebida gratis) y unos
@@ -18,6 +19,7 @@
 // Es idempotente: si "cafe-norte-demo" ya existe, borra solo SUS datos de
 // lealtad y sus ventas de demo, y los vuelve a generar.
 
+import { assertLoyaltyDemoDataOnly, assertLoyaltyDemoSeedAllowed } from "../src/lib/loyalty/demo-safety";
 import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
@@ -112,6 +114,15 @@ function visitDates(enrolledAt: number, now: number, perThirty: number, recentFa
 }
 
 async function main() {
+  assertLoyaltyDemoSeedAllowed(process.env);
+  const existing = await prisma.organization.findUnique({ where: { slug: ORG_SLUG }, select: { id: true } });
+  if (existing) {
+    const [realPrograms, realCustomers] = await Promise.all([
+      prisma.loyaltyProgram.count({ where: { organizationId: existing.id, isDemo: false } }),
+      prisma.customer.count({ where: { organizationId: existing.id, NOT: { phone: { startsWith: "+528100" } } } }),
+    ]);
+    assertLoyaltyDemoDataOnly(realPrograms, realCustomers);
+  }
   console.log("☕ Seed de demo REYMEN Loyalty — Café Norte");
   const now = Date.now();
 

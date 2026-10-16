@@ -97,10 +97,10 @@ export async function lookupCustomerForPos(organizationId: string, rawPhone: unk
   if (!phone || !key) return { status: "invalid_request" as const };
   const customer = await prisma.customer.findUnique({
     where: { organizationId_phoneKey: { organizationId, phoneKey: key } },
-    select: { name: true, postalCode: true, consentAccepted: true },
+    select: { name: true, postalCode: true, consentAccepted: true, birthDay: true, birthMonth: true },
   });
   if (!customer) return { status: "not_found" as const };
   const loyalty = await hasModule(organizationId, "LOYALTY")
     ? await lookupMemberForPos(organizationId, { phone }) : { status: "module_disabled" as const };
-  return { status: "found" as const, customer, loyalty };
+  return { status: "found" as const, customer: { ...customer, birthDay: customer.consentAccepted ? customer.birthDay : null, birthMonth: customer.consentAccepted ? customer.birthMonth : null }, loyalty };
 }

@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { getOrgTimezone, localDateString } from "@/lib/business-day";
 import { prisma } from "@/lib/prisma";
 import { createTestOrg, cleanupOrg } from "@/test/helpers";
 import { normalizePhoneMx, parsePosCustomer } from "./customers";
@@ -133,7 +134,7 @@ describe("clientes en el webhook del POS", () => {
   });
 
   it("borrar ventas de prueba recalcula las estadísticas del cliente", async () => {
-    const day = new Date().toLocaleDateString("en-CA");
+    const day = localDateString(new Date(), await getOrgTimezone(org.id));
     await purgePosSales(org.id, day, day);
     const c = await prisma.customer.findFirstOrThrow({ where: { organizationId: org.id, phoneKey: "5511112222" } });
     expect(c.visitCount).toBe(0);

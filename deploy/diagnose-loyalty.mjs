@@ -14,7 +14,7 @@ async function main() {
       _count: { select: { customers: true } },
       loyaltyPrograms: {
         orderBy: { createdAt: 'asc' },
-        select: { name: true, status: true, isPrimary: true, _count: { select: { members: true, visits: true } } },
+        select: { name: true, status: true, isPrimary: true, isDemo: true, createdAt: true, _count: { select: { members: true, visits: true } } },
       },
     },
   });
