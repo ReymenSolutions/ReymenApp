@@ -5,6 +5,7 @@ import { ingestWebhookEvent } from "@/lib/webhook-ingest";
 import { processLeadEvent } from "@/lib/webhook-processors";
 import { sendEmail } from "@/lib/email";
 import { appUrl } from "@/lib/app-url";
+import { renderBrandedEmail } from "@/lib/email-template";
 import { EMAIL_RE, ipLimited, jsonWithCors, normalizeWhatsapp, originRejected, preflight, webOrg } from "@/lib/public-api";
 
 export const OPTIONS = preflight;
@@ -65,8 +66,24 @@ export async function POST(req: NextRequest) {
   // Aviso al equipo (dueños de la organización). Un fallo del correo nunca rompe el alta.
   try {
     const owners = await prisma.user.findMany({ where: { organizationId: org.id, role: { in: ["OWNER", "ADMIN", "MANAGER"] }, isActive: true }, select: { email: true } });
-    const text = `Nuevo contacto desde el sitio:\n${d.name} · ${d.contact}${d.business ? ` · ${d.business}` : ""}${d.vertical ? ` · ${d.vertical}` : ""}${d.message ? `\n\n${d.message}` : ""}\n\n${appUrl("/portal/leads")}`;
-    await Promise.all(owners.map((o) => sendEmail({ to: o.email, subject: `Nuevo contacto del sitio: ${d.name}`, html: `<p>${text.replace(/\n/g, "<br>")}</p>`, text }).catch(() => undefined)));
+    const waDigits = phone ? phone.replace(/\D/g, "") : null;
+    const { html, text } = renderBrandedEmail({
+      preheader: `${d.name}${d.business ? ` · ${d.business}` : ""}`,
+      title: "Nuevo contacto desde el sitio",
+      intro: "Alguien dejó sus datos en reymen.mx. Responde pronto: el primer mensaje es el que más cuenta.",
+      rows: [
+        { label: "Nombre", value: d.name },
+        { label: isEmail ? "Correo" : "WhatsApp", value: d.contact, href: isEmail ? `mailto:${d.contact}` : phone ? `tel:${phone}` : undefined },
+        { label: "Negocio", value: d.business ?? "" },
+        { label: "Tipo", value: d.vertical ?? "" },
+      ],
+      note: d.message ? { label: "Mensaje", text: d.message } : undefined,
+      actions: [
+        { label: "Ver en el CRM", url: appUrl("/portal/leads") },
+        ...(waDigits ? [{ label: "Escribir por WhatsApp", url: `https://wa.me/${waDigits}`, secondary: true }] : []),
+      ],
+    });
+    await Promise.all(owners.map((o) => sendEmail({ to: o.email, subject: `Nuevo contacto del sitio: ${d.name}`, html, text }).catch(() => undefined)));
   } catch {
     /* sin aviso, el lead ya quedó */
   }

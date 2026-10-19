@@ -2,12 +2,14 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createTestOrg, cleanupOrg } from "@/test/helpers";
+import { createTestOrg, createTestUser, cleanupOrg } from "@/test/helpers";
 
 const preview = vi.fn();
 vi.mock("@/lib/ai-auto-reply", () => ({ previewAgentReply: (...a: unknown[]) => preview(...a) }));
 vi.mock("@/lib/ai-draft", () => ({ isDraftProviderConfigured: () => true }));
-vi.mock("@/lib/email", () => ({ sendEmail: vi.fn(async () => ({ sent: true })) }));
+type Mail = { to: string; subject: string; html: string; text?: string };
+const sendEmail = vi.fn<(m: Mail) => Promise<{ sent: boolean }>>(async () => ({ sent: true }));
+vi.mock("@/lib/email", () => ({ sendEmail: (m: Mail) => sendEmail(m) }));
 
 const leads = await import("./leads/route");
 const chat = await import("./chat/route");
@@ -60,6 +62,19 @@ describe("API pública del sitio", () => {
       const created = await prisma.lead.findFirstOrThrow({ where: { organizationId: org.id, phone: "+525512345678" } });
       expect(created).toMatchObject({ name: "Ana Prueba", source: "web" });
       expect(created.metadata).toMatchObject({ business: "Café Sol", consent: { accepted: true } });
+    });
+
+    it("avisa a los dueños con un correo con formato y sin HTML del visitante", async () => {
+      const owner = await createTestUser(org.id, "OWNER", "web-owner");
+      sendEmail.mockClear();
+      const res = await leads.POST(req("leads", lead({ name: "Eva <b>Hack</b>", contact: "eva@example.com", message: "<script>x</script> hola" }), ORIGIN));
+      expect(res.status).toBe(200);
+      const mail = sendEmail.mock.calls.map((c) => c[0]).find((m) => m.to === owner.email);
+      expect(mail).toBeTruthy();
+      expect(mail!.html).toContain("Reymen");
+      expect(mail!.html).toContain("Ver en el CRM");
+      expect(mail!.html).not.toContain("<script>x");
+      expect(mail!.html).toContain("&lt;b&gt;Hack");
     });
 
     it("el campo trampa parece éxito pero no guarda nada", async () => {
