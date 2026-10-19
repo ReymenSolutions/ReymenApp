@@ -28,6 +28,8 @@ export default auth(async (req) => {
   // Formulario público de opinión (el cliente entra desde un enlace con token único, sin cuenta).
   const isPublicLoyaltyRoute = pathname === "/lealtad" || pathname.startsWith("/lealtad/");
   const isFeedbackRoute = pathname.startsWith("/feedback/");
+  // API pública del sitio (reymen.mx): leads, chat y planes; se protegen solas (origen, límites, campo trampa).
+  const isPublicApiRoute = pathname.startsWith("/api/public");
   // Realty: landing pública de una propiedad (/p/<slug>), sus eventos y sus fotos publicadas
   // (la ruta de fotos revisa sola si la propiedad es pública o si la sesión es de la organización).
   const isPublicRealtyRoute = pathname.startsWith("/p/") || pathname.startsWith("/api/realty/public/") || pathname.startsWith("/api/realty/media/");
@@ -39,7 +41,7 @@ export default auth(async (req) => {
   // route) so n8n's pull requests must not be redirected to /login here, and
   // the health check must be reachable by load balancers/uptime monitors
   // without a session
-  if (isAuthPage || isWebhookRoute || isApiV1Route || isAuthApiRoute || isCronRoute || isHealthRoute || isFeedbackRoute || isPublicLoyaltyRoute || isPublicRealtyRoute) {
+  if (isAuthPage || isWebhookRoute || isApiV1Route || isAuthApiRoute || isCronRoute || isHealthRoute || isFeedbackRoute || isPublicLoyaltyRoute || isPublicRealtyRoute || isPublicApiRoute) {
     return NextResponse.next();
   }
 
