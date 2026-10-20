@@ -1,4 +1,5 @@
 import { after } from "next/server";
+import { observeLegacyCompletion } from "./ai/agents/executions";
 import type { LeadStatus, MessageRole, PipelineAiActionKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { hasModule } from "@/lib/modules";
@@ -235,6 +236,7 @@ export async function recoverPipelineAnalyses(opts: { now?: Date; limit?: number
     const lease = { id: stored.id, status: "PROCESSING" as const, attempts, claimedAt: now };
     const claim = await prisma.webhookEvent.updateMany({ where: { id: stored.id, status: stored.status, attempts: stored.attempts, claimedAt: stored.claimedAt }, data: { status: "PROCESSING", attempts, claimedAt: now } });
     if (!claim.count) continue;
+    await observeLegacyCompletion(stored.id);
     summary.recovered++;
     const payload = stored.payload as { conversationId?: unknown; messageId?: unknown; stage?: unknown };
     const finish = (error: string | null = null) => prisma.webhookEvent.updateMany({ where: lease, data: { status: "PROCESSED", processedAt: new Date(), errorMessage: error } });
@@ -261,6 +263,8 @@ export async function recoverPipelineAnalyses(opts: { now?: Date; limit?: number
       // Side effects may have begun: preserve failure for operator review, never rerun a possible CRM mutation.
       await prisma.webhookEvent.updateMany({ where: lease, data: { status: "FAILED", attempts: AUTO_JOB_MAX_ATTEMPTS, errorMessage: "pipeline_work_interrupted" } }).catch(() => undefined);
       summary.failed++;
+    } finally {
+      await observeLegacyCompletion(stored.id);
     }
   }
   return summary;

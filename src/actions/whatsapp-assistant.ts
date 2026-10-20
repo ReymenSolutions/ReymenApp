@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
+import { withLegacyIdentityWrite } from "@/lib/ai/agents/model";
 import { requireAiManager } from "@/lib/guards";
 
 const upsertSchema = z.object({
@@ -17,11 +17,11 @@ export async function upsertWhatsAppAssistant(
 
   const parsed = upsertSchema.parse(data);
 
-  await prisma.whatsAppAssistant.upsert({
+  await withLegacyIdentityWrite(session.user.organizationId, tx => tx.whatsAppAssistant.upsert({
     where: { organizationId: session.user.organizationId },
     create: { organizationId: session.user.organizationId, ...parsed, capabilities: [] },
     update: parsed,
-  });
+  }));
 
   revalidatePath("/portal/whatsapp");
   return { success: true };

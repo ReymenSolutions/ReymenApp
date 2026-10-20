@@ -1,4 +1,5 @@
 import { after } from "next/server";
+import { observeLegacyCompletion } from "./ai/agents/executions";
 import { Prisma, type MessageRole, type WebhookEvent } from "@prisma/client";
 import { z } from "zod";
 import { AUTO_JOB_SOURCE, AUTO_JOB_TYPE, AUTO_JOB_MAX_ATTEMPTS, AUTO_JOB_LEASE_MS, enqueueAutoReply, type AutoJobPayload } from "./ai-auto-jobs";
@@ -143,7 +144,7 @@ async function stopJob(job: WebhookEvent, payload: AutoJobPayload, reason: strin
 }
 
 /** Atomically claims one persisted turn; old workers cannot finalize a newer lease. */
-export async function processAutoReplyJob(jobId: string, opts: { now?: Date } = {}): Promise<AutoOutcome> {
+async function processAutoReplyJobInternal(jobId: string, opts: { now?: Date } = {}): Promise<AutoOutcome> {
   const now = opts.now ?? new Date();
   const stored = await prisma.webhookEvent.findFirst({ where: { id: jobId, source: AUTO_JOB_SOURCE, eventType: AUTO_JOB_TYPE } });
   if (!stored || stored.status === "PROCESSED") return "skipped";
@@ -151,6 +152,7 @@ export async function processAutoReplyJob(jobId: string, opts: { now?: Date } = 
   if (stored.status === "FAILED" && stored.claimedAt && now.getTime() - stored.claimedAt.getTime() < (stored.attempts >= 2 ? 5 : 1) * 60_000) return "skipped";
   const claimed = await prisma.webhookEvent.updateMany({ where: { id: stored.id, status: stored.status, attempts: stored.attempts, claimedAt: stored.claimedAt }, data: { status: "PROCESSING", attempts: Math.min(stored.attempts + 1, AUTO_JOB_MAX_ATTEMPTS), claimedAt: now } });
   if (!claimed.count) return "skipped";
+  await observeLegacyCompletion(jobId);
   const job = { ...stored, status: "PROCESSING" as const, attempts: Math.min(stored.attempts + 1, AUTO_JOB_MAX_ATTEMPTS), claimedAt: now };
   const parsed = payloadSchema.safeParse(stored.payload);
   if (!parsed.success) {
@@ -178,6 +180,7 @@ export async function processAutoReplyJob(jobId: string, opts: { now?: Date } = 
     });
     if (!preparation) return "skipped";
     payload = preparation.next;
+    await observeLegacyCompletion(jobId);
     const { conv, messages, draft } = preparation;
     const last = messages[messages.length - 1];
     if (customerNeedsHuman(last.content)) return await stopJob(job, payload, "el cliente pidió a una persona o trae un tema delicado", now);
@@ -213,6 +216,7 @@ export async function processAutoReplyJob(jobId: string, opts: { now?: Date } = 
     });
     if (!outbound) return "skipped";
     payload = outbound.next;
+    await observeLegacyCompletion(jobId);
     // Operator UPDATEs use the same row lock. Admission and takeover are serialized across processes.
     const outcome = await prisma.$transaction(async (tx): Promise<AutoOutcome> => {
       await lockTurn(tx, job.organizationId, conv.id);
@@ -254,6 +258,12 @@ export async function processAutoReplyJob(jobId: string, opts: { now?: Date } = 
     await prisma.webhookEvent.updateMany({ where: leaseWhere(job), data: { status: "FAILED", errorMessage: "auto_work_interrupted" } }).catch(() => undefined);
     return "skipped";
   }
+}
+
+/** One effects owner: the Phase 1 model only observes this Phase 0 worker. */
+export async function processAutoReplyJob(jobId: string, opts: { now?: Date } = {}): Promise<AutoOutcome> {
+  try { return await processAutoReplyJobInternal(jobId, opts); }
+  finally { await observeLegacyCompletion(jobId); }
 }
 
 /** Compatibility entry point for the existing fast path. Admission itself is durable at ingestion. */

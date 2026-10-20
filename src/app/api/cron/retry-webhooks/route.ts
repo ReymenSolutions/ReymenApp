@@ -1,3 +1,4 @@
+import { reconcileAgentExecutions } from "@/lib/ai/agents/executions";
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
 import { retryAllFailedWebhookEvents } from "@/lib/webhook-retry";
@@ -33,5 +34,6 @@ export async function POST(req: NextRequest) {
   const result = await retryAllFailedWebhookEvents();
   const pipeline = await recoverPipelineAnalyses();
   const ai = await recoverAutoReplies();
+  await reconcileAgentExecutions().catch(() => { console.error("[agent-model] reconciliation pending"); });
   return NextResponse.json({ success: true, ...result, ai, pipeline });
 }

@@ -6,6 +6,16 @@
 // su versión en español). Un mensaje que no esté aquí se muestra tal cual.
 
 const EN: Record<string, string> = {
+  "Organización inactiva": "Organization inactive",
+  "El modelo de agentes aún no está habilitado en este entorno": "The agent model is not enabled in this environment yet",
+  "La definición legacy requiere revisión; no se sobrescribirá": "The legacy definition needs review; it will not be overwritten",
+  "El mapeo del asistente requiere revisión; no se reasignará automáticamente": "The assistant mapping needs review; it will not be reassigned automatically",
+  "La configuración cambió; repite la comparación antes de aplicar": "The configuration changed; compare it again before applying",
+  "La configuración cambió durante la comparación; repite la revisión": "The configuration changed during comparison; review it again",
+  "La configuración cambió; repite la comparación": "The configuration changed; compare it again",
+  "Organización o módulo inactivo": "Organization or module inactive",
+  "Agente no encontrado": "Agent not found",
+  "La configuración cambió; recarga antes de guardar": "The configuration changed; reload before saving",
   "Confirma el PIN del cajero para canjear.": "Confirm the cashier PIN to redeem.",
   "Aplica esta recompensa como descuento al cobrar.": "Apply this reward as a discount at checkout.",
   "Activa el programa de Lealtad antes de recuperar las visitas.": "Activate the Loyalty program before recovering visits.",

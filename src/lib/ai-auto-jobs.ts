@@ -1,18 +1,8 @@
 import type { Prisma } from "@prisma/client";
+import { observeLegacyAdmission } from "./ai/agents/executions";
 
-// Internal work only. The signed channel webhooks and their payloads stay unchanged.
-export const AUTO_JOB_SOURCE = "ai-center";
-export const AUTO_JOB_TYPE = "ai.auto_reply";
-export const AUTO_JOB_MAX_ATTEMPTS = 3;
-export const AUTO_JOB_LEASE_MS = 10 * 60_000;
-
-export type AutoJobPayload = {
-  conversationId: string;
-  messageId: string;
-  stage: "queued" | "generating" | "dispatching";
-  draftId?: string;
-  outboundMessageId?: string;
-};
+import { AUTO_JOB_SOURCE, AUTO_JOB_TYPE, PIPELINE_JOB_TYPE, type AutoJobPayload } from "./ai-job-contract";
+export * from "./ai-job-contract";
 
 /** Called in the SAME transaction as the inbound message, before acknowledging its webhook. */
 export async function enqueueAutoReply(tx: Prisma.TransactionClient, organizationId: string, conversationId: string, messageId: string) {
@@ -24,15 +14,15 @@ export async function enqueueAutoReply(tx: Prisma.TransactionClient, organizatio
   const org = await tx.organization.findUnique({ where: { id: organizationId }, select: { isActive: true } });
   if (!org?.isActive || entitlement?.status !== "ACTIVE") return null;
   const payload: AutoJobPayload = { conversationId, messageId, stage: "queued" };
-  return tx.webhookEvent.upsert({
+  const job = await tx.webhookEvent.upsert({
     where: { organizationId_source_externalEventId: { organizationId, source: AUTO_JOB_SOURCE, externalEventId: `auto:${messageId}` } },
     create: { organizationId, source: AUTO_JOB_SOURCE, eventType: AUTO_JOB_TYPE, externalEventId: `auto:${messageId}`, payload, status: "PENDING" },
     update: {},
     select: { id: true },
   });
+  await observeLegacyAdmission(tx, organizationId, job.id);
+  return job;
 }
-
-export const PIPELINE_JOB_TYPE = "ai.pipeline";
 
 /** Preserve the existing SUGGEST/AUTO CRM analysis, but persist admission before after(). */
 export async function enqueuePipelineAnalysis(tx: Prisma.TransactionClient, organizationId: string, conversationId: string, messageId: string) {
@@ -44,9 +34,10 @@ export async function enqueuePipelineAnalysis(tx: Prisma.TransactionClient, orga
     tx.organization.findUnique({ where: { id: organizationId }, select: { isActive: true } }),
   ]);
   if ((mode?.mode ?? "SUGGEST") === "OFF" || modules !== 2 || !org?.isActive) return;
-  await tx.webhookEvent.upsert({
+  const job = await tx.webhookEvent.upsert({
     where: { organizationId_source_externalEventId: { organizationId, source: AUTO_JOB_SOURCE, externalEventId: `pipeline:${messageId}` } },
     create: { organizationId, source: AUTO_JOB_SOURCE, eventType: PIPELINE_JOB_TYPE, externalEventId: `pipeline:${messageId}`, payload: { conversationId, messageId, stage: "queued" }, status: "PENDING" },
     update: {},
   });
+  await observeLegacyAdmission(tx, organizationId, job.id);
 }
