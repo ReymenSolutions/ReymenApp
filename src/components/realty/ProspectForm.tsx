@@ -233,7 +233,7 @@ export function ProspectForm({
 
         <div className="mt-5">
           <Label>{R.zones}</Label>
-          <p className="mb-2 text-xs text-slate-500">{R.zonesHint}</p>
+          <p className="mb-2 text-xs text-slate-500">{zones.length ? R.zonesHint : R.noZonesYet}</p>
           <ol className="mb-2 space-y-1.5">
             {v.zoneIds.map((id, i) => (
               <li key={id} className="flex items-center gap-2 rounded-md border border-slate-200 bg-[#F2F4F6] px-2 py-1.5 text-sm">
