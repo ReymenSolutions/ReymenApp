@@ -117,11 +117,28 @@ crea otra tarjeta ni se toca Supabase.
 
 ## Ubicación sin capturar coordenadas
 
-En la propiedad y en las zonas nadie escribe latitud/longitud: se escribe la
-dirección (se arma sola con calle, colonia y zona), **Buscar en el mapa**
-muestra los resultados y el pin, y la persona lo **confirma** (o lo arrastra /
-da clic en el mapa) antes de guardar. Mientras hay un pin sin confirmar, el
-formulario no se guarda. Si no hay resultados, se ubica a mano.
+En la propiedad y en las zonas nadie escribe latitud/longitud ni tiene que
+adivinar el formato de una dirección. El formulario va por partes:
+
+1. **Código postal** (5 dígitos). Con el CP se llenan solos el municipio y el
+   estado, y aparecen las colonias de ese CP (catálogo oficial de SEPOMEX,
+   empaquetado en `@webrek/mx-cp`, MIT: sin API ni llave; `src/lib/realty/postal.ts`).
+2. **Colonia**, elegida de la lista (o "Otra" para escribirla). Si el CP no está
+   en el catálogo, se escriben colonia, municipio y estado a mano.
+3. **Calle y número** (solo propiedades; es interno salvo que se active la
+   ubicación exacta en la landing).
+
+En zonas, el nombre se llena con la colonia (se puede cambiar) y se guarda el
+CP. En propiedades se guardan `postalCode`, `neighborhood` (colonia),
+`municipality`, `state` y `addressLine`, y la zona se propone sola cuando la
+colonia o el CP coinciden con una zona existente.
+
+**Buscar en el mapa** usa esas partes, de lo más fino a lo más general: la casa
+(búsqueda estructurada y luego texto), la colonia, el CP y el municipio. Si no
+encontró la casa exacta lo dice ("ubicamos la colonia; mueve el pin a la casa").
+La persona **confirma** el pin (o lo arrastra / da clic en el mapa) antes de
+guardar; mientras hay un pin sin confirmar, el formulario no se guarda. Si no
+hay resultados, se ubica a mano.
 
 La búsqueda corre en el servidor (`src/lib/realty/geocode.ts`) contra
 Nominatim de OpenStreetMap, respetando su

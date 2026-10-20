@@ -79,7 +79,7 @@ export default async function PublicPropertyPage({ params }: { params: Promise<{
             </p>
             <p className="mt-2 flex items-center gap-1.5 text-sm text-slate-600">
               <MapPin className="h-4 w-4 text-[#063C82]" aria-hidden="true" />
-              {p.location.exact && p.location.address ? p.location.address : `${p.neighborhood ? `${p.neighborhood}, ` : ""}${p.zone.name}`}
+              {p.location.exact && p.location.address ? [p.location.address, p.neighborhood, p.municipality].filter(Boolean).join(", ") : [p.neighborhood, p.zone.name !== p.neighborhood ? p.zone.name : null, p.municipality].filter(Boolean).join(", ")}
               {!p.location.exact && <span className="text-xs text-slate-400">· {R.pubApproxLocation}</span>}
             </p>
             {specs.length > 0 && (

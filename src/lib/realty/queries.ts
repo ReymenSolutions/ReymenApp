@@ -259,7 +259,7 @@ export async function listZones(organizationId: string) {
   return prisma.realtyZone.findMany({
     where: { organizationId },
     orderBy: { name: "asc" },
-    select: { id: true, name: true, key: true, latitude: true, longitude: true, _count: { select: { properties: true, leadZones: true } } },
+    select: { id: true, name: true, key: true, postalCode: true, latitude: true, longitude: true, _count: { select: { properties: true, leadZones: true } } },
   });
 }
 

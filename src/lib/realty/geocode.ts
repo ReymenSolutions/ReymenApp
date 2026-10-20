@@ -34,33 +34,35 @@ export function geocoderEnabled(): boolean {
   return process.env.GEOCODER_DISABLED !== "1";
 }
 
-function cacheKey(q: string): string {
-  return q.trim().toLowerCase().replace(/\s+/g, " ");
-}
-
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Busca una dirección. `organizationId` solo se usa para limitar cuántas búsquedas hace cada empresa. */
-export async function geocodeAddress(organizationId: string, query: string): Promise<GeoResult[]> {
-  if (!geocoderEnabled()) throw new UserError("La búsqueda de direcciones está desactivada. Ubica el pin a mano en el mapa.");
-  const q = query.trim();
-  if (q.length < 3) throw new UserError("Escribe la dirección para buscarla.");
-  const key = cacheKey(q);
-  const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < CACHE_MS) return hit.results;
+/** Espera el turno global de 1 petición por segundo (hasta ~4 s); si no llega, avisa. */
+async function takeGlobalSlot() {
+  for (let i = 0; i < 4; i++) {
+    const slot = await checkRateLimit("geocode-global", { limit: 1, windowMs: 1_100 });
+    if (slot.allowed) return;
+    await sleep(1_150);
+  }
+  throw new UserError("El buscador de direcciones está ocupado; intenta de nuevo en un momento.");
+}
 
+async function checkOrgQuota(organizationId: string) {
   const perOrg = await checkRateLimit(`geocode-org:${organizationId}`, { limit: 60, windowMs: 3_600_000 });
   if (!perOrg.allowed) throw new UserError("Demasiadas búsquedas de direcciones. Intenta más tarde o ubica el pin a mano.");
-  // 1 petición por segundo para toda la app: si otra búsqueda acaba de salir, espera su turno una vez.
-  let slot = await checkRateLimit("geocode-global", { limit: 1, windowMs: 1_100 });
-  if (!slot.allowed) {
-    await sleep(1_200);
-    slot = await checkRateLimit("geocode-global", { limit: 1, windowMs: 1_100 });
-    if (!slot.allowed) throw new UserError("El buscador de direcciones está ocupado; intenta de nuevo en un momento.");
-  }
+}
+
+/**
+ * Una petición al servicio (texto libre `q` o búsqueda estructurada:
+ * street, city, state, postalcode, country). Con caché de 24 h por parámetros.
+ */
+async function request(params: Record<string, string>): Promise<GeoResult[]> {
+  const key = JSON.stringify(Object.entries(params).map(([k, v]) => [k, v.trim().toLowerCase().replace(/\s+/g, " ")]).sort());
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.results;
+  await takeGlobalSlot();
 
   const url = new URL(process.env.GEOCODER_URL || DEFAULT_URL);
-  url.searchParams.set("q", q);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   url.searchParams.set("format", "jsonv2");
   url.searchParams.set("limit", "5");
   url.searchParams.set("accept-language", "es");
@@ -88,4 +90,57 @@ export async function geocodeAddress(organizationId: string, query: string): Pro
   if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value as string);
   cache.set(key, { at: Date.now(), results });
   return results;
+}
+
+/** Busca una dirección escrita libremente. `organizationId` solo limita cuántas búsquedas hace cada empresa. */
+export async function geocodeAddress(organizationId: string, query: string): Promise<GeoResult[]> {
+  if (!geocoderEnabled()) throw new UserError("La búsqueda de direcciones está desactivada. Ubica el pin a mano en el mapa.");
+  const q = query.trim();
+  if (q.length < 3) throw new UserError("Escribe la dirección para buscarla.");
+  await checkOrgQuota(organizationId);
+  return request({ q });
+}
+
+export interface StructuredAddress {
+  /** Calle y número ("Potosí 5002"); vacío para ubicar solo la colonia. */
+  street: string;
+  colonia: string;
+  municipio: string;
+  estado: string;
+  cp: string;
+}
+
+/** Qué tan fino quedó el punto: la casa, la colonia, el CP o solo el municipio. */
+export type GeoPrecision = "address" | "colonia" | "postal" | "municipality";
+
+/**
+ * Búsqueda por partes (CP → colonia → calle). Los mapas abiertos no siempre
+ * tienen el número exacto de una casa en México, así que se intenta de lo más
+ * fino a lo más general y se dice cuál se logró: la persona mueve el pin a la
+ * casa exacta antes de confirmar.
+ */
+export async function geocodeStructured(organizationId: string, a: StructuredAddress): Promise<{ results: GeoResult[]; precision: GeoPrecision | null }> {
+  if (!geocoderEnabled()) throw new UserError("La búsqueda de direcciones está desactivada. Ubica el pin a mano en el mapa.");
+  const street = a.street.trim();
+  const colonia = a.colonia.trim();
+  const municipio = a.municipio.trim();
+  const estado = a.estado.trim();
+  const cp = a.cp.trim();
+  if (!street && !colonia && !cp) throw new UserError("Escribe el código postal para buscar la dirección.");
+  await checkOrgQuota(organizationId);
+
+  const attempts: { precision: GeoPrecision; params: Record<string, string> }[] = [];
+  if (street) {
+    attempts.push({ precision: "address", params: { street, city: municipio, state: estado, ...(cp ? { postalcode: cp } : {}), country: "México" } });
+    attempts.push({ precision: "address", params: { q: [street, colonia, municipio, estado].filter(Boolean).join(", ") } });
+  }
+  if (colonia) attempts.push({ precision: "colonia", params: { q: [colonia, municipio, estado].filter(Boolean).join(", ") } });
+  if (cp) attempts.push({ precision: "postal", params: { postalcode: cp, country: "México" } });
+  if (municipio) attempts.push({ precision: "municipality", params: { q: [municipio, estado].filter(Boolean).join(", ") } });
+
+  for (const at of attempts) {
+    const results = await request(at.params);
+    if (results.length) return { results, precision: at.precision };
+  }
+  return { results: [], precision: null };
 }

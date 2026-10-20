@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { Check, MapPin, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { geocodeRealtyAddress } from "@/actions/realty";
+import { geocodeRealtyAddress, geocodeRealtyStructured } from "@/actions/realty";
 import { getErrorMessage } from "@/lib/user-error";
 import { usePreferences } from "@/context/preferences";
 import { pickDict } from "@/lib/i18n-dict";
@@ -31,7 +31,16 @@ export interface GeoValue {
 /** Monterrey, solo como punto de partida del mapa cuando no hay nada mejor. */
 const FALLBACK: GeoValue = { lat: 25.6866, lng: -100.3161 };
 
+export interface StructuredQuery {
+  cp: string;
+  colonia: string;
+  municipio: string;
+  estado: string;
+  street: string;
+}
+
 export function GeoPicker({
+  structured,
   suggestedQuery,
   value,
   center,
@@ -40,8 +49,10 @@ export function GeoPicker({
   hint,
   idPrefix,
 }: {
-  /** Texto con el que se arma la búsqueda (dirección, colonia, zona…); la persona lo puede editar. */
-  suggestedQuery: string;
+  /** Dirección por partes (CP → colonia → calle): si viene, se busca con ella y no se muestra la caja de texto. */
+  structured?: StructuredQuery;
+  /** Sin `structured`: texto con el que se arma la búsqueda; la persona lo puede editar. */
+  suggestedQuery?: string;
   /** Ubicación ya confirmada (o null). */
   value: GeoValue | null;
   /** Dónde abrir el mapa para ubicar a mano. */
@@ -54,7 +65,8 @@ export function GeoPicker({
 }) {
   const { lang } = usePreferences();
   const R = pickDict(realtyStrings, lang);
-  const [q, setQ] = useState(suggestedQuery);
+  const [q, setQ] = useState(suggestedQuery ?? "");
+  const [precision, setPrecision] = useState<string | null>(null);
   const [edited, setEdited] = useState(false);
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<{ lat: number; lng: number; label: string }[] | null>(null);
@@ -64,7 +76,7 @@ export function GeoPicker({
   // Mientras la persona no escriba su propia búsqueda, se arma sola con la dirección del formulario.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (!edited) setQ(suggestedQuery);
+    if (!edited) setQ(suggestedQuery ?? "");
   }, [suggestedQuery, edited]);
 
   useEffect(() => {
@@ -76,11 +88,21 @@ export function GeoPicker({
     setMapKey((k) => k + 1);
   }
 
+  const canSearch = structured ? /^\d{5}$/.test(structured.cp) || structured.colonia.trim().length > 2 : q.trim().length >= 3;
+
   async function search() {
-    if (q.trim().length < 3) return toast.error(R.geoPlaceholder);
+    if (!canSearch) return toast.error(structured ? R.cpFirst : R.geoPlaceholder);
     setBusy(true);
     try {
-      const found = await geocodeRealtyAddress(q);
+      let found: { lat: number; lng: number; label: string }[];
+      if (structured) {
+        const r = await geocodeRealtyStructured(structured);
+        found = r.results;
+        setPrecision(r.precision);
+      } else {
+        found = await geocodeRealtyAddress(q);
+        setPrecision(null);
+      }
       setResults(found);
       if (found.length > 0) review({ lat: found[0].lat, lng: found[0].lng });
       else setPending(null);
@@ -97,6 +119,7 @@ export function GeoPicker({
     <div className="space-y-3">
       {hint && <p className="text-xs text-slate-500">{hint}</p>}
       <div className="flex flex-col gap-2 sm:flex-row">
+        {!structured && (
         <Input
           id={`${idPrefix}-geo-q`}
           value={q}
@@ -114,7 +137,8 @@ export function GeoPicker({
           maxLength={200}
           aria-label={R.geoTitle}
         />
-        <Button type="button" variant="outline" onClick={search} loading={busy} className="shrink-0">
+        )}
+        <Button type="button" variant="outline" onClick={search} loading={busy} disabled={!canSearch} className="shrink-0">
           <Search className="h-4 w-4" aria-hidden="true" />
           {busy ? R.geoSearching : R.geoSearch}
         </Button>
@@ -146,6 +170,11 @@ export function GeoPicker({
                 })}
               </ul>
             </fieldset>
+          )}
+          {precision && precision !== "address" && !(precision === "colonia" && !structured?.street.trim()) && (
+            <p className="rounded-md bg-amber-50 px-2 py-1.5 text-xs text-amber-800">
+              {precision === "colonia" ? R.geoApproxColonia : precision === "postal" ? R.geoApproxPostal : R.geoApproxMunicipality}
+            </p>
           )}
           <p className="text-sm font-medium text-slate-800">{R.geoReview}</p>
           <PickerMap key={mapKey} value={pending} center={pending} onChange={setPending} height={280} />

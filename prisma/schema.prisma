@@ -2897,6 +2897,8 @@ model RealtyZone {
   organizationId String
   name           String
   key            String
+  // CP de SEPOMEX con el que se dio de alta (ayuda a asignar la zona sola a una propiedad).
+  postalCode     String?
   latitude       Float?
   longitude      Float?
   createdAt      DateTime @default(now())
@@ -2978,8 +2980,12 @@ model RealtyProperty {
   price            Decimal              @db.Decimal(14, 2)
   currency         String               @default("MXN")
   zoneId           String
+  // Dirección estructurada: CP → colonia (neighborhood), municipio y estado de SEPOMEX.
+  postalCode       String?
   neighborhood     String?
-  // Dirección interna: nunca se publica salvo showExactLocation.
+  municipality     String?
+  state            String?
+  // Calle y número (interna): nunca se publica salvo showExactLocation.
   addressLine      String?
   showExactLocation Boolean             @default(false)
   latitude         Float?
