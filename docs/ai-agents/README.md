@@ -4,7 +4,11 @@ Fecha: 2026-10-20. Repositorio examinado: **ReymenApp**, checkout local `codex/p
 
 ## Seguimiento actual
 
-El propietario autorizó exclusivamente el hardening de Fase 0. Ver [12_IMPLEMENTACION_FASE_0.md](12_IMPLEMENTACION_FASE_0.md) para cambios, pruebas, compatibilidad, pendientes y rollback. Los documentos 01–11 conservan la auditoría y propuestas originales; sus referencias a fuente corresponden al commit auditado, no a las líneas actuales tras la corrección. La implementación multiagente de Fase 1 sigue sin autorización.
+La Fase 0 de hardening se completó: [12_IMPLEMENTACION_FASE_0.md](12_IMPLEMENTACION_FASE_0.md). Después, el propietario autorizó la Fase 1: [13_IMPLEMENTACION_FASE_1.md](13_IMPLEMENTACION_FASE_1.md). Los documentos 01–11 conservan la auditoría y propuestas originales; sus referencias a fuente corresponden al commit auditado, no a las líneas actuales. Los apartados de seguimiento registran los avances posteriores. No se ha desplegado ni autorizado la activación productiva de especialistas.
+
+## Seguimiento de Fase 1
+
+Tras autorizar «continua fase 1», se implementó el modelo aditivo y adapter en una rama nueva. Ver [13_IMPLEMENTACION_FASE_1.md](13_IMPLEMENTACION_FASE_1.md) para alcance, pruebas y rollback. La autorización previa de Fase 0 se conserva como antecedente; no limita esta nueva autorización a Fase 0. No se autorizaron ni ejecutaron despliegues o fases posteriores.
 
 ## Dictamen ejecutivo
 
@@ -32,6 +36,7 @@ El propietario autorizó exclusivamente el hardening de Fase 0. Ver [12_IMPLEMEN
 | [10 — ADRs](10_DECISIONES_ARQUITECTONICAS.md) | Decisiones propuestas y alternativas |
 | [11 — Backlog](11_BACKLOG_IMPLEMENTACION.md) | Historias ejecutables y aceptación |
 | [12 — Implementación Fase 0](12_IMPLEMENTACION_FASE_0.md) | Hardening implementado, evidencia y rollback |
+| [13 — Implementación Fase 1](13_IMPLEMENTACION_FASE_1.md) | Modelo aditivo, adapter y observación durable |
 
 Propietario: leer 02 → 03 → 05 → 07. Ingeniería: 01 → 06 → 04 → 09 → 10 → 08 → 11.
 

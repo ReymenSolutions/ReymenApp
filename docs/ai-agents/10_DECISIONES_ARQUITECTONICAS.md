@@ -63,3 +63,7 @@ Todas **I / estado: propuestas**, pendientes de aprobación; no implementación.
 | Conectores reales | Export saneado + pruebas sandbox del canal piloto | Channels |
 
 Estas decisiones no bloquean terminar documentación. Tampoco constituyen solicitud de despliegue: etapa2 requiere aprobación explícita.
+
+## Decisiones aplicadas en Fase 1
+
+Se aplica ADR-01/02/05/09 en modalidad expand + adapter + shadow, descrita en [13](13_IMPLEMENTACION_FASE_1.md). No se crea otro worker, límite comercial ni activación de especialistas. Las otras decisiones siguen siendo propuestas para sus fases; no se eligió un tenant piloto.

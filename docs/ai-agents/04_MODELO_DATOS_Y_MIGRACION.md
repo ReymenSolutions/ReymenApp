@@ -101,3 +101,7 @@ No restaurar una copia antigua encima de producción para revertir UI: perdería
 | Campos config presentes en logs | Redacción por allowlist y acceso auditado |
 
 **V:** volúmenes, downtime tolerable, SLA, cuentas externas y mapeos reales siguen pendientes. Sin ellos no aprobar migración de producción.
+
+## Expansión implementada en Fase 1
+
+[13](13_IMPLEMENTACION_FASE_1.md) especifica las seis tablas implementadas, FKs compuestas, restricciones de referencias legacy y snapshot de admisión. El resto de este documento conserva el diseño objetivo; no implica que conexiones, grants, approvals, ledger por especialista o cutover estén implementados.

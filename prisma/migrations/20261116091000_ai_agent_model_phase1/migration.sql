@@ -129,4 +129,3 @@ ALTER TABLE "AgentExecution" ADD CONSTRAINT "AgentExecution_organizationId_agent
 
 -- AddForeignKey
 ALTER TABLE "AgentExecutionStep" ADD CONSTRAINT "AgentExecutionStep_organizationId_executionId_fkey" FOREIGN KEY ("organizationId", "executionId") REFERENCES "AgentExecution"("organizationId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
-

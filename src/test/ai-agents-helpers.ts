@@ -10,4 +10,3 @@ export async function cleanupAgentFixture(id: string) {
   await prisma.agentModelRollout.deleteMany({ where: { organizationId: id } });
   await cleanupOrg(id);
 }
-

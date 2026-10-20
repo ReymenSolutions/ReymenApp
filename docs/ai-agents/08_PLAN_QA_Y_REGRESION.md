@@ -149,3 +149,7 @@ Se verificaron los 12 Markdown, 226 enlaces locales (destino existente y líneas
 ## Evidencia posterior: implementación Fase 0
 
 Las 18 comprobaciones de auditoría anteriores son históricas y reprodujeron defectos; no representan el resultado del código corregido. Las nuevas suites PostgreSQL, carreras, reintentos, aislamiento y Chromium, junto con resultados reales y limitaciones, están en [12 — evidencia](12_IMPLEMENTACION_FASE_0.md#4-evidencia-de-pruebas). Las pruebas solo utilizan bases desechables independientes de producción.
+
+## Evidencia posterior de Fase 1
+
+La matriz old/new schema/código, backfill, CAS, scopes y observación sin duplicar efectos está en [13](13_IMPLEMENTACION_FASE_1.md#7-evidencia-de-validación). Solo se usaron bases sintéticas. El resultado de Fase 0 se conserva como evidencia histórica, no sustituye esta regresión.

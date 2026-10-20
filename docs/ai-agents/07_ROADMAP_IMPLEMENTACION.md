@@ -161,3 +161,7 @@ Cada PR futura: problema/cambio concreto, pruebas realmente ejecutadas, compatib
 ## Actualización de alcance
 
 El propietario autorizó exclusivamente el hardening, denominado **Fase 0** en su solicitud y **Fase 0B** en este roadmap. La implementación mínima y la evidencia se registran en [12](12_IMPLEMENTACION_FASE_0.md). No se inició Fase 1 ni se crearon AgentDefinition/AgentInstance/ChannelConnection. La decisión de reutilizar WebhookEvent permitió recuperar trabajo actual sin migración de esquema.
+
+## Autorización posterior: Fase 1
+
+El propietario autorizó continuar con Fase 1. El modelo, adapter, flags y observación durable implementados se describen en [13](13_IMPLEMENTACION_FASE_1.md). Se conserva el runtime de Fase 0 como único autor de efectos. El inventario productivo y piloto no se ejecutaron; Fase 2 y especialistas posteriores no se iniciaron.

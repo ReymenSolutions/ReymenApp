@@ -51,3 +51,7 @@ Actual = **C** con evidencia; destino y estrategia = **I**. Datos y despliegue r
 ## Validación de Fase 0
 
 [Implementación 12](12_IMPLEMENTACION_FASE_0.md) especifica los cambios intencionales: denegación de permisos antes omitidos, hilos email/enquiry separados con Lead común, ID explícito incompatible rechazado, payloads null legacy aceptados y respuesta de cron ampliada. No se migraron identidades, canales, planes, conversaciones ni consumo al modelo propuesto. Los destinos de la matriz siguen pendientes.
+
+## Compatibilidad de Fase 1
+
+El modelo permanece tras doble flag y conserva adapter legacy, cap por canal y un único runtime. [13](13_IMPLEMENTACION_FASE_1.md) documenta old/new schema/código, cambios de los formularios bajo flag y límites del snapshot. No se migraron conversaciones, derechos ni consumo histórico.

@@ -176,3 +176,7 @@ Para iniciar: aprobar fase0B y preparación de fase1 con BD desechable, decidir 
 - AG-006–017: no implementadas como historias completas; solo ajustes de compatibilidad expresamente descritos en12.
 
 Ver [entrega Fase 0](12_IMPLEMENTACION_FASE_0.md). No continuar con AG-008 ni fases multiagente sin nueva autorización.
+
+## Avance autorizado de Fase 1
+
+AG-008 cuenta con modelo/adaptor/versiones/backfill/flags y pruebas. AG-003 añade raíces/pasos que observan los trabajos durables existentes, sin segundo worker. Gates de inventario/cutover real siguen pendientes. AG-009–017 no se dan por implementadas. Evidencia, límites y rollback en [13](13_IMPLEMENTACION_FASE_1.md).
