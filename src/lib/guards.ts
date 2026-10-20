@@ -50,3 +50,10 @@ export async function requireLoyaltyOperator() {
   await assertModuleEnabled(session.user.organizationId, "LOYALTY");
   return session;
 }
+
+/** Configuración del asistente y sus fuentes: permiso y módulo se exigen en cada acción. */
+export async function requireAiManager() {
+  const session = await requireOrgPermission("knowledge_base:manage");
+  await assertModuleEnabled(session.user.organizationId, "AI_WHATSAPP");
+  return session;
+}

@@ -49,7 +49,7 @@ export default async function KnowledgeBasePage() {
       <PageHeader
         title={lang === "es" ? "Base de Conocimiento y Rulebook" : "Knowledge Base & Rulebook"}
         description={lang === "es" ? `${articles.length} artículos · ${activeCount} activos` : `${articles.length} articles · ${activeCount} active`}
-        actions={<ArticleDialog mode="create" />}
+        actions={canEditRulebook ? <ArticleDialog mode="create" /> : undefined}
       />
 
       <PortalSectionTabs tabs={getAiWhatsappTabs(t, session.user.role as UserRole)} />
@@ -74,7 +74,7 @@ export default async function KnowledgeBasePage() {
               icon={BookOpen}
               title={lang === "es" ? "Base de conocimiento vacía" : "Empty knowledge base"}
               description={lang === "es" ? "Agrega artículos con información sobre tus servicios, precios, horarios y preguntas frecuentes." : "Add articles with information about your services, pricing, hours and frequently asked questions."}
-              action={<ArticleDialog mode="create" />}
+              action={canEditRulebook ? <ArticleDialog mode="create" /> : undefined}
             />
           </CardContent>
         </Card>
@@ -110,10 +110,10 @@ export default async function KnowledgeBasePage() {
                             </span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1 flex-shrink-0">
+                        {canEditRulebook && <div className="flex items-center gap-1 flex-shrink-0">
                           <ArticleDialog article={article} mode="edit" />
                           <DeleteArticleButton id={article.id} />
-                        </div>
+                        </div>}
                       </div>
                     </CardContent>
                   </Card>

@@ -114,7 +114,7 @@ export default async function WhatsAppCenterPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <AssistantConfigForm assistant={assistant} />
+              <AssistantConfigForm assistant={assistant} canEdit={canConfigure} />
             </CardContent>
           </Card>
         </div>

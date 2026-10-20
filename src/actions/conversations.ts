@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { notifyAdmins } from "@/lib/admin-notifications";
 import { escalationAlertEmail } from "@/lib/email-templates";
-import { assertModuleEnabled } from "@/lib/modules";
+import { requireOrgPermission } from "@/lib/guards";
 import { can } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { triggerN8nWorkflow } from "@/lib/n8n";
@@ -25,10 +25,8 @@ async function requireOrgAndWhatsapp() {
 }
 
 export async function escalateConversation(conversationId: string) {
-  const session = await auth();
-  if (!session?.user.organizationId) throw new UserError("No autorizado");
-
-  await assertModuleEnabled(session.user.organizationId, "AI_WHATSAPP");
+  const session = await requireOrgPermission("conversations:escalate");
+  await assertInboxAccess(session.user.organizationId);
 
   const conv = await prisma.conversation.findFirst({
     where: { id: conversationId, organizationId: session.user.organizationId },
@@ -57,10 +55,8 @@ const MESSAGE_PAGE_SIZE = 50;
 
 /** Fetches the page of messages immediately before `beforeMessageId`, oldest of that page first. */
 export async function getOlderMessages(conversationId: string, beforeMessageId: string) {
-  const session = await auth();
-  if (!session?.user.organizationId) throw new UserError("No autorizado");
-
-  await assertModuleEnabled(session.user.organizationId, "AI_WHATSAPP");
+  const session = await requireOrgPermission("conversations:view");
+  await assertInboxAccess(session.user.organizationId);
 
   const conv = await prisma.conversation.findFirst({
     where: { id: conversationId, organizationId: session.user.organizationId },
@@ -68,8 +64,8 @@ export async function getOlderMessages(conversationId: string, beforeMessageId: 
   });
   if (!conv) throw new UserError("Conversación no encontrada");
 
-  const cursor = await prisma.message.findUnique({
-    where: { id: beforeMessageId },
+  const cursor = await prisma.message.findFirst({
+    where: { id: beforeMessageId, conversationId },
     select: { createdAt: true },
   });
   if (!cursor) throw new UserError("Mensaje no encontrado");
@@ -93,10 +89,8 @@ export async function getOlderMessages(conversationId: string, beforeMessageId: 
 }
 
 export async function resolveConversation(conversationId: string) {
-  const session = await auth();
-  if (!session?.user.organizationId) throw new UserError("No autorizado");
-
-  await assertModuleEnabled(session.user.organizationId, "AI_WHATSAPP");
+  const session = await requireOrgPermission("conversations:resolve");
+  await assertInboxAccess(session.user.organizationId);
 
   const conv = await prisma.conversation.findFirst({
     where: { id: conversationId, organizationId: session.user.organizationId },

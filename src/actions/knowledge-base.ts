@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { requireAiManager } from "@/lib/guards";
 import { UserError } from "@/lib/user-error";
 
 const articleSchema = z.object({
@@ -14,8 +14,7 @@ const articleSchema = z.object({
 });
 
 export async function createArticle(data: z.infer<typeof articleSchema>) {
-  const session = await auth();
-  if (!session?.user.organizationId) throw new UserError("No autorizado");
+  const session = await requireAiManager();
 
   const parsed = articleSchema.parse(data);
 
@@ -35,8 +34,7 @@ export async function updateArticle(
   id: string,
   data: z.infer<typeof articleSchema>
 ) {
-  const session = await auth();
-  if (!session?.user.organizationId) throw new UserError("No autorizado");
+  const session = await requireAiManager();
 
   const parsed = articleSchema.parse(data);
 
@@ -47,7 +45,7 @@ export async function updateArticle(
 
   await prisma.knowledgeBase.update({
     where: { id },
-    data: { ...parsed, tags: parsed.tags ?? [] },
+    data: parsed,
   });
 
   revalidatePath("/portal/knowledge-base");
@@ -55,8 +53,7 @@ export async function updateArticle(
 }
 
 export async function deleteArticle(id: string) {
-  const session = await auth();
-  if (!session?.user.organizationId) throw new UserError("No autorizado");
+  const session = await requireAiManager();
 
   const article = await prisma.knowledgeBase.findFirst({
     where: { id, organizationId: session.user.organizationId },

@@ -28,7 +28,7 @@ const COPY = {
 };
 
 /** Identidad del agente: cómo se llama y su número de WhatsApp. Todo lo demás vive en el Rulebook. */
-export function AssistantConfigForm({ assistant }: { assistant: WhatsAppAssistant | null }) {
+export function AssistantConfigForm({ assistant, canEdit = true }: { assistant: WhatsAppAssistant | null; canEdit?: boolean }) {
   const { t, lang } = usePreferences();
   const c = COPY[lang === "en" ? "en" : "es"];
   const [loading, setLoading] = useState(false);
@@ -55,12 +55,12 @@ export function AssistantConfigForm({ assistant }: { assistant: WhatsAppAssistan
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="assistantconfigform-f1">{t.assistantName}</Label>
-          <Input id="assistantconfigform-f1" placeholder={t.assistantNamePlaceholder} {...register("name")} />
+          <Input disabled={!canEdit} id="assistantconfigform-f1" placeholder={t.assistantNamePlaceholder} {...register("name")} />
           {errors.name && <p className="text-xs text-red-500">{translateMessage(errors.name.message)}</p>}
         </div>
         <div className="space-y-2">
           <Label htmlFor="assistantconfigform-f2">{t.whatsappBusinessNumber}</Label>
-          <Input id="assistantconfigform-f2" placeholder="+52 55 1234 5678" {...register("phoneNumber")} />
+          <Input disabled={!canEdit} id="assistantconfigform-f2" placeholder="+52 55 1234 5678" {...register("phoneNumber")} />
         </div>
       </div>
       <p className="text-xs text-slate-500">
@@ -68,7 +68,7 @@ export function AssistantConfigForm({ assistant }: { assistant: WhatsAppAssistan
         <Link href="/portal/knowledge-base" className="font-medium text-brand-700 underline-offset-2 hover:underline">{c.link}</Link>
       </p>
       <div className="flex justify-end">
-        <Button type="submit" disabled={loading}>
+        <Button type="submit" disabled={loading || !canEdit}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           {t.saveConfig}
         </Button>
