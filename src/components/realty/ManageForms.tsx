@@ -177,7 +177,7 @@ export function ZoneRow({ zone }: { zone: { id?: string; name: string; latitude:
     >
       <div className="col-span-2 space-y-1 sm:col-span-1">
         <Label className="text-xs" htmlFor={`z-n-${zone.id ?? "new"}`}>{R.zone}</Label>
-        <Input id={`z-n-${zone.id ?? "new"}`} value={name} onChange={(e) => setName(e.target.value)} required minLength={2} maxLength={80} placeholder={isNew ? R.addZone : undefined} />
+        <Input id={`z-n-${zone.id ?? "new"}`} value={name} onChange={(e) => setName(e.target.value)} required minLength={2} maxLength={80} placeholder={isNew ? R.zonePlaceholder : undefined} />
         {zone.usage && <p className="text-[11px] text-slate-500">{zone.usage}</p>}
       </div>
       <div className="space-y-1">

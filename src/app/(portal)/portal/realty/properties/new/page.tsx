@@ -2,19 +2,22 @@ import { redirect } from "next/navigation";
 import { getRealtyContext } from "@/lib/realty/context";
 import { listAdvisors, listZones } from "@/lib/realty/queries";
 import { PropertyForm } from "@/components/realty/PropertyForm";
-import { Empty } from "@/components/realty/RealtyBits";
-import Link from "next/link";
+import { SectionCard } from "@/components/realty/RealtyBits";
+import { ZoneRow } from "@/components/realty/ManageForms";
 
 export default async function NewPropertyPage() {
   const ctx = await getRealtyContext();
   if (!ctx.canOperate) redirect("/portal/realty/properties");
   const [zones, advisors] = await Promise.all([listZones(ctx.orgId), listAdvisors(ctx.orgId)]);
+  // Sin zonas no se puede dar de alta una propiedad (cada una pertenece a una zona):
+  // quien administra la agrega aquí mismo; al guardarla, la página muestra el formulario.
   if (zones.length === 0)
     return (
-      <Empty>
-        {ctx.R.zonesSubtitle}{" "}
-        {ctx.canManage && <Link className="font-semibold text-[#063C82] underline" href="/portal/realty/settings">{ctx.R.addZone}</Link>}
-      </Empty>
+      <div className="mx-auto max-w-3xl">
+        <SectionCard title={ctx.R.needZoneTitle} subtitle={ctx.canManage ? ctx.R.needZoneDesc : undefined}>
+          {ctx.canManage ? <ZoneRow zone={{ name: "", latitude: null, longitude: null }} /> : <p className="text-sm text-slate-600">{ctx.R.needZoneAskManager}</p>}
+        </SectionCard>
+      </div>
     );
   return (
     <div className="mx-auto max-w-5xl">
@@ -31,7 +34,7 @@ export default async function NewPropertyPage() {
           status: "AVAILABLE",
           price: "",
           currency: ctx.currency,
-          zoneId: "",
+          zoneId: zones.length === 1 ? zones[0].id : "",
           neighborhood: "",
           addressLine: "",
           showExactLocation: false,
