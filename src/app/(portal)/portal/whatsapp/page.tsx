@@ -14,6 +14,7 @@ import { AssistantConfigForm } from "@/components/portal/AssistantConfigForm";
 import { AgentModesPanel } from "@/components/portal/AgentModesPanel";
 import { getAgentModes } from "@/lib/agent-mode";
 import { getAgentCap } from "@/lib/agent-cap";
+import { AUTO_JOB_SOURCE } from "@/lib/ai-auto-jobs";
 import { isDraftProviderConfigured } from "@/lib/ai-draft";
 import { can } from "@/lib/permissions";
 import { PortalSectionTabs } from "@/components/portal/PortalSectionTabs";
@@ -35,9 +36,9 @@ async function getWhatsAppData(orgId: string) {
     prisma.conversation.count({ where: { organizationId: orgId, status: "ESCALATED" } }),
     prisma.conversation.count({ where: { organizationId: orgId, channel: "whatsapp" } }),
     prisma.conversation.count({ where: { organizationId: orgId, status: "RESOLVED", aiHandled: true } }),
-    prisma.webhookEvent.count({ where: { organizationId: orgId, status: "FAILED", createdAt: { gte: since24h } } }),
+    prisma.webhookEvent.count({ where: { organizationId: orgId, source: { not: AUTO_JOB_SOURCE }, status: "FAILED", createdAt: { gte: since24h } } }),
     prisma.webhookEvent.findFirst({
-      where: { organizationId: orgId, status: "PROCESSED" },
+      where: { organizationId: orgId, source: { not: AUTO_JOB_SOURCE }, status: "PROCESSED" },
       orderBy: { processedAt: "desc" },
       select: { processedAt: true },
     }),

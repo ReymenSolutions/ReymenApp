@@ -9,6 +9,7 @@ import { AiBudgetError, isBudgetBlocked } from "@/lib/ai/budget";
 import type { AiUsageContext } from "@/lib/ai/types";
 import { activeProviderName, getProvider } from "@/lib/ai/providers";
 import { DEFAULT_ANTHROPIC_MODEL, setAnthropicClientForTests } from "@/lib/ai/providers/anthropic";
+import { AUTO_JOB_SOURCE } from "./ai-auto-jobs";
 
 // ── Configuración ────────────────────────────────────────────────────────────
 
@@ -18,8 +19,8 @@ export const DEFAULT_DRAFT_MODEL = DEFAULT_ANTHROPIC_MODEL;
 const MAX_OUTPUT_TOKENS = 4096;
 const TRANSCRIPT_LIMIT = 30;
 const MESSAGE_CHARS = 2000;
-/** Un borrador que lleva más de esto "generando" se considera perdido y se reintenta. */
-const STALE_GENERATING_MS = 90_000;
+/** Above the provider retry/timeout envelope; stale attempts can be recovered without racing a live call. */
+const STALE_GENERATING_MS = 10 * 60_000;
 
 /** ¿Hay con qué generar borradores? (el proveedor activo está configurado, o es el de prueba) */
 export function isDraftProviderConfigured(): boolean {
@@ -138,13 +139,16 @@ export async function getOrCreateReplyDraft(organizationId: string, conversation
   if (!(await draftsAvailable(organizationId, conversation.channel))) return { state: "off" };
   if (await isBudgetBlocked(organizationId, now)) return { state: "budget_exhausted" };
 
-  const recent = await prisma.message.findMany({ where: { conversationId }, orderBy: { createdAt: "desc" }, take: TRANSCRIPT_LIMIT, select: { id: true, role: true, content: true } });
+  const recent = await prisma.message.findMany({ where: { conversationId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: TRANSCRIPT_LIMIT, select: { id: true, role: true, content: true } });
   const messages = recent.reverse();
   const last = messages[messages.length - 1];
   if (!last || last.role !== "USER") return { state: "none" };
 
   let draft = await prisma.replyDraft.findUnique({ where: { conversationId_basedOnMessageId: { conversationId, basedOnMessageId: last.id } } });
-  if (draft && !opts.force) {
+  const autoJob = await prisma.webhookEvent.findFirst({ where: { organizationId, source: AUTO_JOB_SOURCE, externalEventId: `auto:${last.id}`, status: { in: ["PENDING", "PROCESSING", "FAILED"] } }, select: { id: true } });
+  if (autoJob) return draft ? toState(draft) : { state: "generating" };
+  if (draft?.status === "GENERATING" && now.getTime() - draft.updatedAt.getTime() < STALE_GENERATING_MS) return { state: "generating" };
+  if (draft && !opts.force && draft.error !== "budget_exhausted") {
     if (draft.status === "READY" || draft.status === "USED" || draft.status === "DISMISSED") return draft.status === "READY" ? toState(draft) : { state: "none" };
     if (draft.status === "FAILED") return toState(draft);
     if (now.getTime() - draft.updatedAt.getTime() < STALE_GENERATING_MS) return { state: "generating" }; // otra petición lo está redactando
@@ -152,14 +156,20 @@ export async function getOrCreateReplyDraft(organizationId: string, conversation
 
   // Reserva el turno de generación (la llave única impide que dos peticiones redacten lo mismo a la vez).
   try {
-    draft = draft
-      ? await prisma.replyDraft.update({ where: { id: draft.id }, data: { status: "GENERATING", content: "", error: null, finalContent: null, usedAt: null, usedById: null } })
-      : await prisma.replyDraft.create({ data: { organizationId, conversationId, basedOnMessageId: last.id, status: "GENERATING" } });
+    if (draft) {
+      const claimedAt = new Date(Math.max(now.getTime(), draft.updatedAt.getTime() + 1));
+      const claim = await prisma.replyDraft.updateMany({ where: { id: draft.id, organizationId, status: draft.status, updatedAt: draft.updatedAt }, data: { status: "GENERATING", content: "", error: null, finalContent: null, usedAt: null, usedById: null, updatedAt: claimedAt } });
+      if (!claim.count) return { state: "generating" };
+      draft = { ...draft, status: "GENERATING", updatedAt: claimedAt };
+    } else {
+      draft = await prisma.replyDraft.create({ data: { organizationId, conversationId, basedOnMessageId: last.id, status: "GENERATING" } });
+    }
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") return { state: "generating" };
     throw err;
   }
 
+  const owned = { id: draft.id, organizationId, status: "GENERATING" as const, updatedAt: draft.updatedAt };
   try {
     const instructions = await buildBusinessInstructions(organizationId);
     const system = buildDraftSystem(instructions, {
@@ -173,22 +183,23 @@ export async function getOrCreateReplyDraft(organizationId: string, conversation
 
     const result = await generateText({ organizationId, agentKey: `inbox:${conversation.channel}`, operation: "draft", origin: conversation.channel, conversationId, requestId: `draft:${draft.id}:${draft.updatedAt.getTime()}` }, system, turns);
     if ("refused" in result) {
-      draft = await prisma.replyDraft.update({ where: { id: draft.id }, data: { status: "FAILED", model: result.model, error: "refusal" } });
+      await prisma.replyDraft.updateMany({ where: owned, data: { status: "FAILED", model: result.model, error: "refusal" } });
     } else if (!result.text) {
-      draft = await prisma.replyDraft.update({ where: { id: draft.id }, data: { status: "FAILED", model: result.model, error: "empty" } });
+      await prisma.replyDraft.updateMany({ where: owned, data: { status: "FAILED", model: result.model, error: "empty" } });
     } else {
-      draft = await prisma.replyDraft.update({ where: { id: draft.id }, data: { status: "READY", content: result.text, model: result.model, inputTokens: result.inputTokens, outputTokens: result.outputTokens, error: null } });
+      await prisma.replyDraft.updateMany({ where: owned, data: { status: "READY", content: result.text, model: result.model, inputTokens: result.inputTokens, outputTokens: result.outputTokens, error: null } });
     }
   } catch (err) {
     if (err instanceof AiBudgetError) {
-      // Pausa por presupuesto: no se deja un borrador "fallido" que seguiría ahí después de desbloquear; se reintenta solo.
-      await prisma.replyDraft.delete({ where: { id: draft.id } }).catch(() => undefined);
+      // Preserve the attempt; after budget is restored this marker permits a new guarded generation.
+      await prisma.replyDraft.updateMany({ where: owned, data: { status: "FAILED", error: "budget_exhausted" } });
       return { state: "budget_exhausted" };
     }
     const message = (err instanceof Error ? err.message : String(err)).slice(0, 300);
-    draft = await prisma.replyDraft.update({ where: { id: draft.id }, data: { status: "FAILED", error: message } });
+    await prisma.replyDraft.updateMany({ where: owned, data: { status: "FAILED", error: message } });
   }
-  return toState(draft);
+  const current = await prisma.replyDraft.findFirst({ where: { id: draft.id, organizationId } });
+  return current ? toState(current) : { state: "none" };
 }
 
 /** La persona descartó el borrador. */

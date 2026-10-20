@@ -1,11 +1,13 @@
 // @vitest-environment node
 import { describe, it, expect, afterAll, beforeEach, vi } from "vitest";
 import { prisma } from "@/lib/prisma";
+import { processConversationEvent } from "./webhook-processors";
+import { AUTO_JOB_SOURCE, PIPELINE_JOB_TYPE, AUTO_JOB_LEASE_MS } from "./ai-auto-jobs";
 import { createTestOrg, createTestPipelineStages, cleanupOrg, seedTestAiRate } from "@/test/helpers";
 
 vi.mock("next/server", () => ({ after: () => { throw new Error("outside request"); } }));
 
-const { parseAnalysis, planAction, runPipelineAgent, undoPipelineAiAction, acceptPipelineAiAction, rejectPipelineAiAction, ANALYSIS_COOLDOWN_MS } = await import("./ai-pipeline");
+const { parseAnalysis, planAction, runPipelineAgent, recoverPipelineAnalyses, undoPipelineAiAction, acceptPipelineAiAction, rejectPipelineAiAction, ANALYSIS_COOLDOWN_MS } = await import("./ai-pipeline");
 const { setDraftClientForTests } = await import("./ai-draft");
 
 const stages = [
@@ -196,4 +198,50 @@ describe("pipeline con IA (con base de datos)", () => {
     expect(await runPipelineAgent(org.id, conv.id)).toBe("skipped");
     expect(await prisma.opportunity.count({ where: { leadId: lead.id } })).toBe(0);
   });
+  it("recovers persisted SUGGEST pipeline work once without relying on after", async () => {
+    const { org, conv, lead } = await setup("SUGGEST");
+    say();
+    await processConversationEvent({ conversationId: conv.id, channel: "whatsapp", message: { role: "USER", content: "Quiero cotizar", externalId: "durable-pipeline" } }, org.id);
+    expect(await prisma.webhookEvent.count({ where: { organizationId: org.id, source: AUTO_JOB_SOURCE, eventType: PIPELINE_JOB_TYPE, status: "PENDING" } })).toBe(1);
+    await Promise.all(Array.from({ length: 3 }, () => recoverPipelineAnalyses({ organizationId: org.id })));
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(await prisma.opportunity.count({ where: { leadId: lead.id } })).toBe(1);
+    expect(await prisma.webhookEvent.findFirst({ where: { organizationId: org.id, eventType: PIPELINE_JOB_TYPE } })).toMatchObject({ status: "PROCESSED" });
+    await recoverPipelineAnalyses({ organizationId: org.id });
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not replay an interrupted pipeline attempt that may already have written to CRM", async () => {
+    const { org, conv } = await setup("SUGGEST");
+    await processConversationEvent({ conversationId: conv.id, message: { role: "USER", content: "Cotización", externalId: "interrupted-pipeline" } }, org.id);
+    const job = await prisma.webhookEvent.findFirstOrThrow({ where: { organizationId: org.id, eventType: PIPELINE_JOB_TYPE } });
+    const payload = job.payload as { conversationId: string; messageId: string };
+    await prisma.webhookEvent.update({ where: { id: job.id }, data: { payload: { ...payload, stage: "generating" }, status: "PROCESSING", attempts: 3, claimedAt: new Date(Date.now() - AUTO_JOB_LEASE_MS - 1) } });
+    await recoverPipelineAnalyses({ organizationId: org.id });
+    await recoverPipelineAnalyses({ organizationId: org.id });
+    expect(await prisma.webhookEvent.findUnique({ where: { id: job.id } })).toMatchObject({ status: "FAILED", attempts: 3, errorMessage: "pipeline_execution_unconfirmed" });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("pipeline provider failure terminates persisted work without repeating a CRM write", async () => {
+    const { org, conv } = await setup("SUGGEST");
+    await processConversationEvent({ conversationId: conv.id, message: { role: "USER", content: "Cotización", externalId: "failed-pipeline" } }, org.id);
+    create.mockRejectedValue(new Error("provider failed"));
+    await recoverPipelineAnalyses({ organizationId: org.id });
+    await recoverPipelineAnalyses({ organizationId: org.id, now: new Date(Date.now() + AUTO_JOB_LEASE_MS + 1) });
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(await prisma.webhookEvent.findFirst({ where: { organizationId: org.id, eventType: PIPELINE_JOB_TYPE } })).toMatchObject({ status: "FAILED", attempts: 3 });
+  });
+
+  it("pipeline recovery scopes tenant IDs and ignores an obsolete turn", async () => {
+    const a = await setup("SUGGEST"), b = await setup("SUGGEST");
+    await processConversationEvent({ conversationId: a.conv.id, message: { role: "USER", content: "Cotización", externalId: "foreign-pipeline" } }, a.org.id);
+    const job = await prisma.webhookEvent.findFirstOrThrow({ where: { organizationId: a.org.id, eventType: PIPELINE_JOB_TYPE } });
+    const message = await prisma.message.findFirstOrThrow({ where: { conversationId: b.conv.id } });
+    await prisma.webhookEvent.update({ where: { id: job.id }, data: { payload: { conversationId: b.conv.id, messageId: message.id, stage: "queued" } } });
+    await recoverPipelineAnalyses({ organizationId: a.org.id });
+    expect(create).not.toHaveBeenCalled();
+    expect(await prisma.opportunity.count({ where: { organizationId: b.org.id } })).toBe(0);
+  });
+
 });

@@ -7,11 +7,13 @@ import { cleanupOrg, createTestOrg, createTestUser, fakeSession } from "@/test/h
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/email", () => ({ sendEmail: vi.fn().mockResolvedValue({ sent: true }) }));
 const auth = vi.fn();
+const send = vi.fn().mockResolvedValue({ success: true });
+vi.mock("@/lib/n8n", () => ({ triggerN8nWorkflow: (...args: unknown[]) => send(...args) }));
 vi.mock("@/lib/auth", () => ({ auth: () => auth(), isAdmin: (r: string) => ["ADMIN", "SUPER_ADMIN"].includes(r) }));
 const { createArticle, updateArticle, deleteArticle } = await import("./knowledge-base");
 const { upsertWhatsAppAssistant } = await import("./whatsapp-assistant");
 const { saveRulebook } = await import("./rulebook");
-const { escalateConversation, resolveConversation, getOlderMessages } = await import("./conversations");
+const { escalateConversation, resolveConversation, getOlderMessages, sendManualMessage } = await import("./conversations");
 
 describe("AI configuration authorization at Server Action boundary", () => {
   let a: { id: string }, b: { id: string }, owner: { id: string };
@@ -77,4 +79,14 @@ describe("AI configuration authorization at Server Action boundary", () => {
     await expect(escalateConversation(conversation.id)).rejects.toThrow("No autorizado");
     await expect(resolveConversation(conversation.id)).rejects.toThrow("No autorizado");
   });
+  it("rejects a foreign draft before persisting or sending a manual message", async () => {
+    login("OWNER");
+    const own = await prisma.conversation.create({ data: { organizationId: a.id, channel: "whatsapp" } });
+    const draft = await prisma.replyDraft.create({ data: { organizationId: b.id, conversationId: conversation.id, basedOnMessageId: cursor.id, status: "READY", content: "Foreign private draft" } });
+    await expect(sendManualMessage({ conversationId: own.id, content: "x", draftId: draft.id })).rejects.toThrow("Borrador no encontrado");
+    expect(await prisma.message.count({ where: { conversationId: own.id } })).toBe(0);
+    expect(await prisma.replyDraft.findUnique({ where: { id: draft.id } })).toMatchObject({ status: "READY" });
+    expect(send).not.toHaveBeenCalled();
+  });
+
 });

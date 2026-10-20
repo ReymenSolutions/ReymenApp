@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
 import { retryAllFailedWebhookEvents } from "@/lib/webhook-retry";
+import { recoverAutoReplies } from "@/lib/ai-auto-reply";
+import { recoverPipelineAnalyses } from "@/lib/ai-pipeline";
 
 function secretsMatch(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
@@ -29,5 +31,7 @@ export async function POST(req: NextRequest) {
   }
 
   const result = await retryAllFailedWebhookEvents();
-  return NextResponse.json({ success: true, ...result });
+  const pipeline = await recoverPipelineAnalyses();
+  const ai = await recoverAutoReplies();
+  return NextResponse.json({ success: true, ...result, ai, pipeline });
 }

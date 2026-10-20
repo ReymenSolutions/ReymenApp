@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { enqueueAutoReply, enqueuePipelineAnalysis } from "./ai-auto-jobs";
 import { prisma } from "./prisma";
 import { notifyAdmins } from "./admin-notifications";
 import { automationFailureEmail } from "./email-templates";
@@ -169,6 +170,10 @@ export async function processConversationEvent(payload: unknown, orgId: string):
         ...(subject && !conv.subject ? { subject } : {}),
         ...(body.message.role === "USER" ? { unreadCount: { increment: 1 }, archivedAt: null } : {}),
       } });
+    }
+    if (body.message.role === "USER") {
+      await enqueueAutoReply(tx, orgId, conv.id, message.id);
+      await enqueuePipelineAnalysis(tx, orgId, conv.id, message.id);
     }
     return { conversation: conv, inserted: true };
   });

@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 
 const prisma = new PrismaClient();
-const TEST_EMAIL = "e2e-conversation-manual-reply@example.com";
+const TEST_EMAIL = `e2e-conversation-manual-reply-${Date.now()}@example.com`;
 const TEST_PASSWORD = "ConversationManualReply123";
 
 test.describe("manual WhatsApp reply, take/release control, and assignment", () => {
@@ -84,15 +84,14 @@ test.describe("manual WhatsApp reply, take/release control, and assignment", () 
     // environment, has its own bounded timeout before the action resolves,
     // so the response can take a few seconds to land.
     const [response] = await Promise.all([
-      page.waitForResponse((res) => res.url().includes(`/portal/conversations/${conversationId}`) && res.request().method() === "POST", { timeout: 15_000 }),
+      page.waitForResponse((res) => res.url().includes(`/portal/conversations/${conversationId}`) && res.request().method() === "POST" && !!res.request().postData()?.includes("Claro, con gusto te ayudo"), { timeout: 15_000 }),
       page.keyboard.press("Enter"),
     ]);
     expect(response.ok()).toBe(true);
 
     await expect(page.getByText("Claro, con gusto te ayudo")).toBeVisible();
 
-    const message = await prisma.message.findFirstOrThrow({ where: { conversationId, role: "AGENT" } });
-    expect(message.content).toBe("Claro, con gusto te ayudo");
+    await expect.poll(async () => (await prisma.message.findFirst({ where: { conversationId, role: "AGENT" } }))?.content, { timeout: 10_000 }).toBe("Claro, con gusto te ayudo");
   });
 
   test("releasing to AI clears the assignment and flips aiHandled back on", async ({ page }) => {

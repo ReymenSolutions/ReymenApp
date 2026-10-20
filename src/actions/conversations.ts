@@ -139,28 +139,35 @@ export async function sendManualMessage(data: {
     throw new UserError("No se puede responder a una conversación cerrada");
   }
 
-  const message = await prisma.message.create({
-    data: {
-      conversationId: conv.id,
-      role: "AGENT",
-      content: content || "(adjunto)",
-      senderId: session.user.id,
-      attachmentUrl: data.attachmentUrl,
-      attachmentType: data.attachmentType,
-      deliveryStatus: "PENDING",
-    },
-  });
+  const message = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Conversation" WHERE id = ${conv.id} AND "organizationId" = ${session.user.organizationId!} FOR UPDATE`;
+    const current = await tx.conversation.findFirst({ where: { id: conv.id, organizationId: session.user.organizationId! } });
+    if (!current || current.status === "RESOLVED" || current.status === "CLOSED") throw new UserError("No se puede responder a una conversación cerrada");
+    if (data.draftId && !(await tx.replyDraft.findFirst({ where: { id: data.draftId, organizationId: session.user.organizationId!, conversationId: conv.id, status: "READY" } }))) throw new UserError("Borrador no encontrado");
+    const message = await tx.message.create({
+      data: {
+        conversationId: conv.id,
+        role: "AGENT",
+        content: content || "(adjunto)",
+        senderId: session.user.id,
+        attachmentUrl: data.attachmentUrl,
+        attachmentType: data.attachmentType,
+        deliveryStatus: "PENDING",
+      },
+    });
 
-  await prisma.conversation.update({
-    where: { id: conv.id },
-    data: {
-      aiHandled: false,
-      assignedToId: conv.assignedToId ?? session.user.id,
-      lastMessageAt: new Date(),
-      lastMessagePreview: messagePreview(content || "(adjunto)"),
-      lastMessageRole: "AGENT",
-      unreadCount: 0,
-    },
+    await tx.conversation.update({
+      where: { id: conv.id },
+      data: {
+        aiHandled: false,
+        assignedToId: current.assignedToId ?? session.user.id,
+        lastMessageAt: new Date(),
+        lastMessagePreview: messagePreview(content || "(adjunto)"),
+        lastMessageRole: "AGENT",
+        unreadCount: 0,
+      },
+    });
+    return message;
   });
   await recordMetric(session.user.organizationId!, METRIC_KEYS.MESSAGES_SENT);
 
