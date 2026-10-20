@@ -15,6 +15,7 @@ import { enumLabel, realtyStrings } from "@/lib/i18n-realty";
 import { FEATURES, OPERATIONS, PROPERTY_STATUSES, PROPERTY_TYPES } from "@/lib/realty/constants";
 import { cn } from "@/lib/utils";
 import { SELECT } from "./ProspectForm";
+import { GeoPicker } from "./GeoPicker";
 
 export interface PropertyFormValues {
   id?: string;
@@ -54,7 +55,7 @@ export function PropertyForm({
   branches,
 }: {
   initial: PropertyFormValues;
-  zones: { id: string; name: string }[];
+  zones: { id: string; name: string; latitude?: number | null; longitude?: number | null }[];
   advisors: { id: string; name: string | null; email: string }[];
   branches: { id: string; name: string }[];
 }) {
@@ -63,10 +64,15 @@ export function PropertyForm({
   const R = pickDict(realtyStrings, lang);
   const [v, setV] = useState(initial);
   const [saving, setSaving] = useState(false);
+  const [geoPending, setGeoPending] = useState(false);
   const set = <K extends keyof PropertyFormValues>(k: K, value: PropertyFormValues[K]) => setV((s) => ({ ...s, [k]: value }));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (geoPending) {
+      toast.error(R.geoPendingBlock);
+      return;
+    }
     setSaving(true);
     try {
       const res = await saveRealtyProperty({
@@ -159,6 +165,21 @@ export function PropertyForm({
             <Label htmlFor="f-desc">{R.description}</Label>
             <Textarea id="f-desc" rows={4} value={v.description} onChange={(e) => set("description", e.target.value)} maxLength={5000} />
           </div>
+          <div className="space-y-1.5 sm:col-span-2 lg:col-span-4">
+            <Label htmlFor="prop-geo-q">{R.geoTitle}</Label>
+            <GeoPicker
+              idPrefix="prop"
+              hint={R.geoPropertyHint}
+              suggestedQuery={[v.addressLine, v.neighborhood, zones.find((z) => z.id === v.zoneId)?.name].filter(Boolean).join(", ")}
+              value={v.latitude !== "" && v.longitude !== "" ? { lat: Number(v.latitude), lng: Number(v.longitude) } : null}
+              center={(() => {
+                const z = zones.find((x) => x.id === v.zoneId);
+                return z && z.latitude != null && z.longitude != null ? { lat: z.latitude, lng: z.longitude } : null;
+              })()}
+              onConfirm={(p) => setV((s) => ({ ...s, latitude: p ? String(p.lat) : "", longitude: p ? String(p.lng) : "" }))}
+              onPendingChange={setGeoPending}
+            />
+          </div>
         </div>
       </fieldset>
 
@@ -207,8 +228,6 @@ export function PropertyForm({
               </select>
             </div>
           )}
-          {field("latitude", R.latitude, { type: "number", step: "any", min: -90, max: 90 })}
-          {field("longitude", R.longitude, { type: "number", step: "any", min: -180, max: 180 })}
           <label className="flex items-center gap-2 text-sm sm:col-span-2">
             <input type="checkbox" checked={v.showExactLocation} onChange={(e) => set("showExactLocation", e.target.checked)} className="h-4 w-4 rounded border-slate-300" />
             {R.showExactLocation}

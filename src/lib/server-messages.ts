@@ -7,6 +7,11 @@
 
 const EN: Record<string, string> = {
   // ── REYMEN Ops Realty ──
+  "La búsqueda de direcciones está desactivada. Ubica el pin a mano en el mapa.": "Address search is turned off. Place the pin by hand on the map.",
+  "Escribe la dirección para buscarla.": "Type the address to search for it.",
+  "Demasiadas búsquedas de direcciones. Intenta más tarde o ubica el pin a mano.": "Too many address searches. Try later or place the pin by hand.",
+  "El buscador de direcciones está ocupado; intenta de nuevo en un momento.": "The address search is busy; try again in a moment.",
+  "No se pudo buscar la dirección ahora. Ubica el pin a mano en el mapa.": "Couldn't search the address right now. Place the pin by hand on the map.",
   "Cada foto debe pesar menos de 12 MB.": "Each photo must be under 12 MB.",
   "Campaña no encontrada": "Campaign not found",
   "Datos inválidos.": "Invalid data.",
