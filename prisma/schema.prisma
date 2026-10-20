@@ -68,6 +68,9 @@ model Organization {
   createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt
 
+  agentInstances          AgentInstance[]
+  agentRollout            AgentModelRollout?
+  agentExecutions         AgentExecution[]
   users                   User[]
   leads                   Lead[]
   automations             Automation[]
@@ -2805,4 +2808,114 @@ model LoyaltyPosRedemption {
   reward LoyaltyReward @relation(fields: [rewardId], references: [id], onDelete: Restrict)
   @@unique([organizationId, orderId])
   @@index([rewardId, status])
+}
+
+// Phase 1: additive model. Legacy tables remain authoritative; no specialist is activated.
+enum AgentInstanceStatus {
+  LEGACY
+  PAUSED
+}
+
+enum AgentExecutionStatus {
+  QUEUED
+  RUNNING
+  WAITING_HANDOFF
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+model AgentDefinition {
+  key          String
+  version      Int
+  displayName  String
+  specialty    String
+  manifest     Json
+  createdAt    DateTime @default(now())
+  instances    AgentInstance[]
+
+  @@id([key, version])
+}
+
+model AgentModelRollout {
+  organizationId String @id
+  shadowEnabled  Boolean @default(false)
+  updatedById    String?
+  updatedAt      DateTime @updatedAt
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+}
+
+model AgentInstance {
+  id                String @id @default(cuid())
+  organizationId    String
+  definitionKey     String
+  definitionVersion Int
+  publicName        String
+  status            AgentInstanceStatus @default(LEGACY)
+  configVersion     Int @default(1)
+  legacyAssistantId String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  definition        AgentDefinition @relation(fields: [definitionKey, definitionVersion], references: [key, version], onDelete: Restrict)
+  revisions         AgentConfigRevision[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, definitionKey])
+}
+
+model AgentConfigRevision {
+  organizationId String
+  agentInstanceId String
+  version        Int
+  sourceHash     String
+  snapshot       Json
+  createdById    String?
+  createdAt      DateTime @default(now())
+  instance       AgentInstance @relation(fields: [organizationId, agentInstanceId], references: [organizationId, id], onDelete: Restrict)
+  executions     AgentExecution[]
+
+  @@id([organizationId, agentInstanceId, version])
+}
+
+// Mirror of Phase 0 work, NOT a second sender/CRM worker. No prompts, messages or secrets in steps.
+model AgentExecution {
+  id               String @id @default(cuid())
+  organizationId   String
+  agentInstanceId  String
+  configVersion    Int
+  conversationId   String
+  messageId        String
+  operation        String
+  legacyJobId      String
+  status           AgentExecutionStatus @default(QUEUED)
+  attempts         Int @default(0)
+  claimedAt        DateTime?
+  leaseExpiresAt   DateTime?
+  nextAttemptAt    DateTime?
+  lastErrorCode    String?
+  completedAt      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  config           AgentConfigRevision @relation(fields: [organizationId, agentInstanceId, configVersion], references: [organizationId, agentInstanceId, version], onDelete: Restrict)
+  steps            AgentExecutionStep[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, legacyJobId])
+  @@unique([organizationId, conversationId, messageId, operation])
+  @@index([organizationId, status, createdAt])
+}
+
+model AgentExecutionStep {
+  organizationId String
+  executionId    String
+  stepKey        String
+  status         AgentExecutionStatus
+  attempts       Int @default(0)
+  lastErrorCode  String?
+  updatedAt      DateTime @updatedAt
+  execution      AgentExecution @relation(fields: [organizationId, executionId], references: [organizationId, id], onDelete: Restrict)
+
+  @@id([organizationId, executionId, stepKey])
 }
