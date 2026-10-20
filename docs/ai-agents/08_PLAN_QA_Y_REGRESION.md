@@ -145,3 +145,7 @@ Ninguna fuga tenant/rol, doble efecto, envío no aprobado o pérdida de datos ac
 ## Verificación documental de esta entrega — P
 
 Se verificaron los 12 Markdown, 226 enlaces locales (destino existente y líneas dentro del archivo), delimitadores de bloques de código y ausencia de marcadores de plantilla/espacios finales. El ejemplo documental de H01 se volvió a ejecutar sin BD y reprodujo el resultado descrito. `git status --short` mostró únicamente `?? docs/ai-agents/`; no cambios funcionales rastreados. No se validó el renderizador Mermaid en navegador; los diagramas son especificaciones textuales.
+
+## Evidencia posterior: implementación Fase 0
+
+Las 18 comprobaciones de auditoría anteriores son históricas y reprodujeron defectos; no representan el resultado del código corregido. Las nuevas suites PostgreSQL, carreras, reintentos, aislamiento y Chromium, junto con resultados reales y limitaciones, están en [12 — evidencia](12_IMPLEMENTACION_FASE_0.md#4-evidencia-de-pruebas). Las pruebas solo utilizan bases desechables independientes de producción.

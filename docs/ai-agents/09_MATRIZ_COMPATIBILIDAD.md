@@ -47,3 +47,7 @@ Actual = **C** con evidencia; destino y estrategia = **I**. Datos y despliegue r
 4. Roles no ganan permisos por copiar configuración. Arreglar H01 puede quitar acceso que accidentalmente existía: documentar como corrección de seguridad, no entitlement contractual.
 5. Apagar nueva UI/agente preserva datos y operación manual. No restaurar backup antiguo para revertir una pantalla.
 6. Legacy desconocido se marca “requiere revisión”, nunca se descarta o rellena con defaults de Mark silenciosamente.
+
+## Validación de Fase 0
+
+[Implementación 12](12_IMPLEMENTACION_FASE_0.md) especifica los cambios intencionales: denegación de permisos antes omitidos, hilos email/enquiry separados con Lead común, ID explícito incompatible rechazado, payloads null legacy aceptados y respuesta de cron ampliada. No se migraron identidades, canales, planes, conversaciones ni consumo al modelo propuesto. Los destinos de la matriz siguen pendientes.

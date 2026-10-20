@@ -157,3 +157,7 @@ Se adelantan seguridad, conocimiento y telemetría respecto del orden comercial 
 ## Condiciones de aprobación por fase
 
 Cada PR futura: problema/cambio concreto, pruebas realmente ejecutadas, compatibilidad, migración aditiva revisada si existe, feature flag y rollback. Owner aprueba efecto comercial/funcional; seguridad valida permisos; operaciones valida datos/backups/delivery. Ninguna aprobación general de diseño activa producción automáticamente.
+
+## Actualización de alcance
+
+El propietario autorizó exclusivamente el hardening, denominado **Fase 0** en su solicitud y **Fase 0B** en este roadmap. La implementación mínima y la evidencia se registran en [12](12_IMPLEMENTACION_FASE_0.md). No se inició Fase 1 ni se crearon AgentDefinition/AgentInstance/ChannelConnection. La decisión de reutilizar WebhookEvent permitió recuperar trabajo actual sin migración de esquema.

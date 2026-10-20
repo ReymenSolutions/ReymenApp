@@ -2,6 +2,10 @@
 
 Fecha: 2026-10-20. Repositorio examinado: **ReymenApp**, checkout local `codex/pos-manual-reward-redemption`, commit **`6fd1ef66ee7ec3a41bb38bfdb890df76ed217042`**. Árbol limpio al iniciar. Esta auditoría describe ese snapshot; no certifica el HEAD remoto de main ni la versión desplegada en el VPS. La referencia local `origin/main` está atrasada respecto del checkout. No se hizo fetch, checkout, instalación, migración ni despliegue.
 
+## Seguimiento actual
+
+El propietario autorizó exclusivamente el hardening de Fase 0. Ver [12_IMPLEMENTACION_FASE_0.md](12_IMPLEMENTACION_FASE_0.md) para cambios, pruebas, compatibilidad, pendientes y rollback. Los documentos 01–11 conservan la auditoría y propuestas originales; sus referencias a fuente corresponden al commit auditado, no a las líneas actuales tras la corrección. La implementación multiagente de Fase 1 sigue sin autorización.
+
 ## Dictamen ejecutivo
 
 **Confirmado mediante código:** existe una base considerable: Next.js/React, PostgreSQL/Prisma, autenticación, módulos, conversaciones multicanal, reglas del negocio, artículos, proveedor de IA, ledger, presupuestos, borradores y análisis de oportunidades. “Agente” actualmente se contabiliza como canal habilitado; no existe todavía el catálogo de especialistas del prompt.
@@ -27,6 +31,7 @@ Fecha: 2026-10-20. Repositorio examinado: **ReymenApp**, checkout local `codex/p
 | [09 — Compatibilidad](09_MATRIZ_COMPATIBILIDAD.md) | Destino de funcionalidades y datos existentes |
 | [10 — ADRs](10_DECISIONES_ARQUITECTONICAS.md) | Decisiones propuestas y alternativas |
 | [11 — Backlog](11_BACKLOG_IMPLEMENTACION.md) | Historias ejecutables y aceptación |
+| [12 — Implementación Fase 0](12_IMPLEMENTACION_FASE_0.md) | Hardening implementado, evidencia y rollback |
 
 Propietario: leer 02 → 03 → 05 → 07. Ingeniería: 01 → 06 → 04 → 09 → 10 → 08 → 11.
 

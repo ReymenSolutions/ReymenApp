@@ -30,3 +30,7 @@ C/P/I/V según README. Severidad = impacto potencial; prioridad = orden. P0 sign
 ## Orden recomendado
 
 I: H01 → H02/H04/H05 → H03/H11 → H06/H08 → H14. H07/H09/H10/H12/H13 en cambios acotados antes de ampliar catálogo. No se corrigió ningún hallazgo durante esta etapa.
+
+## Seguimiento de implementación — Fase 0 autorizada
+
+La tabla anterior es la evidencia histórica del snapshot auditado. El estado de las correcciones y sus límites está en [12_IMPLEMENTACION_FASE_0](12_IMPLEMENTACION_FASE_0.md). Se implementaron autorización H01, recuperación H02, filtrado por canal H03, control humano H04 y persistencia mínima H05; H03 no incluye cuentas distintas del mismo canal. H07 solo incluye preservación de tags. Los demás diseños/propuestas no se consideran implementados.

@@ -75,3 +75,7 @@ Feature flag por tenant/instancia/conexión; kill switch detiene efectos nuevos,
 Incidente: pausar instancia/conexión afectada → preservar eventos/auditoría → identificar tenant/impacto → conciliar envíos/costos → corregir en staging → reanudar piloto. No borrar clientes, rehacer semillas ni restaurar producción indiscriminadamente. Rotación de credencial no es sinónimo de reproducir eventos sin dedup.
 
 **Gate:** no multiagentes con writes antes de cerrar H01/H02/H03/H04/H05/H06/H08 y verificar n8n del canal piloto. Modelo no es control de seguridad; pruebas negativas obligatorias.
+
+## Controles implementados en Fase 0
+
+[Documento 12](12_IMPLEMENTACION_FASE_0.md) registra guardias server-side, IDs/cursor/borrador con scope, claims/leases, bloqueo de admisión contra toma humana, trabajo durable y tratamiento de envíos inciertos. Los grants/Tool Registry/modelo multiagente de este documento siguen siendo propuestas. La alerta por correo mantiene el servicio best-effort actual; estado y auditoría son durables.

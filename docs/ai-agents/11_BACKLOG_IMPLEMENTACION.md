@@ -165,3 +165,14 @@ Como negocio quiero activar funciones concretas cuyo valor esté demostrado.
 Código/revisión solo en etapa autorizada; pruebas ejecutadas con resultados reales; migración ensayada si necesaria; evidencia de permisos/tenant/efectos/costo; copy ES/EN/a11y cuando hay UI; docs/contrato actualizados; feature flag y rollback; ninguna credencial ni PII real en fixtures/PR. Historia no se marca completa por aparecer un botón o una tabla.
 
 Para iniciar: aprobar fase0B y preparación de fase1 con BD desechable, decidir piloto/entitlements/política de CRM, confirmar versión main/VPS. Producción necesita propuesta concreta separada; estos documentos no ejecutan esa aprobación.
+
+## Estado tras Fase 0
+
+- AG-001: guardias y pruebas de autorización implementadas; auditoría/versionado ampliados quedan fuera de la corrección mínima.
+- AG-002: fallos, recuperación y control humano implementados con estado y alerta existente.
+- AG-003: recuperación mínima implementada con WebhookEvent; no modelo Execution multiagente ni dependencia de AG-008.
+- AG-004: canal/tenant/continuidad corregidos; connectionId y reconciliación de cuentas históricas pendientes.
+- AG-005: validación compatible del mensaje, sin cambios de credenciales/conectores. El contrato completo de cuentas/scopes/media sigue pendiente.
+- AG-006–017: no implementadas como historias completas; solo ajustes de compatibilidad expresamente descritos en12.
+
+Ver [entrega Fase 0](12_IMPLEMENTACION_FASE_0.md). No continuar con AG-008 ni fases multiagente sin nueva autorización.
