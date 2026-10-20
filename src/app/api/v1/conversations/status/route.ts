@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { authenticateOrgRequest } from "@/lib/api-key-auth";
+import { normalizeChannel } from "@/lib/channels";
+import { phoneKey } from "@/lib/phone";
 
 // Internal n8n query: GET /api/v1/conversations/status?orgId=xxx&contactPhone=xxx
 // (or &conversationId=xxx). n8n's AI-reply workflow calls this before
@@ -17,6 +19,9 @@ export async function GET(req: NextRequest) {
 
   const conversationId = searchParams.get("conversationId") ?? undefined;
   const contactPhone = searchParams.get("contactPhone") ?? undefined;
+  const requestedChannel = searchParams.get("channel");
+  const channel = normalizeChannel(requestedChannel);
+  const key = phoneKey(contactPhone);
 
   if (!conversationId && !contactPhone) {
     return NextResponse.json({ error: "conversationId or contactPhone required" }, { status: 400 });
@@ -24,14 +29,16 @@ export async function GET(req: NextRequest) {
 
   const conversation = conversationId
     ? await prisma.conversation.findFirst({
-        where: { id: conversationId, organizationId: orgId },
+        where: { id: conversationId, organizationId: orgId, ...(requestedChannel !== null ? { channel } : {}) },
         select: { id: true, status: true, aiHandled: true, assignedToId: true },
       })
     : await prisma.conversation.findFirst({
-        where: { organizationId: orgId, contactPhone, status: { in: ["OPEN", "ESCALATED"] } },
+        where: { organizationId: orgId, channel, status: { in: ["OPEN", "ESCALATED"] }, ...(key ? { OR: [{ phoneKey: key }, { phoneKey: null, contactPhone }] } : { contactPhone }) },
         orderBy: { updatedAt: "desc" },
         select: { id: true, status: true, aiHandled: true, assignedToId: true },
       });
+
+  if (conversationId && !conversation) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
 
   // No open conversation yet for this contact — the bot is free to create
   // one and respond, matching the aiHandled=true default a new Conversation

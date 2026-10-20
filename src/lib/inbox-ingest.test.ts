@@ -38,8 +38,9 @@ describe("entrada multicanal del inbox", () => {
     const b = await processConversationEvent({ channel: "enquiry", contactEmail: "ana@correo.com", contactName: "Ana", message: { role: "USER", content: "Formulario del sitio" } }, org.id);
     const ca = await prisma.conversation.findUniqueOrThrow({ where: { id: a.conversationId } });
     const cb = await prisma.conversation.findUniqueOrThrow({ where: { id: b.conversationId } });
-    // Mismo correo → misma conversación abierta (se unifican las consultas de la misma persona).
-    expect(cb.id).toBe(ca.id);
+    // Mismo correo comparte contacto, pero cada canal conserva su conversación y destino.
+    expect(cb.id).not.toBe(ca.id);
+    expect(cb.leadId).toBe(ca.leadId);
     expect(ca).toMatchObject({ contactEmail: "ana@correo.com", subject: "Cotización Hilux", channel: "email" });
     expect(await prisma.lead.count({ where: { organizationId: org.id, email: "ana@correo.com" } })).toBe(1);
   });
@@ -72,4 +73,55 @@ describe("entrada multicanal del inbox", () => {
     const conv = await prisma.conversation.findUniqueOrThrow({ where: { id: conversationId } });
     expect(conv).toMatchObject({ channel: "whatsapp", phoneKey: "5512345678", unreadCount: 1 });
   });
+});
+
+describe("phase0: strict channel identity and escalation continuity", () => {
+  const orgs: string[] = [];
+  const setup = async () => { const o = await createTestOrg("Phase0 Channels"); orgs.push(o.id); return o; };
+  afterEach(async () => { for (const id of orgs.splice(0)) await cleanupOrg(id); });
+  const payload = (channel: string, externalId: string) => ({ channel, contactPhone: "+52 81 1234 5678", message: { role: "USER", content: "Hola", externalId } });
+  it("same phone in two channels preserves separate threads, one CRM contact", async () => {
+    const org = await setup();
+    const a = await processConversationEvent(payload("wa", "wa1"), org.id);
+    const b = await processConversationEvent(payload("messenger", "fb1"), org.id);
+    expect(a.conversationId).not.toBe(b.conversationId);
+    const rows = await prisma.conversation.findMany({ where: { organizationId: org.id } });
+    expect(new Set(rows.map((r) => r.leadId)).size).toBe(1);
+    expect(rows.map((r) => r.channel).sort()).toEqual(["messenger", "whatsapp"]);
+  });
+  it("keeps escalated thread and human control for subsequent messages", async () => {
+    const org = await setup();
+    const a = await processConversationEvent(payload("whatsapp", "one"), org.id);
+    await prisma.conversation.update({ where: { id: a.conversationId }, data: { status: "ESCALATED", aiHandled: false, escalatedAt: new Date() } });
+    const b = await processConversationEvent(payload("whatsapp", "two"), org.id);
+    expect(b.conversationId).toBe(a.conversationId);
+    expect(await prisma.conversation.findUnique({ where: { id: a.conversationId } })).toMatchObject({ status: "ESCALATED", aiHandled: false, unreadCount: 2 });
+  });
+  it("rejects explicit foreign IDs and mismatched channel, preserves legacy omitted channel", async () => {
+    const org = await setup(); const other = await setup();
+    const a = await processConversationEvent(payload("instagram", "one"), org.id);
+    await expect(processConversationEvent({ ...payload("whatsapp", "bad"), conversationId: a.conversationId }, org.id)).rejects.toThrow("Conversation not found");
+    await expect(processConversationEvent({ ...payload("instagram", "bad"), conversationId: a.conversationId }, other.id)).rejects.toThrow("Conversation not found");
+    await processConversationEvent({ conversationId: a.conversationId, message: { role: "USER", content: "legacy ID only" } }, org.id);
+    expect(await prisma.conversation.count({ where: { organizationId: org.id } })).toBe(1);
+    expect(await prisma.lead.count({ where: { organizationId: org.id } })).toBe(1);
+    expect(await prisma.message.count({ where: { conversationId: a.conversationId } })).toBe(2);
+  });
+  it("serializes concurrent first deliveries and duplicate messages", async () => {
+    const org = await setup();
+    const results = await Promise.all(Array.from({ length: 5 }, () => processConversationEvent(payload("whatsapp", "same"), org.id)));
+    expect(new Set(results.map((r) => r.conversationId)).size).toBe(1);
+    expect(await prisma.conversation.count({ where: { organizationId: org.id } })).toBe(1);
+    expect(await prisma.lead.count({ where: { organizationId: org.id } })).toBe(1);
+    expect(await prisma.message.count({ where: { conversationId: results[0].conversationId } })).toBe(1);
+    expect((await prisma.conversation.findUniqueOrThrow({ where: { id: results[0].conversationId } })).unreadCount).toBe(1);
+  });
+  it("accepts nullable legacy fields while retaining strict channel identity", async () => {
+    const org = await setup();
+    const a = await processConversationEvent({ channel: "instagram", contactHandle: "@nullable", contactEmail: null, subject: null, contactName: null, contactPhone: null, conversationId: null, message: { role: "USER", content: "hola", externalId: null } }, org.id);
+    const b = await processConversationEvent({ channel: "IG", contactHandle: "@nullable", message: { role: "USER", content: "control" } }, org.id);
+    expect(a.conversationId).toBe(b.conversationId);
+    expect(await prisma.message.count({ where: { conversationId: a.conversationId } })).toBe(2);
+  });
+
 });

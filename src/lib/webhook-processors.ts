@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { z } from "zod";
 import { prisma } from "./prisma";
 import { notifyAdmins } from "./admin-notifications";
 import { automationFailureEmail } from "./email-templates";
@@ -112,113 +113,73 @@ export async function processLeadEvent(payload: unknown, orgId: string): Promise
   await linkOrphanCustomers(orgId, created.id, body.phone);
 }
 
-export async function processConversationEvent(payload: unknown, orgId: string): Promise<{ conversationId: string }> {
-  const body = payload as {
-    conversationId?: string;
-    /** Canales con teléfono (WhatsApp, SMS). */
-    contactPhone?: string;
-    /** Canales con usuario propio: Instagram, Messenger, chat web (id o @usuario). */
-    contactHandle?: string;
-    contactEmail?: string;
-    contactName?: string;
-    subject?: string;
-    channel: string;
-    message: { role: "USER" | "ASSISTANT" | "SYSTEM"; content: string; externalId?: string };
-  };
+const optionalText = z.string().nullish().transform((value) => value ?? undefined);
+const conversationEventSchema = z.object({
+  conversationId: z.string().nullish().transform((value) => value || undefined),
+  contactPhone: optionalText,
+  contactHandle: optionalText,
+  contactEmail: optionalText,
+  contactName: optionalText,
+  subject: optionalText,
+  channel: optionalText,
+  message: z.object({ role: z.enum(["USER", "ASSISTANT", "SYSTEM"]), content: z.string(), externalId: optionalText }),
+});
 
-  const channel = normalizeChannel(body.channel);
+export async function processConversationEvent(payload: unknown, orgId: string): Promise<{ conversationId: string }> {
+  const body = conversationEventSchema.parse(payload);
   const key = phoneKey(body.contactPhone);
-  const handle = typeof body.contactHandle === "string" && body.contactHandle.trim() ? body.contactHandle.trim().slice(0, 200) : null;
+  const handle = body.contactHandle?.trim().slice(0, 200) || null;
   const email = normalizeEmail(body.contactEmail);
-  const subject = typeof body.subject === "string" && body.subject.trim() ? body.subject.trim().slice(0, 200) : null;
+  const subject = body.subject?.trim().slice(0, 200) || null;
   if (!body.conversationId && !body.contactPhone && !handle && !email) {
     throw new Error("La conversación necesita el teléfono, el usuario o el correo del contacto");
   }
 
-  let conversation = body.conversationId
-    ? await prisma.conversation.findFirst({
-        where: { id: body.conversationId, organizationId: orgId },
-      })
-    : await prisma.conversation.findFirst({
-        // Por llave de teléfono: el mismo número con otro formato sigue siendo la misma conversación.
-        // Sin teléfono, por usuario del canal o por correo.
-        where: body.contactPhone
-          ? key
-            ? { organizationId: orgId, phoneKey: key, status: "OPEN" }
-            : { organizationId: orgId, contactPhone: body.contactPhone, status: "OPEN" }
-          : handle
-            ? { organizationId: orgId, channel, contactHandle: handle, status: "OPEN" }
-            : { organizationId: orgId, contactEmail: email, status: "OPEN" },
+  const { conversation, inserted } = await prisma.$transaction(async (tx) => {
+    // Serialize matching/creation for this tenant's channel identity, including concurrent first deliveries.
+    const identity = key || body.contactPhone || handle || email || body.conversationId;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`inbox:${orgId}:${normalizeChannel(body.channel)}:${identity}`}))`;
+    let channel = normalizeChannel(body.channel);
+    let conv;
+    if (body.conversationId) {
+      conv = await tx.conversation.findFirst({ where: { id: body.conversationId, organizationId: orgId } });
+      // Legacy callers with an explicit ID may omit channel; a supplied channel must match.
+      if (!conv || (body.channel !== undefined && normalizeChannel(conv.channel) !== channel)) throw new Error("Conversation not found");
+      channel = conv.channel;
+    } else {
+      conv = await tx.conversation.findFirst({
+        where: {
+          organizationId: orgId, channel, status: { in: ["OPEN", "ESCALATED"] },
+          ...(body.contactPhone ? (key ? { OR: [{ phoneKey: key }, { phoneKey: null, contactPhone: body.contactPhone }] } : { contactPhone: body.contactPhone }) : handle ? { contactHandle: handle } : { contactEmail: email }),
+        },
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
       });
-
-  if (!conversation) {
-    conversation = await prisma.conversation.create({
-      data: {
-        organizationId: orgId,
-        channel,
-        contactPhone: body.contactPhone || null,
-        phoneKey: key,
-        contactHandle: handle,
-        contactEmail: email,
-        subject,
-        contactName: body.contactName,
-      },
-    });
-  }
-
-  // Enlace con el contacto del CRM. Si quien escribe es nuevo, se crea el
-  // lead; si el cliente llegó al límite de su plan o no tiene CRM, el mensaje
-  // se guarda igual y simplemente no hay contacto.
-  if (!conversation.leadId) {
-    const leadId = await resolveLeadForConversation(orgId, { contactPhone: body.contactPhone, contactEmail: email, contactHandle: handle, contactName: body.contactName, channel }, body.message.role === "USER");
-    if (leadId) conversation = await prisma.conversation.update({ where: { id: conversation.id }, data: { leadId } });
-  }
-
-  // Same idempotency pattern as leads: dedup by the provider's own message
-  // ID when supplied, so a retried "new message" webhook doesn't append the
-  // same message twice into the conversation.
-  if (body.message.externalId) {
-    const existingMessage = await prisma.message.findUnique({
-      where: { conversationId_externalId: { conversationId: conversation.id, externalId: body.message.externalId } },
-    });
-    if (existingMessage) return { conversationId: conversation.id };
-  }
-
-  try {
-    await prisma.message.create({
-      data: {
-        conversationId: conversation.id,
-        role: body.message.role,
-        content: body.message.content,
-        externalId: body.message.externalId,
-      },
-    });
-  } catch (err) {
-    if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002")) throw err;
-    return { conversationId: conversation.id };
-  }
-
-  // Datos para listar el inbox sin abrir cada hilo. Un mensaje del cliente suma un no leído y saca la
-  // conversación de "Archivadas" (vuelve a la bandeja de entrada).
-  if (body.message.role !== "SYSTEM") {
-    await prisma.conversation.update({
-      where: { id: conversation.id },
-      data: {
-        lastMessageAt: new Date(),
-        lastMessagePreview: messagePreview(body.message.content),
-        lastMessageRole: body.message.role,
-        ...(subject && !conversation.subject ? { subject } : {}),
+      if (!conv) conv = await tx.conversation.create({ data: { organizationId: orgId, channel, contactPhone: body.contactPhone || null, phoneKey: key, contactHandle: handle, contactEmail: email, subject, contactName: body.contactName } });
+    }
+    // Row lock shares the send-admission boundary with automatic replies and operator updates.
+    await tx.$queryRaw`SELECT id FROM "Conversation" WHERE id = ${conv.id} AND "organizationId" = ${orgId} FOR UPDATE`;
+    if (body.message.externalId !== undefined) {
+      const existing = await tx.message.findUnique({ where: { conversationId_externalId: { conversationId: conv.id, externalId: body.message.externalId } } });
+      if (existing) return { conversation: conv, inserted: false };
+    }
+    const message = await tx.message.create({ data: { conversationId: conv.id, ...body.message } });
+    if (body.message.role !== "SYSTEM") {
+      conv = await tx.conversation.update({ where: { id: conv.id }, data: {
+        lastMessageAt: message.createdAt, lastMessagePreview: messagePreview(body.message.content), lastMessageRole: body.message.role,
+        ...(subject && !conv.subject ? { subject } : {}),
         ...(body.message.role === "USER" ? { unreadCount: { increment: 1 }, archivedAt: null } : {}),
-      },
-    });
-  }
+      } });
+    }
+    return { conversation: conv, inserted: true };
+  });
 
-  if (body.message.role === "USER") {
-    await recordMetric(orgId, METRIC_KEYS.MESSAGES_RECEIVED);
-  } else if (body.message.role === "ASSISTANT") {
-    await recordMetric(orgId, METRIC_KEYS.MESSAGES_SENT);
+  // CRM identity remains shared across channels; conversation identity is channel-specific.
+  if (!conversation.leadId) {
+    const leadId = await resolveLeadForConversation(orgId, { contactPhone: body.contactPhone, contactEmail: email, contactHandle: handle, contactName: body.contactName, channel: conversation.channel }, body.message.role === "USER", conversation.id);
+    if (leadId) await prisma.conversation.updateMany({ where: { id: conversation.id, organizationId: orgId, leadId: null }, data: { leadId } });
   }
-
+  if (inserted && body.message.role === "USER") await recordMetric(orgId, METRIC_KEYS.MESSAGES_RECEIVED);
+  if (inserted && body.message.role === "ASSISTANT") await recordMetric(orgId, METRIC_KEYS.MESSAGES_SENT);
   return { conversationId: conversation.id };
 }
 
@@ -230,7 +191,8 @@ export async function processConversationEvent(payload: unknown, orgId: string):
 async function resolveLeadForConversation(
   orgId: string,
   body: { contactPhone?: string; contactEmail?: string | null; contactHandle?: string | null; contactName?: string; channel: string },
-  isInbound: boolean
+  isInbound: boolean,
+  conversationId: string
 ): Promise<string | null> {
   const existing = await findLeadByPhone(orgId, body.contactPhone);
   if (existing) return existing.id;
@@ -249,25 +211,26 @@ async function resolveLeadForConversation(
   if (!(await hasModule(orgId, "CRM"))) return null;
 
   let lead: { id: string };
+  let created = false;
   try {
-    lead = await withPlanCapacity(orgId, "leads", (tx) =>
-      tx.lead.create({
-        data: {
-          organizationId: orgId,
-          name: label,
-          phone: key ? body.contactPhone : null,
-          phoneKey: key,
-          email: body.contactEmail ?? null,
-          source: body.channel,
-        },
-      })
-    );
+    lead = await withPlanCapacity(orgId, "leads", async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`crm-inbox:${orgId}:${key || body.contactEmail || `${body.channel}:${body.contactHandle}`}`}))`;
+      // Recheck under the admission lock: concurrent channels/deliveries share a CRM person, not a thread.
+      const existing = key || body.contactEmail ? await tx.lead.findFirst({ where: { organizationId: orgId, deletedAt: null, OR: [...(key ? [{ phoneKey: key }] : []), ...(body.contactEmail ? [{ email: { equals: body.contactEmail, mode: "insensitive" as const } }] : [])] }, select: { id: true } }) : null;
+      const previous = body.contactHandle ? await tx.conversation.findFirst({ where: { organizationId: orgId, channel: body.channel, contactHandle: body.contactHandle, leadId: { not: null } }, select: { leadId: true } }) : null;
+      if (existing) return existing;
+      if (previous?.leadId) return { id: previous.leadId };
+      const person = await tx.lead.create({ data: { organizationId: orgId, name: label, phone: key ? body.contactPhone : null, phoneKey: key, email: body.contactEmail ?? null, source: body.channel } });
+      await tx.conversation.updateMany({ where: { id: conversationId, organizationId: orgId, leadId: null }, data: { leadId: person.id } });
+      created = true;
+      return person;
+    });
   } catch (err) {
     if (err instanceof UserError) return null;
     throw err;
   }
   if (key) await linkOrphanCustomers(orgId, lead.id, body.contactPhone);
-  await recordMetric(orgId, METRIC_KEYS.LEADS_CAPTURED);
+  if (created) await recordMetric(orgId, METRIC_KEYS.LEADS_CAPTURED);
   return lead.id;
 }
 
