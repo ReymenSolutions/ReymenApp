@@ -115,6 +115,30 @@ vista por visitante y día; 60 eventos/min por IP.
 módulo NFC_QR está activo). El enlace se pega en la SmartCard existente; no se
 crea otra tarjeta ni se toca Supabase.
 
+## Ubicación sin capturar coordenadas
+
+En la propiedad y en las zonas nadie escribe latitud/longitud: se escribe la
+dirección (se arma sola con calle, colonia y zona), **Buscar en el mapa**
+muestra los resultados y el pin, y la persona lo **confirma** (o lo arrastra /
+da clic en el mapa) antes de guardar. Mientras hay un pin sin confirmar, el
+formulario no se guarda. Si no hay resultados, se ubica a mano.
+
+La búsqueda corre en el servidor (`src/lib/realty/geocode.ts`) contra
+Nominatim de OpenStreetMap, respetando su
+[política de uso](https://operations.osmfoundation.org/policies/nominatim/):
+1 petición por segundo para toda la app, User-Agent propio, caché de 24 h,
+sin autocompletar (solo al dar clic) y atribución en pantalla. Variables
+opcionales:
+
+- `GEOCODER_DISABLED=1` — apaga la búsqueda sin desplegar (queda ubicar a mano).
+- `GEOCODER_URL` (+ `GEOCODER_KEY`) — otro servicio compatible con la API de
+  Nominatim (una instancia propia o un proveedor comercial). Recomendado si el uso
+  crece: el servicio público puede limitarse o retirarse sin aviso.
+- `GEOCODER_COUNTRY` — países donde buscar (por omisión `mx`).
+
+La dirección que se busca se envía a ese servicio externo; no se envía ningún
+dato de prospectos.
+
 ## Fotos
 
 Se reducen en el navegador (≤ 1600 px) y el servidor las re-codifica con

@@ -28,6 +28,7 @@ import {
   updateVisit,
 } from "@/lib/realty/service";
 import { MAX_UPLOAD_BYTES } from "@/lib/realty/media";
+import { geocodeAddress } from "@/lib/realty/geocode";
 
 function revalidateRealty(extra: string[] = []) {
   revalidatePath("/portal/realty", "layout");
@@ -319,4 +320,12 @@ export async function searchRealtyLeads(query: string) {
     orderBy: { createdAt: "desc" },
     select: { id: true, name: true, phone: true, email: true },
   });
+}
+
+/** Busca una dirección para ubicarla en el mapa (la persona confirma el pin antes de guardar). */
+export async function geocodeRealtyAddress(query: string) {
+  const session = await requireRealtyOperator();
+  const q = z.string().trim().min(3).max(200).safeParse(query);
+  if (!q.success) throw new UserError("Escribe la dirección para buscarla.");
+  return geocodeAddress(session.user.organizationId, q.data);
 }

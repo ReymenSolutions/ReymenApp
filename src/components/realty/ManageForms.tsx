@@ -15,6 +15,7 @@ import { usePreferences } from "@/context/preferences";
 import { pickDict } from "@/lib/i18n-dict";
 import { enumLabel, realtyStrings } from "@/lib/i18n-realty";
 import { SELECT } from "./ProspectForm";
+import { GeoPicker, type GeoValue } from "./GeoPicker";
 
 const CHANNELS = ["META", "INSTAGRAM", "GOOGLE", "SMARTCARD", "WHATSAPP", "PORTAL", "REFERRAL", "OTHER"] as const;
 
@@ -155,40 +156,36 @@ export function ZoneRow({ zone }: { zone: { id?: string; name: string; latitude:
   const R = useR();
   const { busy, run } = useRun();
   const [name, setName] = useState(zone.name);
-  const [lat, setLat] = useState(zone.latitude?.toString() ?? "");
-  const [lng, setLng] = useState(zone.longitude?.toString() ?? "");
+  const [point, setPoint] = useState<GeoValue | null>(zone.latitude != null && zone.longitude != null ? { lat: zone.latitude, lng: zone.longitude } : null);
+  const [geoPending, setGeoPending] = useState(false);
   const isNew = !zone.id;
+  // Una zona nueva abre el buscador; en las existentes se abre con "Ubicar" / "Cambiar".
+  const [showGeo, setShowGeo] = useState(isNew);
+  const save = (p: GeoValue | null, after?: () => void) =>
+    run(() => saveRealtyZone({ id: zone.id, name, latitude: p?.lat ?? null, longitude: p?.lng ?? null }), after);
+
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        run(
-          () => saveRealtyZone({ id: zone.id, name, latitude: lat === "" ? null : Number(lat), longitude: lng === "" ? null : Number(lng) }),
-          () => {
-            if (isNew) {
-              setName("");
-              setLat("");
-              setLng("");
-            }
-          },
-        );
+        if (geoPending) {
+          toast.error(R.geoPendingBlock);
+          return;
+        }
+        save(point, () => {
+          if (isNew) {
+            setName("");
+            setPoint(null);
+          }
+        });
       }}
-      className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[1fr_8rem_8rem_auto]"
+      className="space-y-3"
     >
-      <div className="col-span-2 space-y-1 sm:col-span-1">
-        <Label className="text-xs" htmlFor={`z-n-${zone.id ?? "new"}`}>{R.zone}</Label>
-        <Input id={`z-n-${zone.id ?? "new"}`} value={name} onChange={(e) => setName(e.target.value)} required minLength={2} maxLength={80} placeholder={isNew ? R.zonePlaceholder : undefined} />
-        {zone.usage && <p className="text-[11px] text-slate-500">{zone.usage}</p>}
-      </div>
-      <div className="space-y-1">
-        <Label className="text-xs" htmlFor={`z-la-${zone.id ?? "new"}`}>{R.latitude}</Label>
-        <Input id={`z-la-${zone.id ?? "new"}`} type="number" step="any" min={-90} max={90} value={lat} onChange={(e) => setLat(e.target.value)} />
-      </div>
-      <div className="space-y-1">
-        <Label className="text-xs" htmlFor={`z-lo-${zone.id ?? "new"}`}>{R.longitude}</Label>
-        <Input id={`z-lo-${zone.id ?? "new"}`} type="number" step="any" min={-180} max={180} value={lng} onChange={(e) => setLng(e.target.value)} />
-      </div>
-      <div className="col-span-2 flex gap-1.5 sm:col-span-1">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-[12rem] flex-1 space-y-1">
+          <Label className="text-xs" htmlFor={`z-n-${zone.id ?? "new"}`}>{R.zone}</Label>
+          <Input id={`z-n-${zone.id ?? "new"}`} value={name} onChange={(e) => setName(e.target.value)} required minLength={2} maxLength={80} placeholder={isNew ? R.zonePlaceholder : undefined} />
+        </div>
         <Button type="submit" size="sm" loading={busy} className="h-9 bg-[#031738] hover:bg-[#04275A]">{isNew ? R.addZone : R.save}</Button>
         {!isNew && (
           <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => run(() => deleteRealtyZone(zone.id!))} className="h-9 text-red-600" aria-label={R.delete}>
@@ -196,6 +193,31 @@ export function ZoneRow({ zone }: { zone: { id?: string; name: string; latitude:
           </Button>
         )}
       </div>
+      <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+        {zone.usage && <span>{zone.usage}</span>}
+        {!showGeo && (
+          <>
+            <span>{point ? `· ${R.geoConfirmed}` : `· ${R.noLocation}`}</span>
+            <button type="button" onClick={() => setShowGeo(true)} className="font-medium text-[#063C82] hover:underline">
+              {point ? R.geoChange : R.locate}
+            </button>
+          </>
+        )}
+      </div>
+      {showGeo && (
+        <GeoPicker
+          idPrefix={`z-${zone.id ?? "new"}`}
+          hint={R.geoZoneHint}
+          suggestedQuery={name}
+          value={point}
+          onPendingChange={setGeoPending}
+          onConfirm={(p) => {
+            setPoint(p);
+            // En una zona que ya existe, confirmar el punto la guarda de una vez.
+            if (!isNew) save(p, () => setShowGeo(false));
+          }}
+        />
+      )}
     </form>
   );
 }
