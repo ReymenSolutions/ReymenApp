@@ -78,3 +78,7 @@ Tras «inicia», se preparó el núcleo acotado de Mark y el arnés mínimo de s
 ## Publicación y piloto recomendado
 
 El trabajo acumulado se publica en [PR #123](https://github.com/ReymenSolutions/ReymenApp/pull/123). La integración de main, comandos de actualización y propuesta de piloto están en [18_PUBLICACION_Y_PILOTO_RECOMENDADO.md](18_PUBLICACION_Y_PILOTO_RECOMENDADO.md). El propietario aceptó continuar y fijó $25 MXN diarios, conservando $500 mensuales y $1 por turno como límites propuestos. Publicar no activa Mark real ni modifica el VPS.
+
+## Base de presupuesto de piloto
+
+El siguiente incremento separado prepara reservas de $25 MXN/día, $500/ciclo y $1/raíz, con opt-in y compromisos durables: [19_BASE_PRESUPUESTO_PILOTO.md](19_BASE_PRESUPUESTO_PILOTO.md). No activa un proveedor ni completa la contabilidad incierta o la atribución por instancia de Fase 8.

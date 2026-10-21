@@ -1,0 +1,53 @@
+# 19 — Base de presupuesto del piloto privado de Mark
+
+Fecha: 21 de octubre de 2026. Rama: `codex/mark-pilot-budget-25mxn`, dependiente de la publicación [PR #123](https://github.com/ReymenSolutions/ReymenApp/pull/123). Autorización: continuar las propuestas de 18 con **$25 MXN diarios**, conservando $500 mensuales y $1 por turno raíz.
+
+## Resultado de este incremento
+
+Se implementa la admisión financiera de turnos del piloto privado, con reservas durables, límites concurrentes y aislamiento. Es un primer incremento de AG-006/Fase 8, **no la Fase 8 completa ni Mark con proveedor**. No activa canales ni llama a una IA. El sandbox de Fase 5 sigue usando fixtures sin consumo.
+
+Las cuotas son por organización para el piloto `mark:pilot`; no se aplican automáticamente a cada cliente comercial. Una política explícita y el flag `AI_MARK_PILOT_BUDGET_ENABLED=true` permiten reservar, pero no activan inferencia ni una instancia. Los defaults/techos son $25 diarios, $500 por ciclo mensual del negocio y $1 por raíz. Las restricciones SQL impiden superar estos techos configurando la tabla.
+
+## Implementación
+
+- [Servicio](../../src/lib/ai/pilot/budget.ts): configuración opt-in por administrador activo de plataforma con control de versión/auditoría; admisión por OWNER/MANAGER autorizado del negocio, claim único de raíz y cancelación segura de reservas sin despacho.
+- [Presupuesto existente](../../src/lib/ai/budget.ts): comparte el mismo candado PostgreSQL por organización y contabiliza las reservas piloto pendientes junto con las llamadas legacy. Exporta el cálculo decimal interno para evitar decisiones de cupo con números flotantes.
+- [Esquema](../../prisma/schema.prisma) y [migración aditiva](../../prisma/migrations/20261122090000_mark_pilot_budget/migration.sql): `AiPilotBudgetPolicy`, `AiPilotBudgetRoot` y referencia opcional multitenant desde el ledger existente `AiUsage.pilotRootId`.
+- [Restricciones SQL](../../prisma/migrations/20261122091000_mark_pilot_budget_checks/migration.sql): cuotas máximas, reservas no negativas, estados consistentes, ventanas válidas e índice del ledger por raíz. Se conservan las 84 migraciones anteriores; total 86.
+- [.env.example](../../.env.example), [pruebas](../../src/lib/ai/pilot/budget.test.ts) y [limpieza de fixtures](../../src/test/helpers.ts). No se modifican registros reales, planes, claves ni configuraciones del servidor.
+
+## Reglas financieras
+
+La admisión reserva el límite completo de la raíz antes de permitir su claim. La suma de gasto del ledger más reservas abiertas no puede superar cuota diaria, mensual ni el saldo global de la organización. Esta reserva es conservadora: puede negar un turno que habría gastado menos de $1. No usa el margen DEGRADE como ampliación del cupo del piloto.
+
+Las reservas pendientes se suman también al presupuesto global, incluso con el flag piloto o la política apagados. Así las llamadas legacy no consumen dinero comprometido. Mantener el flag apagado no borra obligaciones financieras; a diferencia del sandbox ficticio, esta tabla se consulta para calcular el presupuesto. Aplicar ambas migraciones antes de instalar este código.
+
+Cada día sigue la zona IANA del negocio, incluyendo días de 23/25 horas por DST. El ciclo mensual reutiliza el ancla existente. Cada raíz conserva zona, ventanas, versión de política y cupo; si vence el día/ciclo o cambia zona/política, no se despacha. No se ejecutan resets ni borrados de filas al llegar la medianoche.
+
+La requestKey queda acotada a organización/operador y es idempotente: una raíz cerrada no revive. El claim RESERVED→IN_FLIGHT ocurre una sola vez. Cancelar libera únicamente una raíz RESERVED sin llamadas de ledger asociadas. IN_FLIGHT/UNCERTAIN mantienen su reserva sin TTL, aunque cambie el día/ciclo o se apague el piloto. No hay un job que trate un timeout como gasto gratuito ni reintente la operación.
+
+Se conserva un solo ledger, con referencia opcional a raíz protegida por FK de organización. La tabla de raíces registra compromisos, no una segunda contabilidad de tokens/costos. No se guardan preguntas, respuestas ni datos del CRM en este incremento.
+
+## Pruebas
+
+Validación focal: **33/33** entre piloto, presupuesto y gateway. Los 13 casos nuevos cubren 26 admisiones simultáneas (solo 25 aceptadas), carrera contra reserva legacy bajo el mismo lock, idempotencia, tope global/mensual/diario, constraints SQL, actores/organizaciones ajenos, rol/módulo revocados, admin inactivo, rollback conservando compromisos, no duplicar claim, caducidad/cambio de política/zona y DST de 23/25 horas.
+
+Registrar aquí suite completa, TypeScript/lint/build y estado de publicación después de las comprobaciones finales.
+
+## Compatibilidad, validación y rollback
+
+La admisión no tiene acción pública ni UI: son primitivas internas que la futura integración debe llamar antes del proveedor. Las funciones existentes mantienen sus contratos; el presupuesto global suma un compromiso adicional solo si existen raíces piloto pendientes. No se cambia el gateway o proveedor legacy, el contacto con clientes ni el procesamiento POS/Lealtad.
+
+Para validar en una BD local desechable: aplicar las 86 migraciones, generar Prisma, habilitar el flag únicamente para fixtures y ejecutar `src/lib/ai/pilot/budget.test.ts`, presupuesto/gateway y suite completa. Una cuenta ADMIN puede configurar la política; una sesión de negocio con permiso de gestionar conocimiento puede reservar/iniciar una raíz. Cambiar el flag no configura un proveedor ni envía una respuesta.
+
+Rollback preferido: apagar el flag y la política para detener admisiones; conservar las tablas, FK, recibos y cálculo de compromisos. Las raíces no despachadas pueden cancelarse con autoridad vigente, incluso con el flag apagado. No hacer drop/down, resets ni eliminar reservas para recuperar saldo. No volver a un binario que desconozca estas reservas si existen compromisos abiertos: primero reconciliarlos.
+
+## Gates que siguen pendientes antes de inferencia real
+
+1. Integrar el gateway a la raíz, agregar claims durables por paso y atribución por instancia/versión/ciclo. El nuevo FK no significa que el gateway lo esté escribiendo todavía.
+2. Implementar cierre/conciliación autorizada a partir de evidencia del ledger/proveedor. Este incremento conserva IN_FLIGHT ante incertidumbre; no ofrece liberación manual arbitraria ni cierre automático de llamadas.
+3. Fijar tarifa/modelo servido y estimación conservadora del contexto; controlar reintentos/fallback del SDK y el proveedor. El SDK legacy tiene políticas propias que no deben heredarse silenciosamente a las dos llamadas acotadas de Mark.
+4. Corregir la contabilidad de resultado desconocido del gateway legacy antes de usarlo para el piloto real; esta admisión no reetiqueta su historial ni modifica sus fallos existentes. Una reserva no demuestra un costo de factura.
+5. Conectar conocimiento publicado y CRM con identidad verificada, turno/control humano y emisor único; luego evaluar calidad, costos y canal privado según [18](18_PUBLICACION_Y_PILOTO_RECOMENDADO.md).
+
+Sin estos gates no se presenta el tope como una garantía de facturación del proveedor, ni se habilita Mark real. No se ha elegido un negocio productivo para aplicarlo ni se ha ejecutado el comando del VPS.

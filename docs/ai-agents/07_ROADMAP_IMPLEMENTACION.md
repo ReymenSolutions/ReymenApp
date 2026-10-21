@@ -183,3 +183,7 @@ Se implementó y validó localmente la Fase 4 (AG-010), independiente del piloto
 ## Inicio de Fase 5
 
 Se inició Fase 5 solo con protocolo acotado y arnés mínimo AG-013. No se declara completo AG-011 ni se habilita Mark real: continúan los gates de Fase 3 y mínimo de Fase 8. El panel simula decisiones/lecturas con fixtures, sin proveedor ni entrega. Ver [17_INICIO_FASE_5_MARK.md](17_INICIO_FASE_5_MARK.md).
+
+## Inicio parcial del mínimo de Fase 8
+
+El propietario autorizó continuar y fijó $25 MXN diarios para el piloto privado. Se implementa la admisión de reservas por raíz y sus cuotas, sin inferencia, como base de AG-006. Faltan claims por paso, atribución por instancia, tarifas/modelo efectivos y conciliación del gateway antes de Mark real. Ver [19](19_BASE_PRESUPUESTO_PILOTO.md).

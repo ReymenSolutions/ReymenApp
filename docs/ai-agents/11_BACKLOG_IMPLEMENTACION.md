@@ -198,3 +198,7 @@ AG-010 implementado localmente con revisión/publicación, asignaciones a versio
 ## Inicio de Fase 5
 
 AG-011 iniciado, no completado. Se implementa un arnés mínimo de AG-013 con fixtures, límites, recibos y reset seguro. No hay tools de CRM real ni Mark con proveedor/routing activo. Faltan piloto, mínimo de atribución/presupuesto, calidad y coordinación de turno/humano para el MVP productivo. Ver [17_INICIO_FASE_5_MARK.md](17_INICIO_FASE_5_MARK.md).
+
+## Base parcial de AG-006
+
+Se implementan cuotas y reservas durables de piloto ($25 diarios, $500/ciclo, $1/raíz), autorización fresca, idempotencia y conservación de compromisos al apagar el flag. No se marca AG-006 terminado: el gateway aún debe atribuir cada paso/instancia y conciliar costos inciertos antes de usar un proveedor real. Ver [19](19_BASE_PRESUPUESTO_PILOTO.md).
