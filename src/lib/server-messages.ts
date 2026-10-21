@@ -6,6 +6,11 @@
 // su versión en español). Un mensaje que no esté aquí se muestra tal cual.
 
 const EN: Record<string, string> = {
+  "El presupuesto piloto no está habilitado": "Pilot budgeting is not enabled",
+  "El presupuesto piloto está desactivado para este negocio": "Pilot budgeting is disabled for this business",
+  "Presupuesto piloto agotado; continúa con atención humana": "Pilot budget exhausted; continue with human support",
+  "La prueba cambió o venció; no se puede iniciar": "The test changed or expired and cannot be started",
+  "La operación requiere conciliación; se conserva la reserva": "This operation needs reconciliation; its reservation is retained",
   "Las pruebas de Mark aún no están habilitadas": "Mark tests are not enabled yet",
   "Prueba no encontrada": "Test not found",
   "La solicitud cambió; inicia una prueba nueva": "The request changed; start a new test",
