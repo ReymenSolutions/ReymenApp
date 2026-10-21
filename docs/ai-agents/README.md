@@ -74,3 +74,7 @@ Se implementó el acceso a conocimiento compartido con revisiones/publicación, 
 ## Inicio de Fase 5
 
 Tras «inicia», se preparó el núcleo acotado de Mark y el arnés mínimo de simulación: [17_INICIO_FASE_5_MARK.md](17_INICIO_FASE_5_MARK.md). Usa únicamente fixtures, no un LLM ni herramientas/clientes reales. Queda detrás de un flag apagado. AG-011 sigue en curso: no hay Mark activo, y continúan pendientes el piloto de Fase 3 y presupuesto/evaluación para un proveedor real. No se inició Alex ni marketplace.
+
+## Publicación y piloto recomendado
+
+El trabajo acumulado se publica en [PR #123](https://github.com/ReymenSolutions/ReymenApp/pull/123). La integración de main, comandos de actualización y propuesta de piloto están en [18_PUBLICACION_Y_PILOTO_RECOMENDADO.md](18_PUBLICACION_Y_PILOTO_RECOMENDADO.md). El propietario aceptó continuar y fijó $25 MXN diarios, conservando $500 mensuales y $1 por turno como límites propuestos. Publicar no activa Mark real ni modifica el VPS.
