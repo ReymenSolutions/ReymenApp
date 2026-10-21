@@ -165,3 +165,7 @@ El propietario autorizó exclusivamente el hardening, denominado **Fase 0** en s
 ## Autorización posterior: Fase 1
 
 El propietario autorizó continuar con Fase 1. El modelo, adapter, flags y observación durable implementados se describen en [13](13_IMPLEMENTACION_FASE_1.md). Se conserva el runtime de Fase 0 como único autor de efectos. El inventario productivo y piloto no se ejecutaron; Fase 2 y especialistas posteriores no se iniciaron.
+
+## Seguimiento después de Fase 2
+
+La introducción de este documento conserva el estado de la auditoría original. Después se implementaron Fases 0/1 ([12](12_IMPLEMENTACION_FASE_0.md), [13](13_IMPLEMENTACION_FASE_1.md)) y la interfaz de Fase 2 ([14](14_IMPLEMENTACION_FASE_2.md)). La interfaz usa un flag independiente, no activa especialistas ni conexiones. Fase 3 y despliegue no se iniciaron; requieren su alcance/validación correspondiente.

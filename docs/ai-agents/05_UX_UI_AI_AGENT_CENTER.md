@@ -133,3 +133,7 @@ Solicitud de capacidad muestra revisión pendiente y no simula compra. Reutiliza
 | Usage | gráficos skeleton | Sin consumo en periodo | No mostrar cero si falla consulta | Cifras conciliables y etiquetas de costo |
 
 **V:** estas propuestas requieren prototipo/navegador, dispositivos 320/360/390/768/1280, teclado virtual, lector, contraste claro/oscuro y zoom 200%. No se implementaron componentes ni se generaron screenshots ficticios.
+
+## Implementación posterior de Fase 2
+
+Se implementó la interfaz sobre el asistente legacy, descrita en [14](14_IMPLEMENTACION_FASE_2.md). El diseño anterior es la visión completa; no todo corresponde a esta fase. La lista contiene únicamente el asistente actual. Canales muestra actividad recibida y conexión sin verificar, sin prometer reconexión o salud. Conocimiento mantiene fuentes legacy; el preview conserva costo explícito. Marketplace, grants, aprobaciones, atribución por especialista y playground completo siguen pendientes de sus fases. Se reutiliza MetricGrid y se preservan URLs con fallback por flag.

@@ -10,6 +10,10 @@ La Fase 0 de hardening se completó: [12_IMPLEMENTACION_FASE_0.md](12_IMPLEMENTA
 
 Tras autorizar «continua fase 1», se implementó el modelo aditivo y adapter en una rama nueva. Ver [13_IMPLEMENTACION_FASE_1.md](13_IMPLEMENTACION_FASE_1.md) para alcance, pruebas y rollback. La autorización previa de Fase 0 se conserva como antecedente; no limita esta nueva autorización a Fase 0. No se autorizaron ni ejecutaron despliegues o fases posteriores.
 
+## Seguimiento de Fase 2
+
+Se continuó con la interfaz sobre el adapter en `codex/ai-center-phase2-interface`. El alcance, flag de rollback, evidencia y pendientes se registran en [14_IMPLEMENTACION_FASE_2.md](14_IMPLEMENTACION_FASE_2.md). Este seguimiento actualiza las referencias históricas anteriores a fases no iniciadas. No incluye conexiones/routing de Fase 3 ni despliegue.
+
 ## Dictamen ejecutivo
 
 **Confirmado mediante código:** existe una base considerable: Next.js/React, PostgreSQL/Prisma, autenticación, módulos, conversaciones multicanal, reglas del negocio, artículos, proveedor de IA, ledger, presupuestos, borradores y análisis de oportunidades. “Agente” actualmente se contabiliza como canal habilitado; no existe todavía el catálogo de especialistas del prompt.
@@ -37,6 +41,7 @@ Tras autorizar «continua fase 1», se implementó el modelo aditivo y adapter e
 | [11 — Backlog](11_BACKLOG_IMPLEMENTACION.md) | Historias ejecutables y aceptación |
 | [12 — Implementación Fase 0](12_IMPLEMENTACION_FASE_0.md) | Hardening implementado, evidencia y rollback |
 | [13 — Implementación Fase 1](13_IMPLEMENTACION_FASE_1.md) | Modelo aditivo, adapter y observación durable |
+| [14 — Implementación Fase 2](14_IMPLEMENTACION_FASE_2.md) | Interfaz sobre el adapter, pruebas y rollback visual |
 
 Propietario: leer 02 → 03 → 05 → 07. Ingeniería: 01 → 06 → 04 → 09 → 10 → 08 → 11.
 

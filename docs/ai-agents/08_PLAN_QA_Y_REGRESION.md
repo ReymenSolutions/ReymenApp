@@ -153,3 +153,7 @@ Las 18 comprobaciones de auditoría anteriores son históricas y reprodujeron de
 ## Evidencia posterior de Fase 1
 
 La matriz old/new schema/código, backfill, CAS, scopes y observación sin duplicar efectos está en [13](13_IMPLEMENTACION_FASE_1.md#7-evidencia-de-validación). Solo se usaron bases sintéticas. El resultado de Fase 0 se conserva como evidencia histórica, no sustituye esta regresión.
+
+## Evidencia posterior de Fase 2
+
+La evidencia final de consultas por organización, permisos, interacciones, paginación, cuatro estados y Chromium se registra en [14](14_IMPLEMENTACION_FASE_2.md#5-evidencia-de-pruebas). Se usan dos bases sintéticas separadas y proveedores deshabilitados/simulados. QA19/20 cuentan con cobertura automatizada de viewport/temas/teclado/zoom y grids; los dispositivos físicos, lector de pantalla y CI Node22 conservan sus pendientes. No equivale a gates productivos cumplidos.

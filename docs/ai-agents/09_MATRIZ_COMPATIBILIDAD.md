@@ -55,3 +55,7 @@ Actual = **C** con evidencia; destino y estrategia = **I**. Datos y despliegue r
 ## Compatibilidad de Fase 1
 
 El modelo permanece tras doble flag y conserva adapter legacy, cap por canal y un único runtime. [13](13_IMPLEMENTACION_FASE_1.md) documenta old/new schema/código, cambios de los formularios bajo flag y límites del snapshot. No se migraron conversaciones, derechos ni consumo histórico.
+
+## Compatibilidad de Fase 2
+
+[14](14_IMPLEMENTACION_FASE_2.md) documenta la interfaz y su flag independiente. Se mantienen las URLs legacy, permisos, fuentes de conocimiento, modos/caps, ledger y workers. La lista solo representa al asistente existente. Sin UI nueva se usan las pantallas anteriores; las rutas nuevas redirigen. No se reescribe historial ni se conecta un canal por guardar su número. Se conservan las mejoras compartidas de accesibilidad y protección frente a resultados tardíos del preview al apagar el flag.

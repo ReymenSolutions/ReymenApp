@@ -180,3 +180,7 @@ Ver [entrega Fase 0](12_IMPLEMENTACION_FASE_0.md). No continuar con AG-008 ni fa
 ## Avance autorizado de Fase 1
 
 AG-008 cuenta con modelo/adaptor/versiones/backfill/flags y pruebas. AG-003 añade raíces/pasos que observan los trabajos durables existentes, sin segundo worker. Gates de inventario/cutover real siguen pendientes. AG-009–017 no se dan por implementadas. Evidencia, límites y rollback en [13](13_IMPLEMENTACION_FASE_1.md).
+
+## Avance de interfaz de Fase 2
+
+AG-012 tiene implementación sobre el adapter legacy: resumen, lista/perfil, navegación ES/EN, presentación de canales, conocimiento paginado, estados, móvil y accesibilidad. La evidencia y limitaciones están en [14](14_IMPLEMENTACION_FASE_2.md). No se marca completo el gate de dispositivos físicos/lector ni la métrica de resolución por IA: se muestran conteos verificables. AG-009 no está implementada por mostrar una pantalla de canales; salud/routing/cuentas siguen pendientes. AG-010/013/015 conservan sus alcances futuros: no se añadieron grants, playground sin efectos ni atribución de consumo por especialista.
