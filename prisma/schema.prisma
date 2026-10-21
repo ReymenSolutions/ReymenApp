@@ -2353,6 +2353,9 @@ model AiUsage {
   traceId          String?
   correlationId    String?
   pilotRootId      String?
+  pilotStep        Int?
+  pilotEstimateMxn Decimal?      @db.Decimal(18, 8)
+  pilotInputHash   String?
   externalId       String? // id de la respuesta del proveedor
   status           AiUsageStatus @default(PENDING)
   attempts         Int           @default(1)
@@ -2387,6 +2390,7 @@ model AiUsage {
   @@index([createdAt])
   @@index([provider, model, createdAt])
   @@index([organizationId, pilotRootId])
+  @@unique([organizationId, pilotRootId, pilotStep])
 }
 
 // ─── IA y CONSUMO: presupuesto por tenant (Hard Budget Limit) ───────────────
@@ -2910,6 +2914,7 @@ model AgentConfigRevision {
   createdAt      DateTime @default(now())
   instance       AgentInstance @relation(fields: [organizationId, agentInstanceId], references: [organizationId, id], onDelete: Restrict)
   executions     AgentExecution[]
+  pilotRoots     AiPilotBudgetRoot[]
 
   @@id([organizationId, agentInstanceId, version])
 }
@@ -3424,6 +3429,8 @@ model AiPilotBudgetRoot {
   createdById String
   requestKey String
   contractVersion String @default("private-webchat-pilot-v1")
+  agentInstanceId String?
+  configVersion Int?
   agentKey String @default("mark:pilot")
   policyVersion Int
   timezone String
@@ -3438,6 +3445,7 @@ model AiPilotBudgetRoot {
   createdAt DateTime @default(now())
   closedAt DateTime?
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  config AgentConfigRevision? @relation(fields: [organizationId, agentInstanceId, configVersion], references: [organizationId, agentInstanceId, version], onDelete: Restrict, map: "AiPilotBudgetRoot_config_fkey")
   usages AiUsage[]
   @@unique([organizationId, id])
   @@unique([organizationId, createdById, requestKey])

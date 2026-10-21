@@ -187,3 +187,5 @@ Se inició Fase 5 solo con protocolo acotado y arnés mínimo AG-013. No se decl
 ## Inicio parcial del mínimo de Fase 8
 
 El propietario autorizó continuar y fijó $25 MXN diarios para el piloto privado. Se implementa la admisión de reservas por raíz y sus cuotas, sin inferencia, como base de AG-006. Faltan claims por paso, atribución por instancia, tarifas/modelo efectivos y conciliación del gateway antes de Mark real. Ver [19](19_BASE_PRESUPUESTO_PILOTO.md).
+
+El incremento posterior de [21](21_GATEWAY_FINANCIERO_PILOTO.md) añade claims por paso y atribución a instancia/revisión, snapshot de tarifa/FX y conciliación administrativa con pausa ante incertidumbre, exclusivamente para staging. El transporte Anthropic sigue desactivado y sin driver/UI/canal conectado. No se declara completo el piloto ni el mínimo comercial de Fase 8; quedan evaluación real, operación financiera, identidad/CRM y control de entrega.
