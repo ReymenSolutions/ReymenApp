@@ -69,7 +69,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [legacy, center, feature-rollback]
+        scenario: [legacy, center, feature-rollback, private-pilot-admin]
 
     services:
       postgres:
@@ -140,6 +140,10 @@ jobs:
               export AI_AGENT_MODEL_ENABLED=true AI_AGENT_CENTER_UI_ENABLED=true
               export E2E_CHANNEL_ROLLBACK=true E2E_KNOWLEDGE_ROLLBACK=true E2E_MARK_ROLLBACK=true
               specs=(e2e/channel-connections-rollback.spec.ts e2e/knowledge-access-rollback.spec.ts e2e/mark-sandbox-rollback.spec.ts)
+              ;;
+            private-pilot-admin)
+              export REYMEN_STAGING=true
+              specs=(e2e/private-pilot-admin.spec.ts)
               ;;
           esac
           npx playwright test "${specs[@]}" --workers=1

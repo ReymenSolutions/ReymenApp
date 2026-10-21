@@ -206,3 +206,7 @@ Se implementan cuotas y reservas durables de piloto ($25 diarios, $500/ciclo, $1
 ### Incremento de gateway privado
 
 Se añade la ruta financiera de staging con atribución por instancia/revisión/paso, claim único, cierre atómico y conciliación administrativa de uso/no cobro. Incertidumbre conserva la reserva y pausa el piloto. No se marca AG-006/AG-011 completo: faltan driver, conocimiento, CRM verificado, entrega/control humano, validación real del proveedor y operación de conciliación. El gateway comercial conserva su deuda de errores/TTL. Ver [21](21_GATEWAY_FINANCIERO_PILOTO.md).
+
+### Administración privada de staging
+
+Se implementa preparación pausada e idempotente de Mark y revisión administrativa de reservas/conciliación en una ruta exclusiva de staging. No activa proveedor, conocimiento, CRM ni entrega. Cierra parcialmente la operación manual de conciliación; persisten los gates del gateway y piloto real. Ver [22](22_ADMINISTRACION_PILOTO_PRIVADO.md).
