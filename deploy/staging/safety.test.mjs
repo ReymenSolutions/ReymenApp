@@ -52,9 +52,10 @@ test('resolved Compose keeps staging private and does not inherit external servi
   ], { env, encoding: 'utf8' }));
   assert.equal(config.name, 'reymen-mark-staging');
   assert.equal(config.networks.staging.internal, true);
-  assert.deepEqual(Object.keys(config.services), ['app', 'staging-postgres']);
-  assert.equal(config.services.app.ports[0].host_ip, '127.0.0.1');
-  assert.equal(config.services.app.ports[0].published, '3301');
+  assert.deepEqual(Object.keys(config.services), ['app', 'ingress', 'staging-postgres']);
+  assert.equal(config.services.ingress.ports[0].host_ip, '127.0.0.1');
+  assert.equal(config.services.ingress.ports[0].published, '3301');
+  assert.equal(config.services.app.ports, undefined);
   assert.equal(config.services['staging-postgres'].ports, undefined);
   assert.equal(config.services.app.environment.ANTHROPIC_API_KEY, '');
   assert.equal(config.services.app.environment.AI_PROVIDER, 'mock');

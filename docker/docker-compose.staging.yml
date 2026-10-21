@@ -49,13 +49,23 @@ services:
       dockerfile: docker/Dockerfile.staging
       target: runner
     environment: *staging-environment
-    ports: ["127.0.0.1:3301:3000"]
     networks: [staging]
     depends_on:
       staging-postgres:
         condition: service_healthy
     mem_limit: 1g
     cpus: 1
+    restart: unless-stopped
+
+  ingress:
+    image: nginx:1.28-alpine
+    volumes:
+      - ./nginx.staging.conf:/etc/nginx/nginx.conf:ro
+    ports: ["127.0.0.1:3301:8080"]
+    networks: [staging, ingress]
+    depends_on: [app]
+    mem_limit: 64m
+    cpus: 0.25
     restart: unless-stopped
 
   tools:
@@ -78,6 +88,7 @@ services:
 networks:
   staging:
     internal: true
+  ingress: {}
 
 volumes:
   staging-db:

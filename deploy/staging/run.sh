@@ -8,8 +8,12 @@ case "${1:-}" in
   database) "${compose[@]}" up -d --wait staging-postgres ;;
   migrate) "${compose[@]}" run --rm --no-deps tools node node_modules/prisma/build/index.js migrate deploy ;;
   bootstrap) "${compose[@]}" run --rm --no-deps tools node deploy/staging/bootstrap.mjs ;;
-  start) "${compose[@]}" up -d --no-build app ;;
+  start)
+    "${compose[@]}" up -d --no-build app
+    # Resolve the current app address after every app recreation/update.
+    "${compose[@]}" up -d --no-build --no-deps --force-recreate ingress
+    ;;
   status) "${compose[@]}" ps ;;
-  stop) "${compose[@]}" stop app ;;
+  stop) "${compose[@]}" stop ingress app ;;
   *) echo 'Uso: bash deploy/staging/run.sh {build|database|migrate|bootstrap|start|status|stop}'; exit 1 ;;
 esac

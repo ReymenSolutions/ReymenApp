@@ -42,4 +42,6 @@ jobs:
           curl --fail --retry 20 --retry-delay 3 --retry-connrefused http://127.0.0.1:3301/api/health
       - name: Stop staging while retaining its data
         if: always()
-        run: docker compose --env-file .env.staging -f docker/docker-compose.staging.yml stop
+        run: |
+          docker compose --env-file .env.staging -f docker/docker-compose.staging.yml logs --tail 40 app ingress
+          docker compose --env-file .env.staging -f docker/docker-compose.staging.yml stop

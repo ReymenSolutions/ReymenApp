@@ -5,8 +5,8 @@ Se prepara un entorno separado para el proveedor elegido, **Anthropic**. En esta
 ## Separación y alcance
 
 - Checkout independiente; nunca copiar `.env`, backups ni datos de producción.
-- Proyecto Compose `reymen-mark-staging`, red interna y volumen propios. PostgreSQL sin puerto público; aplicación únicamente en `127.0.0.1:3301`.
-- Sin conexión a las redes del proxy, n8n o POS y sin cron. La red interna bloquea salida externa de los contenedores. El navegador del operador aún puede solicitar recursos públicos de la interfaz, por ejemplo avatares.
+- Proyecto Compose `reymen-mark-staging`, red interna y volumen propios. App y PostgreSQL sin puertos publicados; un Nginx exclusivo de staging sirve únicamente en `127.0.0.1:3301`.
+- Sin conexión a las redes del proxy comercial, n8n o POS y sin cron. La red interna bloquea salida externa de app, herramientas y PostgreSQL. El Nginx de staging usa además una red de entrada separada para publicar loopback: reenvía a un destino fijo, sin proxy abierto. No recibe secretos. El navegador del operador aún puede solicitar recursos públicos de la interfaz, por ejemplo avatares.
 - Secretos aleatorios exclusivos con permisos 0600. El Dockerfile específico excluye `.env*`, respaldos y claves del contexto. El servicio app no recibe las contraseñas de login ni credenciales de Anthropic.
 - Bootstrap transaccional exclusivamente para una base nueva con host/usuario/nombre fijos. Crea «Reymen Piloto» y dos usuarios ficticios; rechaza una base con organizaciones o usuarios. Nunca actualiza contraseñas ni borra registros.
 - No cambia código de negocio, esquema ni configuración de producción. Las migraciones existentes se ejecutan solamente sobre el nuevo servicio de staging.
@@ -64,7 +64,7 @@ Validar login en ambos roles, organización «Reymen Piloto», panel `/portal/ai
 
 Las pruebas de seguridad de configuración se ejecutan con `node --test deploy/staging/safety.test.mjs`; requieren Docker Compose, sin daemon para resolver YAML. Revisan destino del bootstrap, rechazo de configuración ajena, permisos 0600, no sobrescritura, red privada, puerto loopback y proveedor simulado.
 
-Rollback operacional: `sudo bash deploy/staging/run.sh stop`. Solo detiene la app de staging. Para detener también su base, usar el Compose de staging con `stop`; conservar volumen y `.env.staging`. No ejecutar `down -v`, reset ni restauraciones sobre producción. Si una migración falla, conservar evidencia y resolver hacia adelante en esta base aislada.
+Rollback operacional: `sudo bash deploy/staging/run.sh stop`. Solo detiene la app y el Nginx de staging. Para detener también su base, usar el Compose de staging con `stop`; conservar volumen y `.env.staging`. No ejecutar `down -v`, reset ni restauraciones sobre producción. Si una migración falla, conservar evidencia y resolver hacia adelante en esta base aislada.
 
 ## Siguientes gates
 
