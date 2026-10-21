@@ -49,7 +49,7 @@ test.describe("clientes del negocio", () => {
 
     await page.getByPlaceholder(/buscar por nombre/i).fill("zzz");
     await page.keyboard.press("Enter");
-    await expect(page.getByText(/ningún cliente coincide/i)).toBeVisible();
+    await expect(page.getByRole("main").getByRole("heading", { name: /ningún cliente coincide/i })).toBeVisible();
     await page.goto("/portal/customers");
 
     await page.getByRole("button", { name: /crear contacto/i }).click();
