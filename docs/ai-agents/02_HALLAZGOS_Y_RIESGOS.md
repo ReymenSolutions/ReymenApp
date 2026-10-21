@@ -34,3 +34,8 @@ I: H01 → H02/H04/H05 → H03/H11 → H06/H08 → H14. H07/H09/H10/H12/H13 en c
 ## Seguimiento de implementación — Fase 0 autorizada
 
 La tabla anterior es la evidencia histórica del snapshot auditado. El estado de las correcciones y sus límites está en [12_IMPLEMENTACION_FASE_0](12_IMPLEMENTACION_FASE_0.md). Se implementaron autorización H01, recuperación H02, filtrado por canal H03, control humano H04 y persistencia mínima H05; H03 no incluye cuentas distintas del mismo canal. H07 solo incluye preservación de tags. Los demás diseños/propuestas no se consideran implementados.
+
+
+## Seguimiento de Fase 4
+
+H07 se aborda localmente mediante revisiones publicadas, grants por instancia y selección léxica explicable. Se preservan límites visibles y fuentes revocadas no entran al nuevo contexto. No se certifica resistencia del modelo a inyección ni calidad con proveedor real. Ver [16_IMPLEMENTACION_FASE_4.md](16_IMPLEMENTACION_FASE_4.md).

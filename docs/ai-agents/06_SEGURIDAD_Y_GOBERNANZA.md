@@ -83,3 +83,8 @@ Incidente: pausar instancia/conexión afectada → preservar eventos/auditoría 
 ## Controles locales de Fase 3
 
 [15](15_IMPLEMENTACION_FASE_3.md) añade RBAC/CAS y FKs por cuenta, HMAC estricto, generación/secuencia/frescura, propiedad verificada única entre tenants, lock de pausa/admisión, aislamiento del hilo y callbacks v1 monotónicos. El conector sigue siendo la frontera confiable que debe verificar al proveedor. Especificación en [contrato v1](../crm/CANAL-CONEXIONES-V1.md); firma/scopes/ventanas reales y despliegue de n8n siguen pendientes del sandbox.
+
+
+## Seguimiento de Fase 4
+
+Los nuevos controles exigen gestión de conocimiento, módulo y organización activa; FKs compuestas evitan asignaciones cruzadas. La publicación/grants/política usan CAS y bloqueo; la respuesta automática revalida la versión después de inferencia y antes de envío. AuditLog registra referencias/hash, no contenido. La revisión humana de PII sigue pendiente de política operativa. Ver [16_IMPLEMENTACION_FASE_4.md](16_IMPLEMENTACION_FASE_4.md).

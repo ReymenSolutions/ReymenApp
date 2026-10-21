@@ -188,3 +188,8 @@ AG-012 tiene implementación sobre el adapter legacy: resumen, lista/perfil, nav
 ## Base local de AG-009 — Fase 3
 
 Se implementaron cuentas, ruta default al legacy/manual, referencia privada de credencial, protocolo v1, salud con TTL, aislamiento de hilo, propiedad confirmada única, acuses y revisión explícita de historia. Evidencia en [15](15_IMPLEMENTACION_FASE_3.md). No se marca completado el piloto externo ni rutas por intención/especialistas: el propietario pidió posponer la elección de canal, y faltan sandbox, workflow y verificación real. No se iniciaron AG-010/Fase 4 ni producción.
+
+
+## Seguimiento de Fase 4
+
+AG-010 implementado localmente con revisión/publicación, asignaciones a versiones y consulta acotada por pregunta, con límites visibles. No hay embeddings ni agentes nuevos. La aceptación productiva conserva gates de calidad, presupuesto, revisión de PII y piloto. AG-011 no iniciado. Ver [16_IMPLEMENTACION_FASE_4.md](16_IMPLEMENTACION_FASE_4.md).

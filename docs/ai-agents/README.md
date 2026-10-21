@@ -64,3 +64,7 @@ Cada tabla declara su nivel por fila o en su introducción. En documentos de dis
 Solo se crearon estos documentos en `docs/ai-agents/`. No se modificó código funcional, BD, dependencias, integraciones o servidor; no se crearon commits ni PR. Las suites con fixtures de BD no se ejecutaron. Las habilidades anunciadas de seguridad/configuración no estuvieron disponibles en el catálogo de esta sesión; se usó inspección directa y no se ejecutó configuración de entorno.
 
 La etapa 1 termina aquí. Para seguir se requiere autorización explícita para **implementar la fase 0B de correcciones y preparar la fase 1 en una rama con pruebas sobre una BD desechable**. Esa autorización no incluye producción: cualquier migración o despliegue se revisará por separado con artefacto, copia verificada y rollback concretos. No se necesita decidir todavía todo el marketplace.
+
+## Seguimiento de Fase 4
+
+Se implementó el acceso a conocimiento compartido con revisiones/publicación, asignaciones y consulta acotada por pregunta en `codex/ai-center-phase4-knowledge`: [16_IMPLEMENTACION_FASE_4.md](16_IMPLEMENTACION_FASE_4.md). El lector nuevo queda desactivado globalmente y exige además revisión/habilitación por negocio. El piloto externo de Fase 3 sigue pendiente. No hay despliegue ni inicio de Fase 5.

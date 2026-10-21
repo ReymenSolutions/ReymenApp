@@ -109,3 +109,7 @@ No restaurar una copia antigua encima de producción para revertir UI: perdería
 ## Expansión local de Fase 3
 
 [15](15_IMPLEMENTACION_FASE_3.md) implementa ChannelConnection/ChannelRouting, binding nullable de Conversation e índice parcial de propiedad confirmada. Las migraciones se aplicaron solo en bases sintéticas. No hay backfill automático ni cutover real. El binario nuevo requiere expandir esquema previamente, incluso con el flag apagado; el rollback preferido conserva el binario y pausa el flag, sin dejar que un sender viejo ignore cuentas ya vinculadas.
+
+## Seguimiento de Fase 4
+
+Se reutiliza `KnowledgeBase` como fuente única y se añaden `KnowledgeRevision`, `KnowledgeGrant` y `KnowledgeAccessPolicy`. Las revisiones conservan contenido histórico; no se crean copias por asistente ni se equiparan artículos con PromptVersion. No hay backfill/publicación/asignación automática. Ver [16_IMPLEMENTACION_FASE_4.md](16_IMPLEMENTACION_FASE_4.md) para FKs, esquema requerido y rollback sin borrar datos.

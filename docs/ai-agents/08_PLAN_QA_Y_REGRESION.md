@@ -161,3 +161,8 @@ La evidencia final de consultas por organización, permisos, interacciones, pagi
 ## Evidencia local de Fase 3
 
 [15](15_IMPLEMENTACION_FASE_3.md#8-pruebas-y-validación) registra pruebas de cuentas, RBAC/FKs, HMAC, duplicados, generaciones, TTL, callbacks, adopción de historial, workers y carreras de pausa/control humano. Se usan dos bases nuevas con esquema expandido y transporte simulado. La firma real del proveedor, scopes/ventanas, expiración/reconexión física, volumen y CI Node22 siguen como gates externos; aprobar fixtures no aprueba producción.
+
+
+## Seguimiento de Fase 4
+
+Se agregaron pruebas de fuentes/grants/roles/tenant, revisión concurrente, noveno artículo, dato posterior a 1200 caracteres, límites de candidatas y revocación durante proveedor simulado; además un flujo real de acciones en Chromium. La evidencia final y límites de fidelidad están en el reporte 16. Ver [16_IMPLEMENTACION_FASE_4.md](16_IMPLEMENTACION_FASE_4.md).

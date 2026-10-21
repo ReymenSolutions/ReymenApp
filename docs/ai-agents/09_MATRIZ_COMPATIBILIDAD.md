@@ -63,3 +63,8 @@ El modelo permanece tras doble flag y conserva adapter legacy, cap por canal y u
 ## Compatibilidad de Fase 3
 
 La base de [15](15_IMPLEMENTACION_FASE_3.md) preserva rutas/payloads legacy para hilos sin cuenta; añade un contrato independiente para cuentas explícitas. El CRM comparte teléfono/correo, el hilo queda separado por cuenta y los handles se acotan a ella. Historia anterior solo se vincula con revisión/CAS, sin cambiar IDs/mensajes. Datos nuevos no se borran al apagar el flag; los envíos vinculados se bloquean y nunca caen al transporte antiguo. Expandir las columnas de Conversation antes de ejecutar el binario nuevo; no se promete compatibilidad nuevo código/esquema viejo en esta fase.
+
+
+## Seguimiento de Fase 4
+
+Fase 4 conserva IDs/tags y el lector anterior fuera del opt-in; desactiva fuentes en lugar de destruirlas. Dentro del opt-in, API v1/n8n reciben versiones asignadas y fragmentos con metadatos. Requiere esquema expandido en toda la flota antes de habilitar; rollback de flags conserva revisiones, pero volver al lector anterior deja de aplicar grants y exige revisar artículos activos. Ver [16_IMPLEMENTACION_FASE_4.md](16_IMPLEMENTACION_FASE_4.md).

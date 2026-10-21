@@ -173,3 +173,8 @@ La introducción de este documento conserva el estado de la auditoría original.
 ## Base de Fase 3 y gate externo
 
 Ante autorización de continuar se implementó la base local documentada en [15](15_IMPLEMENTACION_FASE_3.md). Cuentas/ruta default/contrato/salud/aislamiento tienen pruebas sintéticas. El propietario pospuso la selección del piloto: no se completó la verificación del proveedor, no se desplegó un conector ni se hizo cutover. Routing por intención y especialistas no se introducen con el único asistente legacy. Fase 4 no iniciada.
+
+
+## Seguimiento de Fase 4
+
+Se implementó y validó localmente la Fase 4 (AG-010), independiente del piloto de canales aplazado. El lector usa opt-in global y por negocio. La Fase 5 no se inicia: faltan autorización y dependencias externas/evaluación del roadmap. Ver [16_IMPLEMENTACION_FASE_4.md](16_IMPLEMENTACION_FASE_4.md).

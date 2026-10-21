@@ -67,3 +67,7 @@ Estas decisiones no bloquean terminar documentación. Tampoco constituyen solici
 ## Decisiones aplicadas en Fase 1
 
 Se aplica ADR-01/02/05/09 en modalidad expand + adapter + shadow, descrita en [13](13_IMPLEMENTACION_FASE_1.md). No se crea otro worker, límite comercial ni activación de especialistas. Las otras decisiones siguen siendo propuestas para sus fases; no se eligió un tenant piloto.
+
+## Decisiones aplicadas en Fase 4
+
+ADR-06 se implementa mediante fuente única, revisiones publicadas y grants a versiones concretas; selección textual medible antes de justificar embeddings. Se mantiene ADR-09 con flags global/por negocio y expansión de esquema sin cutover productivo. El retorno al lector anterior no aplica grants: requiere revisar fuentes activas y preservar revisiones. Ver [16_IMPLEMENTACION_FASE_4.md](16_IMPLEMENTACION_FASE_4.md).
