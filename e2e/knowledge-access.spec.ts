@@ -30,7 +30,7 @@ test.afterAll(async () => {
 });
 test("review, publication, assignment, preview and recoverable removal use real server actions", async ({ page }) => {
   await page.goto("/portal/knowledge-base"); await expect(page.getByText("Usando lector anterior: 8 artículos activos recientes", { exact: true })).toBeVisible();
-  await page.locator("summary").filter({ hasText: "Publicación y acceso" }).click();
+  await page.locator("main summary").filter({ hasText: "Publicación y acceso" }).click();
   const review = page.getByRole("button", { name: "Revisar versión actual", exact: true }); await review.click();
   await expect(page.getByRole("dialog")).toContainText("Abrimos sábados de 9 a 2."); await page.keyboard.press("Escape"); await expect(review).toBeFocused();
   await review.click(); await page.getByRole("button", { name: "Confirmar revisión y publicar", exact: true }).click();
@@ -57,7 +57,7 @@ test("review, publication, assignment, preview and recoverable removal use real 
 test("knowledge access stays responsive, localized and hidden from read-only staff", async ({ page, context }) => {
   for (const width of [320, 390, 768, 1280]) {
     await page.setViewportSize({ width, height: 900 }); await page.goto("/portal/knowledge-base"); await expect(page.getByRole("heading", { name: "Fuentes autorizadas", exact: true })).toBeVisible();
-    await page.locator("summary").filter({ hasText: "Publicación y acceso" }).click();
+    await page.locator("main summary").filter({ hasText: "Publicación y acceso" }).click();
     expect(await page.locator("main").evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   }
   await page.setViewportSize({ width: 390, height: 844 }); await expect.poll(async () => page.locator("aside.sidebar").evaluate(el => el.getBoundingClientRect().right)).toBeLessThanOrEqual(1); await page.screenshot({ path: "/tmp/reymen-phase4-knowledge-mobile.png", fullPage: true });
