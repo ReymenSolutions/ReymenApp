@@ -1,3 +1,4 @@
+import { expireMarkSandboxRuns } from "@/lib/ai/mark/service";
 import { reconcileAgentExecutions } from "@/lib/ai/agents/executions";
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
@@ -35,5 +36,6 @@ export async function POST(req: NextRequest) {
   const pipeline = await recoverPipelineAnalyses();
   const ai = await recoverAutoReplies();
   await reconcileAgentExecutions().catch(() => { console.error("[agent-model] reconciliation pending"); });
+  await expireMarkSandboxRuns().catch(() => { console.error("[mark-sandbox] expiry reconciliation pending"); });
   return NextResponse.json({ success: true, ...result, ai, pipeline });
 }

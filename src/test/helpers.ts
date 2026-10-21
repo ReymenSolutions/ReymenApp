@@ -74,6 +74,7 @@ export async function seedTestAiRate(provider = "anthropic", models: string[] = 
 
 /** Deletes an org and everything scoped to it, in FK-safe order. Best-effort — used for test cleanup only. */
 export async function cleanupOrg(orgId: string) {
+  await prisma.agentSandboxRun.deleteMany({ where: { organizationId: orgId } });
   await prisma.knowledgeGrant.deleteMany({ where: { organizationId: orgId } });
   await prisma.knowledgeRevision.deleteMany({ where: { organizationId: orgId } });
   await prisma.knowledgeAccessPolicy.deleteMany({ where: { organizationId: orgId } });

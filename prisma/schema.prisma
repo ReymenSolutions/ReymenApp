@@ -10,6 +10,7 @@ datasource db {
 // ─── TENANT ──────────────────────────────────────────────────────
 
 model Organization {
+  agentSandboxRuns AgentSandboxRun[]
   knowledgeAccessPolicy KnowledgeAccessPolicy?
   id                       String    @id @default(cuid())
   name                     String
@@ -3019,4 +3020,25 @@ model KnowledgeAccessPolicy {
   version Int @default(1)
   updatedAt DateTime @updatedAt
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+}
+
+// Fase 5 local harness: no live agent, provider consumption or channel destination.
+model AgentSandboxRun {
+  id String @id @default(cuid())
+  organizationId String
+  createdById String
+  requestKey String
+  inputHash String
+  fixtureVersion String
+  definitionVersion Int
+  status AgentExecutionStatus @default(QUEUED)
+  trace Json @default("[]")
+  result Json?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@unique([organizationId, createdById, requestKey])
+  @@index([organizationId, createdById, createdAt])
+  @@index([status, expiresAt])
 }
