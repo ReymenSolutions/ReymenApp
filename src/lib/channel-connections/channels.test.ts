@@ -110,6 +110,22 @@ describe("Phase3 account isolation, configuration and health", () => {
   });
 });
 describe("Phase3 ingress and outbound account boundaries", () => {
+  it("shares the original unbound identity lock with a Phase2 process during rolling updates", async () => {
+    const f = await fixture(), started = deferred<void>(), release = deferred<void>();
+    const oldProcess = prisma.$transaction(async tx => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`inbox:${f.org.id}:whatsapp:${phoneKey("8112345678")}`}))`;
+      started.resolve(); await release.promise;
+    }, { timeout: 15000 });
+    await started.promise;
+    const admission = processConversationEvent({ channel: "whatsapp", contactPhone: "8112345678", message: { role: "USER", content: "Legacy", externalId: "rolling" } }, f.org.id);
+    try {
+      await expect.poll(async () => {
+        const result = await prisma.$queryRaw<{ waiting: bigint }[]>`SELECT count(*) AS waiting FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE '%pg_advisory_xact_lock%'`;
+        return Number(result[0].waiting);
+      }, { timeout: 3000 }).toBeGreaterThan(0);
+    } finally { release.resolve(); }
+    await Promise.all([oldProcess, admission]); expect(await prisma.conversation.count({ where: { organizationId: f.org.id } })).toBe(1);
+  });
   it("does not reserve unverified IDs but rejects the same verified provider account in two tenants", async () => {
     const a = await fixture(), b = await fixture();
     const results = await Promise.allSettled([health(a.connection), health(b.connection)]);

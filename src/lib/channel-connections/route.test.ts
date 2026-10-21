@@ -28,7 +28,7 @@ describe("versioned connector authentication and durable recovery", () => {
   });
   it("rejects wrong accounts, foreign IDs, unsupported versions, extra credentials, malformed or oversized payloads", async () => {
     const a = await fixture(), b = await fixture();
-    for (const patch of [{ externalAccountKey: "wrong" }, { connectionId: b.row.id }, { version: 2 }, { accessToken: "never-store-me" }, { generation: 2 }]) expect((await POST(request(a.org, { ...a.event, ...patch }))).status).toBe(400);
+    for (const patch of [{ externalAccountKey: "wrong" }, { connectionId: b.row.id }, { version: 2 }, { accessToken: "never-store-me" }, { generation: 2 }, { generation: 2147483648 }]) expect((await POST(request(a.org, { ...a.event, ...patch }))).status).toBe(400);
     expect((await POST(request(a.org, "{"))).status).toBe(400);
     expect((await POST(request(a.org, "x".repeat(65537)))).status).toBe(413);
     expect(await prisma.webhookEvent.count({ where: { organizationId: a.org.id } })).toBe(0);

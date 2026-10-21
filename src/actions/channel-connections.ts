@@ -25,7 +25,7 @@ export async function registerChannelConnection(input: { channel: string; label:
 }
 export async function updateChannelConnection(input: { id: string; expectedVersion: number; enabled: boolean; agentInstanceId?: string | null; resetVerification?: boolean }) {
   const session = await manager();
-  const parsed = z.object({ id: z.string().min(1).max(100), expectedVersion: z.number().int().positive(), enabled: z.boolean(), agentInstanceId: z.string().min(1).max(100).nullable().optional(), resetVerification: z.boolean().optional() }).strict().parse(input);
+  const parsed = z.object({ id: z.string().min(1).max(100), expectedVersion: z.number().int().positive().max(2147483647), enabled: z.boolean(), agentInstanceId: z.string().min(1).max(100).nullable().optional(), resetVerification: z.boolean().optional() }).strict().parse(input);
   const result = await configureConnection(session.user.organizationId, session.user.id, parsed);
   revalidatePath("/portal/ai-channels"); return result;
 }

@@ -139,7 +139,9 @@ export async function processConversationEvent(payload: unknown, orgId: string, 
   const { conversation, inserted } = await prisma.$transaction(async (tx) => {
     // Serialize matching/creation for this tenant's channel identity, including concurrent first deliveries.
     const identity = key || body.contactPhone || handle || email || body.conversationId;
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`inbox:${orgId}:${normalizeChannel(body.channel)}:${binding?.connectionId ?? "legacy"}:${binding?.externalThreadId ?? identity}`}))`;
+    // Keep the unbound key byte-for-byte compatible with Phase 2 during rolling updates.
+    const lockKey = binding ? `inbox:${orgId}:${normalizeChannel(body.channel)}:${binding.connectionId}:${binding.externalThreadId}` : `inbox:${orgId}:${normalizeChannel(body.channel)}:${identity}`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
     let channel = normalizeChannel(body.channel);
     if (binding) {
       const connection = await tx.channelConnection.findFirst({ where: { id: binding.connectionId, organizationId: orgId, channel, generation: binding.generation, enabled: true } });

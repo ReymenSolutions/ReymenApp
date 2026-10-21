@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { processConversationEvent } from "@/lib/webhook-processors";
 import { assertConnectionsEnabled, assertRoutable, HEALTH_TTL_MS, lockConnection } from "./service";
 const text = z.string().trim().min(1).max(200);
-const base = { version: z.literal(1), connectionId: text, externalAccountKey: text, generation: z.number().int().positive(), eventId: text };
+const base = { version: z.literal(1), connectionId: text, externalAccountKey: text, generation: z.number().int().positive().max(2147483647), eventId: text };
 export const channelEventSchema = z.discriminatedUnion("type", [
   z.object({ ...base, type: z.literal("health"), sequence: z.number().int().min(1).max(2147483647), observedAt: z.string().datetime(), state: z.enum(["HEALTHY", "DEGRADED", "DISCONNECTED"]), providerVerified: z.boolean(), canReceive: z.boolean(), canSend: z.boolean(), outboundContractVersion: z.literal(1) }).strict(),
   z.object({ ...base, type: z.literal("message"), externalThreadId: text, contactPhone: text.optional(), contactHandle: text.optional(), contactEmail: z.string().email().max(254).optional(), contactName: z.string().max(200).optional(), subject: z.string().max(200).optional(), message: z.object({ externalId: text, content: z.string().min(1).max(16000) }).strict() }).strict(),
