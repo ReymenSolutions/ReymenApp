@@ -152,7 +152,7 @@ export async function runPilotAiCall(context: PilotCallContext, rawInput: z.infe
 async function admin(tx: Tx, actorId: string) {
   if (!await tx.user.findFirst({ where: { id: actorId, isActive: true, role: { in: ["ADMIN", "SUPER_ADMIN"] } }, select: { id: true } })) fail("pilot_reconciliation_forbidden");
 }
-const evidenceSchema = z.object({
+export const pilotReconciliationEvidence = z.object({
   kind: z.enum(["PROVIDER_USAGE", "PROVIDER_NO_CHARGE"]),
   reference: z.string().min(8).max(120).regex(/^[a-zA-Z0-9._:/-]+$/),
   externalId: z.string().regex(/^(msg|req)_[A-Za-z0-9_-]{1,120}$/),
@@ -160,9 +160,9 @@ const evidenceSchema = z.object({
   usage: usageSchema,
   outcome: z.enum(["SUCCEEDED", "REFUSED", "FAILED"]),
 }).strict();
-/** Manual, platform-admin reconciliation against reviewed provider evidence. No public action. */
-export async function reconcilePilotCall(organizationId: string, adminId: string, usageId: string, rawEvidence: z.infer<typeof evidenceSchema>) {
-  const evidence = evidenceSchema.parse(rawEvidence);
+/** Manual platform-admin reconciliation; the staging action reuses this fresh authorization. */
+export async function reconcilePilotCall(organizationId: string, adminId: string, usageId: string, rawEvidence: z.infer<typeof pilotReconciliationEvidence>) {
+  const evidence = pilotReconciliationEvidence.parse(rawEvidence);
   if (evidence.kind === "PROVIDER_NO_CHARGE" && (evidence.outcome !== "FAILED" || Object.values(evidence.usage).some(v => v !== 0))) fail("pilot_invalid_no_charge_evidence");
   if (evidence.kind !== "PROVIDER_NO_CHARGE") {
     receiptId.parse(evidence.externalId);
@@ -179,12 +179,12 @@ export async function reconcilePilotCall(organizationId: string, adminId: string
 }
 
 /** Release unused root capacity only when every admitted call has known cost. Flags may be off. */
-export async function closePilotRoot(organizationId: string, actorId: string, rootId: string) {
+export async function closePilotRoot(organizationId: string, actorId: string, rootId: string, platformOnly = false) {
   return prisma.$transaction(async tx => {
     await lockPilotBudget(tx, organizationId);
     const root = await tx.aiPilotBudgetRoot.findFirst({ where: { id: rootId, organizationId } });
     if (!root) fail("pilot_root_not_found");
-    if (root.createdById === actorId) await assertPilotAuthority(tx, organizationId, actorId); else await admin(tx, actorId);
+    if (!platformOnly && root.createdById === actorId) await assertPilotAuthority(tx, organizationId, actorId); else await admin(tx, actorId);
     if (root.state === "CLOSED") return root;
     if (await tx.aiUsage.count({ where: { organizationId, pilotRootId: rootId, OR: [{ status: "PENDING" }, { costMxn: null }] } })) fail("pilot_reconciliation_required");
     const closed = await tx.aiPilotBudgetRoot.update({ where: { id: rootId }, data: { state: "CLOSED", holdMxn: 0, closedAt: new Date() } });

@@ -8,6 +8,7 @@ import { getBudgetState } from "../budget";
 import { runAiCall } from "../gateway";
 import { reservePilotRoot, configurePilotBudget, beginPilotRoot } from "./budget";
 import { runPilotAiCall, closePilotRoot, reconcilePilotCall, type PilotCallContext } from "./gateway";
+import { PRIVATE_MARK_DEFINITION } from "./definition";
 
 const mocks = vi.hoisted(() => ({ call: vi.fn(), fx: vi.fn() }));
 vi.mock("../providers/anthropic-pilot", () => ({ callAnthropicPilot: mocks.call }));
@@ -24,7 +25,7 @@ async function fixture() {
   const admin = await createTestUser(null, "SUPER_ADMIN", "pilot-gateway-admin"); admins.push(admin.id);
   await prisma.aiBudgetSetting.create({ data: { organizationId: org.id, monthlyBudgetMxn: 100 } });
   await configurePilotBudget(org.id, admin.id, true, 0);
-  await prisma.agentDefinition.upsert({ where: { key_version: { key: "mark", version: 1 } }, update: {}, create: { key: "mark", version: 1, displayName: "Fixture Mark", specialty: "Fixture only", manifest: {} } });
+  await prisma.agentDefinition.upsert({ where: { key_version: { key: "mark", version: 1 } }, update: {}, create: PRIVATE_MARK_DEFINITION });
   const instance = await prisma.agentInstance.create({ data: { organizationId: org.id, definitionKey: "mark", definitionVersion: 1, publicName: "Fixture Mark", status: "PAUSED", revisions: { create: { version: 1, sourceHash: "fixture", snapshot: {} } } } });
   const root = await reservePilotRoot(org.id, owner.id, randomUUID());
   await beginPilotRoot(org.id, owner.id, root.id);
@@ -48,7 +49,8 @@ afterEach(async () => {
     await prisma.agentInstance.deleteMany({ where: { organizationId: id } });
     await cleanupOrg(id);
   }
-  await prisma.agentDefinition.deleteMany({ where: { key: "mark", version: 1 } });
+  // Shared immutable catalog metadata stays for the disposable test database's lifetime,
+  // just like legacy-assistant, so another test file's instance is never removed.
   await prisma.user.deleteMany({ where: { id: { in: admins.splice(0) } } });
   await prisma.aiRate.deleteMany({ where: { source: "test-pilot-gateway" } });
 });
