@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from "react";
 import { updatePreferences } from "@/actions/profile";
 import { strings } from "@/lib/i18n";
 import type { Lang, Strings } from "@/lib/i18n";
@@ -52,7 +52,8 @@ interface PreferencesProviderProps {
 }
 
 export function PreferencesProvider({ children, initialTheme, initialLang }: PreferencesProviderProps) {
-  // Initialize from props only — these come from cookies read server-side in layout.tsx.
+  const writes = useRef(Promise.resolve());
+  // Initialize from server props only — validated session, or cookies when signed out.
   // Do NOT read localStorage here: the initializer runs on both server and client during
   // hydration, so any window/localStorage access would cause a hydration mismatch.
   const [theme, setThemeState] = useState<Theme>(initialTheme === "dark" ? "dark" : "light");
@@ -68,15 +69,22 @@ export function PreferencesProvider({ children, initialTheme, initialLang }: Pre
     localStorage.setItem("reymen-lang", lang);
   }, [lang]);
 
+  // Serialize rapid selections so an older save cannot restore an old theme.
+  const persist = useCallback((data: { theme?: Theme; language?: Lang }) => {
+    writes.current = writes.current.catch(() => {}).then(async () => {
+      await updatePreferences(data);
+    }).catch(() => {});
+  }, []);
+
   const setTheme = useCallback((t: Theme) => {
     setThemeState(t);
-    updatePreferences({ theme: t }).catch(() => {});
-  }, []);
+    persist({ theme: t });
+  }, [persist]);
 
   const setLang = useCallback((l: Lang) => {
     setLangState(l);
-    updatePreferences({ language: l }).catch(() => {});
-  }, []);
+    persist({ language: l });
+  }, [persist]);
 
   const t = strings[lang];
 
