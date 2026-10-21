@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { FEATURES, OPERATIONS, PROPERTY_STATUSES, PROPERTY_TYPES } from "@/lib/r
 import { cn } from "@/lib/utils";
 import { SELECT } from "./ProspectForm";
 import { GeoPicker } from "./GeoPicker";
+import { AddressFields, type AddressValue } from "./AddressFields";
 
 export interface PropertyFormValues {
   id?: string;
@@ -27,7 +28,10 @@ export interface PropertyFormValues {
   price: string;
   currency: string;
   zoneId: string;
+  postalCode: string;
   neighborhood: string;
+  municipality: string;
+  state: string;
   addressLine: string;
   showExactLocation: boolean;
   latitude: string;
@@ -55,7 +59,7 @@ export function PropertyForm({
   branches,
 }: {
   initial: PropertyFormValues;
-  zones: { id: string; name: string; latitude?: number | null; longitude?: number | null }[];
+  zones: { id: string; name: string; postalCode?: string | null; latitude?: number | null; longitude?: number | null }[];
   advisors: { id: string; name: string | null; email: string }[];
   branches: { id: string; name: string }[];
 }) {
@@ -66,6 +70,26 @@ export function PropertyForm({
   const [saving, setSaving] = useState(false);
   const [geoPending, setGeoPending] = useState(false);
   const set = <K extends keyof PropertyFormValues>(k: K, value: PropertyFormValues[K]) => setV((s) => ({ ...s, [k]: value }));
+  const address: AddressValue = { cp: v.postalCode, colonia: v.neighborhood, municipio: v.municipality, estado: v.state, street: v.addressLine };
+  const setAddress = (p: Partial<AddressValue>) =>
+    setV((s) => ({
+      ...s,
+      ...(p.cp !== undefined ? { postalCode: p.cp } : {}),
+      ...(p.colonia !== undefined ? { neighborhood: p.colonia } : {}),
+      ...(p.municipio !== undefined ? { municipality: p.municipio } : {}),
+      ...(p.estado !== undefined ? { state: p.estado } : {}),
+      ...(p.street !== undefined ? { addressLine: p.street } : {}),
+    }));
+
+  // Sin zona elegida: se propone la que coincide con la colonia o el CP (la persona la puede cambiar).
+  useEffect(() => {
+    if (v.zoneId) return;
+    const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const col = norm(v.neighborhood);
+    const match = (col && zones.find((z) => norm(z.name) === col)) || (/^\d{5}$/.test(v.postalCode) && zones.find((z) => z.postalCode === v.postalCode));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (match) setV((s) => (s.zoneId ? s : { ...s, zoneId: match.id }));
+  }, [v.neighborhood, v.postalCode, v.zoneId, zones]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -85,7 +109,10 @@ export function PropertyForm({
         price: Number(v.price),
         currency: v.currency as "MXN" | "USD",
         zoneId: v.zoneId,
+        postalCode: v.postalCode || null,
         neighborhood: v.neighborhood || null,
+        municipality: v.municipality || null,
+        state: v.state || null,
         addressLine: v.addressLine || null,
         showExactLocation: v.showExactLocation,
         latitude: n(v.latitude),
@@ -144,13 +171,6 @@ export function PropertyForm({
               {PROPERTY_STATUSES.map((s) => <option key={s} value={s}>{enumLabel(R, "st", s)}</option>)}
             </select>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="f-zone">{R.zone} *</Label>
-            <select id="f-zone" className={SELECT} value={v.zoneId} onChange={(e) => set("zoneId", e.target.value)} required>
-              <option value="" disabled>—</option>
-              {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
-            </select>
-          </div>
           {field("price", `${R.price} *`, { type: "number", min: 1, step: "any", required: true })}
           <div className="space-y-1.5">
             <Label htmlFor="f-cur">{R.currency}</Label>
@@ -159,18 +179,31 @@ export function PropertyForm({
               <option value="USD">USD</option>
             </select>
           </div>
-          {field("neighborhood", R.neighborhood, { maxLength: 120 })}
-          {field("addressLine", R.address, { maxLength: 200 })}
           <div className="space-y-1.5 sm:col-span-2 lg:col-span-4">
             <Label htmlFor="f-desc">{R.description}</Label>
             <Textarea id="f-desc" rows={4} value={v.description} onChange={(e) => set("description", e.target.value)} maxLength={5000} />
           </div>
-          <div className="space-y-1.5 sm:col-span-2 lg:col-span-4">
-            <Label htmlFor="prop-geo-q">{R.geoTitle}</Label>
+        </div>
+      </fieldset>
+
+      <fieldset className="rounded-card border border-slate-200 bg-white p-4 sm:p-5">
+        <legend className="px-1 text-sm font-semibold text-slate-900">{R.addressSection}</legend>
+        <div className="space-y-5">
+          <AddressFields idPrefix="prop" value={address} onChange={setAddress} />
+          <div className="max-w-sm space-y-1.5">
+            <Label htmlFor="f-zone">{R.zone} *</Label>
+            <select id="f-zone" className={SELECT} value={v.zoneId} onChange={(e) => set("zoneId", e.target.value)} required>
+              <option value="" disabled>—</option>
+              {zones.map((z) => <option key={z.id} value={z.id}>{z.name}{z.postalCode ? ` · CP ${z.postalCode}` : ""}</option>)}
+            </select>
+            <p className="text-[11px] text-slate-500">{R.zoneAutoHint}</p>
+          </div>
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium text-slate-900">{R.geoTitle}</p>
             <GeoPicker
               idPrefix="prop"
               hint={R.geoPropertyHint}
-              suggestedQuery={[v.addressLine, v.neighborhood, zones.find((z) => z.id === v.zoneId)?.name].filter(Boolean).join(", ")}
+              structured={address}
               value={v.latitude !== "" && v.longitude !== "" ? { lat: Number(v.latitude), lng: Number(v.longitude) } : null}
               center={(() => {
                 const z = zones.find((x) => x.id === v.zoneId);

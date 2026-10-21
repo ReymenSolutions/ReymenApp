@@ -40,6 +40,7 @@ export async function getPublicProperty(slug: string) {
       price: true,
       currency: true,
       neighborhood: true,
+      municipality: true,
       addressLine: true,
       showExactLocation: true,
       latitude: true,

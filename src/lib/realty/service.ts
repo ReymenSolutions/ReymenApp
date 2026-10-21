@@ -43,12 +43,12 @@ export async function assertProfile(organizationId: string, profileId: string) {
 
 // ─── Zonas y ajustes ────────────────────────────────────────────────────
 
-export async function saveZone(organizationId: string, userId: string, input: { id?: string; name: string; latitude: number | null; longitude: number | null }) {
+export async function saveZone(organizationId: string, userId: string, input: { id?: string; name: string; postalCode?: string | null; latitude: number | null; longitude: number | null }) {
   const key = zoneKey(input.name);
   if (!key) throw new UserError("Nombre de zona inválido");
   const dupe = await prisma.realtyZone.findFirst({ where: { organizationId, key, ...(input.id ? { id: { not: input.id } } : {}) }, select: { id: true } });
   if (dupe) throw new UserError("Ya existe una zona con ese nombre.");
-  const data = { name: input.name.trim(), key, latitude: input.latitude, longitude: input.longitude };
+  const data = { name: input.name.trim(), key, postalCode: input.postalCode ?? null, latitude: input.latitude, longitude: input.longitude };
   let zoneId = input.id;
   if (zoneId) {
     await assertZone(organizationId, zoneId);
@@ -92,7 +92,10 @@ export interface PropertyInput {
   price: number;
   currency: string;
   zoneId: string;
+  postalCode: string | null;
   neighborhood: string | null;
+  municipality: string | null;
+  state: string | null;
   addressLine: string | null;
   showExactLocation: boolean;
   latitude: number | null;

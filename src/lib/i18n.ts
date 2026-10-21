@@ -41,7 +41,7 @@ export const strings = {
     foodProfitability: "Rentabilidad",
     smartcard: "SmartCard",
     loyalty: "Lealtad",
-    realty: "Realty",
+    realty: "Real Estate",
 
     // ── User menu ────────────────────────────────────────────
     notifications: "Notificaciones",
@@ -593,7 +593,7 @@ export const strings = {
     foodProfitability: "Profitability",
     smartcard: "SmartCard",
     loyalty: "Loyalty",
-    realty: "Realty",
+    realty: "Real Estate",
 
     // ── User menu ────────────────────────────────────────────
     notifications: "Notifications",

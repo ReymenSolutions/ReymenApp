@@ -28,7 +28,8 @@ import {
   updateVisit,
 } from "@/lib/realty/service";
 import { MAX_UPLOAD_BYTES } from "@/lib/realty/media";
-import { geocodeAddress } from "@/lib/realty/geocode";
+import { geocodeAddress, geocodeStructured } from "@/lib/realty/geocode";
+import { lookupPostalCode } from "@/lib/realty/postal";
 
 function revalidateRealty(extra: string[] = []) {
   revalidatePath("/portal/realty", "layout");
@@ -54,7 +55,10 @@ const propertySchema = z.object({
   price: z.coerce.number().positive().max(10_000_000_000),
   currency,
   zoneId: z.string().min(1),
+  postalCode: z.string().trim().regex(/^\d{5}$/).nullable().optional().or(z.literal("")).transform((v) => (v ? v : null)),
   neighborhood: optText(120),
+  municipality: optText(120),
+  state: optText(80),
   addressLine: optText(200),
   showExactLocation: z.boolean().default(false),
   latitude: coord(90),
@@ -281,7 +285,13 @@ export async function deleteRealtyCampaign(id: string) {
   revalidateRealty();
 }
 
-const zoneSchema = z.object({ id: z.string().optional(), name: z.string().trim().min(2).max(80), latitude: coord(90), longitude: coord(180) });
+const zoneSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().trim().min(2).max(80),
+  postalCode: z.string().trim().regex(/^\d{5}$/).nullable().optional().or(z.literal("")).transform((v) => (v ? v : null)),
+  latitude: coord(90),
+  longitude: coord(180),
+});
 
 export async function saveRealtyZone(data: z.input<typeof zoneSchema>) {
   const session = await requireRealtyManager();
@@ -328,4 +338,28 @@ export async function geocodeRealtyAddress(query: string) {
   const q = z.string().trim().min(3).max(200).safeParse(query);
   if (!q.success) throw new UserError("Escribe la dirección para buscarla.");
   return geocodeAddress(session.user.organizationId, q.data);
+}
+
+/** CP → estado, municipio y colonias (catálogo SEPOMEX). null si el CP no existe. */
+export async function lookupRealtyPostalCode(cp: string) {
+  await requireRealtyOperator();
+  const q = z.string().trim().regex(/^\d{5}$/).safeParse(cp);
+  if (!q.success) return null;
+  return lookupPostalCode(q.data);
+}
+
+const structuredSchema = z.object({
+  street: z.string().trim().max(200).default(""),
+  colonia: z.string().trim().max(120).default(""),
+  municipio: z.string().trim().max(120).default(""),
+  estado: z.string().trim().max(80).default(""),
+  cp: z.string().trim().max(5).default(""),
+});
+
+/** Ubica una dirección por partes (CP, colonia, calle); dice qué tan fino quedó el punto. */
+export async function geocodeRealtyStructured(data: z.input<typeof structuredSchema>) {
+  const session = await requireRealtyOperator();
+  const parsed = structuredSchema.safeParse(data);
+  if (!parsed.success) throw new UserError("Escribe el código postal para buscar la dirección.");
+  return geocodeStructured(session.user.organizationId, parsed.data);
 }

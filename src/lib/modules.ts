@@ -22,7 +22,7 @@ export const MODULE_LABEL: Record<PlatformModule, string> = {
   FOOD_OPS: "Reymen Foods",
   REYMEN_POS: "Reymen POS",
   LOYALTY: "Reymen Loyalty (Lealtad)",
-  REALTY: "REYMEN Ops Realty",
+  REALTY: "REYMEN Ops Real Estate",
 };
 
 const MODULE_LABEL_EN: Record<PlatformModule, string> = {
@@ -34,7 +34,7 @@ const MODULE_LABEL_EN: Record<PlatformModule, string> = {
   FOOD_OPS: "Reymen Foods",
   REYMEN_POS: "Reymen POS",
   LOYALTY: "Reymen Loyalty",
-  REALTY: "REYMEN Ops Realty",
+  REALTY: "REYMEN Ops Real Estate",
 };
 
 /** Todos los módulos, en el orden en que se muestran. */

@@ -16,6 +16,7 @@ import { pickDict } from "@/lib/i18n-dict";
 import { enumLabel, realtyStrings } from "@/lib/i18n-realty";
 import { SELECT } from "./ProspectForm";
 import { GeoPicker, type GeoValue } from "./GeoPicker";
+import { AddressFields, type AddressValue } from "./AddressFields";
 
 const CHANNELS = ["META", "INSTAGRAM", "GOOGLE", "SMARTCARD", "WHATSAPP", "PORTAL", "REFERRAL", "OTHER"] as const;
 
@@ -152,17 +153,25 @@ export function CampaignEditToggle({ initial, properties }: { initial: CampaignV
   );
 }
 
-export function ZoneRow({ zone }: { zone: { id?: string; name: string; latitude: number | null; longitude: number | null; usage?: string } }) {
+export function ZoneRow({ zone }: { zone: { id?: string; name: string; postalCode?: string | null; latitude: number | null; longitude: number | null; usage?: string } }) {
   const R = useR();
   const { busy, run } = useRun();
+  const isNew = !zone.id;
+  const blank = (): AddressValue => ({ cp: zone.postalCode ?? "", colonia: isNew ? "" : zone.name, municipio: "", estado: "", street: "" });
   const [name, setName] = useState(zone.name);
+  // El nombre se llena con la colonia mientras la persona no lo escriba a mano.
+  const [nameTouched, setNameTouched] = useState(!isNew);
+  const [addr, setAddr] = useState<AddressValue>(blank);
   const [point, setPoint] = useState<GeoValue | null>(zone.latitude != null && zone.longitude != null ? { lat: zone.latitude, lng: zone.longitude } : null);
   const [geoPending, setGeoPending] = useState(false);
-  const isNew = !zone.id;
-  // Una zona nueva abre el buscador; en las existentes se abre con "Ubicar" / "Cambiar".
+  // Una zona nueva abre CP + mapa; en las existentes se abre con "Ubicar" / "Cambiar".
   const [showGeo, setShowGeo] = useState(isNew);
   const save = (p: GeoValue | null, after?: () => void) =>
-    run(() => saveRealtyZone({ id: zone.id, name, latitude: p?.lat ?? null, longitude: p?.lng ?? null }), after);
+    run(() => saveRealtyZone({ id: zone.id, name, postalCode: addr.cp || null, latitude: p?.lat ?? null, longitude: p?.lng ?? null }), after);
+  const onAddr = (patch: Partial<AddressValue>) => {
+    setAddr((a) => ({ ...a, ...patch }));
+    if (patch.colonia !== undefined && !nameTouched) setName(patch.colonia);
+  };
 
   return (
     <form
@@ -175,16 +184,35 @@ export function ZoneRow({ zone }: { zone: { id?: string; name: string; latitude:
         save(point, () => {
           if (isNew) {
             setName("");
+            setNameTouched(false);
+            setAddr(blank());
             setPoint(null);
-          }
+          } else setShowGeo(false);
         });
       }}
       className="space-y-3"
     >
+      {showGeo && (
+        <div className="space-y-2">
+          {isNew && <p className="text-xs text-slate-500">{R.zoneCpHint}</p>}
+          <AddressFields idPrefix={`z-${zone.id ?? "new"}`} value={addr} onChange={onAddr} withStreet={false} />
+        </div>
+      )}
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-[12rem] flex-1 space-y-1">
-          <Label className="text-xs" htmlFor={`z-n-${zone.id ?? "new"}`}>{R.zone}</Label>
-          <Input id={`z-n-${zone.id ?? "new"}`} value={name} onChange={(e) => setName(e.target.value)} required minLength={2} maxLength={80} placeholder={isNew ? R.zonePlaceholder : undefined} />
+          <Label className="text-xs" htmlFor={`z-n-${zone.id ?? "new"}`}>{R.zoneName}</Label>
+          <Input
+            id={`z-n-${zone.id ?? "new"}`}
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              setNameTouched(e.target.value !== "");
+            }}
+            required
+            minLength={2}
+            maxLength={80}
+            placeholder={isNew ? R.zonePlaceholder : undefined}
+          />
         </div>
         <Button type="submit" size="sm" loading={busy} className="h-9 bg-[#031738] hover:bg-[#04275A]">{isNew ? R.addZone : R.save}</Button>
         {!isNew && (
@@ -197,6 +225,7 @@ export function ZoneRow({ zone }: { zone: { id?: string; name: string; latitude:
         {zone.usage && <span>{zone.usage}</span>}
         {!showGeo && (
           <>
+            {zone.postalCode && <span>· CP {zone.postalCode}</span>}
             <span>{point ? `· ${R.geoConfirmed}` : `· ${R.noLocation}`}</span>
             <button type="button" onClick={() => setShowGeo(true)} className="font-medium text-[#063C82] hover:underline">
               {point ? R.geoChange : R.locate}
@@ -208,7 +237,7 @@ export function ZoneRow({ zone }: { zone: { id?: string; name: string; latitude:
         <GeoPicker
           idPrefix={`z-${zone.id ?? "new"}`}
           hint={R.geoZoneHint}
-          suggestedQuery={name}
+          structured={addr}
           value={point}
           onPendingChange={setGeoPending}
           onConfirm={(p) => {
