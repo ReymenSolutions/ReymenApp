@@ -68,6 +68,7 @@ model Organization {
   createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt
 
+  channelConnections      ChannelConnection[]
   agentInstances          AgentInstance[]
   agentRollout            AgentModelRollout?
   agentExecutions         AgentExecution[]
@@ -513,6 +514,8 @@ model Conversation {
   id                 String             @id @default(cuid())
   organizationId     String
   channel            String
+  channelConnectionId String?
+  externalThreadId   String?
   contactPhone       String?
   // Misma llave que Lead.phoneKey, para encontrar la conversación aunque el
   // número llegue con otro formato.
@@ -544,12 +547,15 @@ model Conversation {
   lead         Lead?        @relation(fields: [leadId], references: [id])
   messages     Message[]
   drafts       ReplyDraft[]
+  channelConnection ChannelConnection? @relation(fields: [organizationId, channelConnectionId], references: [organizationId, id], onDelete: Restrict)
 
   @@index([organizationId])
   @@index([organizationId, phoneKey])
   @@index([leadId])
   @@index([organizationId, status])
   @@index([organizationId, assignedToId])
+  @@unique([channelConnectionId, externalThreadId])
+  @@index([organizationId, channelConnectionId])
   @@index([organizationId, channel, lastMessageAt])
   @@index([organizationId, contactHandle])
   @@index([organizationId, contactEmail])
@@ -2859,6 +2865,7 @@ model AgentInstance {
   organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   definition        AgentDefinition @relation(fields: [definitionKey, definitionVersion], references: [key, version], onDelete: Restrict)
   revisions         AgentConfigRevision[]
+  channelRoutes     ChannelRouting[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, definitionKey])
@@ -2918,4 +2925,52 @@ model AgentExecutionStep {
   execution      AgentExecution @relation(fields: [organizationId, executionId], references: [organizationId, id], onDelete: Restrict)
 
   @@id([organizationId, executionId, stepKey])
+}
+
+// Phase 3: explicit accounts; nothing is connected/enabled by migration.
+enum ChannelConnectionState {
+  UNVERIFIED
+  HEALTHY
+  DEGRADED
+  DISCONNECTED
+}
+
+// SQL also preserves a partial unique index on verified channel/account ownership.
+model ChannelConnection {
+  id                 String @id @default(cuid())
+  organizationId     String
+  channel            String
+  label              String
+  externalAccountKey String
+  credentialRef      String
+  enabled            Boolean @default(false)
+  version            Int @default(1)
+  generation         Int @default(1)
+  state              ChannelConnectionState @default(UNVERIFIED)
+  healthSequence     Int @default(0)
+  checkedAt          DateTime?
+  providerVerified   Boolean @default(false)
+  canReceive         Boolean @default(false)
+  canSend            Boolean @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  route              ChannelRouting?
+  conversations      Conversation[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, channel, externalAccountKey])
+}
+
+model ChannelRouting {
+  connectionId    String @id
+  organizationId  String
+  agentInstanceId String
+  enabled         Boolean @default(true)
+  version         Int @default(1)
+  updatedAt       DateTime @updatedAt
+  connection      ChannelConnection @relation(fields: [organizationId, connectionId], references: [organizationId, id], onDelete: Restrict)
+  agent           AgentInstance @relation(fields: [organizationId, agentInstanceId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, connectionId])
 }

@@ -6,6 +6,18 @@
 // su versión en español). Un mensaje que no esté aquí se muestra tal cual.
 
 const EN: Record<string, string> = {
+  "Pausa la cuenta antes de reiniciar su verificación": "Pause the account before resetting verification",
+  "El historial cambió o ya está vinculado; recarga y revisa la conversación": "History changed or is already linked; reload and review the conversation",
+  "Revisa los mensajes y trabajos pendientes antes de vincular el historial": "Review pending messages and jobs before linking history",
+
+  "Las conexiones por cuenta están en pausa": "Account connections are paused",
+  "Conexión no encontrada": "Connection not found",
+  "La conexión no está disponible; verifica la cuenta antes de responder": "The connection is unavailable; verify the account before replying",
+  "La conexión cambió; recarga antes de guardar": "The connection changed; reload before saving",
+  "El conector debe verificar primero esta cuenta y sus capacidades": "The connector must verify this account and its capabilities first",
+  "Asistente no disponible": "Assistant unavailable",
+  "Esta conexión admite solo texto por el momento": "This connection currently supports text only",
+
   "Organización inactiva": "Organization inactive",
   "El modelo de agentes aún no está habilitado en este entorno": "The agent model is not enabled in this environment yet",
   "La definición legacy requiere revisión; no se sobrescribirá": "The legacy definition needs review; it will not be overwritten",
