@@ -1,3 +1,4 @@
+import { assertKnowledgeCurrent } from "@/lib/ai/knowledge/retrieval";
 import { connectionAiAllowed } from "./channel-connections/service";
 import { after } from "next/server";
 import { observeLegacyCompletion } from "./ai/agents/executions";
@@ -7,7 +8,7 @@ import { hasModule } from "@/lib/modules";
 import { logAudit } from "@/lib/audit";
 import { UserError } from "@/lib/user-error";
 import { getChannelMode } from "@/lib/agent-mode";
-import { buildBusinessInstructions } from "@/lib/rulebook";
+import { buildBusinessContext } from "@/lib/rulebook";
 import { buildDraftMessages, generateText, isDraftProviderConfigured } from "@/lib/ai-draft";
 import { AiBudgetError } from "@/lib/ai/budget";
 import { syncLeadStatusFromOpportunity } from "@/lib/lead-status-sync";
@@ -141,12 +142,12 @@ export async function runPipelineAgent(organizationId: string, conversationId: s
       select: { id: true, title: true, pipelineStageId: true },
     });
 
-    const instructions = await buildBusinessInstructions(organizationId);
+    const { instructions, knowledgeVersion, knowledgeManaged } = await buildBusinessContext(organizationId, last.content, `pipeline:${conversationId}:${last.id}`);
     const system = [
       SYSTEM,
       `PIPELINE STAGES (in order)\n${stages.map((s) => `- ${s.name}${s.isWon ? " (won)" : s.isLost ? " (lost)" : ""}`).join("\n")}`,
       `CONTACT\nName: ${lead.name}\nCRM status: ${lead.status}\nOpen opportunity: ${openOpp ? `"${openOpp.title}" at stage "${stages.find((s) => s.id === openOpp.pipelineStageId)?.name ?? "?"}"` : "none"}`,
-      ...(instructions.trim() ? [`BUSINESS CONTEXT\n${instructions.trim().slice(0, 3000)}`] : []),
+      ...(instructions.trim() ? [`BUSINESS CONTEXT\n${(knowledgeManaged ? instructions.trim() : instructions.trim().slice(0, 3000))}`] : []),
     ].join("\n\n");
     const turns = buildDraftMessages(messages as { role: MessageRole; content: string }[]);
     if (turns.length === 0) return "skipped";
@@ -154,6 +155,7 @@ export async function runPipelineAgent(organizationId: string, conversationId: s
     const mockText = JSON.stringify({ intent: "pricing_inquiry", summary: "Pregunta por precios.", action: openOpp ? "none" : "create_opportunity", title: `Interés de ${lead.name}`, reason: "Preguntó por precios." });
     const result = await generateText({ organizationId, agentKey: "pipeline", operation: "pipeline", origin: "pipeline", conversationId, requestId: `pipeline:${conversationId}:${last.id}` }, system, turns, { json: true, mockText });
     if ("refused" in result) return "skipped";
+    await prisma.$transaction(tx => assertKnowledgeCurrent(tx, organizationId, knowledgeVersion));
     const analysis = parseAnalysis(result.text);
     if (!analysis) return "skipped";
 

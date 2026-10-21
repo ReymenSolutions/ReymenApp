@@ -6,6 +6,16 @@
 // su versión en español). Un mensaje que no esté aquí se muestra tal cual.
 
 const EN: Record<string, string> = {
+  "El artículo cambió; actualiza antes de guardar": "The article changed; refresh before saving",
+  "Organización no disponible": "Organization unavailable",
+  "El acceso por fuentes aún no está habilitado": "Source access is not enabled yet",
+  "El artículo cambió; actualiza y revisa de nuevo": "The article changed; refresh and review again",
+  "El artículo cambió; revisa su versión actual": "The article changed; review its current version",
+  "Fuente o asistente no disponible": "Source or assistant unavailable",
+  "La asignación cambió; actualiza antes de guardar": "The assignment changed; refresh before saving",
+  "La configuración cambió; actualiza antes de guardar": "The configuration changed; refresh before saving",
+  "Prepara primero el asistente existente": "Prepare the existing assistant first",
+
   "Pausa la cuenta antes de reiniciar su verificación": "Pause the account before resetting verification",
   "El historial cambió o ya está vinculado; recarga y revisa la conversación": "History changed or is already linked; reload and review the conversation",
   "Revisa los mensajes y trabajos pendientes antes de vincular el historial": "Review pending messages and jobs before linking history",

@@ -1,3 +1,5 @@
+import { fingerprint } from "@/lib/ai/agents/legacy";
+import { readKnowledge, renderKnowledge } from "@/lib/ai/knowledge/retrieval";
 import { prisma } from "@/lib/prisma";
 
 /** Secciones del rulebook. Cada una es texto libre que la IA sigue en cada respuesta del negocio. */
@@ -64,11 +66,23 @@ export function renderRulebookPrompt(rulebook: RulebookInput, articles: PromptAr
 }
 
 /** Rulebook + artículos activos del negocio, ya armados como texto para el prompt. */
-export async function buildBusinessInstructions(organizationId: string): Promise<string> {
+export async function buildBusinessContext(organizationId: string, query = "", requestKey?: string) {
+  const knowledge = await readKnowledge(organizationId, query);
   const [rulebook, assistant, articles] = await Promise.all([
     getRulebook(organizationId),
     prisma.whatsAppAssistant.findUnique({ where: { organizationId }, select: { name: true } }),
-    prisma.knowledgeBase.findMany({ where: { organizationId, isActive: true }, orderBy: { updatedAt: "desc" }, take: KB_ARTICLES_LIMIT, select: { title: true, content: true, category: true } }),
+    knowledge?.enabled ? Promise.resolve([]) : prisma.knowledgeBase.findMany({ where: { organizationId, isActive: true }, orderBy: { updatedAt: "desc" }, take: KB_ARTICLES_LIMIT, select: { title: true, content: true, category: true } }),
   ]);
-  return renderRulebookPrompt(rulebook, articles, assistant?.name);
+  const base = renderRulebookPrompt(rulebook, articles, assistant?.name);
+  const references = knowledge?.enabled ? renderKnowledge(knowledge) : "";
+  if (knowledge?.enabled) await prisma.auditLog.create({ data: { organizationId, action: "knowledge.retrieve", resource: "AgentInstance", resourceId: knowledge.instanceId, metadata: {
+    policyVersion: knowledge.policyVersion, queryHash: fingerprint(query), requestKey: requestKey ?? null,
+    eligible: knowledge.eligible, matching: knowledge.matching, considered: knowledge.considered, candidateLimitReached: knowledge.candidateLimitReached,
+    characters: knowledge.characters, estimatedTokens: knowledge.estimatedTokens,
+    sources: knowledge.selected.map(s => ({ articleId: s.articleId, version: s.version, sourceHash: s.sourceHash, start: s.start, characters: s.content.length, truncated: s.truncated })),
+  } } });
+  return { instructions: [base, references].filter(Boolean).join("\n\n"), knowledgeVersion: knowledge?.policyVersion ?? null, knowledgeManaged: knowledge?.enabled ?? false };
+}
+export async function buildBusinessInstructions(organizationId: string, query = ""): Promise<string> {
+  return (await buildBusinessContext(organizationId, query)).instructions;
 }

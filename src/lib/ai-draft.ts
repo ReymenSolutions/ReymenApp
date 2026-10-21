@@ -1,8 +1,9 @@
+import { assertKnowledgeCurrent } from "@/lib/ai/knowledge/retrieval";
 import type Anthropic from "@anthropic-ai/sdk";
 import { Prisma, type MessageRole, type ReplyDraft } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { hasModule } from "@/lib/modules";
-import { buildBusinessInstructions } from "@/lib/rulebook";
+import { buildBusinessContext } from "@/lib/rulebook";
 import { getChannelMode } from "@/lib/agent-mode";
 import { runAiCall } from "@/lib/ai/gateway";
 import { AiBudgetError, isBudgetBlocked } from "@/lib/ai/budget";
@@ -171,7 +172,7 @@ export async function getOrCreateReplyDraft(organizationId: string, conversation
 
   const owned = { id: draft.id, organizationId, status: "GENERATING" as const, updatedAt: draft.updatedAt };
   try {
-    const instructions = await buildBusinessInstructions(organizationId);
+    const { instructions, knowledgeVersion } = await buildBusinessContext(organizationId, last.content, `draft:${draft.id}`);
     const system = buildDraftSystem(instructions, {
       name: conversation.contactName,
       channel: conversation.channel,
@@ -187,7 +188,10 @@ export async function getOrCreateReplyDraft(organizationId: string, conversation
     } else if (!result.text) {
       await prisma.replyDraft.updateMany({ where: owned, data: { status: "FAILED", model: result.model, error: "empty" } });
     } else {
-      await prisma.replyDraft.updateMany({ where: owned, data: { status: "READY", content: result.text, model: result.model, inputTokens: result.inputTokens, outputTokens: result.outputTokens, error: null } });
+      await prisma.$transaction(async tx => {
+        await assertKnowledgeCurrent(tx, organizationId, knowledgeVersion);
+        await tx.replyDraft.updateMany({ where: owned, data: { status: "READY", content: result.text, model: result.model, inputTokens: result.inputTokens, outputTokens: result.outputTokens, error: null } });
+      });
     }
   } catch (err) {
     if (err instanceof AiBudgetError) {

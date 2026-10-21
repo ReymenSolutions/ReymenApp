@@ -10,6 +10,7 @@ datasource db {
 // ─── TENANT ──────────────────────────────────────────────────────
 
 model Organization {
+  knowledgeAccessPolicy KnowledgeAccessPolicy?
   id                       String    @id @default(cuid())
   name                     String
   slug                     String    @unique
@@ -886,6 +887,9 @@ model WhatsAppAssistant {
 // ─── KNOWLEDGE BASE ───────────────────────────────────────────────
 
 model KnowledgeBase {
+  knowledgeVersion Int @default(0)
+  revisions KnowledgeRevision[]
+  grants KnowledgeGrant[]
   id             String   @id @default(cuid())
   organizationId String
   title          String
@@ -901,6 +905,7 @@ model KnowledgeBase {
   @@index([organizationId])
   @@index([organizationId, category])
   @@index([organizationId, isActive])
+  @@unique([organizationId, id])
 }
 
 /// Rulebook del negocio: las reglas de voz, saludo, límites y precios que la IA sigue en cada respuesta.
@@ -2866,6 +2871,7 @@ model AgentInstance {
   definition        AgentDefinition @relation(fields: [definitionKey, definitionVersion], references: [key, version], onDelete: Restrict)
   revisions         AgentConfigRevision[]
   channelRoutes     ChannelRouting[]
+  knowledgeGrants   KnowledgeGrant[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, definitionKey])
@@ -2973,4 +2979,44 @@ model ChannelRouting {
   agent           AgentInstance @relation(fields: [organizationId, agentInstanceId], references: [organizationId, id], onDelete: Restrict)
 
   @@unique([organizationId, connectionId])
+}
+
+// Phase 4: immutable content revisions; grants pin an explicitly reviewed version.
+model KnowledgeRevision {
+  organizationId String
+  articleId String
+  version Int
+  title String
+  content String @db.Text
+  category String?
+  tags String[]
+  sourceHash String
+  createdAt DateTime @default(now())
+  createdById String?
+  publishedAt DateTime?
+  publishedById String?
+  article KnowledgeBase @relation(fields: [organizationId, articleId], references: [organizationId, id], onDelete: Restrict)
+  grants KnowledgeGrant[]
+  @@id([organizationId, articleId, version])
+}
+model KnowledgeGrant {
+  organizationId String
+  articleId String
+  agentInstanceId String
+  revisionVersion Int
+  enabled Boolean @default(true)
+  version Int @default(1)
+  updatedAt DateTime @updatedAt
+  article KnowledgeBase @relation(fields: [organizationId, articleId], references: [organizationId, id], onDelete: Restrict)
+  revision KnowledgeRevision @relation(fields: [organizationId, articleId, revisionVersion], references: [organizationId, articleId, version], onDelete: Restrict)
+  instance AgentInstance @relation(fields: [organizationId, agentInstanceId], references: [organizationId, id], onDelete: Restrict)
+  @@id([organizationId, articleId, agentInstanceId])
+  @@index([organizationId, agentInstanceId, enabled])
+}
+model KnowledgeAccessPolicy {
+  organizationId String @id
+  enabled Boolean @default(false)
+  version Int @default(1)
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 }

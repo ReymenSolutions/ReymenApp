@@ -1,3 +1,4 @@
+import { assertKnowledgeCurrent } from "@/lib/ai/knowledge/retrieval";
 import { connectionAiAllowed, lockConnection } from "./channel-connections/service";
 import { sendConversationOutbound } from "./channel-connections/outbound";
 import { after } from "next/server";
@@ -11,7 +12,7 @@ import { notifyAdmins } from "./admin-notifications";
 import { escalationAlertEmail } from "./email-templates";
 import { appUrl } from "./app-url";
 import { messagePreview } from "@/lib/channels";
-import { buildBusinessInstructions } from "@/lib/rulebook";
+import { buildBusinessContext } from "@/lib/rulebook";
 import { buildDraftMessages, generateText, isDraftProviderConfigured } from "@/lib/ai-draft";
 import { AiBudgetError } from "@/lib/ai/budget";
 
@@ -129,7 +130,7 @@ async function stopJob(job: WebhookEvent, payload: AutoJobPayload, reason: strin
         return "replied";
       }
     }
-    if (payload.draftId) await tx.replyDraft.updateMany({ where: { id: payload.draftId, organizationId: job.organizationId, conversationId: payload.conversationId, status: { in: ["GENERATING", "READY"] } }, data: { status: failed ? "FAILED" : "DISMISSED", error: reason } });
+    if (payload.draftId) await tx.replyDraft.updateMany({ where: { id: payload.draftId, organizationId: job.organizationId, conversationId: payload.conversationId, status: { in: ["GENERATING", "READY", ...(payload.outboundMessageId ? ["USED" as const] : [])] } }, data: { status: failed ? "FAILED" : "DISMISSED", error: reason } });
     if (payload.outboundMessageId) await tx.message.updateMany({ where: { id: payload.outboundMessageId, conversationId: payload.conversationId, deliveryStatus: "PENDING" }, data: { deliveryStatus: "FAILED" } });
     const eligible = await eligibleTurn(tx, job.organizationId, payload, payload.outboundMessageId ?? payload.messageId, now);
     if (eligible) {
@@ -187,7 +188,7 @@ async function processAutoReplyJobInternal(jobId: string, opts: { now?: Date } =
     if (customerNeedsHuman(last.content)) return await stopJob(job, payload, "el cliente pidió a una persona o trae un tema delicado", now);
     const sent = await prisma.message.count({ where: { conversationId: conv.id, role: "ASSISTANT", createdAt: { gte: new Date(now.getTime() - 60 * 60_000) } } });
     if (sent >= AUTO_REPLIES_PER_HOUR) return await stopJob(job, payload, "demasiadas respuestas automáticas seguidas en esta conversación", now);
-    const instructions = await buildBusinessInstructions(job.organizationId);
+    const { instructions, knowledgeVersion } = await buildBusinessContext(job.organizationId, last.content, `auto:${draft.id}`);
     const customer = [`Channel: ${conv.channel}`, ...(conv.contactName ? [`Name: ${conv.contactName}`] : []), ...(conv.lead?.status ? [`CRM status: ${conv.lead.status}`] : [])];
     const system = [AUTO_PREAMBLE, `BUSINESS RULEBOOK\n${instructions.trim() || "(empty: the business has not written a rulebook, so escalate everything)"}`, `CUSTOMER CONTEXT\n${customer.join("\n")}`].join("\n\n");
     let result;
@@ -206,6 +207,7 @@ async function processAutoReplyJobInternal(jobId: string, opts: { now?: Date } =
     const outbound = await prisma.$transaction(async (tx) => {
       await lockTurn(tx, job.organizationId, conv.id);
       await assertLease(tx, job);
+      await assertKnowledgeCurrent(tx, job.organizationId, knowledgeVersion);
       const account = conv.channelConnectionId ? await lockConnection(tx, job.organizationId, conv.channelConnectionId) : null;
       const eligible = await eligibleTurn(tx, job.organizationId, payload, payload.messageId, new Date());
       const ownDraft = await tx.replyDraft.updateMany({ where: { id: draft.id, organizationId: job.organizationId, status: "GENERATING", updatedAt: draft.updatedAt }, data: eligible ? { status: "USED", content: decision.reply, finalContent: decision.reply, model: result.model, inputTokens: result.inputTokens, outputTokens: result.outputTokens, usedAt: new Date() } : { status: "DISMISSED", error: "turn_no_longer_eligible" } });
@@ -223,6 +225,7 @@ async function processAutoReplyJobInternal(jobId: string, opts: { now?: Date } =
     const outcome = await prisma.$transaction(async (tx): Promise<AutoOutcome> => {
       await lockTurn(tx, job.organizationId, conv.id);
       await assertLease(tx, job);
+      await assertKnowledgeCurrent(tx, job.organizationId, knowledgeVersion);
       if (conv.channelConnectionId) await lockConnection(tx, job.organizationId, conv.channelConnectionId);
       const eligible = await eligibleTurn(tx, job.organizationId, payload, outbound.message.id, new Date());
       if (!eligible) {
@@ -251,6 +254,7 @@ async function processAutoReplyJobInternal(jobId: string, opts: { now?: Date } =
     return outcome;
   } catch (err) {
     if (err instanceof LeaseLost) return "skipped";
+    if (err instanceof Error && err.message === "knowledge_changed_during_generation") return stopJob(job, payload, "El conocimiento cambió durante la respuesta; requiere revisión humana.", now, true);
     // Keep durable state, without logging prompts/provider errors. DB-only recovery is bounded to three claims.
     console.error("[ai-auto-reply] work interrupted", { jobId: job.id });
     if (job.attempts >= AUTO_JOB_MAX_ATTEMPTS) {
@@ -333,10 +337,12 @@ export async function previewAgentReply(organizationId: string, messages: { role
   if (!last || last.role !== "USER" || !last.content.trim()) throw new Error("empty_conversation");
   if (customerNeedsHuman(last.content)) return { action: "escalate", kind: "human", reason: "el cliente pidió a una persona o trae un tema delicado" };
 
-  const instructions = await buildBusinessInstructions(organizationId);
+  const { instructions, knowledgeVersion } = await buildBusinessContext(organizationId, last.content, "probe");
   const system = [AUTO_PREAMBLE, `BUSINESS RULEBOOK\n${instructions.trim() || "(empty: the business has not written a rulebook, so escalate everything)"}`, `CUSTOMER CONTEXT\nChannel: ${channel}`].join("\n\n");
   const turns = buildDraftMessages(messages as { role: MessageRole; content: string }[]);
+  await prisma.$transaction(tx => assertKnowledgeCurrent(tx, organizationId, knowledgeVersion));
   const result = await generateText({ organizationId, agentKey: "probador", operation: "probe", origin: "admin" }, system, turns, { json: true });
+  await prisma.$transaction(tx => assertKnowledgeCurrent(tx, organizationId, knowledgeVersion));
   if ("refused" in result) return { action: "escalate", kind: "model", reason: "el modelo no pudo responder este mensaje" };
   const decision = parseDecision(result.text);
   if (decision.action === "escalate") return { action: "escalate", kind: "model", reason: decision.reason };
