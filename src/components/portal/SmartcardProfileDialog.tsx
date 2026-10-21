@@ -24,6 +24,7 @@ import {
 } from "@/actions/portal/smartcard";
 import type { SmartcardProfile, ProfileLink } from "@/lib/smartcard-company";
 import { passesWcagAA } from "@/lib/smartcard-theme";
+import { SmartcardProductsSection } from "./SmartcardProductsSection";
 
 /**
  * Self-service editor for a SmartCard PROFILE (2026-09-29) — the rich
@@ -347,6 +348,8 @@ export function SmartcardProfileDialog({
               <Field id="profile-tiktok" label="TikTok" value={form.tiktok ?? ""} onChange={(v) => set("tiktok", v)} placeholder="https://..." />
               <Field id="profile-youtube" label="YouTube" value={form.youtube ?? ""} onChange={(v) => set("youtube", v)} placeholder="https://..." />
             </div>
+
+            {profileId && <SmartcardProductsSection profileId={profileId} lang={lang} />}
 
             <div>
               <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">

@@ -30,6 +30,8 @@ import {
 import { MAX_UPLOAD_BYTES } from "@/lib/realty/media";
 import { geocodeAddress, geocodeStructured } from "@/lib/realty/geocode";
 import { lookupPostalCode } from "@/lib/realty/postal";
+import { schedulePropertySmartcardSync } from "@/lib/realty/smartcard-sync";
+import { prisma } from "@/lib/prisma";
 
 function revalidateRealty(extra: string[] = []) {
   revalidatePath("/portal/realty", "layout");
@@ -92,6 +94,7 @@ export async function saveRealtyProperty(data: z.input<typeof propertySchema>) {
     ageYears: d.ageYears === null ? null : Math.round(d.ageYears),
   });
   revalidateRealty();
+  schedulePropertySmartcardSync(session.user.organizationId, id);
   return { id };
 }
 
@@ -103,6 +106,7 @@ export async function changeRealtyPropertyStatus(data: z.input<typeof statusSche
   if (!parsed.success) throw new UserError("Estado inválido.");
   await changePropertyStatus(session.user.organizationId, session.user.id, parsed.data.propertyId, parsed.data.status as never, parsed.data.notes);
   revalidateRealty();
+  schedulePropertySmartcardSync(session.user.organizationId, parsed.data.propertyId);
 }
 
 export async function uploadRealtyPhotos(formData: FormData) {
@@ -116,18 +120,25 @@ export async function uploadRealtyPhotos(formData: FormData) {
   const buffers = await Promise.all(files.map(async (f) => ({ buffer: Buffer.from(await f.arrayBuffer()), type: f.type, name: f.name })));
   await addPropertyPhotos(session.user.organizationId, session.user.id, propertyId, buffers);
   revalidateRealty();
+  schedulePropertySmartcardSync(session.user.organizationId, propertyId);
 }
 
 export async function deleteRealtyPhoto(mediaId: string) {
   const session = await requireRealtyOperator();
-  await deletePropertyPhoto(session.user.organizationId, session.user.id, z.string().min(1).parse(mediaId));
+  const id = z.string().min(1).parse(mediaId);
+  const media = await prisma.realtyPropertyMedia.findFirst({ where: { id, organizationId: session.user.organizationId }, select: { propertyId: true } });
+  await deletePropertyPhoto(session.user.organizationId, session.user.id, id);
   revalidateRealty();
+  schedulePropertySmartcardSync(session.user.organizationId, media?.propertyId);
 }
 
 export async function setRealtyCoverPhoto(mediaId: string) {
   const session = await requireRealtyOperator();
-  await setCoverPhoto(session.user.organizationId, z.string().min(1).parse(mediaId));
+  const id = z.string().min(1).parse(mediaId);
+  await setCoverPhoto(session.user.organizationId, id);
   revalidateRealty();
+  const media = await prisma.realtyPropertyMedia.findFirst({ where: { id, organizationId: session.user.organizationId }, select: { propertyId: true } });
+  schedulePropertySmartcardSync(session.user.organizationId, media?.propertyId);
 }
 
 // ─── Prospectos ─────────────────────────────────────────────────────────

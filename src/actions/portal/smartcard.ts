@@ -17,6 +17,14 @@ import { findOrCreateSmartcardAuthUser } from "@/lib/smartcard-link";
 import { HEX_COLOR } from "@/lib/smartcard-theme";
 import { inviteTeamMember } from "@/actions/team";
 import { UserError } from "@/lib/user-error";
+import { listCatalog, resolveCatalogItem } from "@/lib/catalog";
+import {
+  listProfileProducts,
+  productColumns,
+  PRODUCT_LINK_TYPE,
+  MAX_PROFILE_PRODUCTS,
+  type ProfileProduct,
+} from "@/lib/smartcard-products";
 
 // Owner/admin/manager can edit a company's own cards and download their QR
 // — widened from owner/admin-only (2026-09-29, explicit ask: a manager
@@ -815,5 +823,92 @@ export async function deleteProfileLink(linkId: string, profileId: string): Prom
       console.error("[smartcard/actions] deleteProfileLink falló con un valor no-Error:", err);
     }
     return { success: false, error: message };
+  }
+}
+
+// ─── Productos en el perfil (catálogo de los módulos) ────────────────────
+// Ver src/lib/smartcard-products.ts (cómo se guardan) y src/lib/catalog
+// (de dónde salen: Real Estate hoy, cualquier módulo que registre su fuente).
+
+export type CatalogPickerGroup = {
+  key: string;
+  label: string;
+  items: { ref: string; title: string; subtitle: string | null; priceLabel: string | null; imageUrl: string | null }[];
+};
+
+export type ProfileProductsResult =
+  | { success: true; products: ProfileProduct[]; ready: boolean }
+  | { success: false; error: string };
+
+async function requireProductEditor(profileId: string) {
+  const session = await auth();
+  if (!session?.user.organizationId) throw new UserError("Sesión inválida.");
+  const membership = await requireCardManagementMembership();
+  const existing = await getSmartcardProfile(profileId, membership.companyId);
+  if (!existing) throw new UserError("Ese perfil no pertenece a tu empresa.");
+  return { organizationId: session.user.organizationId };
+}
+
+/** Productos del perfil. `ready: false` = falta la migración de productos en SmartCard. */
+export async function getProfileProducts(profileId: string): Promise<ProfileProductsResult> {
+  try {
+    await requireProductEditor(profileId);
+    const products = await listProfileProducts(profileId);
+    return { success: true, products: products ?? [], ready: products !== null };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "No se pudieron cargar los productos." };
+  }
+}
+
+/** Productos que se pueden agregar, agrupados por módulo (solo los módulos activos). */
+export async function listSmartcardCatalog(query: string, lang: "es" | "en" = "es"): Promise<CatalogPickerGroup[]> {
+  const session = await auth();
+  if (!session?.user.organizationId) throw new UserError("Sesión inválida.");
+  await requireCardManagementMembership();
+  const groups = await listCatalog(session.user.organizationId, query.slice(0, 80));
+  return groups.map((g) => ({
+    key: g.key,
+    label: g.label[lang],
+    items: g.items.map((i) => ({ ref: i.ref, title: i.title, subtitle: i.subtitle, priceLabel: i.priceLabel, imageUrl: i.imageUrl })),
+  }));
+}
+
+/**
+ * Agrega un producto al perfil. El cliente solo manda el ref: título, precio,
+ * foto y URL se leen aquí del módulo dueño (nunca se confía en lo que mande
+ * el navegador), y solo si el producto es de esta organización y está disponible.
+ */
+export async function addProfileProduct(profileId: string, ref: string): Promise<{ success: true; product: ProfileProduct } | { success: false; error: string }> {
+  try {
+    const { organizationId } = await requireProductEditor(profileId);
+    const item = await resolveCatalogItem(organizationId, ref);
+    if (!item) throw new UserError("Ese producto no existe o su módulo no está activo.");
+    if (!item.available) throw new UserError("Ese producto no está disponible (no publicado, vendido o rentado).");
+
+    const current = await listProfileProducts(profileId);
+    if (current === null) throw new UserError("Los productos todavía no están habilitados en SmartCard. Contacta a soporte de Reymen.");
+    if (current.some((p) => p.ref === item.ref)) throw new UserError("Ese producto ya está en el perfil.");
+    if (current.length >= MAX_PROFILE_PRODUCTS) throw new UserError("Máximo 12 productos por perfil."); // = MAX_PROFILE_PRODUCTS
+
+    const supabase = getSmartcardAdminClient();
+    if (!supabase) throw new UserError("SmartCard aún no está configurado en este entorno.");
+    const sortOrder = current.length > 0 ? Math.max(...current.map((p) => p.sortOrder)) + 1 : 0;
+    const cols = productColumns(item);
+    const { data, error } = await supabase
+      .from("profile_links")
+      .insert({ profile_id: profileId, type: PRODUCT_LINK_TYPE, source_ref: item.ref, sort_order: sortOrder, is_active: true, ...cols })
+      .select("id")
+      .single();
+    if (error || !data) {
+      console.error("[smartcard/actions] Error agregando producto:", error?.message);
+      throw new UserError("No se pudo agregar el producto. Intenta de nuevo.");
+    }
+    revalidatePath("/portal/smartcard");
+    return {
+      success: true,
+      product: { id: data.id as string, ref: item.ref, title: cols.title, subtitle: cols.subtitle, priceLabel: cols.price_label, imageUrl: cols.image_url, url: cols.url, sortOrder },
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "No se pudo agregar el producto." };
   }
 }
