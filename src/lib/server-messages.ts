@@ -6,6 +6,12 @@
 // su versión en español). Un mensaje que no esté aquí se muestra tal cual.
 
 const EN: Record<string, string> = {
+  "Las pruebas de Mark aún no están habilitadas": "Mark tests are not enabled yet",
+  "Prueba no encontrada": "Test not found",
+  "La solicitud cambió; inicia una prueba nueva": "The request changed; start a new test",
+  "Demasiadas pruebas; espera un minuto": "Too many tests; wait one minute",
+  "Ya hay una prueba en curso; detenla antes de iniciar otra": "A test is already running; stop it before starting another",
+
   "El artículo cambió; actualiza antes de guardar": "The article changed; refresh before saving",
   "Organización no disponible": "Organization unavailable",
   "El acceso por fuentes aún no está habilitado": "Source access is not enabled yet",
