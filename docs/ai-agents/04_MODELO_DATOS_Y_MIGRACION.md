@@ -105,3 +105,7 @@ No restaurar una copia antigua encima de producción para revertir UI: perdería
 ## Expansión implementada en Fase 1
 
 [13](13_IMPLEMENTACION_FASE_1.md) especifica las seis tablas implementadas, FKs compuestas, restricciones de referencias legacy y snapshot de admisión. El resto de este documento conserva el diseño objetivo; no implica que conexiones, grants, approvals, ledger por especialista o cutover estén implementados.
+
+## Expansión local de Fase 3
+
+[15](15_IMPLEMENTACION_FASE_3.md) implementa ChannelConnection/ChannelRouting, binding nullable de Conversation e índice parcial de propiedad confirmada. Las migraciones se aplicaron solo en bases sintéticas. No hay backfill automático ni cutover real. El binario nuevo requiere expandir esquema previamente, incluso con el flag apagado; el rollback preferido conserva el binario y pausa el flag, sin dejar que un sender viejo ignore cuentas ya vinculadas.

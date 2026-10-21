@@ -59,3 +59,7 @@ El modelo permanece tras doble flag y conserva adapter legacy, cap por canal y u
 ## Compatibilidad de Fase 2
 
 [14](14_IMPLEMENTACION_FASE_2.md) documenta la interfaz y su flag independiente. Se mantienen las URLs legacy, permisos, fuentes de conocimiento, modos/caps, ledger y workers. La lista solo representa al asistente existente. Sin UI nueva se usan las pantallas anteriores; las rutas nuevas redirigen. No se reescribe historial ni se conecta un canal por guardar su número. Se conservan las mejoras compartidas de accesibilidad y protección frente a resultados tardíos del preview al apagar el flag.
+
+## Compatibilidad de Fase 3
+
+La base de [15](15_IMPLEMENTACION_FASE_3.md) preserva rutas/payloads legacy para hilos sin cuenta; añade un contrato independiente para cuentas explícitas. El CRM comparte teléfono/correo, el hilo queda separado por cuenta y los handles se acotan a ella. Historia anterior solo se vincula con revisión/CAS, sin cambiar IDs/mensajes. Datos nuevos no se borran al apagar el flag; los envíos vinculados se bloquean y nunca caen al transporte antiguo. Expandir las columnas de Conversation antes de ejecutar el binario nuevo; no se promete compatibilidad nuevo código/esquema viejo en esta fase.

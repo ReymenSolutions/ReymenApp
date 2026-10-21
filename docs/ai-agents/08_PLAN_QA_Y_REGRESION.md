@@ -157,3 +157,7 @@ La matriz old/new schema/código, backfill, CAS, scopes y observación sin dupli
 ## Evidencia posterior de Fase 2
 
 La evidencia final de consultas por organización, permisos, interacciones, paginación, cuatro estados y Chromium se registra en [14](14_IMPLEMENTACION_FASE_2.md#5-evidencia-de-pruebas). Se usan dos bases sintéticas separadas y proveedores deshabilitados/simulados. QA19/20 cuentan con cobertura automatizada de viewport/temas/teclado/zoom y grids; los dispositivos físicos, lector de pantalla y CI Node22 conservan sus pendientes. No equivale a gates productivos cumplidos.
+
+## Evidencia local de Fase 3
+
+[15](15_IMPLEMENTACION_FASE_3.md#8-pruebas-y-validación) registra pruebas de cuentas, RBAC/FKs, HMAC, duplicados, generaciones, TTL, callbacks, adopción de historial, workers y carreras de pausa/control humano. Se usan dos bases nuevas con esquema expandido y transporte simulado. La firma real del proveedor, scopes/ventanas, expiración/reconexión física, volumen y CI Node22 siguen como gates externos; aprobar fixtures no aprueba producción.

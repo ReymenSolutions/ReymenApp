@@ -79,3 +79,7 @@ Incidente: pausar instancia/conexión afectada → preservar eventos/auditoría 
 ## Controles implementados en Fase 0
 
 [Documento 12](12_IMPLEMENTACION_FASE_0.md) registra guardias server-side, IDs/cursor/borrador con scope, claims/leases, bloqueo de admisión contra toma humana, trabajo durable y tratamiento de envíos inciertos. Los grants/Tool Registry/modelo multiagente de este documento siguen siendo propuestas. La alerta por correo mantiene el servicio best-effort actual; estado y auditoría son durables.
+
+## Controles locales de Fase 3
+
+[15](15_IMPLEMENTACION_FASE_3.md) añade RBAC/CAS y FKs por cuenta, HMAC estricto, generación/secuencia/frescura, propiedad verificada única entre tenants, lock de pausa/admisión, aislamiento del hilo y callbacks v1 monotónicos. El conector sigue siendo la frontera confiable que debe verificar al proveedor. Especificación en [contrato v1](../crm/CANAL-CONEXIONES-V1.md); firma/scopes/ventanas reales y despliegue de n8n siguen pendientes del sandbox.

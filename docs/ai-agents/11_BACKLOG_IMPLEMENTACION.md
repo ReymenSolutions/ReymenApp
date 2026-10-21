@@ -184,3 +184,7 @@ AG-008 cuenta con modelo/adaptor/versiones/backfill/flags y pruebas. AG-003 aña
 ## Avance de interfaz de Fase 2
 
 AG-012 tiene implementación sobre el adapter legacy: resumen, lista/perfil, navegación ES/EN, presentación de canales, conocimiento paginado, estados, móvil y accesibilidad. La evidencia y limitaciones están en [14](14_IMPLEMENTACION_FASE_2.md). No se marca completo el gate de dispositivos físicos/lector ni la métrica de resolución por IA: se muestran conteos verificables. AG-009 no está implementada por mostrar una pantalla de canales; salud/routing/cuentas siguen pendientes. AG-010/013/015 conservan sus alcances futuros: no se añadieron grants, playground sin efectos ni atribución de consumo por especialista.
+
+## Base local de AG-009 — Fase 3
+
+Se implementaron cuentas, ruta default al legacy/manual, referencia privada de credencial, protocolo v1, salud con TTL, aislamiento de hilo, propiedad confirmada única, acuses y revisión explícita de historia. Evidencia en [15](15_IMPLEMENTACION_FASE_3.md). No se marca completado el piloto externo ni rutas por intención/especialistas: el propietario pidió posponer la elección de canal, y faltan sandbox, workflow y verificación real. No se iniciaron AG-010/Fase 4 ni producción.

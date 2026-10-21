@@ -169,3 +169,7 @@ El propietario autorizó continuar con Fase 1. El modelo, adapter, flags y obser
 ## Seguimiento después de Fase 2
 
 La introducción de este documento conserva el estado de la auditoría original. Después se implementaron Fases 0/1 ([12](12_IMPLEMENTACION_FASE_0.md), [13](13_IMPLEMENTACION_FASE_1.md)) y la interfaz de Fase 2 ([14](14_IMPLEMENTACION_FASE_2.md)). La interfaz usa un flag independiente, no activa especialistas ni conexiones. Fase 3 y despliegue no se iniciaron; requieren su alcance/validación correspondiente.
+
+## Base de Fase 3 y gate externo
+
+Ante autorización de continuar se implementó la base local documentada en [15](15_IMPLEMENTACION_FASE_3.md). Cuentas/ruta default/contrato/salud/aislamiento tienen pruebas sintéticas. El propietario pospuso la selección del piloto: no se completó la verificación del proveedor, no se desplegó un conector ni se hizo cutover. Routing por intención y especialistas no se introducen con el único asistente legacy. Fase 4 no iniciada.
