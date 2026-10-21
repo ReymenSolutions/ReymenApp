@@ -1,3 +1,4 @@
+import { connectionAiAllowed } from "./channel-connections/service";
 import { after } from "next/server";
 import { observeLegacyCompletion } from "./ai/agents/executions";
 import type { LeadStatus, MessageRole, PipelineAiActionKind } from "@prisma/client";
@@ -119,7 +120,7 @@ export async function runPipelineAgent(organizationId: string, conversationId: s
     if (!(await hasModule(organizationId, "CRM")) || !(await hasModule(organizationId, "AI_WHATSAPP"))) return "skipped";
 
     const conv = await prisma.conversation.findFirst({ where: { id: conversationId, organizationId } });
-    if (!conv?.leadId) return "skipped";
+    if (!conv?.leadId || (conv.channelConnectionId && !await prisma.$transaction(tx => connectionAiAllowed(tx, organizationId, conv)))) return "skipped";
     if ((await getChannelMode(organizationId, conv.channel)) === "OFF") return "skipped";
     const lead = await prisma.lead.findFirst({ where: { id: conv.leadId, organizationId, deletedAt: null }, select: { id: true, name: true, status: true } });
     if (!lead) return "skipped";
@@ -157,7 +158,7 @@ export async function runPipelineAgent(organizationId: string, conversationId: s
     if (!analysis) return "skipped";
 
     const currentLast = await prisma.message.findFirst({ where: { conversationId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true } });
-    if (currentLast?.id !== last.id) return "skipped";
+    if (currentLast?.id !== last.id || (conv.channelConnectionId && !await prisma.$transaction(tx => connectionAiAllowed(tx, organizationId, conv)))) return "skipped";
 
     // Una sola vez por mensaje (llave única): si otra petición ya lo analizó, no se repite.
     let run;

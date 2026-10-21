@@ -1,5 +1,8 @@
 "use server";
 
+import { assertRoutable, lockConnection } from "@/lib/channel-connections/service";
+import { sendConversationOutbound } from "@/lib/channel-connections/outbound";
+
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
@@ -143,11 +146,19 @@ export async function sendManualMessage(data: {
     await tx.$queryRaw`SELECT id FROM "Conversation" WHERE id = ${conv.id} AND "organizationId" = ${session.user.organizationId!} FOR UPDATE`;
     const current = await tx.conversation.findFirst({ where: { id: conv.id, organizationId: session.user.organizationId! } });
     if (!current || current.status === "RESOLVED" || current.status === "CLOSED") throw new UserError("No se puede responder a una conversación cerrada");
+    let channelGeneration: number | undefined;
+    if (current.channelConnectionId) {
+      const account = await lockConnection(tx, session.user.organizationId!, current.channelConnectionId);
+      channelGeneration = account.generation;
+      await assertRoutable(tx, session.user.organizationId!, current.channelConnectionId, current.channel, true);
+      if (data.attachmentUrl || data.attachmentType) throw new UserError("Esta conexión admite solo texto por el momento");
+    }
     if (data.draftId && !(await tx.replyDraft.findFirst({ where: { id: data.draftId, organizationId: session.user.organizationId!, conversationId: conv.id, status: "READY" } }))) throw new UserError("Borrador no encontrado");
     const message = await tx.message.create({
       data: {
         conversationId: conv.id,
         role: "AGENT",
+        ...(channelGeneration ? { metadata: { channelGeneration } } : {}),
         content: content || "(adjunto)",
         senderId: session.user.id,
         attachmentUrl: data.attachmentUrl,
@@ -171,10 +182,7 @@ export async function sendManualMessage(data: {
   });
   await recordMetric(session.user.organizationId!, METRIC_KEYS.MESSAGES_SENT);
 
-  const trigger = await triggerN8nWorkflow(outboundWorkflowPath(conv.channel), {
-    organizationId: session.user.organizationId!,
-    event: "message.send",
-    data: {
+  const outboundData = {
       conversationId: conv.id,
       messageId: message.id,
       contactPhone: conv.contactPhone,
@@ -185,13 +193,24 @@ export async function sendManualMessage(data: {
       content,
       attachmentUrl: data.attachmentUrl,
       attachmentType: data.attachmentType,
-    },
-  });
-
-  const finalMessage = trigger.success
+  };
+  const trigger = conv.channelConnectionId
+    ? await prisma.$transaction(async tx => {
+        await tx.$queryRaw`SELECT id FROM "Conversation" WHERE id = ${conv.id} AND "organizationId" = ${session.user.organizationId!} FOR UPDATE`;
+        const current = await tx.conversation.findFirstOrThrow({ where: { id: conv.id, organizationId: session.user.organizationId! } });
+        if (["CLOSED", "RESOLVED"].includes(current.status)) throw new UserError("No se puede responder a una conversación cerrada");
+        return sendConversationOutbound(tx, session.user.organizationId!, current, message.id, outboundData);
+      }, { timeout: 15000 }).catch(() => ({ success: false }))
+    : await triggerN8nWorkflow(outboundWorkflowPath(conv.channel), { organizationId: session.user.organizationId!, event: "message.send", data: outboundData });
+  // A late callback may already prove delivery; never downgrade it on a failed HTTP acknowledgement.
+  if (!trigger.success && conv.channelConnectionId) {
+    await prisma.message.updateMany({ where: { id: message.id, deliveryStatus: "PENDING" }, data: { deliveryStatus: "FAILED" } });
+  }
+  const finalMessage = conv.channelConnectionId ? await prisma.message.findUniqueOrThrow({ where: { id: message.id } }) : trigger.success
     ? message
     : await prisma.message.update({ where: { id: message.id }, data: { deliveryStatus: "FAILED" } });
 
+  const delivered = trigger.success || (!!conv.channelConnectionId && ["SENT", "DELIVERED", "READ"].includes(finalMessage.deliveryStatus ?? ""));
   if (data.draftId) await markReplyDraftUsed(session.user.organizationId!, data.draftId, session.user.id, content);
 
   await logAudit({
@@ -200,7 +219,7 @@ export async function sendManualMessage(data: {
     action: "conversation.manual_message",
     resource: "Conversation",
     resourceId: conv.id,
-    metadata: { messageId: message.id, delivered: trigger.success },
+    metadata: { messageId: message.id, delivered },
   });
 
   revalidatePath(`/portal/conversations/${conv.id}`);
@@ -208,7 +227,7 @@ export async function sendManualMessage(data: {
   revalidatePath("/portal/whatsapp");
   return {
     success: true,
-    delivered: trigger.success,
+    delivered,
     message: { ...finalMessage, sender: { name: session.user.name ?? null, email: session.user.email } },
   };
 }

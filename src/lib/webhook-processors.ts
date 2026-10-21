@@ -126,7 +126,7 @@ const conversationEventSchema = z.object({
   message: z.object({ role: z.enum(["USER", "ASSISTANT", "SYSTEM"]), content: z.string(), externalId: optionalText }),
 });
 
-export async function processConversationEvent(payload: unknown, orgId: string): Promise<{ conversationId: string }> {
+export async function processConversationEvent(payload: unknown, orgId: string, binding?: { connectionId: string; externalThreadId: string; generation: number }): Promise<{ conversationId: string }> {
   const body = conversationEventSchema.parse(payload);
   const key = phoneKey(body.contactPhone);
   const handle = body.contactHandle?.trim().slice(0, 200) || null;
@@ -139,18 +139,26 @@ export async function processConversationEvent(payload: unknown, orgId: string):
   const { conversation, inserted } = await prisma.$transaction(async (tx) => {
     // Serialize matching/creation for this tenant's channel identity, including concurrent first deliveries.
     const identity = key || body.contactPhone || handle || email || body.conversationId;
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`inbox:${orgId}:${normalizeChannel(body.channel)}:${identity}`}))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`inbox:${orgId}:${normalizeChannel(body.channel)}:${binding?.connectionId ?? "legacy"}:${binding?.externalThreadId ?? identity}`}))`;
     let channel = normalizeChannel(body.channel);
+    if (binding) {
+      const connection = await tx.channelConnection.findFirst({ where: { id: binding.connectionId, organizationId: orgId, channel, generation: binding.generation, enabled: true } });
+      if (!connection) throw new Error("Invalid channel binding");
+    }
     let conv;
-    if (body.conversationId) {
+    if (binding) {
+      conv = await tx.conversation.findFirst({ where: { organizationId: orgId, channelConnectionId: binding.connectionId, externalThreadId: binding.externalThreadId } });
+      if (conv && (conv.phoneKey !== key || conv.contactHandle !== handle || conv.contactEmail !== email)) throw new Error("Thread identity mismatch");
+      if (!conv) conv = await tx.conversation.create({ data: { organizationId: orgId, channel, channelConnectionId: binding.connectionId, externalThreadId: binding.externalThreadId, contactPhone: body.contactPhone || null, phoneKey: key, contactHandle: handle, contactEmail: email, subject, contactName: body.contactName } });
+    } else if (body.conversationId) {
       conv = await tx.conversation.findFirst({ where: { id: body.conversationId, organizationId: orgId } });
       // Legacy callers with an explicit ID may omit channel; a supplied channel must match.
-      if (!conv || (body.channel !== undefined && normalizeChannel(conv.channel) !== channel)) throw new Error("Conversation not found");
+      if (!conv || conv.channelConnectionId || (body.channel !== undefined && normalizeChannel(conv.channel) !== channel)) throw new Error("Conversation not found");
       channel = conv.channel;
     } else {
       conv = await tx.conversation.findFirst({
         where: {
-          organizationId: orgId, channel, status: { in: ["OPEN", "ESCALATED"] },
+          organizationId: orgId, channel, channelConnectionId: null, status: { in: ["OPEN", "ESCALATED"] },
           ...(body.contactPhone ? (key ? { OR: [{ phoneKey: key }, { phoneKey: null, contactPhone: body.contactPhone }] } : { contactPhone: body.contactPhone }) : handle ? { contactHandle: handle } : { contactEmail: email }),
         },
         orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
@@ -159,6 +167,8 @@ export async function processConversationEvent(payload: unknown, orgId: string):
     }
     // Row lock shares the send-admission boundary with automatic replies and operator updates.
     await tx.$queryRaw`SELECT id FROM "Conversation" WHERE id = ${conv.id} AND "organizationId" = ${orgId} FOR UPDATE`;
+    const locked = await tx.conversation.findFirstOrThrow({ where: { id: conv.id, organizationId: orgId } });
+    if ((!binding && locked.channelConnectionId) || (binding && (locked.channelConnectionId !== binding.connectionId || locked.externalThreadId !== binding.externalThreadId))) throw new Error("Conversation binding changed");
     if (body.message.externalId !== undefined) {
       const existing = await tx.message.findUnique({ where: { conversationId_externalId: { conversationId: conv.id, externalId: body.message.externalId } } });
       if (existing) return { conversation: conv, inserted: false };
@@ -168,7 +178,7 @@ export async function processConversationEvent(payload: unknown, orgId: string):
       conv = await tx.conversation.update({ where: { id: conv.id }, data: {
         lastMessageAt: message.createdAt, lastMessagePreview: messagePreview(body.message.content), lastMessageRole: body.message.role,
         ...(subject && !conv.subject ? { subject } : {}),
-        ...(body.message.role === "USER" ? { unreadCount: { increment: 1 }, archivedAt: null } : {}),
+        ...(body.message.role === "USER" ? { unreadCount: { increment: 1 }, archivedAt: null, ...(binding && ["RESOLVED", "CLOSED"].includes(conv.status) ? { status: "OPEN", resolvedAt: null } : {}) } : {}),
       } });
     }
     if (body.message.role === "USER") {
@@ -180,7 +190,7 @@ export async function processConversationEvent(payload: unknown, orgId: string):
 
   // CRM identity remains shared across channels; conversation identity is channel-specific.
   if (!conversation.leadId) {
-    const leadId = await resolveLeadForConversation(orgId, { contactPhone: body.contactPhone, contactEmail: email, contactHandle: handle, contactName: body.contactName, channel: conversation.channel }, body.message.role === "USER", conversation.id);
+    const leadId = await resolveLeadForConversation(orgId, { contactPhone: body.contactPhone, contactEmail: email, contactHandle: handle, contactName: body.contactName, channel: conversation.channel, channelConnectionId: conversation.channelConnectionId }, body.message.role === "USER", conversation.id);
     if (leadId) await prisma.conversation.updateMany({ where: { id: conversation.id, organizationId: orgId, leadId: null }, data: { leadId } });
   }
   if (inserted && body.message.role === "USER") await recordMetric(orgId, METRIC_KEYS.MESSAGES_RECEIVED);
@@ -195,7 +205,7 @@ export async function processConversationEvent(payload: unknown, orgId: string):
  */
 async function resolveLeadForConversation(
   orgId: string,
-  body: { contactPhone?: string; contactEmail?: string | null; contactHandle?: string | null; contactName?: string; channel: string },
+  body: { contactPhone?: string; contactEmail?: string | null; contactHandle?: string | null; contactName?: string; channel: string; channelConnectionId: string | null },
   isInbound: boolean,
   conversationId: string
 ): Promise<string | null> {
@@ -206,7 +216,7 @@ async function resolveLeadForConversation(
     if (byEmail) return byEmail.id;
   }
   if (body.contactHandle) {
-    const prev = await prisma.conversation.findFirst({ where: { organizationId: orgId, channel: body.channel, contactHandle: body.contactHandle, leadId: { not: null } }, select: { leadId: true } });
+    const prev = await prisma.conversation.findFirst({ where: { organizationId: orgId, channel: body.channel, channelConnectionId: body.channelConnectionId, contactHandle: body.contactHandle, leadId: { not: null } }, select: { leadId: true } });
     if (prev?.leadId) return prev.leadId;
   }
 
@@ -222,7 +232,7 @@ async function resolveLeadForConversation(
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`crm-inbox:${orgId}:${key || body.contactEmail || `${body.channel}:${body.contactHandle}`}`}))`;
       // Recheck under the admission lock: concurrent channels/deliveries share a CRM person, not a thread.
       const existing = key || body.contactEmail ? await tx.lead.findFirst({ where: { organizationId: orgId, deletedAt: null, OR: [...(key ? [{ phoneKey: key }] : []), ...(body.contactEmail ? [{ email: { equals: body.contactEmail, mode: "insensitive" as const } }] : [])] }, select: { id: true } }) : null;
-      const previous = body.contactHandle ? await tx.conversation.findFirst({ where: { organizationId: orgId, channel: body.channel, contactHandle: body.contactHandle, leadId: { not: null } }, select: { leadId: true } }) : null;
+      const previous = body.contactHandle ? await tx.conversation.findFirst({ where: { organizationId: orgId, channel: body.channel, channelConnectionId: body.channelConnectionId, contactHandle: body.contactHandle, leadId: { not: null } }, select: { leadId: true } }) : null;
       if (existing) return existing;
       if (previous?.leadId) return { id: previous.leadId };
       const person = await tx.lead.create({ data: { organizationId: orgId, name: label, phone: key ? body.contactPhone : null, phoneKey: key, email: body.contactEmail ?? null, source: body.channel } });
@@ -265,9 +275,9 @@ export async function processMessageStatusEvent(payload: unknown, orgId: string)
 
   const message = await prisma.message.findFirst({
     where: { id: body.messageId, conversation: { organizationId: orgId } },
-    select: { id: true },
+    select: { id: true, metadata: true, conversation: { select: { channelConnectionId: true } } },
   });
-  if (!message) throw new Error("Message not found");
+  if (!message || (message.conversation.channelConnectionId && (message.metadata as { channelGeneration?: number } | null)?.channelGeneration !== undefined)) throw new Error("Message not found");
 
   await prisma.message.update({
     where: { id: message.id },
@@ -358,6 +368,7 @@ export async function processAutomationEvent(payload: unknown, orgId: string): P
 }
 
 export type WebhookEventType =
+  | "channel.v1"
   | "lead.created"
   | "conversation.message"
   | "lead.scored"
@@ -377,6 +388,9 @@ export async function processWebhookEventPayload(
   orgId: string
 ): Promise<void> {
   switch (eventType as WebhookEventType) {
+    case "channel.v1":
+      await (await import("./channel-connections/events")).processChannelEvent(payload, orgId);
+      return;
     case "lead.created":
       return processLeadEvent(payload, orgId);
     case "conversation.message":

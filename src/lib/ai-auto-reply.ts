@@ -1,15 +1,16 @@
+import { connectionAiAllowed, lockConnection } from "./channel-connections/service";
+import { sendConversationOutbound } from "./channel-connections/outbound";
 import { after } from "next/server";
 import { observeLegacyCompletion } from "./ai/agents/executions";
 import { Prisma, type MessageRole, type WebhookEvent } from "@prisma/client";
 import { z } from "zod";
 import { AUTO_JOB_SOURCE, AUTO_JOB_TYPE, AUTO_JOB_MAX_ATTEMPTS, AUTO_JOB_LEASE_MS, enqueueAutoReply, type AutoJobPayload } from "./ai-auto-jobs";
 import { prisma } from "@/lib/prisma";
-import { triggerN8nWorkflow } from "@/lib/n8n";
 import { recordMetric, METRIC_KEYS } from "@/lib/metrics";
 import { notifyAdmins } from "./admin-notifications";
 import { escalationAlertEmail } from "./email-templates";
 import { appUrl } from "./app-url";
-import { outboundWorkflowPath, messagePreview } from "@/lib/channels";
+import { messagePreview } from "@/lib/channels";
 import { buildBusinessInstructions } from "@/lib/rulebook";
 import { buildDraftMessages, generateText, isDraftProviderConfigured } from "@/lib/ai-draft";
 import { AiBudgetError } from "@/lib/ai/budget";
@@ -85,7 +86,7 @@ async function lockTurn(tx: Prisma.TransactionClient, organizationId: string, co
 /** This read happens under the conversation row lock, including immediately before dispatch. */
 async function eligibleTurn(tx: Prisma.TransactionClient, organizationId: string, payload: AutoJobPayload, latestId: string, now: Date) {
   const conv = await tx.conversation.findFirst({ where: { id: payload.conversationId, organizationId }, include: { organization: { select: { isActive: true } }, lead: { select: { status: true } } } });
-  if (!conv || !conv.organization.isActive || conv.status !== "OPEN" || !conv.aiHandled || conv.assignedToId) return null;
+  if (!conv || !conv.organization.isActive || conv.status !== "OPEN" || !conv.aiHandled || conv.assignedToId || !await connectionAiAllowed(tx, organizationId, conv)) return null;
   const [entitlement, mode, recent] = await Promise.all([
     tx.organizationModule.findUnique({ where: { organizationId_module: { organizationId, module: "AI_WHATSAPP" } }, select: { status: true } }),
     tx.agentChannelSetting.findUnique({ where: { organizationId_channel: { organizationId, channel: conv.channel } }, select: { mode: true } }),
@@ -205,10 +206,11 @@ async function processAutoReplyJobInternal(jobId: string, opts: { now?: Date } =
     const outbound = await prisma.$transaction(async (tx) => {
       await lockTurn(tx, job.organizationId, conv.id);
       await assertLease(tx, job);
+      const account = conv.channelConnectionId ? await lockConnection(tx, job.organizationId, conv.channelConnectionId) : null;
       const eligible = await eligibleTurn(tx, job.organizationId, payload, payload.messageId, new Date());
       const ownDraft = await tx.replyDraft.updateMany({ where: { id: draft.id, organizationId: job.organizationId, status: "GENERATING", updatedAt: draft.updatedAt }, data: eligible ? { status: "USED", content: decision.reply, finalContent: decision.reply, model: result.model, inputTokens: result.inputTokens, outputTokens: result.outputTokens, usedAt: new Date() } : { status: "DISMISSED", error: "turn_no_longer_eligible" } });
       if (!eligible || !ownDraft.count) { await finishJob(tx, job, "turn_no_longer_eligible"); return null; }
-      const message = await tx.message.create({ data: { conversationId: conv.id, role: "ASSISTANT", content: decision.reply, deliveryStatus: "PENDING" } });
+      const message = await tx.message.create({ data: { conversationId: conv.id, role: "ASSISTANT", content: decision.reply, deliveryStatus: "PENDING", ...(account ? { metadata: { channelGeneration: account.generation } } : {}) } });
       await tx.conversation.update({ where: { id: conv.id }, data: { lastMessageAt: message.createdAt, lastMessagePreview: messagePreview(decision.reply), lastMessageRole: "ASSISTANT" } });
       const next: AutoJobPayload = { ...payload, stage: "dispatching", outboundMessageId: message.id };
       await tx.webhookEvent.updateMany({ where: leaseWhere(job), data: { payload: next } });
@@ -221,6 +223,7 @@ async function processAutoReplyJobInternal(jobId: string, opts: { now?: Date } =
     const outcome = await prisma.$transaction(async (tx): Promise<AutoOutcome> => {
       await lockTurn(tx, job.organizationId, conv.id);
       await assertLease(tx, job);
+      if (conv.channelConnectionId) await lockConnection(tx, job.organizationId, conv.channelConnectionId);
       const eligible = await eligibleTurn(tx, job.organizationId, payload, outbound.message.id, new Date());
       if (!eligible) {
         await tx.message.updateMany({ where: { id: outbound.message.id, deliveryStatus: "PENDING" }, data: { deliveryStatus: "FAILED" } });
@@ -228,9 +231,7 @@ async function processAutoReplyJobInternal(jobId: string, opts: { now?: Date } =
         await finishJob(tx, job, "turn_no_longer_eligible");
         return "skipped";
       }
-      const trigger = await triggerN8nWorkflow(outboundWorkflowPath(conv.channel), {
-        organizationId: job.organizationId, event: "message.send",
-        data: { conversationId: conv.id, messageId: outbound.message.id, contactPhone: eligible.conv.contactPhone, contactHandle: eligible.conv.contactHandle, contactEmail: eligible.conv.contactEmail, subject: eligible.conv.subject, channel: eligible.conv.channel, content: decision.reply },
+      const trigger = await sendConversationOutbound(tx, job.organizationId, eligible.conv, outbound.message.id, { conversationId: conv.id, messageId: outbound.message.id, contactPhone: eligible.conv.contactPhone, contactHandle: eligible.conv.contactHandle, contactEmail: eligible.conv.contactEmail, subject: eligible.conv.subject, channel: eligible.conv.channel, content: decision.reply,
       }).catch(() => ({ success: false }));
       const delivery = await tx.message.findUniqueOrThrow({ where: { id: outbound.message.id }, select: { deliveryStatus: true } });
       const accepted = trigger.success || ["SENT", "DELIVERED", "READ"].includes(delivery.deliveryStatus ?? "");
