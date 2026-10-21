@@ -103,6 +103,9 @@ export function PropertyForm({
     }
   }, [match, v.zoneId, zoneAuto]);
 
+  const colonia = v.neighborhood.trim();
+  const currentZoneName = zones.find((z) => z.id === v.zoneId)?.name ?? "";
+
   async function createZoneFromAddress() {
     const name = v.neighborhood.trim();
     if (name.length < 2) return;
@@ -234,9 +237,17 @@ export function PropertyForm({
               <option value="" disabled>—</option>
               {zones.map((z) => <option key={z.id} value={z.id}>{z.name}{z.postalCode ? ` · CP ${z.postalCode}` : ""}</option>)}
             </select>
-            {!v.zoneId && !match && v.neighborhood.trim().length >= 2 ? (
+            {colonia.length >= 2 && match && v.zoneId && v.zoneId !== match.id ? (
+              // La zona elegida (p. ej. la que traía una propiedad ya guardada) no es la de la dirección.
               <div className="space-y-1.5 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                <p>{R.zoneNoMatch(v.neighborhood.trim(), v.postalCode)}</p>
+                <p>{R.zoneMismatch(currentZoneName, colonia)}</p>
+                <Button type="button" size="sm" variant="outline" onClick={() => { set("zoneId", match.id); setZoneAuto(true); }} className="h-8 bg-white text-xs">
+                  {R.zoneUse(match.name)}
+                </Button>
+              </div>
+            ) : colonia.length >= 2 && !match ? (
+              <div className="space-y-1.5 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <p>{v.zoneId ? R.zoneMismatch(currentZoneName, colonia) + " " : ""}{R.zoneNoMatch(colonia, v.postalCode)}</p>
                 {canManage ? (
                   <Button type="button" size="sm" variant="outline" loading={creatingZone} onClick={createZoneFromAddress} className="h-8 bg-white text-xs">
                     {R.zoneCreateFrom(v.neighborhood.trim())}
