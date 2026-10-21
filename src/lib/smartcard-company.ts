@@ -531,6 +531,8 @@ export async function getSmartcardProfile(
     .select("id, title, url, sort_order")
     .eq("profile_id", profileId)
     .eq("is_active", true)
+    // Los productos (type = 'product', ver smartcard-products.ts) se editan aparte.
+    .or("type.is.null,type.neq.product")
     .order("sort_order", { ascending: true });
 
   if (linksError) {

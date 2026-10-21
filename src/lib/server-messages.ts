@@ -6,6 +6,14 @@
 // su versión en español). Un mensaje que no esté aquí se muestra tal cual.
 
 const EN: Record<string, string> = {
+  // ── Productos en la SmartCard ──
+  "Ese perfil no pertenece a tu empresa.": "That profile doesn't belong to your company.",
+  "Ese producto no existe o su módulo no está activo.": "That product doesn't exist or its module isn't enabled.",
+  "Ese producto no está disponible (no publicado, vendido o rentado).": "That product isn't available (unpublished, sold or rented).",
+  "Los productos todavía no están habilitados en SmartCard. Contacta a soporte de Reymen.": "Products aren't enabled in SmartCard yet. Please contact Reymen support.",
+  "Ese producto ya está en el perfil.": "That product is already on the profile.",
+  "No se pudo agregar el producto. Intenta de nuevo.": "Couldn't add the product. Please try again.",
+  "Máximo 12 productos por perfil.": "Up to 12 products per profile.",
   // ── REYMEN Ops Real Estate ──
   "La búsqueda de direcciones está desactivada. Ubica el pin a mano en el mapa.": "Address search is turned off. Place the pin by hand on the map.",
   "Escribe la dirección para buscarla.": "Type the address to search for it.",
