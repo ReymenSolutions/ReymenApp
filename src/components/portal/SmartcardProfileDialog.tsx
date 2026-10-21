@@ -349,8 +349,6 @@ export function SmartcardProfileDialog({
               <Field id="profile-youtube" label="YouTube" value={form.youtube ?? ""} onChange={(v) => set("youtube", v)} placeholder="https://..." />
             </div>
 
-            {profileId && <SmartcardProductsSection profileId={profileId} lang={lang} />}
-
             <div>
               <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
                 {t(`Links del perfil público (${links.length})`, `Public profile links (${links.length})`)}
@@ -402,6 +400,8 @@ export function SmartcardProfileDialog({
                 </Button>
               </div>
             </div>
+
+            {profileId && <SmartcardProductsSection profileId={profileId} lang={lang} />}
           </div>
         )}
 
