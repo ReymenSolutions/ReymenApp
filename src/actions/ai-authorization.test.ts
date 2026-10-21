@@ -11,7 +11,7 @@ const send = vi.fn().mockResolvedValue({ success: true });
 vi.mock("@/lib/n8n", () => ({ triggerN8nWorkflow: (...args: unknown[]) => send(...args) }));
 vi.mock("@/lib/auth", () => ({ auth: () => auth(), isAdmin: (r: string) => ["ADMIN", "SUPER_ADMIN"].includes(r) }));
 const { createArticle, updateArticle, deleteArticle } = await import("./knowledge-base");
-const { upsertWhatsAppAssistant } = await import("./whatsapp-assistant");
+const { upsertWhatsAppAssistant, updateAssistantPhoneNumber } = await import("./whatsapp-assistant");
 const { saveRulebook } = await import("./rulebook");
 const { escalateConversation, resolveConversation, getOlderMessages, sendManualMessage } = await import("./conversations");
 
@@ -32,7 +32,7 @@ describe("AI configuration authorization at Server Action boundary", () => {
   it.each(["AGENT", "VIEWER", "CLIENT"] as UserRole[])("denies %s direct knowledge/identity/rulebook mutations without writes", async (role) => {
     login(role);
     const count = await prisma.knowledgeBase.count({ where: { organizationId: a.id } });
-    for (const call of [() => createArticle(input), () => updateArticle(article.id, input), () => deleteArticle(article.id), () => upsertWhatsAppAssistant({ name: "forged" }), () => saveRulebook({ voice: "x", greeting: "", rules: "", pricing: "" })]) {
+    for (const call of [() => createArticle(input), () => updateArticle(article.id, input), () => deleteArticle(article.id), () => upsertWhatsAppAssistant({ name: "forged" }), () => updateAssistantPhoneNumber("123"), () => saveRulebook({ voice: "x", greeting: "", rules: "", pricing: "" })]) {
       await expect(call()).rejects.toThrow("No autorizado");
     }
     expect(await prisma.knowledgeBase.count({ where: { organizationId: a.id } })).toBe(count);
@@ -50,7 +50,7 @@ describe("AI configuration authorization at Server Action boundary", () => {
     login("OWNER");
     await prisma.organizationModule.update({ where: { organizationId_module: { organizationId: a.id, module: "AI_WHATSAPP" } }, data: { status: "CANCELLED" } });
     try {
-      for (const call of [() => createArticle(input), () => updateArticle(article.id, input), () => deleteArticle(article.id), () => upsertWhatsAppAssistant({ name: "x" }), () => saveRulebook({ voice: "", greeting: "", rules: "", pricing: "" })]) await expect(call()).rejects.toThrow(/módulo/);
+      for (const call of [() => createArticle(input), () => updateArticle(article.id, input), () => deleteArticle(article.id), () => upsertWhatsAppAssistant({ name: "x" }), () => updateAssistantPhoneNumber("123"), () => saveRulebook({ voice: "", greeting: "", rules: "", pricing: "" })]) await expect(call()).rejects.toThrow(/módulo/);
     } finally {
       await prisma.organizationModule.update({ where: { organizationId_module: { organizationId: a.id, module: "AI_WHATSAPP" } }, data: { status: "ACTIVE" } });
     }
@@ -78,6 +78,15 @@ describe("AI configuration authorization at Server Action boundary", () => {
     login(role);
     await expect(escalateConversation(conversation.id)).rejects.toThrow("No autorizado");
     await expect(resolveConversation(conversation.id)).rejects.toThrow("No autorizado");
+  });
+  it("phone-only edit keeps identity and rejects a suspended tenant", async () => {
+    login("OWNER");
+    await upsertWhatsAppAssistant({ name: "Identidad conservada" });
+    await updateAssistantPhoneNumber("8112345678");
+    expect(await prisma.whatsAppAssistant.findUnique({ where: { organizationId: a.id } })).toMatchObject({ name: "Identidad conservada", phoneNumber: "8112345678" });
+    await prisma.organization.update({ where: { id: a.id }, data: { isActive: false } });
+    try { await expect(updateAssistantPhoneNumber("otra")).rejects.toThrow("Organización inactiva"); }
+    finally { await prisma.organization.update({ where: { id: a.id }, data: { isActive: true } }); }
   });
   it("rejects a foreign draft before persisting or sending a manual message", async () => {
     login("OWNER");
