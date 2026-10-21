@@ -138,15 +138,18 @@ test("owner recovers two legacy skipped POS purchases from a member profile only
   expect((await prisma.loyaltyMember.findUniqueOrThrow({ where: { id: member.id } })).totalVisits).toBe(3);
 });
 
-test("mobile dark English pages render real data without horizontal overflow", async ({ page, context }, testInfo) => {
-  await prisma.user.update({ where: { email }, data: { theme: "dark", language: "en" } });
-  loginCookies = undefined; // Refresh JWT preference claims after changing the fixture.
-  await context.addCookies([{ name: "reymen-theme", value: "dark", url: "http://127.0.0.1:3000" }, { name: "reymen-lang", value: "en", url: "http://127.0.0.1:3000" }]);
+test("mobile dark English pages render real data without horizontal overflow", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page);
-  // Authenticated preferences are supplied by the existing session; cookies also
-  // exercise the server translations used by Loyalty's public pages.
-  await context.addCookies([{ name: "reymen-theme", value: "dark", url: "http://127.0.0.1:3000" }, { name: "reymen-lang", value: "en", url: "http://127.0.0.1:3000" }]);
+  // Use the real preference action, which invalidates the server session cache.
+  // Updating the DB directly leaves an authenticated cached snapshot unchanged.
+  const userMenu = page.locator("header > div").last().locator(":scope > button").last();
+  await userMenu.click();
+  await page.getByRole("button", { name: /^(Oscuro|Dark)$/, exact: true }).click();
+  await expect.poll(async () => (await prisma.user.findUniqueOrThrow({ where: { email } })).theme).toBe("dark");
+  await page.getByRole("button", { name: "EN", exact: true }).click();
+  await expect.poll(async () => (await prisma.user.findUniqueOrThrow({ where: { email } })).language).toBe("en");
+  await userMenu.click();
   for (const path of ["", "/members", "/visits", "/map", "/analytics", "/program"]) {
     await page.goto(`/portal/loyalty${path}`);
     await expect(page.getByRole("heading", { name: /REYMEN Loyalty/i })).toBeVisible();

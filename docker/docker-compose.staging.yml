@@ -1,0 +1,100 @@
+name: reymen-mark-staging
+
+x-staging-environment: &staging-environment
+  REYMEN_STAGING: "true"
+  DATABASE_URL: postgresql://reymen_staging:${STAGING_DB_PASSWORD:?Run staging init first}@staging-postgres:5432/reymen_mark_staging
+  NEXTAUTH_URL: http://localhost:3301
+  NEXTAUTH_SECRET: ${STAGING_AUTH_SECRET:?Run staging init first}
+  NEXT_PUBLIC_APP_URL: http://localhost:3301
+  AUTH_TRUST_HOST: "true"
+  AI_PROVIDER: mock
+  AI_DRAFT_PROVIDER: mock
+  AI_AGENT_MODEL_ENABLED: "false"
+  AI_AGENT_CENTER_UI_ENABLED: "true"
+  AI_CHANNEL_CONNECTIONS_ENABLED: "false"
+  AI_KNOWLEDGE_ACCESS_ENABLED: "false"
+  AI_MARK_SANDBOX_ENABLED: "true"
+  AI_MARK_PILOT_BUDGET_ENABLED: "false"
+  ANTHROPIC_API_KEY: ""
+  OPENAI_API_KEY: ""
+  RESEND_API_KEY: ""
+  N8N_BASE_URL: http://127.0.0.1:9
+  N8N_WEBHOOK_SECRET: ${STAGING_WEBHOOK_SECRET:?Run staging init first}
+  CRON_SECRET: ${STAGING_CRON_SECRET:?Run staging init first}
+  REYMEN_POS_URL: http://127.0.0.1:9
+
+services:
+  staging-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: reymen_mark_staging
+      POSTGRES_USER: reymen_staging
+      POSTGRES_PASSWORD: ${STAGING_DB_PASSWORD:?Run staging init first}
+    volumes:
+      - staging-db:/var/lib/postgresql/data
+    networks: [staging]
+    mem_limit: 512m
+    cpus: 0.5
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U reymen_staging -d reymen_mark_staging"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    image: reymen-mark-staging-app:local
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.staging
+      target: runner
+    environment: *staging-environment
+    networks: [staging]
+    depends_on:
+      staging-postgres:
+        condition: service_healthy
+    mem_limit: 1g
+    cpus: 1
+    restart: unless-stopped
+
+  ingress:
+    image: nginx:1.28-alpine
+    volumes:
+      - ./nginx.staging.conf:/etc/nginx/nginx.conf:ro
+    ports: ["127.0.0.1:3301:8080"]
+    networks: [staging, ingress]
+    depends_on: [app]
+    mem_limit: 64m
+    cpus: 0.25
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD-SHELL, "wget -Y off -q -O /dev/null http://127.0.0.1:8080/api/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  tools:
+    image: reymen-mark-staging-tools:local
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.staging
+      target: builder
+    profiles: [tools]
+    environment:
+      <<: *staging-environment
+      STAGING_ADMIN_PASSWORD: ${STAGING_ADMIN_PASSWORD:?Run staging init first}
+      STAGING_OWNER_PASSWORD: ${STAGING_OWNER_PASSWORD:?Run staging init first}
+    networks: [staging]
+    mem_limit: 1g
+    cpus: 1
+    entrypoint: []
+    command: [node, deploy/staging/bootstrap.mjs]
+
+networks:
+  staging:
+    internal: true
+  ingress: {}
+
+volumes:
+  staging-db:

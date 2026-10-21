@@ -1,0 +1,47 @@
+name: Private staging configuration
+
+on:
+  pull_request:
+    paths:
+      - 'deploy/staging/**'
+      - 'docker/*staging*'
+      - '.github/workflows/staging-config.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  staging-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate private configuration
+        run: |
+          bash -n deploy/staging/init.sh deploy/staging/run.sh
+          node --test deploy/staging/safety.test.mjs
+          bash deploy/staging/init.sh
+      - name: Build isolated staging
+        run: bash deploy/staging/run.sh build
+      - name: Migrate and bootstrap disposable staging
+        run: |
+          bash deploy/staging/run.sh database
+          bash deploy/staging/run.sh migrate
+          bash deploy/staging/run.sh bootstrap
+          if bash deploy/staging/run.sh bootstrap; then
+            echo 'ERROR: bootstrap accepted a populated database'
+            exit 1
+          fi
+      - name: Start and check health
+        run: |
+          bash deploy/staging/run.sh start
+          curl --fail --retry 20 --retry-delay 3 --retry-connrefused http://127.0.0.1:3301/api/health
+      - name: Stop staging while retaining its data
+        if: always()
+        run: |
+          docker compose --env-file .env.staging -f docker/docker-compose.staging.yml logs --tail 40 app ingress
+          docker compose --env-file .env.staging -f docker/docker-compose.staging.yml stop
