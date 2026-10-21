@@ -45,6 +45,20 @@ export async function requireLoyaltyManager() {
  * organización con loyalty:operate (incluye al Agente, que es quien cobra) y
  * el módulo LOYALTY activo.
  */
+/** Realty: configurar zonas, ajustes y campañas. */
+export async function requireRealtyManager() {
+  const session = await requireOrgPermission("realty:manage");
+  await assertModuleEnabled(session.user.organizationId, "REALTY");
+  return session;
+}
+
+/** Realty: asesores — propiedades, prospectos, visitas y cierres. */
+export async function requireRealtyOperator() {
+  const session = await requireOrgPermission("realty:operate");
+  await assertModuleEnabled(session.user.organizationId, "REALTY");
+  return session;
+}
+
 export async function requireLoyaltyOperator() {
   const session = await requireOrgPermission("loyalty:operate");
   await assertModuleEnabled(session.user.organizationId, "LOYALTY");

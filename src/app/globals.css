@@ -525,3 +525,27 @@ summary:active {
   .metric-grid[data-density="comfortable"] { grid-template-columns: minmax(0, 1fr); }
   .metric-grid[data-density="comfortable"] > * { grid-column: auto; }
 }
+
+/* ── REYMEN Ops Realty en modo oscuro ──
+   Realty usa los tonos REYMEN con clases arbitrarias (texto navy #031738,
+   azul #063C82, fondos claros #F2F4F6). El modo oscuro de la app es por la
+   clase .dark (no por la variante dark: de Tailwind), así que se aclaran aquí,
+   igual que los demás colores de arriba. El texto oscuro de los botones verdes
+   (#080C13) no se toca. */
+.dark .text-\[\#031738\],
+.dark .text-\[\#04275A\] {
+  color: #f1f5f9;
+}
+.dark .text-\[\#063C82\] {
+  color: #8ab0ff;
+}
+.dark .bg-\[\#F2F4F6\],
+.dark .bg-\[\#EDECEB\] {
+  background-color: rgb(148 163 184 / 0.12);
+}
+.dark .bg-\[\#031738\] {
+  background-color: #1a3ef5;
+}
+.dark .border-\[\#031738\] {
+  border-color: #5585ff;
+}

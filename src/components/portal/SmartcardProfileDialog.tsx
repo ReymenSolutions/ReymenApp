@@ -24,6 +24,7 @@ import {
 } from "@/actions/portal/smartcard";
 import type { SmartcardProfile, ProfileLink } from "@/lib/smartcard-company";
 import { passesWcagAA } from "@/lib/smartcard-theme";
+import { SmartcardProductsSection } from "./SmartcardProductsSection";
 
 /**
  * Self-service editor for a SmartCard PROFILE (2026-09-29) — the rich
@@ -399,6 +400,8 @@ export function SmartcardProfileDialog({
                 </Button>
               </div>
             </div>
+
+            {profileId && <SmartcardProductsSection profileId={profileId} lang={lang} />}
           </div>
         )}
 

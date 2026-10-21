@@ -142,6 +142,12 @@ model Organization {
   loyaltyVisits           LoyaltyVisit[]
   loyaltyRewards          LoyaltyReward[]
   loyaltyLocations        LoyaltyLocation[]
+  realtyZones             RealtyZone[]
+  realtyLeadProfiles      RealtyLeadProfile[]
+  realtyProperties        RealtyProperty[]
+  realtyCampaigns         RealtyCampaign[]
+  realtyClosings          RealtyClosing[]
+  realtySettings          RealtySettings?
   loyaltyEventReceipts    LoyaltyEventReceipt[]
 
   @@index([slug])
@@ -179,6 +185,8 @@ model User {
   sentMessages          Message[]      @relation("MessageSender")
   loyaltyVisitsRecorded LoyaltyVisit[]  @relation("LoyaltyVisitEmployee")
   loyaltyRedemptions    LoyaltyReward[] @relation("LoyaltyRewardRedeemedBy")
+  realtyPropertiesAdvised RealtyProperty[]    @relation("RealtyPropertyAdvisor")
+  realtyProfilesAdvised   RealtyLeadProfile[] @relation("RealtyProfileAdvisor")
 
   @@index([organizationId])
   @@index([email])
@@ -277,6 +285,7 @@ model Lead {
   appointments  Appointment[]
   followUpLogs  FollowUpLog[]
   conversations Conversation[]
+  realtyProfiles RealtyLeadProfile[]
 
   @@unique([organizationId, externalId])
   @@index([organizationId])
@@ -634,6 +643,7 @@ model Appointment {
   lead         Lead?                    @relation(fields: [leadId], references: [id])
   service      Service?                 @relation(fields: [serviceId], references: [id])
   reminderLogs AppointmentReminderLog[]
+  realtyVisit  RealtyPropertyVisit?
 
   @@index([organizationId])
   @@index([organizationId, startTime])
@@ -1298,6 +1308,11 @@ enum PlatformModule {
   // (/portal/loyalty). Módulo propio: no requiere FOOD_OPS; si el negocio
   // también tiene Food, la participación sobre ventas usa FoodSale.
   LOYALTY
+  // REYMEN Ops Realty (/portal/realty): inventario inmobiliario, demanda de
+  // prospectos y oportunidades. Capa vertical sobre el CRM: el contacto vive
+  // en Lead; Realty solo guarda lo inmobiliario (preferencias, propiedades,
+  // matches, visitas ligadas a Appointment, cierres y campañas).
+  REALTY
 }
 
 enum ModuleStatus {
@@ -1398,6 +1413,8 @@ model Branch {
   loyaltyVisits         LoyaltyVisit[]  @relation("LoyaltyVisitBranch")
   loyaltyRedemptions    LoyaltyReward[] @relation("LoyaltyRewardRedeemedBranch")
   loyaltyLocation       LoyaltyLocation[]
+  realtyProperties      RealtyProperty[]
+  realtyProfiles        RealtyLeadProfile[]
 
   @@index([organizationId])
 }
@@ -3041,4 +3058,345 @@ model AgentSandboxRun {
   @@unique([organizationId, createdById, requestKey])
   @@index([organizationId, createdById, createdAt])
   @@index([status, expiresAt])
+}
+
+// ─── REYMEN Ops Realty ───────────────────────────────────────────────
+// Capa inmobiliaria sobre el Core/CRM. No duplica contactos (Lead), agenda
+// (Appointment) ni sucursales/usuarios: los referencia. Aislamiento por
+// organizationId en cada tabla (ver docs/realty.md: la app filtra por la
+// organización de la sesión en cada consulta; no hay RLS en este repo).
+
+enum RealtyOperation {
+  SALE
+  RENT
+}
+
+enum RealtyPropertyType {
+  HOUSE
+  APARTMENT
+  LAND
+  OFFICE
+  COMMERCIAL
+  WAREHOUSE
+  OTHER
+}
+
+enum RealtyPropertyStatus {
+  AVAILABLE
+  RESERVED
+  NEGOTIATION
+  SOLD
+  RENTED
+  INACTIVE
+}
+
+enum RealtyEventType {
+  VIEW
+  WHATSAPP_CLICK
+  SCHEDULE_CLICK
+  SHARE_CLICK
+}
+
+enum RealtyCampaignChannel {
+  META
+  INSTAGRAM
+  GOOGLE
+  SMARTCARD
+  WHATSAPP
+  PORTAL
+  REFERRAL
+  OTHER
+}
+
+enum RealtyCampaignStatus {
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+// Ajustes del módulo por organización: contacto público de la landing.
+model RealtySettings {
+  id              String   @id @default(cuid())
+  organizationId  String   @unique
+  publicWhatsapp  String?
+  defaultCurrency String   @default("MXN")
+  updatedAt       DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// Zonas comerciales de la empresa (colonias/sectores). `key` = nombre
+// normalizado, único por organización. El punto es aproximado (lo fija el
+// negocio) y solo sirve para el mapa de demanda.
+model RealtyZone {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  key            String
+  // CP de SEPOMEX con el que se dio de alta (ayuda a asignar la zona sola a una propiedad).
+  postalCode     String?
+  latitude       Float?
+  longitude      Float?
+  createdAt      DateTime @default(now())
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  properties   RealtyProperty[]
+  leadZones    RealtyLeadZone[]
+
+  @@unique([organizationId, key])
+}
+
+// Perfil inmobiliario de un prospecto. El contacto (nombre, teléfono,
+// correo, estado comercial) es el Lead del CRM; aquí solo lo que Realty
+// necesita para matching y analítica. leadId nullable para enlazar después.
+model RealtyLeadProfile {
+  id              String              @id @default(cuid())
+  organizationId  String
+  leadId          String?
+  branchId        String?
+  advisorUserId   String?
+  operation       RealtyOperation
+  propertyType    RealtyPropertyType?
+  minBudget       Decimal?            @db.Decimal(14, 2)
+  maxBudget       Decimal             @db.Decimal(14, 2)
+  currency        String              @default("MXN")
+  minBedrooms     Int?
+  minBathrooms    Float?
+  minArea         Float?
+  moveTimeline    String?
+  financingNeeded Boolean?
+  // Extras deseados: parking, pet_friendly, furnished, terrace, garden, amenities…
+  preferences     String[]            @default([])
+  active          Boolean             @default(true)
+  source          String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead?                 @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  branch       Branch?               @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  advisor      User?                 @relation("RealtyProfileAdvisor", fields: [advisorUserId], references: [id], onDelete: SetNull)
+  zones        RealtyLeadZone[]
+  matches      RealtyMatch[]
+  visits       RealtyPropertyVisit[]
+  closings     RealtyClosing[]
+
+  @@index([organizationId, active])
+  @@index([organizationId, createdAt])
+  @@index([leadId])
+}
+
+model RealtyLeadZone {
+  id             String @id @default(cuid())
+  organizationId String
+  profileId      String
+  zoneId         String
+  // 1 = la zona que más le interesa.
+  priority       Int    @default(1)
+
+  profile RealtyLeadProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  zone    RealtyZone        @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, zoneId])
+  @@index([organizationId, zoneId])
+}
+
+model RealtyProperty {
+  id               String               @id @default(cuid())
+  organizationId   String
+  branchId         String?
+  advisorUserId    String?
+  // Único global: es la URL pública /p/<slug>.
+  slug             String               @unique
+  title            String
+  description      String?              @db.Text
+  operation        RealtyOperation
+  propertyType     RealtyPropertyType
+  status           RealtyPropertyStatus @default(AVAILABLE)
+  price            Decimal              @db.Decimal(14, 2)
+  currency         String               @default("MXN")
+  zoneId           String
+  // Dirección estructurada: CP → colonia (neighborhood), municipio y estado de SEPOMEX.
+  postalCode       String?
+  neighborhood     String?
+  municipality     String?
+  state            String?
+  // Calle y número (interna): nunca se publica salvo showExactLocation.
+  addressLine      String?
+  showExactLocation Boolean             @default(false)
+  latitude         Float?
+  longitude        Float?
+  bedrooms         Int?
+  bathrooms        Float?
+  parkingSpaces    Int?
+  constructionArea Float?
+  landArea         Float?
+  ageYears         Int?
+  furnished        Boolean?
+  features         String[]             @default([])
+  // WhatsApp de contacto de esta propiedad (si no, el de RealtySettings).
+  contactWhatsapp  String?
+  publishedAt      DateTime?
+  availableSince   DateTime             @default(now())
+  isDemo           Boolean              @default(false)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  organization  Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branch        Branch?                       @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  advisor       User?                         @relation("RealtyPropertyAdvisor", fields: [advisorUserId], references: [id], onDelete: SetNull)
+  zone          RealtyZone                    @relation(fields: [zoneId], references: [id], onDelete: Restrict)
+  media         RealtyPropertyMedia[]
+  statusHistory RealtyPropertyStatusHistory[]
+  events        RealtyPropertyEvent[]
+  matches       RealtyMatch[]
+  visits        RealtyPropertyVisit[]
+  closings      RealtyClosing[]
+  campaigns     RealtyCampaign[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, zoneId])
+  @@index([organizationId, availableSince])
+}
+
+// Fotos optimizadas (WebP, ≤ 1600 px) guardadas en la base: el repo no
+// tiene almacenamiento de objetos todavía. Se sirven por
+// /api/realty/media/<id> con caché larga; ver docs/realty.md.
+model RealtyPropertyMedia {
+  id             String   @id @default(cuid())
+  organizationId String
+  propertyId     String
+  mimeType       String
+  data           Bytes
+  width          Int
+  height         Int
+  sortOrder      Int      @default(0)
+  altText        String?
+  createdAt      DateTime @default(now())
+
+  property RealtyProperty @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, sortOrder])
+}
+
+model RealtyPropertyStatusHistory {
+  id             String                @id @default(cuid())
+  organizationId String
+  propertyId     String
+  fromStatus     RealtyPropertyStatus?
+  toStatus       RealtyPropertyStatus
+  changedById    String?
+  changedAt      DateTime              @default(now())
+  notes          String?               @db.Text
+
+  property RealtyProperty @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, changedAt])
+}
+
+// Interacciones con la landing pública. Sin datos personales: solo tipo,
+// origen (?src=smartcard, qr, campaña…) y un hash diario del visitante.
+model RealtyPropertyEvent {
+  id             String          @id @default(cuid())
+  organizationId String
+  propertyId     String
+  type           RealtyEventType
+  source         String?
+  campaignId     String?
+  visitorHash    String?
+  occurredAt     DateTime        @default(now())
+
+  property RealtyProperty @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, occurredAt])
+  @@index([propertyId, type, occurredAt])
+}
+
+model RealtyMatch {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  profileId          String
+  propertyId         String
+  totalScore         Int
+  budgetScore        Int
+  zoneScore          Int
+  typeScore          Int
+  roomsScore         Int
+  areaScore          Int
+  extrasScore        Int
+  calculationVersion String
+  calculatedAt       DateTime @default(now())
+
+  profile  RealtyLeadProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  property RealtyProperty    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, propertyId])
+  @@index([organizationId, totalScore])
+  @@index([propertyId, totalScore])
+}
+
+model RealtyCampaign {
+  id                String                @id @default(cuid())
+  organizationId    String
+  propertyId        String?
+  name              String
+  channel           RealtyCampaignChannel
+  spend             Decimal               @db.Decimal(14, 2)
+  startDate         DateTime
+  endDate           DateTime?
+  leadsCount        Int                   @default(0)
+  visitsCount       Int                   @default(0)
+  closingsCount     Int                   @default(0)
+  attributedRevenue Decimal?              @db.Decimal(14, 2)
+  status            RealtyCampaignStatus  @default(ACTIVE)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  property     RealtyProperty? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, startDate])
+}
+
+// Visita a una propiedad = una cita del CRM (Appointment: hora y estado)
+// + la propiedad y el prospecto. No es una agenda nueva.
+model RealtyPropertyVisit {
+  id             String   @id @default(cuid())
+  organizationId String
+  appointmentId  String   @unique
+  propertyId     String
+  profileId      String?
+  advisorUserId  String?
+  outcome        String?  @db.Text
+  createdAt      DateTime @default(now())
+
+  appointment Appointment        @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  property    RealtyProperty     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  profile     RealtyLeadProfile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, propertyId])
+}
+
+// Cierre comercial para analítica (no facturación ni contratos).
+model RealtyClosing {
+  id               String          @id @default(cuid())
+  organizationId   String
+  propertyId       String
+  profileId        String?
+  advisorUserId    String?
+  // Enlace opcional a la oportunidad del pipeline del CRM, si existe.
+  opportunityId    String?
+  operation        RealtyOperation
+  finalAmount      Decimal         @db.Decimal(14, 2)
+  currency         String          @default("MXN")
+  commissionAmount Decimal?        @db.Decimal(14, 2)
+  closedAt         DateTime
+  notes            String?         @db.Text
+  createdAt        DateTime        @default(now())
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  property     RealtyProperty     @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  profile      RealtyLeadProfile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, closedAt])
 }
