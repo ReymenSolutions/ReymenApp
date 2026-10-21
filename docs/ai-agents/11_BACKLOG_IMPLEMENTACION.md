@@ -202,3 +202,7 @@ AG-011 iniciado, no completado. Se implementa un arnés mínimo de AG-013 con fi
 ## Base parcial de AG-006
 
 Se implementan cuotas y reservas durables de piloto ($25 diarios, $500/ciclo, $1/raíz), autorización fresca, idempotencia y conservación de compromisos al apagar el flag. No se marca AG-006 terminado: el gateway aún debe atribuir cada paso/instancia y conciliar costos inciertos antes de usar un proveedor real. Ver [19](19_BASE_PRESUPUESTO_PILOTO.md).
+
+### Incremento de gateway privado
+
+Se añade la ruta financiera de staging con atribución por instancia/revisión/paso, claim único, cierre atómico y conciliación administrativa de uso/no cobro. Incertidumbre conserva la reserva y pausa el piloto. No se marca AG-006/AG-011 completo: faltan driver, conocimiento, CRM verificado, entrega/control humano, validación real del proveedor y operación de conciliación. El gateway comercial conserva su deuda de errores/TTL. Ver [21](21_GATEWAY_FINANCIERO_PILOTO.md).

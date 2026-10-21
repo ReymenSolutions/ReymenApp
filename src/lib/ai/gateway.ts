@@ -7,6 +7,7 @@ import { activeProviderName, getProvider } from "./providers";
 import { AiBudgetError, estimateCallCostMxn, getBudgetState, releaseReservation, reserveBudget, type Estimate } from "./budget";
 import { evaluateBudgetAlerts } from "./budget-alerts";
 import type { AiUsageContext, ChatTurn, NormalizedUsage, ProviderResult } from "./types";
+export { runPilotAiCall, closePilotRoot, reconcilePilotCall } from "./pilot/gateway";
 
 // ── Gateway de IA ────────────────────────────────────────────────────────────────────────────────────────────────
 // Toda llamada a un modelo pasa por aquí: se identifica el tenant, se elige proveedor/modelo, se llama y se registra el
@@ -76,6 +77,7 @@ async function finish(id: string, organizationId: string, provider: string, mode
  */
 export async function runAiCall(ctx: AiUsageContext, input: AiCallInput): Promise<AiCallResult> {
   if (!ctx.organizationId) throw new Error("ai_gateway_missing_tenant");
+  if (ctx.agentKey === "mark:pilot") throw new Error("pilot_requires_durable_gateway");
   const providerName = activeProviderName();
   const provider = getProvider(providerName);
   if (!provider) throw new Error("ai_provider_unavailable");

@@ -10,6 +10,7 @@ const enabled = () => process.env.AI_MARK_PILOT_BUDGET_ENABLED === "true";
 const requestKeySchema = z.string().uuid();
 type Tx = Prisma.TransactionClient;
 const D = (v: Prisma.Decimal.Value) => new Prisma.Decimal(v);
+export { authority as assertPilotAuthority, lock as lockPilotBudget, state as loadPilotQuotaState };
 function gate() { if (!enabled()) throw new UserError("El presupuesto piloto no está habilitado"); }
 async function authority(tx: Tx, organizationId: string, actorId: string) {
   const user = await tx.user.findFirst({ where: { id: actorId, organizationId, isActive: true, organization: { isActive: true } }, select: { role: true } });
