@@ -11,7 +11,7 @@ case "${1:-}" in
   start)
     "${compose[@]}" up -d --no-build app
     # Resolve the current app address after every app recreation/update.
-    "${compose[@]}" up -d --no-build --no-deps --force-recreate ingress
+    "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 90 ingress
     ;;
   status) "${compose[@]}" ps ;;
   stop) "${compose[@]}" stop ingress app ;;
