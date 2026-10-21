@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { saveRealtyProperty, saveRealtyZone } from "@/actions/realty";
+import { saveRealtyProperty } from "@/actions/realty";
 import { getErrorMessage } from "@/lib/user-error";
 import { usePreferences } from "@/context/preferences";
 import { pickDict } from "@/lib/i18n-dict";
@@ -17,7 +17,6 @@ import { cn } from "@/lib/utils";
 import { SELECT } from "./ProspectForm";
 import { GeoPicker } from "./GeoPicker";
 import { AddressFields, type AddressValue } from "./AddressFields";
-import { matchZone } from "@/lib/realty/zone-match";
 
 export interface PropertyFormValues {
   id?: string;
@@ -58,14 +57,11 @@ export function PropertyForm({
   zones: initialZones,
   advisors,
   branches,
-  canManage = false,
 }: {
   initial: PropertyFormValues;
   zones: { id: string; name: string; postalCode?: string | null; latitude?: number | null; longitude?: number | null }[];
   advisors: { id: string; name: string | null; email: string }[];
   branches: { id: string; name: string }[];
-  /** Puede crear zonas (gerencia): ofrece crear la de la colonia si no existe. */
-  canManage?: boolean;
 }) {
   const router = useRouter();
   const { lang } = usePreferences();
@@ -85,43 +81,11 @@ export function PropertyForm({
       ...(p.street !== undefined ? { addressLine: p.street } : {}),
     }));
 
-  const [zones, setZones] = useState(initialZones);
-  // La zona se propone sola según la colonia o el CP. Si la eligió el sistema
-  // (no la persona) y la dirección cambia a otra que no coincide, se quita:
-  // nunca se queda puesta una zona que no corresponde a la dirección.
-  const [zoneAuto, setZoneAuto] = useState(false);
-  const [creatingZone, setCreatingZone] = useState(false);
-  const match = matchZone(zones, v.neighborhood, v.postalCode);
-  useEffect(() => {
-    if (match && (!v.zoneId || zoneAuto) && v.zoneId !== match.id) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setV((s) => ({ ...s, zoneId: match.id }));
-      setZoneAuto(true);
-    } else if (!match && zoneAuto && v.zoneId) {
-      setV((s) => ({ ...s, zoneId: "" }));
-      setZoneAuto(false);
-    }
-  }, [match, v.zoneId, zoneAuto]);
-
+  const zones = initialZones;
   const colonia = v.neighborhood.trim();
-  const currentZoneName = zones.find((z) => z.id === v.zoneId)?.name ?? "";
-
-  async function createZoneFromAddress() {
-    const name = v.neighborhood.trim();
-    if (name.length < 2) return;
-    setCreatingZone(true);
-    try {
-      const { id } = await saveRealtyZone({ name, postalCode: /^\d{5}$/.test(v.postalCode) ? v.postalCode : null, latitude: null, longitude: null });
-      setZones((zs) => [...zs, { id, name, postalCode: v.postalCode || null, latitude: null, longitude: null }].sort((a, b) => a.name.localeCompare(b.name, "es")));
-      setV((s) => ({ ...s, zoneId: id }));
-      setZoneAuto(true);
-      toast.success(R.zoneCreated(name));
-    } catch (err) {
-      toast.error(getErrorMessage(err, "Error"));
-    } finally {
-      setCreatingZone(false);
-    }
-  }
+  // La zona ES la colonia (se calcula al guardar). Solo una propiedad de antes, sin colonia, muestra la que tenía.
+  const legacyZone = !colonia && v.zoneId ? zones.find((z) => z.id === v.zoneId)?.name : null;
+  const coloniaZone = colonia ? zones.find((z) => z.postalCode === v.postalCode && z.name.split(" (")[0].trim().toLowerCase() === colonia.toLowerCase()) ?? zones.find((z) => z.name.toLowerCase() === colonia.toLowerCase()) : null;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -140,7 +104,7 @@ export function PropertyForm({
         status: v.status,
         price: Number(v.price),
         currency: v.currency as "MXN" | "USD",
-        zoneId: v.zoneId,
+        zoneId: v.zoneId || null,
         postalCode: v.postalCode || null,
         neighborhood: v.neighborhood || null,
         municipality: v.municipality || null,
@@ -222,43 +186,12 @@ export function PropertyForm({
         <legend className="px-1 text-sm font-semibold text-slate-900">{R.addressSection}</legend>
         <div className="space-y-5">
           <AddressFields idPrefix="prop" value={address} onChange={setAddress} />
-          <div className="max-w-sm space-y-1.5">
-            <Label htmlFor="f-zone">{R.zone} *</Label>
-            <select
-              id="f-zone"
-              className={SELECT}
-              value={v.zoneId}
-              onChange={(e) => {
-                set("zoneId", e.target.value);
-                setZoneAuto(false);
-              }}
-              required
-            >
-              <option value="" disabled>—</option>
-              {zones.map((z) => <option key={z.id} value={z.id}>{z.name}{z.postalCode ? ` · CP ${z.postalCode}` : ""}</option>)}
-            </select>
-            {colonia.length >= 2 && match && v.zoneId && v.zoneId !== match.id ? (
-              // La zona elegida (p. ej. la que traía una propiedad ya guardada) no es la de la dirección.
-              <div className="space-y-1.5 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                <p>{R.zoneMismatch(currentZoneName, colonia)}</p>
-                <Button type="button" size="sm" variant="outline" onClick={() => { set("zoneId", match.id); setZoneAuto(true); }} className="h-8 bg-white text-xs">
-                  {R.zoneUse(match.name)}
-                </Button>
-              </div>
-            ) : colonia.length >= 2 && !match ? (
-              <div className="space-y-1.5 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                <p>{v.zoneId ? R.zoneMismatch(currentZoneName, colonia) + " " : ""}{R.zoneNoMatch(colonia, v.postalCode)}</p>
-                {canManage ? (
-                  <Button type="button" size="sm" variant="outline" loading={creatingZone} onClick={createZoneFromAddress} className="h-8 bg-white text-xs">
-                    {R.zoneCreateFrom(v.neighborhood.trim())}
-                  </Button>
-                ) : (
-                  <p>{R.zoneAskManager}</p>
-                )}
-              </div>
-            ) : (
-              <p className="text-[11px] text-slate-500">{R.zoneAutoHint}</p>
-            )}
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-slate-900">{R.zone}</p>
+            <p className="text-sm text-slate-700">
+              {colonia ? `${colonia}${/^\d{5}$/.test(v.postalCode) ? ` · CP ${v.postalCode}` : ""}` : legacyZone ?? <span className="text-slate-400">{R.cpFirst}</span>}
+            </p>
+            <p className="text-[11px] text-slate-500">{R.zoneIsColonia}</p>
           </div>
           <div className="space-y-1.5">
             <p className="text-sm font-medium text-slate-900">{R.geoTitle}</p>
@@ -268,7 +201,7 @@ export function PropertyForm({
               structured={address}
               value={v.latitude !== "" && v.longitude !== "" ? { lat: Number(v.latitude), lng: Number(v.longitude) } : null}
               center={(() => {
-                const z = zones.find((x) => x.id === v.zoneId);
+                const z = coloniaZone ?? zones.find((x) => x.id === v.zoneId);
                 return z && z.latitude != null && z.longitude != null ? { lat: z.latitude, lng: z.longitude } : null;
               })()}
               onConfirm={(p) => setV((s) => ({ ...s, latitude: p ? String(p.lat) : "", longitude: p ? String(p.lng) : "" }))}

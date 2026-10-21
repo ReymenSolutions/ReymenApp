@@ -7,7 +7,7 @@ import { ArrowDown, ArrowUp, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { saveRealtyProspect, searchRealtyLeads } from "@/actions/realty";
+import { ensureRealtyColoniaZone, saveRealtyProspect, searchRealtyLeads } from "@/actions/realty";
 import { getErrorMessage } from "@/lib/user-error";
 import { usePreferences } from "@/context/preferences";
 import { pickDict } from "@/lib/i18n-dict";
@@ -15,7 +15,9 @@ import { enumLabel, realtyStrings } from "@/lib/i18n-realty";
 import { FEATURES, OPERATIONS, PROPERTY_TYPES } from "@/lib/realty/constants";
 import { cn } from "@/lib/utils";
 
-export const SELECT = "h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-[#063C82] focus:outline-none focus:ring-2 focus:ring-[#063C82]/20";
+import { SELECT } from "./select";
+import { AddressFields, type AddressValue } from "./AddressFields";
+export { SELECT };
 
 export interface ProspectFormValues {
   id?: string;
@@ -46,7 +48,7 @@ const n = (s: string) => (s.trim() === "" ? null : Number(s));
 
 export function ProspectForm({
   initial,
-  zones,
+  zones: initialZones,
   advisors,
   branches,
 }: {
@@ -59,6 +61,25 @@ export function ProspectForm({
   const { lang } = usePreferences();
   const R = pickDict(realtyStrings, lang);
   const [v, setV] = useState(initial);
+  const [zones, setZones] = useState(initialZones);
+  // Colonias que todavía no son zona: se buscan por CP y se agregan (la zona es la colonia).
+  const [addr, setAddr] = useState<AddressValue>({ cp: "", colonia: "", municipio: "", estado: "", street: "" });
+  const [addingZone, setAddingZone] = useState(false);
+  async function addColonia() {
+    if (addr.colonia.trim().length < 2) return toast.error(R.chooseColonia);
+    if (v.zoneIds.length >= 5) return;
+    setAddingZone(true);
+    try {
+      const z = await ensureRealtyColoniaZone({ colonia: addr.colonia, postalCode: addr.cp || null, municipality: addr.municipio || null, state: addr.estado || null });
+      setZones((zs) => (zs.some((x) => x.id === z.id) ? zs : [...zs, { id: z.id, name: z.name }]));
+      setV((s) => (s.zoneIds.includes(z.id) ? s : { ...s, zoneIds: [...s.zoneIds, z.id] }));
+      setAddr({ cp: "", colonia: "", municipio: "", estado: "", street: "" });
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Error"));
+    } finally {
+      setAddingZone(false);
+    }
+  }
   const [saving, setSaving] = useState(false);
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<{ id: string; name: string; phone: string | null; email: string | null }[]>([]);
@@ -233,7 +254,7 @@ export function ProspectForm({
 
         <div className="mt-5">
           <Label>{R.zones}</Label>
-          <p className="mb-2 text-xs text-slate-500">{zones.length ? R.zonesHint : R.noZonesYet}</p>
+          <p className="mb-2 text-xs text-slate-500">{R.zonesHint}</p>
           <ol className="mb-2 space-y-1.5">
             {v.zoneIds.map((id, i) => (
               <li key={id} className="flex items-center gap-2 rounded-md border border-slate-200 bg-[#F2F4F6] px-2 py-1.5 text-sm">
@@ -254,6 +275,15 @@ export function ProspectForm({
                 </button>
               ))}
           </div>
+          {v.zoneIds.length < 5 && (
+            <div className="mt-3 rounded-lg border border-dashed border-slate-200 p-3">
+              <p className="mb-2 text-xs font-medium text-slate-600">{R.addColoniaTitle}</p>
+              <AddressFields idPrefix="pz" value={addr} onChange={(p) => setAddr((a) => ({ ...a, ...p }))} withStreet={false} />
+              <Button type="button" size="sm" variant="outline" className="mt-2" loading={addingZone} disabled={addr.colonia.trim().length < 2} onClick={addColonia}>
+                {R.addColonia}
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="mt-5">

@@ -11,7 +11,7 @@ import { lookupRealtyPostalCode } from "@/actions/realty";
 import { usePreferences } from "@/context/preferences";
 import { pickDict } from "@/lib/i18n-dict";
 import { realtyStrings } from "@/lib/i18n-realty";
-import { SELECT } from "./ProspectForm";
+import { SELECT } from "./select";
 
 export interface AddressValue {
   cp: string;

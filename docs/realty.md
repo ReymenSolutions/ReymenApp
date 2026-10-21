@@ -130,10 +130,14 @@ adivinar el formato de una dirección. El formulario va por partes:
 3. **Calle y número** (solo propiedades; es interno salvo que se active la
    ubicación exacta en la landing).
 
-En zonas, el nombre se llena con la colonia (se puede cambiar) y se guarda el
-CP. En propiedades se guardan `postalCode`, `neighborhood` (colonia),
-`municipality`, `state` y `addressLine`, y la zona se propone sola cuando la
-colonia o el CP coinciden con una zona existente.
+**La zona es la colonia.** La propiedad no tiene selector de zona: al guardar
+se asigna la zona de su colonia (colonia + CP) y, si no existe, se crea sola
+(`ensureColoniaZone` en `src/lib/realty/service.ts`); su punto aproximado para
+el mapa se busca después (`src/lib/realty/zone-geo.ts`). Colonias con el mismo
+nombre en otro CP son zonas distintas ("Centro (San Pedro Garza García)"). En
+el prospecto, las colonias de interés se eligen de las existentes o se agregan
+por CP. Market Pulse solo lista colonias con demanda u oferta. Una propiedad de
+antes sin colonia conserva la zona que tenía.
 
 **Buscar en el mapa** usa esas partes, de lo más fino a lo más general: la casa
 (búsqueda estructurada y luego texto), la colonia, el CP y el municipio. Si no
