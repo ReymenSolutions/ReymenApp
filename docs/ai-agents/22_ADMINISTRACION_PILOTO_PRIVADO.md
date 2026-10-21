@@ -44,6 +44,6 @@ Detener app/ingress de staging con `bash deploy/staging/run.sh stop`, volver al 
 - Typecheck y lint de los archivos nuevos: aprobados.
 - Build de producción local aprobado con proveedor simulado.
 - Chromium local sobre ese build: preparación pausada/idempotente, acceso denegado al propietario y anchos móviles aprobados (2 casos). Panel no encontrado y sin efectos fuera de staging aprobado (1 caso). El caso de entorno contrario se omite expresamente en cada ejecución; CI usa escenarios separados para cubrir ambos.
-- Primera regresión completa: 1 fallo y 1527 casos aprobados. El fallo fue la prueba existente de recuperación de clientes (`customer-detectors.test.ts`, se esperaba ejecución PENDING y no se obtuvo ninguna); sus ocho casos pasaron al repetir el archivo aislado. No se modificó ese código ni se ocultó el fallo. La repetición completa y CI deben aprobar antes de fusionar.
+- Primera regresión completa: 1 fallo y 1527 casos aprobados. El fallo fue la prueba existente de recuperación de clientes (`customer-detectors.test.ts`, se esperaba ejecución PENDING y no se obtuvo ninguna); sus ocho casos pasaron al repetir el archivo aislado. La segunda ejecución completa aprobó los 216 archivos y 1528 casos. No se modificó ese código ni se ocultó el fallo inicial. CI debe aprobar antes de fusionar.
 
 No se ha desplegado este incremento en el VPS ni se han realizado llamadas pagadas. No autoriza todavía el piloto productivo.
