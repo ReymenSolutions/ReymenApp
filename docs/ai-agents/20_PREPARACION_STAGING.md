@@ -64,6 +64,10 @@ Validar login en ambos roles, organización «Reymen Piloto», panel `/portal/ai
 
 Las pruebas de seguridad de configuración se ejecutan con `node --test deploy/staging/safety.test.mjs`; requieren Docker Compose, sin daemon para resolver YAML. Revisan destino del bootstrap, rechazo de configuración ajena, permisos 0600, no sobrescritura, red privada, puerto loopback y proveedor simulado.
 
+Evidencia local: 3/3 pruebas de configuración y validación de sintaxis correctas. Las 86 migraciones se aplicaron sobre un volumen nuevo de PostgreSQL de staging; bootstrap creó 1 organización, 2 usuarios y 2 módulos, con 0 llamadas IA. Un segundo bootstrap fue rechazado y conservó esas cantidades. Una petición HTTP externa desde la red interna fue rechazada. Para estas comprobaciones se utilizó Node 22 con las dependencias locales montadas: el build Docker local se bloqueó por conectividad al registro de paquetes, por lo que no se presenta como validación de la imagen final.
+
+La primera ejecución del workflow completo construyó las imágenes y pasó migración/bootstrap, pero detectó que Docker no publica puertos de una red interna. Se añadió el Nginx separado de entrada sin dar salida externa a la app. Exigir que el check **Private staging configuration / staging-smoke** del [PR #125](https://github.com/ReymenSolutions/ReymenApp/pull/125) pase sobre la última revisión antes de instalar. La suite funcional existente se valida también en el CI habitual; no se reemplaza por las tres pruebas de configuración.
+
 Rollback operacional: `sudo bash deploy/staging/run.sh stop`. Solo detiene la app y el Nginx de staging. Para detener también su base, usar el Compose de staging con `stop`; conservar volumen y `.env.staging`. No ejecutar `down -v`, reset ni restauraciones sobre producción. Si una migración falla, conservar evidencia y resolver hacia adelante en esta base aislada.
 
 ## Siguientes gates
