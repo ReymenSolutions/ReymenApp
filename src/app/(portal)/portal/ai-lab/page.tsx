@@ -1,3 +1,6 @@
+import { markSandboxEnabled } from "@/lib/ai/mark/contract";
+import { MarkSandbox } from "@/components/portal/ai-center/MarkSandbox";
+import { aiCenterUiEnabled } from "@/lib/ai/agents/center-ui";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { requireModule } from "@/lib/modules";
@@ -25,11 +28,13 @@ export default async function AgentTesterPage() {
         title={es ? "Probador del Agente IA" : "AI Agent tester"}
         description={es ? "Prueba qué respondería tu agente antes de activarlo en un canal" : "Test what your agent would answer before turning it on for a channel"}
       />
-      <PortalSectionTabs tabs={getAiWhatsappTabs(t, session.user.role as UserRole)} />
+      <PortalSectionTabs label={es ? "Secciones de asistentes IA" : "AI assistant sections"} wrap={aiCenterUiEnabled()} tabs={getAiWhatsappTabs(t, session.user.role as UserRole, lang)} />
       <AgentTester
+        plainLanguage={aiCenterUiEnabled()}
         aiConfigured={isDraftProviderConfigured()}
-        notConfiguredText={es ? "Falta la clave de Claude en el servidor (ANTHROPIC_API_KEY): el probador funciona cuando esté configurada." : "The server has no Claude key (ANTHROPIC_API_KEY): the tester works once it is set."}
+        notConfiguredText={aiCenterUiEnabled() ? (es ? "La IA no está disponible por el momento. Puedes preparar tus reglas y volver a intentar más tarde." : "AI is currently unavailable. You can prepare your rules and try again later.") : es ? "Falta la clave de Claude en el servidor (ANTHROPIC_API_KEY): el probador funciona cuando esté configurada." : "The server has no Claude key (ANTHROPIC_API_KEY): the tester works once it is set."}
       />
+      {markSandboxEnabled() && <MarkSandbox lang={lang} />}
     </div>
   );
 }

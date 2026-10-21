@@ -1,3 +1,6 @@
+import { aiCenterUiEnabled } from "./ai/agents/center-ui";
+import { aiCenterCopy } from "./ai/agents/center-copy";
+import type { Lang } from "./i18n";
 import { can } from "./permissions";
 import type { Strings } from "./i18n";
 import type { UserRole } from "@prisma/client";
@@ -10,7 +13,19 @@ import type { PortalTab } from "@/components/portal/PortalSectionTabs";
 // families' page headers stay consistent instead of re-deriving the list
 // on each page.
 
-export function getAiWhatsappTabs(t: Strings, role: UserRole): PortalTab[] {
+export function getAiWhatsappTabs(t: Strings, role: UserRole, lang: Lang = "es"): PortalTab[] {
+  if (aiCenterUiEnabled()) {
+    const c = aiCenterCopy(lang);
+    const tabs: PortalTab[] = [
+      { href: "/portal/whatsapp", label: c.overview },
+      { href: "/portal/ai-agents", label: c.agents, matchChildren: true },
+      { href: "/portal/ai-channels", label: c.channels },
+      { href: "/portal/knowledge-base", label: c.knowledge },
+    ];
+    if (can(role, "knowledge_base:manage")) tabs.push({ href: "/portal/ai-lab", label: c.test });
+    if (can(role, "settings:view")) tabs.push({ href: "/portal/ai-usage", label: c.usage });
+    return tabs;
+  }
   const tabs: PortalTab[] = [
     { href: "/portal/whatsapp", label: t.whatsapp },
     { href: "/portal/knowledge-base", label: t.knowledgeBase },

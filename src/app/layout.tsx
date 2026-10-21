@@ -3,8 +3,7 @@ import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import { SessionProvider } from "next-auth/react";
 import { cookies } from "next/headers";
-import NextAuth from "next-auth";
-import { authConfig } from "@/lib/auth.config";
+import { auth } from "@/lib/auth";
 import { PreferencesProvider } from "@/context/preferences";
 import "./globals.css";
 
@@ -17,19 +16,11 @@ export const metadata: Metadata = {
   appleWebApp: { title: "Reymen", capable: true, statusBarStyle: "default" },
 };
 
-// Edge-safe auth() (same pattern as middleware.ts) — this only needs to
-// decode the already-issued JWT for its theme/language claims, not sign in,
-// so it skips the Credentials provider and PrismaAdapter that the full
-// @/lib/auth pulls in.
-const { auth } = NextAuth(authConfig);
-
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  // Prefer the value carried on the session (set from the User row at login,
-  // kept in sync by updatePreferences()'s "update" trigger) so preferences
-  // follow the account across devices and survive a fresh login even when
-  // the reymen-theme/reymen-lang cookies were never set (new browser,
-  // cleared cookies, etc). Cookies are the fallback for logged-out pages,
-  // where there's no session to read from yet.
+  // Use the validated server session: its preferences come from the User
+  // row (cache invalidated by updatePreferences), rather than JWT claims
+  // issued at login. Otherwise a hard reload restores an old theme/language.
+  // Cookies remain the fallback for logged-out pages.
   const session = await auth().catch(() => null);
   const store = await cookies();
 

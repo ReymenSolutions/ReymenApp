@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Bot, Send, User, UserRoundCog, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -47,12 +47,16 @@ const COPY = {
   },
 };
 
-export function AgentTester({ aiConfigured, notConfiguredText }: { aiConfigured: boolean; notConfiguredText: string }) {
+export function AgentTester({ aiConfigured, notConfiguredText, plainLanguage = false }: { aiConfigured: boolean; notConfiguredText: string; plainLanguage?: boolean }) {
   const { lang } = usePreferences();
-  const t = COPY[lang === "en" ? "en" : "es"];
+  const base = COPY[lang === "en" ? "en" : "es"];
+  const t = plainLanguage ? { ...base, intro: lang === "es" ? "Prueba con la información actual de tu negocio. No se envían mensajes ni se modifican clientes. Cada prueba usa la IA configurada y registra consumo de tu plan." : "Test with your current business information. No messages are sent and no customers are changed. Each test uses the configured AI and records plan usage." } : base;
+  const epoch = useRef(0);
+  const [consent, setConsent] = useState(false);
+  useEffect(() => () => { ++epoch.current; }, []);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
-  const [pending, start] = useTransition();
+  const [pending, setPending] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
 
   function toHistory(list: Turn[]): { role: "USER" | "ASSISTANT"; content: string }[] {
@@ -64,24 +68,28 @@ export function AgentTester({ aiConfigured, notConfiguredText }: { aiConfigured:
     return out;
   }
 
-  function submit() {
+  async function submit() {
     const text = input.trim();
-    if (!text || pending || !aiConfigured) return;
+    if (!text || pending || !aiConfigured || (plainLanguage && !consent)) return;
     const next: Turn[] = [...turns, { kind: "customer", text }];
     setTurns(next);
     setInput("");
-    start(async () => {
+    const token = ++epoch.current;
+    setPending(true);
+    {
       try {
         const result: AgentPreview = await testAgentReply(toHistory(next));
+        if (token !== epoch.current) return;
         setTurns((cur) => [...cur, result.action === "reply" ? { kind: "agent", text: result.reply } : { kind: "handoff", reason: result.reason, draftedReply: result.draftedReply }]);
       } catch (e) {
+        if (token !== epoch.current) return;
         setTurns(turns); // se quita el mensaje que no obtuvo respuesta
         setInput(text);
         toast.error(t.error, { description: getErrorMessage(e, "") || undefined });
       } finally {
-        setTimeout(() => bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" }), 50);
+        if (token === epoch.current) { setPending(false); setTimeout(() => bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" }), 50); }
       }
-    });
+    }
   }
 
   return (
@@ -118,8 +126,10 @@ export function AgentTester({ aiConfigured, notConfiguredText }: { aiConfigured:
           <div ref={bottom} />
         </div>
 
-        <div className="flex items-end gap-2">
+        {plainLanguage && <label className="flex min-h-11 items-start gap-3 text-sm text-slate-600"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-1 h-5 w-5 shrink-0" />{lang === "es" ? "Entiendo que esta prueba consume capacidad de IA de mi plan." : "I understand this test uses AI capacity from my plan."}</label>}
+        <div className="flex flex-wrap items-end gap-2">
           <Textarea
+            aria-label={lang === "es" ? "Mensaje de prueba" : "Test message"}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -132,16 +142,17 @@ export function AgentTester({ aiConfigured, notConfiguredText }: { aiConfigured:
             rows={2}
             maxLength={1000}
             disabled={!aiConfigured}
-            className="min-h-0 flex-1"
+            className="min-h-11 flex-1 basis-48 text-base"
           />
-          <Button onClick={submit} disabled={!input.trim() || !aiConfigured} loading={pending}>
+          <Button className={plainLanguage ? "min-h-11" : undefined} onClick={submit} disabled={!input.trim() || !aiConfigured || (plainLanguage && !consent)} loading={pending}>
             {!pending && <Send className="h-4 w-4" />} {t.send}
           </Button>
         </div>
+        {plainLanguage && <p className="text-xs text-slate-500">{lang === "es" ? "Reiniciar oculta los resultados pendientes; una prueba ya iniciada puede registrar consumo." : "Reset hides pending results; a test already started may still record usage."}</p>}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-slate-500">{t.editHint}</p>
           {turns.length > 0 && (
-            <Button size="sm" variant="ghost" onClick={() => setTurns([])}>
+            <Button size="sm" variant="ghost" className={plainLanguage ? "min-h-11" : undefined} onClick={() => { ++epoch.current; setTurns([]); setInput(""); setPending(false); }}>
               <RotateCcw className="h-3.5 w-3.5" /> {t.reset}
             </Button>
           )}

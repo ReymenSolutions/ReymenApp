@@ -168,7 +168,7 @@ describe("borradores de IA (con base de datos y cliente simulado)", () => {
     await prisma.replyDraft.create({ data: { organizationId: org.id, conversationId: conv.id, basedOnMessageId: last.id, status: "GENERATING" } });
     create.mockResolvedValue(text("Recuperado"));
     expect(await getOrCreateReplyDraft(org.id, conv.id)).toEqual({ state: "generating" });
-    expect(await getOrCreateReplyDraft(org.id, conv.id, { now: new Date(Date.now() + 5 * 60_000) })).toMatchObject({ state: "ready", draft: { content: "Recuperado" } });
+    expect(await getOrCreateReplyDraft(org.id, conv.id, { now: new Date(Date.now() + 11 * 60_000) })).toMatchObject({ state: "ready", draft: { content: "Recuperado" } });
   });
 
   it("descartar y marcar como usado respetan la organización y el estado", async () => {
@@ -196,4 +196,35 @@ describe("borradores de IA (con base de datos y cliente simulado)", () => {
     expect(r.state).toBe("ready");
     expect(create).not.toHaveBeenCalled();
   });
+  it("serializes force regenerations and does not let late generation overwrite a dismissal", async () => {
+    const org = await newOrg();
+    const conv = await conversation(org.id, ["USER"]);
+    create.mockResolvedValue(text("First"));
+    await getOrCreateReplyDraft(org.id, conv.id);
+    let started!: () => void, finish!: (value: ReturnType<typeof text>) => void;
+    const ready = new Promise<void>((resolve) => { started = resolve; });
+    const response = new Promise<ReturnType<typeof text>>((resolve) => { finish = resolve; });
+    create.mockImplementation(() => { started(); return response; });
+    const running = getOrCreateReplyDraft(org.id, conv.id, { force: true });
+    await ready;
+    expect(await getOrCreateReplyDraft(org.id, conv.id, { force: true })).toEqual({ state: "generating" });
+    const draft = await prisma.replyDraft.findFirstOrThrow({ where: { conversationId: conv.id } });
+    await dismissReplyDraft(org.id, draft.id);
+    finish(text("Late response must not replace dismissal"));
+    expect(await running).toEqual({ state: "none" });
+    expect(await prisma.replyDraft.findUnique({ where: { id: draft.id } })).toMatchObject({ status: "DISMISSED" });
+    expect(create).toHaveBeenCalledTimes(2); // First + one regeneration, not two.
+  });
+
+  it("only one concurrent caller claims an abandoned draft", async () => {
+    const org = await newOrg();
+    const conv = await conversation(org.id, ["USER"]);
+    const last = await prisma.message.findFirstOrThrow({ where: { conversationId: conv.id } });
+    await prisma.replyDraft.create({ data: { organizationId: org.id, conversationId: conv.id, basedOnMessageId: last.id, status: "GENERATING", updatedAt: new Date(Date.now() - 11 * 60_000) } });
+    create.mockResolvedValue(text("Recovered once"));
+    const results = await Promise.all(Array.from({ length: 4 }, () => getOrCreateReplyDraft(org.id, conv.id, { force: true })));
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(results.some((r) => r.state === "ready")).toBe(true);
+  });
+
 });

@@ -1,14 +1,18 @@
+import { assertKnowledgeCurrent } from "@/lib/ai/knowledge/retrieval";
+import { connectionAiAllowed } from "./channel-connections/service";
 import { after } from "next/server";
+import { observeLegacyCompletion } from "./ai/agents/executions";
 import type { LeadStatus, MessageRole, PipelineAiActionKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { hasModule } from "@/lib/modules";
 import { logAudit } from "@/lib/audit";
 import { UserError } from "@/lib/user-error";
 import { getChannelMode } from "@/lib/agent-mode";
-import { buildBusinessInstructions } from "@/lib/rulebook";
+import { buildBusinessContext } from "@/lib/rulebook";
 import { buildDraftMessages, generateText, isDraftProviderConfigured } from "@/lib/ai-draft";
 import { AiBudgetError } from "@/lib/ai/budget";
 import { syncLeadStatusFromOpportunity } from "@/lib/lead-status-sync";
+import { AUTO_JOB_SOURCE, PIPELINE_JOB_TYPE, AUTO_JOB_LEASE_MS, AUTO_JOB_MAX_ATTEMPTS } from "./ai-auto-jobs";
 
 // ── Pipeline con IA ──────────────────────────────────────────────────────────
 // El agente lee cada mensaje nuevo de un contacto del CRM y decide qué pasa con su oportunidad.
@@ -110,22 +114,22 @@ Rules:
 type RunOutcome = "analyzed" | "skipped";
 
 /** Analiza el último mensaje del cliente de una conversación y aplica o sugiere lo que corresponda. Nunca lanza. */
-export async function runPipelineAgent(organizationId: string, conversationId: string, opts: { now?: Date } = {}): Promise<RunOutcome> {
+export async function runPipelineAgent(organizationId: string, conversationId: string, opts: { now?: Date; messageId?: string; throwOnError?: boolean } = {}): Promise<RunOutcome> {
   const now = opts.now ?? new Date();
   try {
     if (!isDraftProviderConfigured()) return "skipped";
     if (!(await hasModule(organizationId, "CRM")) || !(await hasModule(organizationId, "AI_WHATSAPP"))) return "skipped";
 
     const conv = await prisma.conversation.findFirst({ where: { id: conversationId, organizationId } });
-    if (!conv?.leadId) return "skipped";
+    if (!conv?.leadId || (conv.channelConnectionId && !await prisma.$transaction(tx => connectionAiAllowed(tx, organizationId, conv)))) return "skipped";
     if ((await getChannelMode(organizationId, conv.channel)) === "OFF") return "skipped";
     const lead = await prisma.lead.findFirst({ where: { id: conv.leadId, organizationId, deletedAt: null }, select: { id: true, name: true, status: true } });
     if (!lead) return "skipped";
 
-    const recent = await prisma.message.findMany({ where: { conversationId }, orderBy: { createdAt: "desc" }, take: 20, select: { id: true, role: true, content: true } });
+    const recent = await prisma.message.findMany({ where: { conversationId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 20, select: { id: true, role: true, content: true } });
     const messages = recent.reverse();
     const last = messages[messages.length - 1];
-    if (!last || last.role !== "USER") return "skipped";
+    if (!last || last.role !== "USER" || (opts.messageId && last.id !== opts.messageId)) return "skipped";
 
     const lastRun = await prisma.pipelineAiRun.findFirst({ where: { conversationId }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
     if (lastRun && now.getTime() - lastRun.createdAt.getTime() < ANALYSIS_COOLDOWN_MS) return "skipped";
@@ -138,12 +142,12 @@ export async function runPipelineAgent(organizationId: string, conversationId: s
       select: { id: true, title: true, pipelineStageId: true },
     });
 
-    const instructions = await buildBusinessInstructions(organizationId);
+    const { instructions, knowledgeVersion, knowledgeManaged } = await buildBusinessContext(organizationId, last.content, `pipeline:${conversationId}:${last.id}`);
     const system = [
       SYSTEM,
       `PIPELINE STAGES (in order)\n${stages.map((s) => `- ${s.name}${s.isWon ? " (won)" : s.isLost ? " (lost)" : ""}`).join("\n")}`,
       `CONTACT\nName: ${lead.name}\nCRM status: ${lead.status}\nOpen opportunity: ${openOpp ? `"${openOpp.title}" at stage "${stages.find((s) => s.id === openOpp.pipelineStageId)?.name ?? "?"}"` : "none"}`,
-      ...(instructions.trim() ? [`BUSINESS CONTEXT\n${instructions.trim().slice(0, 3000)}`] : []),
+      ...(instructions.trim() ? [`BUSINESS CONTEXT\n${(knowledgeManaged ? instructions.trim() : instructions.trim().slice(0, 3000))}`] : []),
     ].join("\n\n");
     const turns = buildDraftMessages(messages as { role: MessageRole; content: string }[]);
     if (turns.length === 0) return "skipped";
@@ -151,8 +155,12 @@ export async function runPipelineAgent(organizationId: string, conversationId: s
     const mockText = JSON.stringify({ intent: "pricing_inquiry", summary: "Pregunta por precios.", action: openOpp ? "none" : "create_opportunity", title: `Interés de ${lead.name}`, reason: "Preguntó por precios." });
     const result = await generateText({ organizationId, agentKey: "pipeline", operation: "pipeline", origin: "pipeline", conversationId, requestId: `pipeline:${conversationId}:${last.id}` }, system, turns, { json: true, mockText });
     if ("refused" in result) return "skipped";
+    await prisma.$transaction(tx => assertKnowledgeCurrent(tx, organizationId, knowledgeVersion));
     const analysis = parseAnalysis(result.text);
     if (!analysis) return "skipped";
+
+    const currentLast = await prisma.message.findFirst({ where: { conversationId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true } });
+    if (currentLast?.id !== last.id || (conv.channelConnectionId && !await prisma.$transaction(tx => connectionAiAllowed(tx, organizationId, conv)))) return "skipped";
 
     // Una sola vez por mensaje (llave única): si otra petición ya lo analizó, no se repite.
     let run;
@@ -201,19 +209,68 @@ export async function runPipelineAgent(organizationId: string, conversationId: s
     return "analyzed";
   } catch (err) {
     if (err instanceof AiBudgetError) return "skipped"; // pausa por presupuesto: el pipeline manual sigue funcionando
-    console.error("[ai-pipeline] failed", err);
+    if (opts.throwOnError) throw err;
+    console.error("[ai-pipeline] failed");
     return "skipped";
   }
 }
 
-/** Programa el análisis para después de contestarle al webhook. */
+/** after is an optimization over the persisted jobs, not the only copy of accepted work. */
 export function schedulePipelineAgent(organizationId: string, conversationId: string) {
-  const job = () => runPipelineAgent(organizationId, conversationId).then(() => undefined);
-  try {
-    after(job);
-  } catch {
-    void job();
+  const job = () => recoverPipelineAnalyses({ organizationId, conversationId }).then(() => undefined).catch(() => { console.error("[ai-pipeline] fast path interrupted"); });
+  try { after(job); } catch { void job(); }
+}
+
+/** Minimal recovery for existing CRM analysis; uncertain model/write attempts are never replayed. */
+export async function recoverPipelineAnalyses(opts: { now?: Date; limit?: number; organizationId?: string; conversationId?: string } = {}) {
+  const now = opts.now ?? new Date();
+  const jobs = await prisma.webhookEvent.findMany({ where: {
+    source: AUTO_JOB_SOURCE, eventType: PIPELINE_JOB_TYPE,
+    ...(opts.organizationId ? { organizationId: opts.organizationId } : {}),
+    ...(opts.conversationId ? { payload: { path: ["conversationId"], equals: opts.conversationId } } : {}),
+    OR: [ { status: "PENDING" },
+      { status: "PROCESSING", OR: [{ claimedAt: { lt: new Date(now.getTime() - AUTO_JOB_LEASE_MS) } }, { claimedAt: null }] },
+      { status: "FAILED", attempts: { lt: AUTO_JOB_MAX_ATTEMPTS }, claimedAt: { lte: new Date(now.getTime() - 5 * 60_000) } },
+    ],
+  }, orderBy: { createdAt: "asc" }, take: opts.limit ?? 3 });
+  const summary = { recovered: 0, analyzed: 0, failed: 0 };
+  for (const stored of jobs) {
+    const attempts = Math.min(stored.attempts + 1, AUTO_JOB_MAX_ATTEMPTS);
+    const lease = { id: stored.id, status: "PROCESSING" as const, attempts, claimedAt: now };
+    const claim = await prisma.webhookEvent.updateMany({ where: { id: stored.id, status: stored.status, attempts: stored.attempts, claimedAt: stored.claimedAt }, data: { status: "PROCESSING", attempts, claimedAt: now } });
+    if (!claim.count) continue;
+    await observeLegacyCompletion(stored.id);
+    summary.recovered++;
+    const payload = stored.payload as { conversationId?: unknown; messageId?: unknown; stage?: unknown };
+    const finish = (error: string | null = null) => prisma.webhookEvent.updateMany({ where: lease, data: { status: "PROCESSED", processedAt: new Date(), errorMessage: error } });
+    try {
+      if (!payload || typeof payload.conversationId !== "string" || typeof payload.messageId !== "string") { await finish("invalid_pipeline_job"); continue; }
+      if (payload.stage !== "queued" || stored.attempts >= AUTO_JOB_MAX_ATTEMPTS) {
+        await prisma.webhookEvent.updateMany({ where: lease, data: { status: "FAILED", attempts: AUTO_JOB_MAX_ATTEMPTS, errorMessage: "pipeline_execution_unconfirmed" } });
+        summary.failed++; continue;
+      }
+      const conv = await prisma.conversation.findFirst({ where: { id: payload.conversationId, organizationId: stored.organizationId }, include: { organization: { select: { isActive: true } } } });
+      const latest = conv ? await prisma.message.findFirst({ where: { conversationId: conv.id }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] }) : null;
+      if (!conv || !conv.organization.isActive || latest?.id !== payload.messageId || latest.role !== "USER" || (await getChannelMode(stored.organizationId, conv.channel)) === "OFF" || !(await hasModule(stored.organizationId, "CRM")) || !(await hasModule(stored.organizationId, "AI_WHATSAPP"))) { await finish("pipeline_turn_no_longer_eligible"); continue; }
+      // CRM linking can finish after message admission. Wait a bounded number of sweeps instead of losing analysis.
+      if (!conv.leadId) {
+        await prisma.webhookEvent.updateMany({ where: lease, data: { status: "FAILED", errorMessage: "pipeline_contact_not_ready" } });
+        summary.failed++; continue;
+      }
+      const marked = await prisma.webhookEvent.updateMany({ where: lease, data: { payload: { conversationId: conv.id, messageId: payload.messageId, stage: "generating" } } });
+      if (!marked.count) continue;
+      const outcome = await runPipelineAgent(stored.organizationId, conv.id, { now, messageId: payload.messageId, throwOnError: true });
+      await finish(outcome === "skipped" ? "pipeline_skipped" : null);
+      if (outcome === "analyzed") summary.analyzed++;
+    } catch {
+      // Side effects may have begun: preserve failure for operator review, never rerun a possible CRM mutation.
+      await prisma.webhookEvent.updateMany({ where: lease, data: { status: "FAILED", attempts: AUTO_JOB_MAX_ATTEMPTS, errorMessage: "pipeline_work_interrupted" } }).catch(() => undefined);
+      summary.failed++;
+    } finally {
+      await observeLegacyCompletion(stored.id);
+    }
   }
+  return summary;
 }
 
 // ── Deshacer / aceptar / descartar ───────────────────────────────────────────

@@ -10,6 +10,8 @@ datasource db {
 // ─── TENANT ──────────────────────────────────────────────────────
 
 model Organization {
+  agentSandboxRuns AgentSandboxRun[]
+  knowledgeAccessPolicy KnowledgeAccessPolicy?
   id                       String    @id @default(cuid())
   name                     String
   slug                     String    @unique
@@ -68,6 +70,10 @@ model Organization {
   createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt
 
+  channelConnections      ChannelConnection[]
+  agentInstances          AgentInstance[]
+  agentRollout            AgentModelRollout?
+  agentExecutions         AgentExecution[]
   users                   User[]
   leads                   Lead[]
   automations             Automation[]
@@ -519,6 +525,8 @@ model Conversation {
   id                 String             @id @default(cuid())
   organizationId     String
   channel            String
+  channelConnectionId String?
+  externalThreadId   String?
   contactPhone       String?
   // Misma llave que Lead.phoneKey, para encontrar la conversación aunque el
   // número llegue con otro formato.
@@ -550,12 +558,15 @@ model Conversation {
   lead         Lead?        @relation(fields: [leadId], references: [id])
   messages     Message[]
   drafts       ReplyDraft[]
+  channelConnection ChannelConnection? @relation(fields: [organizationId, channelConnectionId], references: [organizationId, id], onDelete: Restrict)
 
   @@index([organizationId])
   @@index([organizationId, phoneKey])
   @@index([leadId])
   @@index([organizationId, status])
   @@index([organizationId, assignedToId])
+  @@unique([channelConnectionId, externalThreadId])
+  @@index([organizationId, channelConnectionId])
   @@index([organizationId, channel, lastMessageAt])
   @@index([organizationId, contactHandle])
   @@index([organizationId, contactEmail])
@@ -887,6 +898,9 @@ model WhatsAppAssistant {
 // ─── KNOWLEDGE BASE ───────────────────────────────────────────────
 
 model KnowledgeBase {
+  knowledgeVersion Int @default(0)
+  revisions KnowledgeRevision[]
+  grants KnowledgeGrant[]
   id             String   @id @default(cuid())
   organizationId String
   title          String
@@ -902,6 +916,7 @@ model KnowledgeBase {
   @@index([organizationId])
   @@index([organizationId, category])
   @@index([organizationId, isActive])
+  @@unique([organizationId, id])
 }
 
 /// Rulebook del negocio: las reglas de voz, saludo, límites y precios que la IA sigue en cada respuesta.
@@ -2822,6 +2837,227 @@ model LoyaltyPosRedemption {
   reward LoyaltyReward @relation(fields: [rewardId], references: [id], onDelete: Restrict)
   @@unique([organizationId, orderId])
   @@index([rewardId, status])
+}
+
+// Phase 1: additive model. Legacy tables remain authoritative; no specialist is activated.
+enum AgentInstanceStatus {
+  LEGACY
+  PAUSED
+}
+
+enum AgentExecutionStatus {
+  QUEUED
+  RUNNING
+  WAITING_HANDOFF
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+model AgentDefinition {
+  key          String
+  version      Int
+  displayName  String
+  specialty    String
+  manifest     Json
+  createdAt    DateTime @default(now())
+  instances    AgentInstance[]
+
+  @@id([key, version])
+}
+
+model AgentModelRollout {
+  organizationId String @id
+  shadowEnabled  Boolean @default(false)
+  updatedById    String?
+  updatedAt      DateTime @updatedAt
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+}
+
+model AgentInstance {
+  id                String @id @default(cuid())
+  organizationId    String
+  definitionKey     String
+  definitionVersion Int
+  publicName        String
+  status            AgentInstanceStatus @default(LEGACY)
+  configVersion     Int @default(1)
+  legacyAssistantId String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  definition        AgentDefinition @relation(fields: [definitionKey, definitionVersion], references: [key, version], onDelete: Restrict)
+  revisions         AgentConfigRevision[]
+  channelRoutes     ChannelRouting[]
+  knowledgeGrants   KnowledgeGrant[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, definitionKey])
+}
+
+model AgentConfigRevision {
+  organizationId String
+  agentInstanceId String
+  version        Int
+  sourceHash     String
+  snapshot       Json
+  createdById    String?
+  createdAt      DateTime @default(now())
+  instance       AgentInstance @relation(fields: [organizationId, agentInstanceId], references: [organizationId, id], onDelete: Restrict)
+  executions     AgentExecution[]
+
+  @@id([organizationId, agentInstanceId, version])
+}
+
+// Mirror of Phase 0 work, NOT a second sender/CRM worker. No prompts, messages or secrets in steps.
+model AgentExecution {
+  id               String @id @default(cuid())
+  organizationId   String
+  agentInstanceId  String
+  configVersion    Int
+  conversationId   String
+  messageId        String
+  operation        String
+  legacyJobId      String
+  status           AgentExecutionStatus @default(QUEUED)
+  attempts         Int @default(0)
+  claimedAt        DateTime?
+  leaseExpiresAt   DateTime?
+  nextAttemptAt    DateTime?
+  lastErrorCode    String?
+  completedAt      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  config           AgentConfigRevision @relation(fields: [organizationId, agentInstanceId, configVersion], references: [organizationId, agentInstanceId, version], onDelete: Restrict)
+  steps            AgentExecutionStep[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, legacyJobId])
+  @@unique([organizationId, conversationId, messageId, operation])
+  @@index([organizationId, status, createdAt])
+}
+
+model AgentExecutionStep {
+  organizationId String
+  executionId    String
+  stepKey        String
+  status         AgentExecutionStatus
+  attempts       Int @default(0)
+  lastErrorCode  String?
+  updatedAt      DateTime @updatedAt
+  execution      AgentExecution @relation(fields: [organizationId, executionId], references: [organizationId, id], onDelete: Restrict)
+
+  @@id([organizationId, executionId, stepKey])
+}
+
+// Phase 3: explicit accounts; nothing is connected/enabled by migration.
+enum ChannelConnectionState {
+  UNVERIFIED
+  HEALTHY
+  DEGRADED
+  DISCONNECTED
+}
+
+// SQL also preserves a partial unique index on verified channel/account ownership.
+model ChannelConnection {
+  id                 String @id @default(cuid())
+  organizationId     String
+  channel            String
+  label              String
+  externalAccountKey String
+  credentialRef      String
+  enabled            Boolean @default(false)
+  version            Int @default(1)
+  generation         Int @default(1)
+  state              ChannelConnectionState @default(UNVERIFIED)
+  healthSequence     Int @default(0)
+  checkedAt          DateTime?
+  providerVerified   Boolean @default(false)
+  canReceive         Boolean @default(false)
+  canSend            Boolean @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  route              ChannelRouting?
+  conversations      Conversation[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, channel, externalAccountKey])
+}
+
+model ChannelRouting {
+  connectionId    String @id
+  organizationId  String
+  agentInstanceId String
+  enabled         Boolean @default(true)
+  version         Int @default(1)
+  updatedAt       DateTime @updatedAt
+  connection      ChannelConnection @relation(fields: [organizationId, connectionId], references: [organizationId, id], onDelete: Restrict)
+  agent           AgentInstance @relation(fields: [organizationId, agentInstanceId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, connectionId])
+}
+
+// Phase 4: immutable content revisions; grants pin an explicitly reviewed version.
+model KnowledgeRevision {
+  organizationId String
+  articleId String
+  version Int
+  title String
+  content String @db.Text
+  category String?
+  tags String[]
+  sourceHash String
+  createdAt DateTime @default(now())
+  createdById String?
+  publishedAt DateTime?
+  publishedById String?
+  article KnowledgeBase @relation(fields: [organizationId, articleId], references: [organizationId, id], onDelete: Restrict)
+  grants KnowledgeGrant[]
+  @@id([organizationId, articleId, version])
+}
+model KnowledgeGrant {
+  organizationId String
+  articleId String
+  agentInstanceId String
+  revisionVersion Int
+  enabled Boolean @default(true)
+  version Int @default(1)
+  updatedAt DateTime @updatedAt
+  article KnowledgeBase @relation(fields: [organizationId, articleId], references: [organizationId, id], onDelete: Restrict)
+  revision KnowledgeRevision @relation(fields: [organizationId, articleId, revisionVersion], references: [organizationId, articleId, version], onDelete: Restrict)
+  instance AgentInstance @relation(fields: [organizationId, agentInstanceId], references: [organizationId, id], onDelete: Restrict)
+  @@id([organizationId, articleId, agentInstanceId])
+  @@index([organizationId, agentInstanceId, enabled])
+}
+model KnowledgeAccessPolicy {
+  organizationId String @id
+  enabled Boolean @default(false)
+  version Int @default(1)
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+}
+
+// Fase 5 local harness: no live agent, provider consumption or channel destination.
+model AgentSandboxRun {
+  id String @id @default(cuid())
+  organizationId String
+  createdById String
+  requestKey String
+  inputHash String
+  fixtureVersion String
+  definitionVersion Int
+  status AgentExecutionStatus @default(QUEUED)
+  trace Json @default("[]")
+  result Json?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@unique([organizationId, createdById, requestKey])
+  @@index([organizationId, createdById, createdAt])
+  @@index([status, expiresAt])
 }
 
 // ─── REYMEN Ops Realty ───────────────────────────────────────────────

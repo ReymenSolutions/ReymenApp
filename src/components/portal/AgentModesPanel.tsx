@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Power, Lightbulb, Zap } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePreferences } from "@/context/preferences";
 import { setAgentChannelMode } from "@/actions/agent";
@@ -57,9 +59,16 @@ const COPY = {
 const ICON = { OFF: Power, SUGGEST: Lightbulb, AUTO: Zap } as const;
 const ORDER: AgentMode[] = ["OFF", "SUGGEST", "AUTO"];
 
-export function AgentModesPanel({ initial, cap, canEdit, aiConfigured }: { initial: Record<string, AgentMode>; cap: { cap: number | null; overBy: number }; canEdit: boolean; aiConfigured: boolean }) {
+export function AgentModesPanel({ initial, cap, canEdit, aiConfigured, plainLanguage = false }: { initial: Record<string, AgentMode>; cap: { cap: number | null; overBy: number }; canEdit: boolean; aiConfigured: boolean; plainLanguage?: boolean }) {
   const { lang } = usePreferences();
-  const t = COPY[lang === "en" ? "en" : "es"];
+  const base = COPY[lang === "en" ? "en" : "es"];
+  const t = plainLanguage ? { ...base,
+    noKey: lang === "es" ? "La IA no está disponible por el momento. Tu equipo puede seguir atendiendo manualmente." : "AI is currently unavailable. Your team can continue replying manually.",
+    capLine: (active: number, cap: number) => lang === "es" ? `Canales con IA: ${active} de ${cap} incluidos en tu plan` : `Channels with AI: ${active} of ${cap} included in your plan`,
+    capReached: lang === "es" ? "Llegaste al límite de canales con IA. Apaga uno o revisa tu plan para activar otro." : "You reached your limit of channels with AI. Turn one off or review your plan to enable another.",
+    capOver: (active: number, cap: number) => lang === "es" ? `Tienes ${active} canales con IA y tu plan incluye ${cap}. Conservas los actuales; para activar otro, apaga uno o revisa tu plan.` : `You have ${active} channels with AI and your plan includes ${cap}. You keep the current channels; turn one off or review your plan to enable another.`,
+  } : base;
+  const confirmationTrigger = useRef<HTMLElement | null>(null);
   const [modes, setModes] = useState(initial);
   const [pending, start] = useTransition();
 
@@ -74,6 +83,7 @@ export function AgentModesPanel({ initial, cap, canEdit, aiConfigured }: { initi
       return;
     }
     if (mode === "AUTO" && !confirmed) {
+      confirmationTrigger.current = document.activeElement as HTMLElement | null;
       setConfirming(channel);
       return;
     }
@@ -112,7 +122,8 @@ export function AgentModesPanel({ initial, cap, canEdit, aiConfigured }: { initi
               <p className="text-sm font-medium text-slate-900">{t.channels[channel] ?? channel}</p>
               <p className="text-xs text-slate-500">{t.modes[modes[channel]].hint}</p>
             </div>
-            <div role="radiogroup" aria-label={t.channels[channel] ?? channel} className="inline-flex flex-shrink-0 rounded-lg bg-slate-100 p-0.5">
+            <div role="radiogroup" aria-label={t.channels[channel] ?? channel} className="inline-flex max-w-full flex-wrap shrink-0 rounded-lg bg-slate-100 p-0.5"
+              onKeyDown={e => { if (!plainLanguage || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) return; e.preventDefault(); const buttons = [...e.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')]; const index = buttons.indexOf(e.target as HTMLButtonElement); const next = e.key === "Home" ? 0 : e.key === "End" ? buttons.length - 1 : (index + (["ArrowLeft", "ArrowUp"].includes(e.key) ? -1 : 1) + buttons.length) % buttons.length; buttons[next]?.focus(); buttons[next]?.click(); }}>
               {ORDER.map((mode) => {
                 const Icon = ICON[mode];
                 const active = modes[channel] === mode;
@@ -122,10 +133,11 @@ export function AgentModesPanel({ initial, cap, canEdit, aiConfigured }: { initi
                     type="button"
                     role="radio"
                     aria-checked={active}
+                    tabIndex={plainLanguage ? (active ? 0 : -1) : undefined}
                     disabled={!canEdit || pending}
                     title={t.modes[mode].hint}
                     onClick={() => choose(channel, mode)}
-                    className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium motion-micro transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50 ${active ? "bg-brand-600 text-[rgb(255_255_255)] shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+                    className={`${plainLanguage ? "min-h-11" : ""} flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium motion-micro transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50 ${active ? "bg-brand-600 text-[rgb(255_255_255)] shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
                   >
                     <Icon className="h-3.5 w-3.5" />
                     {t.modes[mode].label}
@@ -133,7 +145,7 @@ export function AgentModesPanel({ initial, cap, canEdit, aiConfigured }: { initi
                 );
               })}
             </div>
-            {confirming === channel && (
+            {!plainLanguage && confirming === channel && (
               <div role="alertdialog" aria-label={t.confirmTitle} className="w-full rounded-card border border-amber-200 bg-amber-50 p-3 sm:order-last">
                 <p className="text-sm font-medium text-amber-900">{t.confirmTitle}</p>
                 <p className="mt-1 text-xs text-amber-800">{t.confirmBody}</p>
@@ -146,6 +158,10 @@ export function AgentModesPanel({ initial, cap, canEdit, aiConfigured }: { initi
           </div>
         ))}
       </CardContent>
+      {plainLanguage && <Dialog open={confirming !== null} onOpenChange={open => { if (!open) setConfirming(null); }}><DialogContent touchClose closeLabel={lang === "es" ? "Cerrar ventana" : "Close dialog"} onCloseAutoFocus={e => { e.preventDefault(); confirmationTrigger.current?.focus(); }}>
+        <DialogHeader className="pr-10"><DialogTitle>{t.confirmTitle}</DialogTitle><DialogDescription>{t.confirmBody}</DialogDescription></DialogHeader>
+        <div className="flex flex-wrap gap-3"><Button type="button" className="min-h-11" onClick={() => { if (confirming) choose(confirming, "AUTO", true); }}>{t.confirm}</Button><Button variant="outline" className="min-h-11" type="button" onClick={() => setConfirming(null)}>{t.cancel}</Button></div>
+      </DialogContent></Dialog>}
     </Card>
   );
 }

@@ -66,6 +66,10 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     needs: lint-typecheck-test-build
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [legacy, center, feature-rollback]
 
     services:
       postgres:
@@ -112,12 +116,38 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run e2e tests
-        run: npm run test:e2e
+        shell: bash
+        run: |
+          export AI_AGENT_MODEL_ENABLED=false AI_AGENT_CENTER_UI_ENABLED=false
+          export AI_CHANNEL_CONNECTIONS_ENABLED=false AI_KNOWLEDGE_ACCESS_ENABLED=false AI_MARK_SANDBOX_ENABLED=false
+          case "${{ matrix.scenario }}" in
+            legacy)
+              export E2E_AI_UI_ROLLBACK=true
+              specs=()
+              for spec in e2e/*.spec.ts; do
+                case "$spec" in
+                  e2e/ai-center-phase2.spec.ts|e2e/channel-connections*.spec.ts|e2e/knowledge-access*.spec.ts|e2e/mark-sandbox*.spec.ts) continue ;;
+                esac
+                specs+=("$spec")
+              done
+              ;;
+            center)
+              export AI_AGENT_MODEL_ENABLED=true AI_AGENT_CENTER_UI_ENABLED=true
+              export AI_CHANNEL_CONNECTIONS_ENABLED=true AI_KNOWLEDGE_ACCESS_ENABLED=true AI_MARK_SANDBOX_ENABLED=true
+              specs=(e2e/ai-center-phase2.spec.ts e2e/channel-connections.spec.ts e2e/knowledge-access.spec.ts e2e/mark-sandbox.spec.ts e2e/rulebook.spec.ts e2e/inbox.spec.ts e2e/conversation-manual-reply.spec.ts e2e/webhook-retry-cron.spec.ts)
+              ;;
+            feature-rollback)
+              export AI_AGENT_MODEL_ENABLED=true AI_AGENT_CENTER_UI_ENABLED=true
+              export E2E_CHANNEL_ROLLBACK=true E2E_KNOWLEDGE_ROLLBACK=true E2E_MARK_ROLLBACK=true
+              specs=(e2e/channel-connections-rollback.spec.ts e2e/knowledge-access-rollback.spec.ts e2e/mark-sandbox-rollback.spec.ts)
+              ;;
+          esac
+          npx playwright test "${specs[@]}" --workers=1
 
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.scenario }}
           path: playwright-report/
           retention-days: 7

@@ -77,3 +77,20 @@ describe("GET /api/v1/conversations/status", () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe("phase0: status channel isolation", () => {
+  const orgs: string[] = [];
+  afterAll(async () => { for (const id of orgs) await cleanupOrg(id); });
+  it("defaults phone-only legacy lookup to WhatsApp and supports explicit canonical aliases", async () => {
+    const org = await createTestOrg("Phase0 Status"); orgs.push(org.id);
+    const phone = "+52 81 1234 5678";
+    const wa = await prisma.conversation.create({ data: { organizationId: org.id, channel: "whatsapp", contactPhone: phone, phoneKey: "8112345678", aiHandled: false } });
+    const ig = await prisma.conversation.create({ data: { organizationId: org.id, channel: "instagram", contactPhone: phone, phoneKey: "8112345678", aiHandled: true } });
+    const url = `http://localhost/api/v1/conversations/status?orgId=${org.id}&contactPhone=8112345678`;
+    const headers = { "x-api-key": org.n8nWebhookSecret };
+    expect((await (await GET(makeRequest(url, headers))).json()).data.conversationId).toBe(wa.id);
+    expect((await (await GET(makeRequest(url + "&channel=ig", headers))).json()).data.conversationId).toBe(ig.id);
+    const mismatch = await GET(makeRequest(`http://localhost/api/v1/conversations/status?orgId=${org.id}&conversationId=${ig.id}&channel=whatsapp`, headers));
+    expect(mismatch.status).toBe(404);
+  });
+});

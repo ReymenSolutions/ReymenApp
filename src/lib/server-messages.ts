@@ -6,6 +6,45 @@
 // su versión en español). Un mensaje que no esté aquí se muestra tal cual.
 
 const EN: Record<string, string> = {
+  "Las pruebas de Mark aún no están habilitadas": "Mark tests are not enabled yet",
+  "Prueba no encontrada": "Test not found",
+  "La solicitud cambió; inicia una prueba nueva": "The request changed; start a new test",
+  "Demasiadas pruebas; espera un minuto": "Too many tests; wait one minute",
+  "Ya hay una prueba en curso; detenla antes de iniciar otra": "A test is already running; stop it before starting another",
+
+  "El artículo cambió; actualiza antes de guardar": "The article changed; refresh before saving",
+  "Organización no disponible": "Organization unavailable",
+  "El acceso por fuentes aún no está habilitado": "Source access is not enabled yet",
+  "El artículo cambió; actualiza y revisa de nuevo": "The article changed; refresh and review again",
+  "El artículo cambió; revisa su versión actual": "The article changed; review its current version",
+  "Fuente o asistente no disponible": "Source or assistant unavailable",
+  "La asignación cambió; actualiza antes de guardar": "The assignment changed; refresh before saving",
+  "La configuración cambió; actualiza antes de guardar": "The configuration changed; refresh before saving",
+  "Prepara primero el asistente existente": "Prepare the existing assistant first",
+
+  "Pausa la cuenta antes de reiniciar su verificación": "Pause the account before resetting verification",
+  "El historial cambió o ya está vinculado; recarga y revisa la conversación": "History changed or is already linked; reload and review the conversation",
+  "Revisa los mensajes y trabajos pendientes antes de vincular el historial": "Review pending messages and jobs before linking history",
+
+  "Las conexiones por cuenta están en pausa": "Account connections are paused",
+  "Conexión no encontrada": "Connection not found",
+  "La conexión no está disponible; verifica la cuenta antes de responder": "The connection is unavailable; verify the account before replying",
+  "La conexión cambió; recarga antes de guardar": "The connection changed; reload before saving",
+  "El conector debe verificar primero esta cuenta y sus capacidades": "The connector must verify this account and its capabilities first",
+  "Asistente no disponible": "Assistant unavailable",
+  "Esta conexión admite solo texto por el momento": "This connection currently supports text only",
+
+  "Organización inactiva": "Organization inactive",
+  "El modelo de agentes aún no está habilitado en este entorno": "The agent model is not enabled in this environment yet",
+  "La definición legacy requiere revisión; no se sobrescribirá": "The legacy definition needs review; it will not be overwritten",
+  "El mapeo del asistente requiere revisión; no se reasignará automáticamente": "The assistant mapping needs review; it will not be reassigned automatically",
+  "La configuración cambió; repite la comparación antes de aplicar": "The configuration changed; compare it again before applying",
+  "La configuración cambió durante la comparación; repite la revisión": "The configuration changed during comparison; review it again",
+  "La configuración cambió; repite la comparación": "The configuration changed; compare it again",
+  "Organización o módulo inactivo": "Organization or module inactive",
+  "Agente no encontrado": "Agent not found",
+  "La configuración cambió; recarga antes de guardar": "The configuration changed; reload before saving",
+
   // ── Productos en la SmartCard ──
   "Ese perfil no pertenece a tu empresa.": "That profile doesn't belong to your company.",
   "Ese producto no existe o su módulo no está activo.": "That product doesn't exist or its module isn't enabled.",

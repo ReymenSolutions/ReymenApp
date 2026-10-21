@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { processWebhookEventPayload } from "./webhook-processors";
+import { AUTO_JOB_SOURCE } from "./ai-auto-jobs";
 
 export const MAX_WEBHOOK_ATTEMPTS = 5;
 
@@ -12,6 +13,7 @@ export const STALE_PROCESSING_MS = 10 * 60 * 1000;
 function retryableWhere(now: Date) {
   const cutoff = new Date(now.getTime() - STALE_PROCESSING_MS);
   return {
+    source: { not: AUTO_JOB_SOURCE },
     attempts: { lt: MAX_WEBHOOK_ATTEMPTS },
     OR: [
       { status: "FAILED" as const },
@@ -29,6 +31,7 @@ function retryableWhere(now: Date) {
 export async function retryWebhookEvent(eventId: string, now: Date = new Date()): Promise<{ success: boolean }> {
   const event = await prisma.webhookEvent.findUniqueOrThrow({ where: { id: eventId } });
 
+  if (event.source === AUTO_JOB_SOURCE) throw new WebhookRetryError("La recuperación interna de IA se procesa desde el cron");
   if (event.status === "PROCESSED") {
     throw new WebhookRetryError("Este evento ya fue procesado exitosamente");
   }

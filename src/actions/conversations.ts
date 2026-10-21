@@ -1,11 +1,14 @@
 "use server";
 
+import { assertRoutable, lockConnection } from "@/lib/channel-connections/service";
+import { sendConversationOutbound } from "@/lib/channel-connections/outbound";
+
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { notifyAdmins } from "@/lib/admin-notifications";
 import { escalationAlertEmail } from "@/lib/email-templates";
-import { assertModuleEnabled } from "@/lib/modules";
+import { requireOrgPermission } from "@/lib/guards";
 import { can } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { triggerN8nWorkflow } from "@/lib/n8n";
@@ -25,10 +28,8 @@ async function requireOrgAndWhatsapp() {
 }
 
 export async function escalateConversation(conversationId: string) {
-  const session = await auth();
-  if (!session?.user.organizationId) throw new UserError("No autorizado");
-
-  await assertModuleEnabled(session.user.organizationId, "AI_WHATSAPP");
+  const session = await requireOrgPermission("conversations:escalate");
+  await assertInboxAccess(session.user.organizationId);
 
   const conv = await prisma.conversation.findFirst({
     where: { id: conversationId, organizationId: session.user.organizationId },
@@ -57,10 +58,8 @@ const MESSAGE_PAGE_SIZE = 50;
 
 /** Fetches the page of messages immediately before `beforeMessageId`, oldest of that page first. */
 export async function getOlderMessages(conversationId: string, beforeMessageId: string) {
-  const session = await auth();
-  if (!session?.user.organizationId) throw new UserError("No autorizado");
-
-  await assertModuleEnabled(session.user.organizationId, "AI_WHATSAPP");
+  const session = await requireOrgPermission("conversations:view");
+  await assertInboxAccess(session.user.organizationId);
 
   const conv = await prisma.conversation.findFirst({
     where: { id: conversationId, organizationId: session.user.organizationId },
@@ -68,8 +67,8 @@ export async function getOlderMessages(conversationId: string, beforeMessageId: 
   });
   if (!conv) throw new UserError("Conversación no encontrada");
 
-  const cursor = await prisma.message.findUnique({
-    where: { id: beforeMessageId },
+  const cursor = await prisma.message.findFirst({
+    where: { id: beforeMessageId, conversationId },
     select: { createdAt: true },
   });
   if (!cursor) throw new UserError("Mensaje no encontrado");
@@ -93,10 +92,8 @@ export async function getOlderMessages(conversationId: string, beforeMessageId: 
 }
 
 export async function resolveConversation(conversationId: string) {
-  const session = await auth();
-  if (!session?.user.organizationId) throw new UserError("No autorizado");
-
-  await assertModuleEnabled(session.user.organizationId, "AI_WHATSAPP");
+  const session = await requireOrgPermission("conversations:resolve");
+  await assertInboxAccess(session.user.organizationId);
 
   const conv = await prisma.conversation.findFirst({
     where: { id: conversationId, organizationId: session.user.organizationId },
@@ -145,35 +142,47 @@ export async function sendManualMessage(data: {
     throw new UserError("No se puede responder a una conversación cerrada");
   }
 
-  const message = await prisma.message.create({
-    data: {
-      conversationId: conv.id,
-      role: "AGENT",
-      content: content || "(adjunto)",
-      senderId: session.user.id,
-      attachmentUrl: data.attachmentUrl,
-      attachmentType: data.attachmentType,
-      deliveryStatus: "PENDING",
-    },
-  });
+  const message = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Conversation" WHERE id = ${conv.id} AND "organizationId" = ${session.user.organizationId!} FOR UPDATE`;
+    const current = await tx.conversation.findFirst({ where: { id: conv.id, organizationId: session.user.organizationId! } });
+    if (!current || current.status === "RESOLVED" || current.status === "CLOSED") throw new UserError("No se puede responder a una conversación cerrada");
+    let channelGeneration: number | undefined;
+    if (current.channelConnectionId) {
+      const account = await lockConnection(tx, session.user.organizationId!, current.channelConnectionId);
+      channelGeneration = account.generation;
+      await assertRoutable(tx, session.user.organizationId!, current.channelConnectionId, current.channel, true);
+      if (data.attachmentUrl || data.attachmentType) throw new UserError("Esta conexión admite solo texto por el momento");
+    }
+    if (data.draftId && !(await tx.replyDraft.findFirst({ where: { id: data.draftId, organizationId: session.user.organizationId!, conversationId: conv.id, status: "READY" } }))) throw new UserError("Borrador no encontrado");
+    const message = await tx.message.create({
+      data: {
+        conversationId: conv.id,
+        role: "AGENT",
+        ...(channelGeneration ? { metadata: { channelGeneration } } : {}),
+        content: content || "(adjunto)",
+        senderId: session.user.id,
+        attachmentUrl: data.attachmentUrl,
+        attachmentType: data.attachmentType,
+        deliveryStatus: "PENDING",
+      },
+    });
 
-  await prisma.conversation.update({
-    where: { id: conv.id },
-    data: {
-      aiHandled: false,
-      assignedToId: conv.assignedToId ?? session.user.id,
-      lastMessageAt: new Date(),
-      lastMessagePreview: messagePreview(content || "(adjunto)"),
-      lastMessageRole: "AGENT",
-      unreadCount: 0,
-    },
+    await tx.conversation.update({
+      where: { id: conv.id },
+      data: {
+        aiHandled: false,
+        assignedToId: current.assignedToId ?? session.user.id,
+        lastMessageAt: new Date(),
+        lastMessagePreview: messagePreview(content || "(adjunto)"),
+        lastMessageRole: "AGENT",
+        unreadCount: 0,
+      },
+    });
+    return message;
   });
   await recordMetric(session.user.organizationId!, METRIC_KEYS.MESSAGES_SENT);
 
-  const trigger = await triggerN8nWorkflow(outboundWorkflowPath(conv.channel), {
-    organizationId: session.user.organizationId!,
-    event: "message.send",
-    data: {
+  const outboundData = {
       conversationId: conv.id,
       messageId: message.id,
       contactPhone: conv.contactPhone,
@@ -184,13 +193,24 @@ export async function sendManualMessage(data: {
       content,
       attachmentUrl: data.attachmentUrl,
       attachmentType: data.attachmentType,
-    },
-  });
-
-  const finalMessage = trigger.success
+  };
+  const trigger = conv.channelConnectionId
+    ? await prisma.$transaction(async tx => {
+        await tx.$queryRaw`SELECT id FROM "Conversation" WHERE id = ${conv.id} AND "organizationId" = ${session.user.organizationId!} FOR UPDATE`;
+        const current = await tx.conversation.findFirstOrThrow({ where: { id: conv.id, organizationId: session.user.organizationId! } });
+        if (["CLOSED", "RESOLVED"].includes(current.status)) throw new UserError("No se puede responder a una conversación cerrada");
+        return sendConversationOutbound(tx, session.user.organizationId!, current, message.id, outboundData);
+      }, { timeout: 15000 }).catch(() => ({ success: false }))
+    : await triggerN8nWorkflow(outboundWorkflowPath(conv.channel), { organizationId: session.user.organizationId!, event: "message.send", data: outboundData });
+  // A late callback may already prove delivery; never downgrade it on a failed HTTP acknowledgement.
+  if (!trigger.success && conv.channelConnectionId) {
+    await prisma.message.updateMany({ where: { id: message.id, deliveryStatus: "PENDING" }, data: { deliveryStatus: "FAILED" } });
+  }
+  const finalMessage = conv.channelConnectionId ? await prisma.message.findUniqueOrThrow({ where: { id: message.id } }) : trigger.success
     ? message
     : await prisma.message.update({ where: { id: message.id }, data: { deliveryStatus: "FAILED" } });
 
+  const delivered = trigger.success || (!!conv.channelConnectionId && ["SENT", "DELIVERED", "READ"].includes(finalMessage.deliveryStatus ?? ""));
   if (data.draftId) await markReplyDraftUsed(session.user.organizationId!, data.draftId, session.user.id, content);
 
   await logAudit({
@@ -199,7 +219,7 @@ export async function sendManualMessage(data: {
     action: "conversation.manual_message",
     resource: "Conversation",
     resourceId: conv.id,
-    metadata: { messageId: message.id, delivered: trigger.success },
+    metadata: { messageId: message.id, delivered },
   });
 
   revalidatePath(`/portal/conversations/${conv.id}`);
@@ -207,7 +227,7 @@ export async function sendManualMessage(data: {
   revalidatePath("/portal/whatsapp");
   return {
     success: true,
-    delivered: trigger.success,
+    delivered,
     message: { ...finalMessage, sender: { name: session.user.name ?? null, email: session.user.email } },
   };
 }

@@ -32,3 +32,7 @@ El conector envía por su plataforma y reporta el resultado con el webhook `mess
 
 ## Credenciales y aprobaciones
 Instagram, Messenger y correo requieren credenciales (y, en Meta, revisión de la app) de cada negocio: viven en n8n, nunca en la app.
+
+## Cuentas explícitas — Fase 3 opt-in
+
+El contrato anterior se conserva para conversaciones sin binding. El nuevo [CANAL-CONEXIONES-V1](CANAL-CONEXIONES-V1.md) separa cuenta/hilo y usa otro endpoint/path de salida tras flag apagado por defecto. No enviar ambos contratos para el mismo mensaje ni asumir que el registro de una cuenta conecta un proveedor. El piloto físico queda pendiente.

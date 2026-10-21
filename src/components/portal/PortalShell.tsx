@@ -13,6 +13,7 @@ import { EnabledModulesProvider } from "@/context/modules";
 import type { PlatformModule } from "@prisma/client";
 
 interface PortalShellProps {
+  aiCenterEnabled?: boolean;
   orgName: string;
   orgLogoUrl: string | null;
   enabledModules: PlatformModule[];
@@ -25,7 +26,7 @@ interface PortalShellProps {
 // from (portal)/layout.tsx, a Server Component that can't hold useState
 // itself. The layout still does all the data fetching; this only owns the
 // one boolean neither sidebar nor topbar can own on its own.
-export function PortalShell({ orgName, orgLogoUrl, enabledModules, pendingConversations, children }: PortalShellProps) {
+export function PortalShell({ aiCenterEnabled = false, orgName, orgLogoUrl, enabledModules, pendingConversations, children }: PortalShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   useEffect(() => { setMobileOpen(false); }, [pathname]);
@@ -43,6 +44,7 @@ export function PortalShell({ orgName, orgLogoUrl, enabledModules, pendingConver
     <EnabledModulesProvider modules={enabledModules}>
     <div className="flex h-dvh overflow-hidden bg-slate-50">
       <PortalSidebar
+        aiCenterEnabled={aiCenterEnabled}
         orgName={orgName}
         orgLogoUrl={orgLogoUrl}
         enabledModules={enabledModules}
