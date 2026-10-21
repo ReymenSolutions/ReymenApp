@@ -1,4 +1,6 @@
-# REYMEN Ops Realty v1
+# REYMEN Ops Real Estate v1
+
+> Nombre visible: **Real Estate** (antes "Realty"). En el código, rutas (`/portal/realty`), permisos y tablas se siguen llamando `realty` / `Realty*`.
 
 Módulo `REALTY` (`/portal/realty`): **demanda + inventario + oportunidades** para
 inmobiliarias. Es una capa vertical sobre el Core/CRM existente, **no** un CRM

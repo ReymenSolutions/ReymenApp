@@ -6,7 +6,7 @@
 // su versión en español). Un mensaje que no esté aquí se muestra tal cual.
 
 const EN: Record<string, string> = {
-  // ── REYMEN Ops Realty ──
+  // ── REYMEN Ops Real Estate ──
   "La búsqueda de direcciones está desactivada. Ubica el pin a mano en el mapa.": "Address search is turned off. Place the pin by hand on the map.",
   "Escribe la dirección para buscarla.": "Type the address to search for it.",
   "Escribe el código postal para buscar la dirección.": "Type the postal code to search the address.",

@@ -39,14 +39,14 @@ import { translateMessage } from "@/lib/user-error";
 
 const MODULE_LABELS_ES: Record<string, string> = {
   smartcard: "SmartCard",
-  realty: "Realty",
+  realty: "Real Estate",
   food: "Food",
   retail: "Retail",
   care: "Care",
 };
 const MODULE_LABELS_EN: Record<string, string> = {
   smartcard: "SmartCard",
-  realty: "Realty",
+  realty: "Real Estate",
   food: "Food",
   retail: "Retail",
   care: "Care",

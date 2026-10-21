@@ -1,12 +1,12 @@
 // Pure module — importable from client and server contexts.
-// Textos de REYMEN Ops Realty (/portal/realty/*) y de la landing pública /p/<slug>.
+// Textos de REYMEN Ops Real Estate (/portal/realty/*) y de la landing pública /p/<slug>.
 
 import { defineDict } from "./i18n-dict";
 
 export const realtyStrings = defineDict({
   es: {
-    moduleName: "REYMEN Ops Realty",
-    sectionName: "Realty",
+    moduleName: "REYMEN Ops Real Estate",
+    sectionName: "Real Estate",
     tagline: "Demanda, inventario y oportunidades de tu inmobiliaria.",
     demoBadge: "Datos de demostración",
     // ── Pestañas ──
@@ -229,7 +229,7 @@ export const realtyStrings = defineDict({
     prospectsEmpty: "Sin prospectos todavía.",
     openInCrm: "Abrir en CRM",
     prospectProfile: "Perfil inmobiliario",
-    crmContactNote: "El contacto vive en el CRM: Realty solo guarda lo que busca.",
+    crmContactNote: "El contacto vive en el CRM: Real Estate solo guarda lo que busca.",
     // ── Propiedades ──
     property: "Propiedad",
     title: "Título",
@@ -364,7 +364,7 @@ export const realtyStrings = defineDict({
     geoAttribution: "Búsqueda de direcciones: © OpenStreetMap",
     needZoneTitle: "Primero agrega una zona",
     needZoneDesc: "Cada propiedad pertenece a una zona (colonia o sector) para medir oferta y demanda. Agrega la primera aquí; después puedes agregar más en Configuración.",
-    needZoneAskManager: "Todavía no hay zonas. Pide al dueño o al gerente que las agregue en Realty → Configuración.",
+    needZoneAskManager: "Todavía no hay zonas. Pide al dueño o al gerente que las agregue en Real Estate → Configuración.",
     noZonesYet: "Todavía no hay zonas: agrégalas en Configuración.",
     zoneInUse: (props: number, asks: number) => `${props} propiedades · ${asks} prospectos`,
     publicWhatsapp: "WhatsApp público",
@@ -384,8 +384,8 @@ export const realtyStrings = defineDict({
     pubPoweredBy: "Publicado con REYMEN Ops",
   },
   en: {
-    moduleName: "REYMEN Ops Realty",
-    sectionName: "Realty",
+    moduleName: "REYMEN Ops Real Estate",
+    sectionName: "Real Estate",
     tagline: "Demand, inventory and opportunities for your brokerage.",
     demoBadge: "Demo data",
     tabSummary: "Overview",
@@ -599,7 +599,7 @@ export const realtyStrings = defineDict({
     prospectsEmpty: "No prospects yet.",
     openInCrm: "Open in CRM",
     prospectProfile: "Real estate profile",
-    crmContactNote: "The contact lives in the CRM: Realty only stores what they're looking for.",
+    crmContactNote: "The contact lives in the CRM: Real Estate only stores what they're looking for.",
     property: "Listing",
     title: "Title",
     description: "Description",
@@ -729,7 +729,7 @@ export const realtyStrings = defineDict({
     geoAttribution: "Address search: © OpenStreetMap",
     needZoneTitle: "Add a zone first",
     needZoneDesc: "Every listing belongs to a zone (neighborhood or area) so supply and demand can be measured. Add the first one here; you can add more in Settings.",
-    needZoneAskManager: "There are no zones yet. Ask the owner or a manager to add them in Realty → Settings.",
+    needZoneAskManager: "There are no zones yet. Ask the owner or a manager to add them in Real Estate → Settings.",
     noZonesYet: "No zones yet: add them in Settings.",
     zoneInUse: (props: number, asks: number) => `${props} listings · ${asks} prospects`,
     publicWhatsapp: "Public WhatsApp",
