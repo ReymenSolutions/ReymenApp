@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   const raw = await limitedBody(req);
   if (raw === null) return NextResponse.json({ error: "Body too large" }, { status: 413 });
   if (!org?.n8nWebhookSecret || !isTimestampFresh(timestamp) || !verifyWebhookSignature(raw, req.headers.get("x-reymen-signature") ?? "", org.n8nWebhookSecret, timestamp)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!org.isActive || !await prisma.organizationModule.findFirst({ where: { organizationId, module: "AI_WHATSAPP", status: "ACTIVE" }, select: { id: true } })) return NextResponse.json({ error: "Organization or module inactive" }, { status: 403 });
+  if (!org.isActive || !await prisma.organizationModule.findFirst({ where: { organizationId, module: { in: ["CRM", "AI_WHATSAPP"] }, status: "ACTIVE" }, select: { id: true } })) return NextResponse.json({ error: "Organization or module inactive" }, { status: 403 });
   const limit = await checkRateLimit(`webhook:channel-v1:${organizationId}`, { limit: 120, windowMs: 60000 });
   if (!limit.allowed) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   let json: unknown; try { json = JSON.parse(raw); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }

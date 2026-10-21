@@ -57,11 +57,16 @@ describe("versioned connector authentication and durable recovery", () => {
     const blocked = await prisma.webhookEvent.create({ data: { organizationId: f.org.id, source: `channel-v1:${f.row.id}`, eventType: "channel.v1", payload: { ...f.event, eventId: "old", sequence: 2 }, externalEventId: "old", status: "FAILED", attempts: 1 } });
     await prisma.channelConnection.update({ where: { id: f.row.id }, data: { generation: 2 } }); expect(await retryWebhookEvent(blocked.id)).toEqual({ success: false });
   });
+  it("continues trusted health ingress with CRM when AI is inactive", async () => {
+    const f = await fixture();
+    await prisma.organizationModule.updateMany({ where: { organizationId: f.org.id, module: "AI_WHATSAPP" }, data: { status: "SUSPENDED" } });
+    expect((await POST(request(f.org, f.event))).status).toBe(200);
+  });
   it("rejects suspended organizations, inactive modules and the global pause without admitting events", async () => {
     const f = await fixture();
     await prisma.organization.update({ where: { id: f.org.id }, data: { isActive: false } }); expect((await POST(request(f.org, f.event))).status).toBe(403);
     await prisma.organization.update({ where: { id: f.org.id }, data: { isActive: true } });
-    await prisma.organizationModule.deleteMany({ where: { organizationId: f.org.id, module: "AI_WHATSAPP" } }); expect((await POST(request(f.org, f.event))).status).toBe(403);
+    await prisma.organizationModule.deleteMany({ where: { organizationId: f.org.id, module: { in: ["CRM", "AI_WHATSAPP"] } } }); expect((await POST(request(f.org, f.event))).status).toBe(403);
     vi.stubEnv("AI_CHANNEL_CONNECTIONS_ENABLED", "false"); expect((await POST(request(f.org, f.event))).status).toBe(503);
     expect(await prisma.webhookEvent.count({ where: { organizationId: f.org.id } })).toBe(0);
   });

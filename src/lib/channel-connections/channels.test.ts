@@ -199,6 +199,16 @@ describe("Phase3 ingress and outbound account boundaries", () => {
     expect(trigger).toHaveBeenCalledTimes(1); expect(generate).toHaveBeenCalledTimes(1);
     expect(trigger.mock.calls[0][1].data.connectionId).toBe(f.connection.id);
   });
+  it("keeps CRM-only manual operation after suspending AI without admitting new AI work", async () => {
+    const f = await fixture(); await enable(f);
+    await prisma.agentChannelSetting.create({ data: { organizationId: f.org.id, channel: "whatsapp", mode: "AUTO" } });
+    await prisma.organizationModule.updateMany({ where: { organizationId: f.org.id, module: "AI_WHATSAPP" }, data: { status: "SUSPENDED" } });
+    const conversationId = await incoming(f.connection);
+    expect(await prisma.webhookEvent.count({ where: { organizationId: f.org.id, eventType: AUTO_JOB_TYPE } })).toBe(0);
+    await sendManualMessage({ conversationId, content: "Te atiende el equipo" });
+    expect(trigger).toHaveBeenCalledTimes(1); expect(trigger.mock.calls[0][0]).toBe("channel-outbound-v1"); expect(generate).not.toHaveBeenCalled();
+    await expect(listChannelConnections()).rejects.toThrow();
+  });
   it("global pause blocks bound manual sends while legacy manual replies still use their original path", async () => {
     const f = await fixture(); await enable(f); const bound = await incoming(f.connection);
     const legacy = await prisma.conversation.create({ data: { organizationId: f.org.id, channel: "whatsapp", contactPhone: "8187654321" } });

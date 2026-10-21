@@ -17,7 +17,7 @@ export type ChannelEvent = z.infer<typeof channelEventSchema>;
 export async function processChannelEvent(payload: unknown, organizationId: string) {
   assertConnectionsEnabled();
   const event = channelEventSchema.parse(payload);
-  if (!await prisma.organization.findFirst({ where: { id: organizationId, isActive: true }, select: { id: true } }) || !await prisma.organizationModule.findFirst({ where: { organizationId, module: "AI_WHATSAPP", status: "ACTIVE" }, select: { id: true } })) throw new Error("Inactive organization or module");
+  if (!await prisma.organization.findFirst({ where: { id: organizationId, isActive: true }, select: { id: true } }) || !await prisma.organizationModule.findFirst({ where: { organizationId, module: { in: ["CRM", "AI_WHATSAPP"] }, status: "ACTIVE" }, select: { id: true } })) throw new Error("Inactive organization or module");
   const row = await prisma.channelConnection.findFirst({ where: { id: event.connectionId, organizationId, externalAccountKey: event.externalAccountKey, ...(event.type !== "status" ? { generation: event.generation } : {}) } });
   if (!row) throw new Error("Invalid channel account or generation");
   if (event.type === "health") {
