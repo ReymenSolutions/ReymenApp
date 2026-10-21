@@ -177,4 +177,9 @@ Ante autorización de continuar se implementó la base local documentada en [15]
 
 ## Seguimiento de Fase 4
 
-Se implementó y validó localmente la Fase 4 (AG-010), independiente del piloto de canales aplazado. El lector usa opt-in global y por negocio. La Fase 5 no se inicia: faltan autorización y dependencias externas/evaluación del roadmap. Ver [16_IMPLEMENTACION_FASE_4.md](16_IMPLEMENTACION_FASE_4.md).
+Se implementó y validó localmente la Fase 4 (AG-010), independiente del piloto de canales aplazado. El lector usa opt-in global y por negocio. Al cierre de Fase 4, Fase 5 aún no se había iniciado: faltaban autorización y dependencias externas/evaluación del roadmap. El inicio posterior acotado se registra abajo. Ver [16_IMPLEMENTACION_FASE_4.md](16_IMPLEMENTACION_FASE_4.md).
+
+
+## Inicio de Fase 5
+
+Se inició Fase 5 solo con protocolo acotado y arnés mínimo AG-013. No se declara completo AG-011 ni se habilita Mark real: continúan los gates de Fase 3 y mínimo de Fase 8. El panel simula decisiones/lecturas con fixtures, sin proveedor ni entrega. Ver [17_INICIO_FASE_5_MARK.md](17_INICIO_FASE_5_MARK.md).

@@ -88,3 +88,8 @@ Incidente: pausar instancia/conexión afectada → preservar eventos/auditoría 
 ## Seguimiento de Fase 4
 
 Los nuevos controles exigen gestión de conocimiento, módulo y organización activa; FKs compuestas evitan asignaciones cruzadas. La publicación/grants/política usan CAS y bloqueo; la respuesta automática revalida la versión después de inferencia y antes de envío. AuditLog registra referencias/hash, no contenido. La revisión humana de PII sigue pendiente de política operativa. Ver [16_IMPLEMENTACION_FASE_4.md](16_IMPLEMENTACION_FASE_4.md).
+
+
+## Inicio de Fase 5
+
+El arnés de Mark aplica schemas estrictos y allowlist de dos lecturas sobre fixtures; rechaza escrituras/envíos, IDs de tenant/cliente y proveedor arbitrario. Permisos y usuario/módulo/organización se revalidan; cancelación/lease cercan resultados tardíos. Esto no valida herramientas ni control humano en conversaciones reales: siguen pendientes de integración/piloto. Ver [17_INICIO_FASE_5_MARK.md](17_INICIO_FASE_5_MARK.md).

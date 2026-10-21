@@ -192,4 +192,9 @@ Se implementaron cuentas, ruta default al legacy/manual, referencia privada de c
 
 ## Seguimiento de Fase 4
 
-AG-010 implementado localmente con revisión/publicación, asignaciones a versiones y consulta acotada por pregunta, con límites visibles. No hay embeddings ni agentes nuevos. La aceptación productiva conserva gates de calidad, presupuesto, revisión de PII y piloto. AG-011 no iniciado. Ver [16_IMPLEMENTACION_FASE_4.md](16_IMPLEMENTACION_FASE_4.md).
+AG-010 implementado localmente con revisión/publicación, asignaciones a versiones y consulta acotada por pregunta, con límites visibles. No hay embeddings ni agentes nuevos. La aceptación productiva conserva gates de calidad, presupuesto, revisión de PII y piloto. AG-011 no iniciado al cierre de Fase 4; el inicio posterior figura abajo. Ver [16_IMPLEMENTACION_FASE_4.md](16_IMPLEMENTACION_FASE_4.md).
+
+
+## Inicio de Fase 5
+
+AG-011 iniciado, no completado. Se implementa un arnés mínimo de AG-013 con fixtures, límites, recibos y reset seguro. No hay tools de CRM real ni Mark con proveedor/routing activo. Faltan piloto, mínimo de atribución/presupuesto, calidad y coordinación de turno/humano para el MVP productivo. Ver [17_INICIO_FASE_5_MARK.md](17_INICIO_FASE_5_MARK.md).

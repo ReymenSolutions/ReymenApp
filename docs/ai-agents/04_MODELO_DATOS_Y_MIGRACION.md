@@ -113,3 +113,8 @@ No restaurar una copia antigua encima de producción para revertir UI: perdería
 ## Seguimiento de Fase 4
 
 Se reutiliza `KnowledgeBase` como fuente única y se añaden `KnowledgeRevision`, `KnowledgeGrant` y `KnowledgeAccessPolicy`. Las revisiones conservan contenido histórico; no se crean copias por asistente ni se equiparan artículos con PromptVersion. No hay backfill/publicación/asignación automática. Ver [16_IMPLEMENTACION_FASE_4.md](16_IMPLEMENTACION_FASE_4.md) para FKs, esquema requerido y rollback sin borrar datos.
+
+
+## Inicio de Fase 5
+
+Se añade AgentSandboxRun para recibos de prueba con clave organización/actor/requestKey, hash/versiones, claim, cancelación y expiración. AgentExecution legacy y las sesiones de prompts no cambian. No se crea una instancia real de Mark ni una tabla de consumo paralela. Ver [17_INICIO_FASE_5_MARK.md](17_INICIO_FASE_5_MARK.md).

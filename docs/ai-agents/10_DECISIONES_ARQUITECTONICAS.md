@@ -71,3 +71,8 @@ Se aplica ADR-01/02/05/09 en modalidad expand + adapter + shadow, descrita en [1
 ## Decisiones aplicadas en Fase 4
 
 ADR-06 se implementa mediante fuente única, revisiones publicadas y grants a versiones concretas; selección textual medible antes de justificar embeddings. Se mantiene ADR-09 con flags global/por negocio y expansión de esquema sin cutover productivo. El retorno al lector anterior no aplica grants: requiere revisar fuentes activas y preservar revisiones. Ver [16_IMPLEMENTACION_FASE_4.md](16_IMPLEMENTACION_FASE_4.md).
+
+
+## Inicio de Fase 5
+
+Se inicia ADR-08 con adaptadores de fixtures, permisos backend, protocolo acotado y coste claramente simulado. ADR-05/09 se aplican a recibos idempotentes/expirables en PostgreSQL y rollback por flag. Se pospone la integración real con gateway, grants, turno, control humano y emisor hasta resolver sus gates. Ver [17_INICIO_FASE_5_MARK.md](17_INICIO_FASE_5_MARK.md).

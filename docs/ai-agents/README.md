@@ -47,6 +47,8 @@ Se implementó la base local de cuentas/routing en `codex/ai-center-phase3-chann
 | [13 — Implementación Fase 1](13_IMPLEMENTACION_FASE_1.md) | Modelo aditivo, adapter y observación durable |
 | [14 — Implementación Fase 2](14_IMPLEMENTACION_FASE_2.md) | Interfaz sobre el adapter, pruebas y rollback visual |
 | [15 — Implementación Fase 3](15_IMPLEMENTACION_FASE_3.md) | Cuentas, contrato versionado y routing local; piloto externo pendiente |
+| [16 — Implementación Fase 4](16_IMPLEMENTACION_FASE_4.md) | Conocimiento versionado, publicación y grants opt-in |
+| [17 — Inicio Fase 5](17_INICIO_FASE_5_MARK.md) | Núcleo de Mark y simulación con datos ficticios; MVP real pendiente |
 
 Propietario: leer 02 → 03 → 05 → 07. Ingeniería: 01 → 06 → 04 → 09 → 10 → 08 → 11.
 
@@ -59,7 +61,7 @@ Propietario: leer 02 → 03 → 05 → 07. Ingeniería: 01 → 06 → 04 → 09 
 
 Cada tabla declara su nivel por fila o en su introducción. En documentos de diseño, todo lo propuesto es **I**, salvo referencias expresamente C/P/V. Los enlaces a código corresponden al snapshot indicado; abrir el mismo commit para conservar líneas. Ausencia en las rutas examinadas no equivale a ausencia en todos los servicios externos.
 
-## Límites respetados y próxima autorización
+## Límites y próxima autorización al cierre de la auditoría original
 
 Solo se crearon estos documentos en `docs/ai-agents/`. No se modificó código funcional, BD, dependencias, integraciones o servidor; no se crearon commits ni PR. Las suites con fixtures de BD no se ejecutaron. Las habilidades anunciadas de seguridad/configuración no estuvieron disponibles en el catálogo de esta sesión; se usó inspección directa y no se ejecutó configuración de entorno.
 
@@ -67,4 +69,8 @@ La etapa 1 termina aquí. Para seguir se requiere autorización explícita para 
 
 ## Seguimiento de Fase 4
 
-Se implementó el acceso a conocimiento compartido con revisiones/publicación, asignaciones y consulta acotada por pregunta en `codex/ai-center-phase4-knowledge`: [16_IMPLEMENTACION_FASE_4.md](16_IMPLEMENTACION_FASE_4.md). El lector nuevo queda desactivado globalmente y exige además revisión/habilitación por negocio. El piloto externo de Fase 3 sigue pendiente. No hay despliegue ni inicio de Fase 5.
+Se implementó el acceso a conocimiento compartido con revisiones/publicación, asignaciones y consulta acotada por pregunta en `codex/ai-center-phase4-knowledge`: [16_IMPLEMENTACION_FASE_4.md](16_IMPLEMENTACION_FASE_4.md). El lector nuevo queda desactivado globalmente y exige además revisión/habilitación por negocio. El piloto externo de Fase 3 sigue pendiente. Al cierre de Fase 4 no había despliegue ni inicio de Fase 5; el avance posterior figura abajo.
+
+## Inicio de Fase 5
+
+Tras «inicia», se preparó el núcleo acotado de Mark y el arnés mínimo de simulación: [17_INICIO_FASE_5_MARK.md](17_INICIO_FASE_5_MARK.md). Usa únicamente fixtures, no un LLM ni herramientas/clientes reales. Queda detrás de un flag apagado. AG-011 sigue en curso: no hay Mark activo, y continúan pendientes el piloto de Fase 3 y presupuesto/evaluación para un proveedor real. No se inició Alex ni marketplace.

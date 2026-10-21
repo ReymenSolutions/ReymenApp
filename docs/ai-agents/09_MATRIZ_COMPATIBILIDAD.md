@@ -68,3 +68,8 @@ La base de [15](15_IMPLEMENTACION_FASE_3.md) preserva rutas/payloads legacy para
 ## Seguimiento de Fase 4
 
 Fase 4 conserva IDs/tags y el lector anterior fuera del opt-in; desactiva fuentes en lugar de destruirlas. Dentro del opt-in, API v1/n8n reciben versiones asignadas y fragmentos con metadatos. Requiere esquema expandido en toda la flota antes de habilitar; rollback de flags conserva revisiones, pero volver al lector anterior deja de aplicar grants y exige revisar artículos activos. Ver [16_IMPLEMENTACION_FASE_4.md](16_IMPLEMENTACION_FASE_4.md).
+
+
+## Inicio de Fase 5
+
+El sandbox de Mark es independiente y está apagado por defecto. No altera los probadores/lectores legacy, AgentInstance, conversaciones, canales, ledger, planes ni POS. La tabla aditiva conserva recibos al apagar el flag; no es una ejecución productiva ni prueba de entrega. Ver [17_INICIO_FASE_5_MARK.md](17_INICIO_FASE_5_MARK.md).

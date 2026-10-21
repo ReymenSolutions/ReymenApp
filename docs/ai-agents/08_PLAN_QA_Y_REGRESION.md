@@ -166,3 +166,8 @@ La evidencia final de consultas por organización, permisos, interacciones, pagi
 ## Seguimiento de Fase 4
 
 Se agregaron pruebas de fuentes/grants/roles/tenant, revisión concurrente, noveno artículo, dato posterior a 1200 caracteres, límites de candidatas y revocación durante proveedor simulado; además un flujo real de acciones en Chromium. La evidencia final y límites de fidelidad están en el reporte 16. Ver [16_IMPLEMENTACION_FASE_4.md](16_IMPLEMENTACION_FASE_4.md).
+
+
+## Inicio de Fase 5
+
+Se agregan pruebas de allowlist/permisos de tools, suplantación de argumentos, dos lecturas/cuatro pasos, timeout/cancelación, recibos idempotentes, rol/tenant/actor, estados vencidos, errores privados y respuestas tardías tras reset; además flujos Chromium y rollback. El golden es determinista y no sustituye evaluación de un LLM. Ver [17_INICIO_FASE_5_MARK.md](17_INICIO_FASE_5_MARK.md).
