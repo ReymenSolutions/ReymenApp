@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { saveRealtyProperty } from "@/actions/realty";
+import { saveRealtyProperty, saveRealtyZone } from "@/actions/realty";
 import { getErrorMessage } from "@/lib/user-error";
 import { usePreferences } from "@/context/preferences";
 import { pickDict } from "@/lib/i18n-dict";
@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { SELECT } from "./ProspectForm";
 import { GeoPicker } from "./GeoPicker";
 import { AddressFields, type AddressValue } from "./AddressFields";
+import { matchZone } from "@/lib/realty/zone-match";
 
 export interface PropertyFormValues {
   id?: string;
@@ -54,14 +55,17 @@ const n = (s: string) => (s.trim() === "" ? null : Number(s));
 
 export function PropertyForm({
   initial,
-  zones,
+  zones: initialZones,
   advisors,
   branches,
+  canManage = false,
 }: {
   initial: PropertyFormValues;
   zones: { id: string; name: string; postalCode?: string | null; latitude?: number | null; longitude?: number | null }[];
   advisors: { id: string; name: string | null; email: string }[];
   branches: { id: string; name: string }[];
+  /** Puede crear zonas (gerencia): ofrece crear la de la colonia si no existe. */
+  canManage?: boolean;
 }) {
   const router = useRouter();
   const { lang } = usePreferences();
@@ -81,15 +85,40 @@ export function PropertyForm({
       ...(p.street !== undefined ? { addressLine: p.street } : {}),
     }));
 
-  // Sin zona elegida: se propone la que coincide con la colonia o el CP (la persona la puede cambiar).
+  const [zones, setZones] = useState(initialZones);
+  // La zona se propone sola según la colonia o el CP. Si la eligió el sistema
+  // (no la persona) y la dirección cambia a otra que no coincide, se quita:
+  // nunca se queda puesta una zona que no corresponde a la dirección.
+  const [zoneAuto, setZoneAuto] = useState(false);
+  const [creatingZone, setCreatingZone] = useState(false);
+  const match = matchZone(zones, v.neighborhood, v.postalCode);
   useEffect(() => {
-    if (v.zoneId) return;
-    const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-    const col = norm(v.neighborhood);
-    const match = (col && zones.find((z) => norm(z.name) === col)) || (/^\d{5}$/.test(v.postalCode) && zones.find((z) => z.postalCode === v.postalCode));
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (match) setV((s) => (s.zoneId ? s : { ...s, zoneId: match.id }));
-  }, [v.neighborhood, v.postalCode, v.zoneId, zones]);
+    if (match && (!v.zoneId || zoneAuto) && v.zoneId !== match.id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setV((s) => ({ ...s, zoneId: match.id }));
+      setZoneAuto(true);
+    } else if (!match && zoneAuto && v.zoneId) {
+      setV((s) => ({ ...s, zoneId: "" }));
+      setZoneAuto(false);
+    }
+  }, [match, v.zoneId, zoneAuto]);
+
+  async function createZoneFromAddress() {
+    const name = v.neighborhood.trim();
+    if (name.length < 2) return;
+    setCreatingZone(true);
+    try {
+      const { id } = await saveRealtyZone({ name, postalCode: /^\d{5}$/.test(v.postalCode) ? v.postalCode : null, latitude: null, longitude: null });
+      setZones((zs) => [...zs, { id, name, postalCode: v.postalCode || null, latitude: null, longitude: null }].sort((a, b) => a.name.localeCompare(b.name, "es")));
+      setV((s) => ({ ...s, zoneId: id }));
+      setZoneAuto(true);
+      toast.success(R.zoneCreated(name));
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Error"));
+    } finally {
+      setCreatingZone(false);
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -192,11 +221,33 @@ export function PropertyForm({
           <AddressFields idPrefix="prop" value={address} onChange={setAddress} />
           <div className="max-w-sm space-y-1.5">
             <Label htmlFor="f-zone">{R.zone} *</Label>
-            <select id="f-zone" className={SELECT} value={v.zoneId} onChange={(e) => set("zoneId", e.target.value)} required>
+            <select
+              id="f-zone"
+              className={SELECT}
+              value={v.zoneId}
+              onChange={(e) => {
+                set("zoneId", e.target.value);
+                setZoneAuto(false);
+              }}
+              required
+            >
               <option value="" disabled>—</option>
               {zones.map((z) => <option key={z.id} value={z.id}>{z.name}{z.postalCode ? ` · CP ${z.postalCode}` : ""}</option>)}
             </select>
-            <p className="text-[11px] text-slate-500">{R.zoneAutoHint}</p>
+            {!v.zoneId && !match && v.neighborhood.trim().length >= 2 ? (
+              <div className="space-y-1.5 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <p>{R.zoneNoMatch(v.neighborhood.trim(), v.postalCode)}</p>
+                {canManage ? (
+                  <Button type="button" size="sm" variant="outline" loading={creatingZone} onClick={createZoneFromAddress} className="h-8 bg-white text-xs">
+                    {R.zoneCreateFrom(v.neighborhood.trim())}
+                  </Button>
+                ) : (
+                  <p>{R.zoneAskManager}</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-[11px] text-slate-500">{R.zoneAutoHint}</p>
+            )}
           </div>
           <div className="space-y-1.5">
             <p className="text-sm font-medium text-slate-900">{R.geoTitle}</p>

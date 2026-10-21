@@ -26,6 +26,7 @@ export default async function NewPropertyPage() {
         zones={zones}
         advisors={advisors}
         branches={ctx.branches}
+        canManage={ctx.canManage}
         initial={{
           title: "",
           description: "",
@@ -34,7 +35,7 @@ export default async function NewPropertyPage() {
           status: "AVAILABLE",
           price: "",
           currency: ctx.currency,
-          zoneId: zones.length === 1 ? zones[0].id : "",
+          zoneId: "",
           postalCode: "",
           neighborhood: "",
           municipality: "",
