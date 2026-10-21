@@ -1,6 +1,6 @@
 # 19 — Base de presupuesto del piloto privado de Mark
 
-Fecha: 21 de octubre de 2026. Rama: `codex/mark-pilot-budget-25mxn`, dependiente de la publicación [PR #123](https://github.com/ReymenSolutions/ReymenApp/pull/123). Autorización: continuar las propuestas de 18 con **$25 MXN diarios**, conservando $500 mensuales y $1 por turno raíz.
+Fecha: 21 de octubre de 2026. Rama: `codex/mark-pilot-budget-25mxn`, publicada en [PR #124](https://github.com/ReymenSolutions/ReymenApp/pull/124). Su dependencia [PR #123](https://github.com/ReymenSolutions/ReymenApp/pull/123) se integró en main como `e99781e`, por autorización expresa del propietario. Autorización: continuar las propuestas de 18 con **$25 MXN diarios**, conservando $500 mensuales y $1 por turno raíz.
 
 ## Resultado de este incremento
 
@@ -14,7 +14,7 @@ Las cuotas son por organización para el piloto `mark:pilot`; no se aplican auto
 - [Presupuesto existente](../../src/lib/ai/budget.ts): comparte el mismo candado PostgreSQL por organización y contabiliza las reservas piloto pendientes junto con las llamadas legacy. Exporta el cálculo decimal interno para evitar decisiones de cupo con números flotantes.
 - [Esquema](../../prisma/schema.prisma) y [migración aditiva](../../prisma/migrations/20261122090000_mark_pilot_budget/migration.sql): `AiPilotBudgetPolicy`, `AiPilotBudgetRoot` y referencia opcional multitenant desde el ledger existente `AiUsage.pilotRootId`.
 - [Restricciones SQL](../../prisma/migrations/20261122091000_mark_pilot_budget_checks/migration.sql): cuotas máximas, reservas no negativas, estados consistentes, ventanas válidas e índice del ledger por raíz. Se conservan las 84 migraciones anteriores; total 86.
-- [.env.example](../../.env.example), [pruebas](../../src/lib/ai/pilot/budget.test.ts) y [limpieza de fixtures](../../src/test/helpers.ts). No se modifican registros reales, planes, claves ni configuraciones del servidor.
+- [Traducciones](../../src/lib/server-messages.ts), [.env.example](../../.env.example), [pruebas](../../src/lib/ai/pilot/budget.test.ts) y [limpieza de fixtures](../../src/test/helpers.ts). No se modifican registros reales, planes, claves ni configuraciones del servidor.
 
 ## Reglas financieras
 
@@ -34,7 +34,17 @@ Validación focal: **34/34** entre piloto, presupuesto, gateway y cierre atómic
 
 La primera corrida completa se detuvo al fallar la prueba de concurrencia existente del presupuesto. Una prueba determinista adicional confirmó un defecto previo: ante fallo al liberar la reserva, el ledger ya había quedado SUCCEEDED. Se modificó [gateway](../../src/lib/ai/gateway.ts) para confirmar gasto y liberar reserva en una transacción con el mismo lock de admisión. La [prueba de regresión](../../src/lib/ai/gateway-settlement.test.ts) falló antes de la corrección (SUCCEEDED en vez de PENDING) y pasó después; las 34 focales pasaron con el cambio. No se relajaron límites ni aserciones.
 
-Registrar aquí suite completa final, TypeScript/lint/build y estado de publicación después de las comprobaciones finales.
+| Evidencia final | Resultado observado |
+| --- | --- |
+| Migración local | 86 migraciones desde cero; comparación Prisma vacía |
+| Financiera focal | 34/34 aprobadas después de la corrección de atomicidad |
+| Suite local de 212 archivos | 211 aprobados; 1497 pruebas aprobadas y 1 fallo de traducciones en el código previo a `91200ae` |
+| Corrección de traducciones | Los cinco mensajes se tradujeron en `91200ae`; las 5 pruebas de UserError pasaron después |
+| TypeScript y build | Correctos tras la corrección financiera |
+| Lint | 0 errores; 51 advertencias existentes |
+| CI Node 22 | Consultar los checks finales de [PR #124](https://github.com/ReymenSolutions/ReymenApp/pull/124); exigir toda la suite y los tres escenarios E2E en verde antes de fusionar |
+
+El único fallo de la suite local final fue la comprobación de traducciones iniciada antes de esa corrección; no fallaron las pruebas financieras. No se presenta esa corrida como 1498/1498 local. El CI de la versión corregida verifica el conjunto exacto. El propietario autorizó fusionar los PR listos; #124 se redirige a main después de #123 y solo se fusiona con los controles finales aprobados. No se ejecuta el despliegue del VPS.
 
 ## Compatibilidad, validación y rollback
 
