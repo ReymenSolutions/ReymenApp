@@ -78,6 +78,9 @@ export async function cleanupOrg(orgId: string) {
   await prisma.knowledgeGrant.deleteMany({ where: { organizationId: orgId } });
   await prisma.knowledgeRevision.deleteMany({ where: { organizationId: orgId } });
   await prisma.knowledgeAccessPolicy.deleteMany({ where: { organizationId: orgId } });
+  await prisma.aiUsage.deleteMany({ where: { organizationId: orgId } });
+  await prisma.aiPilotBudgetRoot.deleteMany({ where: { organizationId: orgId } });
+  await prisma.aiPilotBudgetPolicy.deleteMany({ where: { organizationId: orgId } });
   await prisma.aiBudgetReservation.deleteMany({ where: { organizationId: orgId } });
   await prisma.automationEvent.deleteMany({ where: { organizationId: orgId } });
   await prisma.message.deleteMany({ where: { conversation: { organizationId: orgId } } });

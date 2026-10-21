@@ -62,6 +62,12 @@ export function billingCycle(anchor: Date, timezone: string, now: Date): { start
   return { start: zonedMidnight(startMonth.y, startMonth.m, day, timezone), end: zonedMidnight(endMonth.y, endMonth.m, day, timezone) };
 }
 
+/** Calendar day in the organization's IANA timezone, including 23/25-hour DST days. */
+export function budgetDay(timezone: string, now: Date = new Date()) {
+  const { y, m, d } = localParts(now, timezone);
+  return { start: zonedMidnight(y, m, d, timezone), end: zonedMidnight(y, m, d + 1, timezone) };
+}
+
 // ── Estado del presupuesto ───────────────────────────────────────────────────────────────────────────────────────
 
 export type BudgetStatus = "OK" | "WARN_50" | "WARN_75" | "CRITICAL_90" | "EXHAUSTED";
@@ -96,7 +102,7 @@ export async function planBudgetMxn(plan: string): Promise<number> {
   return (await getPlan(plan)).aiBudgetMxn;
 }
 
-async function loadState(tx: Tx, organizationId: string, now: Date): Promise<BudgetState & { raw: { spent: Prisma.Decimal; reserved: Prisma.Decimal; available: Prisma.Decimal; degradeCap: Prisma.Decimal | null } }> {
+export async function loadBudgetState(tx: Tx, organizationId: string, now: Date): Promise<BudgetState & { raw: { spent: Prisma.Decimal; reserved: Prisma.Decimal; available: Prisma.Decimal; degradeCap: Prisma.Decimal | null } }> {
   const org = await tx.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { plan: true, timezone: true, createdAt: true, aiBudgetSetting: true } });
   const setting = org.aiBudgetSetting;
   const { start, end } = billingCycle(setting?.cycleAnchorAt ?? org.createdAt, org.timezone, now);
@@ -108,7 +114,9 @@ async function loadState(tx: Tx, organizationId: string, now: Date): Promise<Bud
   const base = setting?.monthlyBudgetMxn ?? D(await planBudgetMxn(org.plan));
   const adj = adjAgg._sum.amountMxn ?? D(0);
   const spent = spentAgg._sum.costMxn ?? D(0);
-  const reserved = reservedAgg._sum.amountMxn ?? D(0);
+  // Pilot root holds are durable financial commitments: disabling a flag must not erase them.
+  const pilotHolds = await tx.aiPilotBudgetRoot.aggregate({ where: { organizationId, state: { not: "CLOSED" } }, _sum: { holdMxn: true } });
+  const reserved = (reservedAgg._sum.amountMxn ?? D(0)).add(pilotHolds._sum.holdMxn ?? D(0));
   const available = base.add(adj);
   const percent = available.gt(0) ? Number(spent.div(available).mul(100)) : 100;
   return {
@@ -132,7 +140,7 @@ async function loadState(tx: Tx, organizationId: string, now: Date): Promise<Bud
 }
 
 export async function getBudgetState(organizationId: string, now: Date = new Date()): Promise<BudgetState> {
-  const { raw: _raw, ...state } = await loadState(prisma, organizationId, now);
+  const { raw: _raw, ...state } = await loadBudgetState(prisma, organizationId, now);
   return state;
 }
 
@@ -165,7 +173,7 @@ export type ReserveResult =
 export async function reserveBudget(organizationId: string, usageId: string, primary: Estimate, fallback: Estimate | null, now: Date = new Date()): Promise<ReserveResult> {
   return prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${"ai-budget:" + organizationId}))`;
-    const state = await loadState(tx, organizationId, now);
+    const state = await loadBudgetState(tx, organizationId, now);
     const used = state.raw.spent.add(state.raw.reserved);
     const hold = async (est: Estimate) => (await tx.aiBudgetReservation.create({ data: { organizationId, usageId, amountMxn: est.costMxn, expiresAt: new Date(now.getTime() + RESERVATION_TTL_MS) }, select: { id: true } })).id;
 

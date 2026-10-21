@@ -10,6 +10,8 @@ datasource db {
 // ─── TENANT ──────────────────────────────────────────────────────
 
 model Organization {
+  aiPilotBudgetPolicy AiPilotBudgetPolicy?
+  aiPilotBudgetRoots AiPilotBudgetRoot[]
   agentSandboxRuns AgentSandboxRun[]
   knowledgeAccessPolicy KnowledgeAccessPolicy?
   id                       String    @id @default(cuid())
@@ -2350,6 +2352,7 @@ model AiUsage {
   requestId        String
   traceId          String?
   correlationId    String?
+  pilotRootId      String?
   externalId       String? // id de la respuesta del proveedor
   status           AiUsageStatus @default(PENDING)
   attempts         Int           @default(1)
@@ -2375,6 +2378,7 @@ model AiUsage {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   rate         AiRate?      @relation(fields: [rateId], references: [id])
+  pilotRoot    AiPilotBudgetRoot? @relation(fields: [organizationId, pilotRootId], references: [organizationId, id], onDelete: Restrict)
 
   @@unique([organizationId, requestId])
   @@index([organizationId, createdAt])
@@ -2382,6 +2386,7 @@ model AiUsage {
   @@index([organizationId, conversationId])
   @@index([createdAt])
   @@index([provider, model, createdAt])
+  @@index([organizationId, pilotRootId])
 }
 
 // ─── IA y CONSUMO: presupuesto por tenant (Hard Budget Limit) ───────────────
@@ -3399,4 +3404,42 @@ model RealtyClosing {
   profile      RealtyLeadProfile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, closedAt])
+}
+
+// Opt-in pilot quotas. No provider, channel or live Mark instance is activated here.
+model AiPilotBudgetPolicy {
+  organizationId String @id
+  enabled Boolean @default(false)
+  monthlyMxn Decimal @default(500) @db.Decimal(14, 6)
+  dailyMxn Decimal @default(25) @db.Decimal(14, 6)
+  rootMxn Decimal @default(1) @db.Decimal(14, 6)
+  version Int @default(1)
+  updatedById String
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+}
+model AiPilotBudgetRoot {
+  id String @id @default(cuid())
+  organizationId String
+  createdById String
+  requestKey String
+  contractVersion String @default("private-webchat-pilot-v1")
+  agentKey String @default("mark:pilot")
+  policyVersion Int
+  timezone String
+  dayStart DateTime
+  dayEnd DateTime
+  cycleStart DateTime
+  cycleEnd DateTime
+  rootLimitMxn Decimal @db.Decimal(14, 6)
+  holdMxn Decimal @db.Decimal(14, 6)
+  // CLOSED means ledger-confirmed or no dispatch; UNCERTAIN remains reserved.
+  state String @default("RESERVED")
+  createdAt DateTime @default(now())
+  closedAt DateTime?
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  usages AiUsage[]
+  @@unique([organizationId, id])
+  @@unique([organizationId, createdById, requestKey])
+  @@index([organizationId, state])
 }
