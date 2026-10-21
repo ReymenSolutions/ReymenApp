@@ -16,12 +16,13 @@ import {
 import { createArticle, updateArticle } from "@/actions/knowledge-base";
 import { usePreferences } from "@/context/preferences";
 import type { KnowledgeBase } from "@prisma/client";
-import { translateMessage } from "@/lib/user-error";
+import { getErrorMessage, translateMessage } from "@/lib/user-error";
 
 const schema = z.object({
-  title: z.string().min(1, "Título requerido"),
-  content: z.string().min(1, "Contenido requerido"),
-  category: z.string().optional(),
+  title: z.string().min(1, "Título requerido").max(240),
+  content: z.string().min(1, "Contenido requerido").max(50000),
+  category: z.string().max(120).optional(),
+  tags: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -35,35 +36,45 @@ export function ArticleDialog({ article, mode = "create" }: ArticleDialogProps) 
   const { lang } = usePreferences();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [expectedVersion, setExpectedVersion] = useState(article?.knowledgeVersion ?? 0);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: article
-      ? { title: article.title, content: article.content, category: article.category ?? "" }
+      ? { title: article.title, content: article.content, category: article.category ?? "", tags: article.tags.join(", ") }
       : {},
   });
 
   async function onSubmit(data: FormData) {
     setLoading(true);
     try {
+      const tags = (data.tags ?? "").split(",").map(tag => tag.trim()).filter(Boolean);
       if (mode === "edit" && article) {
-        await updateArticle(article.id, { ...data, category: data.category || undefined });
+        await updateArticle(article.id, { ...data, tags, expectedVersion, category: data.category || undefined });
         toast.success(lang === "es" ? "Artículo actualizado" : "Article updated");
       } else {
-        await createArticle({ ...data, category: data.category || undefined });
+        await createArticle({ ...data, tags, category: data.category || undefined });
         toast.success(lang === "es" ? "Artículo creado" : "Article created");
         reset();
       }
       setOpen(false);
-    } catch {
-      toast.error(lang === "es" ? "Error al guardar artículo" : "Error saving article");
+    } catch (error) {
+      toast.error(getErrorMessage(error, lang === "es" ? "Error al guardar artículo" : "Error saving article"));
     } finally {
       setLoading(false);
     }
   }
 
+  function changeOpen(next: boolean) {
+    if (next && mode === "edit" && article) {
+      reset({ title: article.title, content: article.content, category: article.category ?? "", tags: article.tags.join(", ") });
+      setExpectedVersion(article.knowledgeVersion);
+    }
+    setOpen(next);
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger asChild>
         {mode === "create" ? (
           <Button size="sm" className="min-h-11">
@@ -106,6 +117,7 @@ export function ArticleDialog({ article, mode = "create" }: ArticleDialogProps) 
               {lang === "es" ? "Este contenido es consultado por el asistente AI para responder preguntas de los clientes." : "This content is consulted by the AI assistant to answer customer questions."}
             </p>
           </div>
+          <div className="space-y-2"><Label htmlFor="article-tags">{lang === "es" ? "Etiquetas (separadas por coma)" : "Tags (comma separated)"}</Label><Input id="article-tags" className="min-h-11 text-base" {...register("tags")} /></div>
           <DialogFooter>
             <Button type="button" variant="outline" className="min-h-11" onClick={() => setOpen(false)}>{lang === "es" ? "Cancelar" : "Cancel"}</Button>
             <Button type="submit" className="min-h-11" disabled={loading}>

@@ -48,6 +48,9 @@ test.describe("Phase 2 responsive AI Center", () => {
   test.beforeEach(async ({ context }) => { await context.addCookies(cookies); });
   test.afterAll(async () => {
     if (organizationId) {
+      await prisma.knowledgeGrant.deleteMany({ where: { organizationId } });
+      await prisma.knowledgeRevision.deleteMany({ where: { organizationId } });
+      await prisma.knowledgeAccessPolicy.deleteMany({ where: { organizationId } });
       await prisma.agentExecutionStep.deleteMany({ where: { organizationId } }); await prisma.agentExecution.deleteMany({ where: { organizationId } });
       await prisma.agentConfigRevision.deleteMany({ where: { organizationId } }); await prisma.agentInstance.deleteMany({ where: { organizationId } });
       await prisma.agentModelRollout.deleteMany({ where: { organizationId } });

@@ -12,13 +12,13 @@ export function DeleteArticleButton({ id }: { id: string }) {
   const [loading, setLoading] = useState(false);
 
   async function handleDelete() {
-    if (!confirm(lang === "es" ? "¿Eliminar este artículo? Esta acción no se puede deshacer." : "Delete this article? This action cannot be undone.")) return;
+    if (!confirm(lang === "es" ? "¿Desactivar este artículo? Se conservarán su contenido y sus versiones." : "Deactivate this article? Its content and versions will be preserved.")) return;
     setLoading(true);
     try {
       await deleteArticle(id);
-      toast.success(lang === "es" ? "Artículo eliminado" : "Article deleted");
+      toast.success(lang === "es" ? "Artículo desactivado" : "Article deactivated");
     } catch {
-      toast.error(lang === "es" ? "Error al eliminar artículo" : "Error deleting article");
+      toast.error(lang === "es" ? "Error al desactivar artículo" : "Error deactivating article");
     } finally {
       setLoading(false);
     }
@@ -28,7 +28,7 @@ export function DeleteArticleButton({ id }: { id: string }) {
     <Button
       variant="ghost"
       size="icon"
-      aria-label={lang === "es" ? "Eliminar artículo" : "Delete article"}
+      aria-label={lang === "es" ? "Desactivar artículo" : "Deactivate article"}
       className="h-11 w-11 text-slate-400 hover:text-red-600"
       onClick={handleDelete}
       disabled={loading}
