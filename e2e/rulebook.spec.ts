@@ -36,6 +36,8 @@ test.describe("rulebook del negocio", () => {
     await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 15_000 });
 
     await page.goto("/portal/knowledge-base");
+    const rulesSection = page.locator("summary").filter({ hasText: "Reglas del negocio" });
+    if (await rulesSection.isVisible()) await rulesSection.click();
     await expect(page.getByText("0 de 4 secciones listas")).toBeVisible();
     await expect(page.getByRole("button", { name: "Guardado" })).toBeDisabled();
 
@@ -45,6 +47,7 @@ test.describe("rulebook del negocio", () => {
     await expect(page.getByText("Rulebook guardado")).toBeVisible();
 
     await page.reload();
+    if (await rulesSection.isVisible()) await rulesSection.click();
     await expect(page.getByLabel("Reglas duras")).toHaveValue("Nunca inventes precios");
     await expect(page.getByText("2 de 4 secciones listas")).toBeVisible();
     expect(await prisma.businessRulebook.count({ where: { organizationId: orgId, rules: "Nunca inventes precios" } })).toBe(1);

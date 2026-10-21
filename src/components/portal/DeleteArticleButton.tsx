@@ -28,7 +28,8 @@ export function DeleteArticleButton({ id }: { id: string }) {
     <Button
       variant="ghost"
       size="icon"
-      className="h-8 w-8 text-slate-400 hover:text-red-600"
+      aria-label={lang === "es" ? "Eliminar artículo" : "Delete article"}
+      className="h-11 w-11 text-slate-400 hover:text-red-600"
       onClick={handleDelete}
       disabled={loading}
     >

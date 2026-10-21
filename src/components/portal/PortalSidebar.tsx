@@ -75,7 +75,7 @@ const NAV_ITEMS: { href: string; key: keyof ReturnType<typeof useNavItems>; icon
   { href: "/portal/appointments", key: "appointments", icon: Calendar, section: "customers" },
 
   { href: "/portal/inbox", key: "inbox", icon: MessageSquare, section: "communication", anyModule: ["CRM", "AI_WHATSAPP"], hiddenWithModule: "CRM", alsoActiveFor: ["/portal/conversations"] },
-  { href: "/portal/whatsapp", key: "whatsapp", icon: Bot, section: "communication", module: "AI_WHATSAPP", alsoActiveFor: ["/portal/knowledge-base", "/portal/ai-lab", "/portal/ai-usage"] },
+  { href: "/portal/whatsapp", key: "whatsapp", icon: Bot, section: "communication", module: "AI_WHATSAPP", alsoActiveFor: ["/portal/knowledge-base", "/portal/ai-lab", "/portal/ai-usage", "/portal/ai-agents", "/portal/ai-channels"] },
   { href: "/portal/automations", key: "automations", icon: Zap, section: "communication", module: "AUTOMATIONS", alsoActiveFor: ["/portal/templates"] },
 
   { href: "/portal/dashboard", key: "dashboard", icon: LayoutDashboard, section: "results" },
@@ -97,6 +97,7 @@ const SECTION_TITLES: Record<NavSectionKey, { es: string; en: string } | null> =
 const SECTION_ORDER: NavSectionKey[] = ["main", "business", "customers", "communication", "results", "account"];
 
 interface PortalSidebarProps {
+  aiCenterEnabled?: boolean;
   orgName: string;
   orgLogoUrl?: string | null;
   enabledModules: PlatformModule[];
@@ -108,10 +109,11 @@ interface PortalSidebarProps {
   onMobileClose: () => void;
 }
 
-export function PortalSidebar({ orgName, orgLogoUrl: initialLogoUrl, enabledModules, pendingConversations = 0, mobileOpen, onMobileClose }: PortalSidebarProps) {
+export function PortalSidebar({ aiCenterEnabled = false, orgName, orgLogoUrl: initialLogoUrl, enabledModules, pendingConversations = 0, mobileOpen, onMobileClose }: PortalSidebarProps) {
   const pathname = usePathname();
   const { t, lang } = usePreferences();
-  const labels = useNavItems();
+  const originalLabels = useNavItems();
+  const labels = { ...originalLabels, ...(aiCenterEnabled ? { whatsapp: lang === "es" ? "Asistentes IA" : "AI Assistants" } : {}) };
   const visibleNavItems = NAV_ITEMS.filter((item) => (!item.module || enabledModules.includes(item.module)) && (!item.anyModule || item.anyModule.some((m) => enabledModules.includes(m))) && !(item.hiddenWithModule && enabledModules.includes(item.hiddenWithModule)));
 
   // Secciones cerradas por el usuario; se recuerdan en este navegador. Al

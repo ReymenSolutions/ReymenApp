@@ -61,9 +61,14 @@ const COPY = {
   },
 };
 
-export function RulebookEditor({ initial, canEdit, aiConfigured = true }: { initial: RulebookInput; canEdit: boolean; aiConfigured?: boolean }) {
+export function RulebookEditor({ initial, canEdit, aiConfigured = true, plainLanguage = false }: { initial: RulebookInput; canEdit: boolean; aiConfigured?: boolean; plainLanguage?: boolean }) {
   const { lang } = usePreferences();
-  const t = COPY[lang === "en" ? "en" : "es"];
+  const base = COPY[lang === "en" ? "en" : "es"];
+  const t = plainLanguage ? { ...base,
+    title: lang === "es" ? "Reglas del negocio" : "Business rules",
+    howText: lang === "es" ? "Estas reglas y los artículos ayudan al asistente a preparar respuestas. En modo Sugerir, una persona las revisa; en Automático pueden enviarse sin revisión. Tú eliges el modo en Canales." : "These rules and articles help the assistant prepare replies. In Suggest mode a person reviews them; in Automatic mode they may be sent without review. Choose the mode in Channels.",
+    draftsOff: lang === "es" ? "La IA no está disponible por el momento. Puedes preparar tus reglas mientras se revisa el servicio." : "AI is currently unavailable. You can prepare your rules while the service is reviewed.",
+  } : base;
   const [saved, setSaved] = useState(initial);
   const [draft, setDraft] = useState(initial);
   const [pending, startTransition] = useTransition();
@@ -116,7 +121,7 @@ export function RulebookEditor({ initial, canEdit, aiConfigured = true }: { init
       {!canEdit && <p className="mb-3 text-xs text-slate-500">{t.readOnly}</p>}
 
       <p className="mb-4 text-xs text-slate-500">
-        {aiConfigured ? t.modesHint : t.draftsOff} <Link href="/portal/whatsapp" className="font-medium text-brand-700 underline-offset-2 hover:underline">{t.modesLink}</Link>
+        {aiConfigured ? t.modesHint : t.draftsOff} <Link href={plainLanguage ? "/portal/ai-channels" : "/portal/whatsapp"} className="font-medium text-brand-700 underline-offset-2 hover:underline">{t.modesLink}</Link>
       </p>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -145,7 +150,7 @@ export function RulebookEditor({ initial, canEdit, aiConfigured = true }: { init
                   readOnly={!canEdit}
                   maxLength={RULEBOOK_MAX_CHARS}
                   onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
-                  className="min-h-[140px] resize-y font-mono text-[13px] leading-relaxed"
+                  className={plainLanguage ? "min-h-[140px] resize-y text-base leading-relaxed" : "min-h-[140px] resize-y font-mono text-[13px] leading-relaxed"}
                 />
                 <p className="text-right text-[11px] tabular-nums text-slate-400">{t.chars(value.length, RULEBOOK_MAX_CHARS)}</p>
               </CardContent>

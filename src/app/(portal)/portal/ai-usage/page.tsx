@@ -1,3 +1,4 @@
+import { aiCenterUiEnabled } from "@/lib/ai/agents/center-ui";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { requireModule } from "@/lib/modules";
@@ -31,7 +32,7 @@ export default async function AiUsagePage() {
         title={es ? "Mi consumo de IA" : "My AI usage"}
         description={es ? "Tu plan incluye el uso de agentes de IA bajo una política de uso justo. Puedes consultar tu consumo y adquirir capacidad adicional cuando la necesites." : "Your plan includes the use of AI agents under a fair-use policy. You can check your usage and get additional capacity whenever you need it."}
       />
-      <PortalSectionTabs tabs={getAiWhatsappTabs(t, session.user.role as UserRole)} />
+      <PortalSectionTabs label={es ? "Secciones de asistentes IA" : "AI assistant sections"} wrap={aiCenterUiEnabled()} tabs={getAiWhatsappTabs(t, session.user.role as UserRole, lang)} />
 
       <div className="space-y-4">
         {u.paused && (

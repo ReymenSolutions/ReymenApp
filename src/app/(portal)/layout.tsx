@@ -1,3 +1,4 @@
+import { aiCenterUiEnabled } from "@/lib/ai/agents/center-ui";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -45,6 +46,7 @@ export default async function PortalLayout({ children }: { children: React.React
 
   return (
     <PortalShell
+      aiCenterEnabled={aiCenterUiEnabled()}
       orgName={org.name}
       orgLogoUrl={org.logoUrl}
       enabledModules={enabledModules}
