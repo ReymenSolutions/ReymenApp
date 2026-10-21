@@ -15,7 +15,7 @@ export function ExecutionDetail({ id }: { id: string }) {
   }
   return <Dialog open={open} onOpenChange={value => { setOpen(value); if (!value) ++request.current; }}><DialogTrigger asChild><Button type="button" variant="outline" className="min-h-11" onClick={load}>{c.details}</Button></DialogTrigger><DialogContent touchClose closeLabel={lang === "es" ? "Cerrar ventana" : "Close dialog"} className="min-w-0 [overflow-wrap:anywhere]">
       <DialogHeader className="pr-10"><DialogTitle>{c.activity}</DialogTitle><DialogDescription>{c.observation}</DialogDescription></DialogHeader>
-      <div aria-busy={loading} aria-live="polite">{loading && <p>{c.loading}</p>}{failed && <div role="alert" className="space-y-3"><p>{c.retryTrace}</p><Button type="button" onClick={load}>{c.retry}</Button></div>}
+      <div aria-busy={loading} aria-live="polite">{loading && <p>{c.loading}</p>}{failed && <div role="alert" className="space-y-3"><p>{c.retryTrace}</p><Button type="button" className="min-h-11" onClick={load}>{c.retry}</Button></div>}
         {trace && <div className="space-y-4"><p className="font-semibold">{executionLabel(trace.status, lang)}</p><p className="text-sm text-slate-600">{c.revision}: {trace.configVersion}</p><ol className="space-y-3">{trace.steps.map(step => <li key={step.stepKey} className="rounded-md border border-slate-200 p-3"><p className="text-sm font-medium">{executionLabel(step.stepKey, lang)}</p><p className="text-sm text-slate-600">{executionLabel(step.status, lang)}</p></li>)}</ol><p className="text-xs text-slate-500">{c.deliveredNote}</p></div>}
       </div><Button variant="outline" type="button" className="min-h-11" onClick={() => { ++request.current; setOpen(false); }}>{c.close}</Button>
     </DialogContent></Dialog>;

@@ -108,7 +108,7 @@ export function RulebookEditor({ initial, canEdit, aiConfigured = true, plainLan
           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{t.progress(progress.filled, progress.total)}</span>
         </h2>
         {canEdit && (
-          <Button size="sm" onClick={save} disabled={!dirty} loading={pending}>
+          <Button size="sm" className={plainLanguage ? "min-h-11" : undefined} onClick={save} disabled={!dirty} loading={pending}>
             {!pending && !dirty && <Check className="h-3.5 w-3.5" />}
             {pending ? t.saving : dirty ? t.save : t.saved}
           </Button>
@@ -139,7 +139,7 @@ export function RulebookEditor({ initial, canEdit, aiConfigured = true, plainLan
                     <p className="text-xs text-slate-500">{copy.hint}</p>
                   </div>
                   {canEdit && value.trim() === "" && (
-                    <Button type="button" size="sm" variant="ghost" className="flex-shrink-0 text-xs" onClick={() => setDraft((d) => ({ ...d, [key]: copy.example }))}>
+                    <Button type="button" size="sm" variant="ghost" className={`flex-shrink-0 text-xs ${plainLanguage ? "min-h-11" : ""}`} onClick={() => setDraft((d) => ({ ...d, [key]: copy.example }))}>
                       {t.example}
                     </Button>
                   )}

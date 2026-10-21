@@ -144,7 +144,7 @@ export function AgentTester({ aiConfigured, notConfiguredText, plainLanguage = f
             disabled={!aiConfigured}
             className="min-h-11 flex-1 basis-48 text-base"
           />
-          <Button onClick={submit} disabled={!input.trim() || !aiConfigured || (plainLanguage && !consent)} loading={pending}>
+          <Button className={plainLanguage ? "min-h-11" : undefined} onClick={submit} disabled={!input.trim() || !aiConfigured || (plainLanguage && !consent)} loading={pending}>
             {!pending && <Send className="h-4 w-4" />} {t.send}
           </Button>
         </div>
@@ -152,7 +152,7 @@ export function AgentTester({ aiConfigured, notConfiguredText, plainLanguage = f
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-slate-500">{t.editHint}</p>
           {turns.length > 0 && (
-            <Button size="sm" variant="ghost" onClick={() => { ++epoch.current; setTurns([]); setInput(""); setPending(false); }}>
+            <Button size="sm" variant="ghost" className={plainLanguage ? "min-h-11" : undefined} onClick={() => { ++epoch.current; setTurns([]); setInput(""); setPending(false); }}>
               <RotateCcw className="h-3.5 w-3.5" /> {t.reset}
             </Button>
           )}

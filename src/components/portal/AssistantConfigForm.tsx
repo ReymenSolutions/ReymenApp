@@ -69,7 +69,7 @@ export function AssistantConfigForm({ assistant, canEdit = true, numberOnly = fa
         <Link href="/portal/knowledge-base" className="font-medium text-brand-700 underline-offset-2 hover:underline">{c.link}</Link>
       </p>}
       <div className="flex justify-end">
-        <Button type="submit" disabled={loading || !canEdit}>
+        <Button type="submit" className={numberOnly ? "min-h-11" : undefined} disabled={loading || !canEdit}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           {t.saveConfig}
         </Button>

@@ -66,7 +66,7 @@ export function ArticleDialog({ article, mode = "create" }: ArticleDialogProps) 
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {mode === "create" ? (
-          <Button size="sm">
+          <Button size="sm" className="min-h-11">
             <Plus className="h-4 w-4" />
             {lang === "es" ? "Nuevo artículo" : "New article"}
           </Button>
@@ -107,8 +107,8 @@ export function ArticleDialog({ article, mode = "create" }: ArticleDialogProps) 
             </p>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>{lang === "es" ? "Cancelar" : "Cancel"}</Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="button" variant="outline" className="min-h-11" onClick={() => setOpen(false)}>{lang === "es" ? "Cancelar" : "Cancel"}</Button>
+            <Button type="submit" className="min-h-11" disabled={loading}>
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
               {mode === "create" ? (lang === "es" ? "Crear artículo" : "Create article") : (lang === "es" ? "Guardar cambios" : "Save changes")}
             </Button>
