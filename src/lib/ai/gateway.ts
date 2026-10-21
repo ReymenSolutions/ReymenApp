@@ -29,7 +29,7 @@ export async function findRate(provider: string, model: string, at: Date) {
 }
 
 /** Cierra el registro de una llamada: tokens, estado y costo (con la tarifa y el tipo de cambio usados, para poder auditarlo). */
-async function finish(id: string, provider: string, model: string, outcome: { status: "SUCCEEDED" | "FAILED" | "REFUSED"; usage: NormalizedUsage; modelServed?: string; externalId?: string; errorCode?: string; latencyMs: number }) {
+async function finish(id: string, organizationId: string, provider: string, model: string, outcome: { status: "SUCCEEDED" | "FAILED" | "REFUSED"; usage: NormalizedUsage; modelServed?: string; externalId?: string; errorCode?: string; latencyMs: number }) {
   const now = new Date();
   const rate = await findRate(provider, model, now);
   let cost: Prisma.Decimal | null = null;
@@ -40,29 +40,33 @@ async function finish(id: string, provider: string, model: string, outcome: { st
     if (rate.currency === "USD") fx = await getMxnPerUsdRate();
     costMxn = toMxn(cost, rate.currency, fx?.rate ?? null);
   }
-  await prisma.aiUsage.update({
-    where: { id },
-    data: {
-      status: outcome.status,
-      modelServed: outcome.modelServed ?? null,
-      externalId: outcome.externalId ?? null,
-      errorCode: outcome.errorCode ?? null,
-      latencyMs: outcome.latencyMs,
-      inputTokens: outcome.usage.inputTokens,
-      outputTokens: outcome.usage.outputTokens,
-      cacheReadTokens: outcome.usage.cacheReadTokens,
-      cacheWriteTokens: outcome.usage.cacheWriteTokens,
-      reasoningTokens: outcome.usage.reasoningTokens,
-      costBasis: rate ? "ESTIMATED" : "NO_RATE",
-      rateId: rate?.id ?? null,
-      costOriginal: cost,
-      currencyOriginal: rate?.currency ?? null,
-      costMxn,
-      fxRate: costMxn && rate?.currency === "USD" && fx ? new Prisma.Decimal(fx.rate) : null,
-      fxDate: costMxn && rate?.currency === "USD" ? (fx?.date ?? null) : null,
-      fxSource: costMxn && rate?.currency === "USD" ? (fx?.source ?? null) : null,
-      completedAt: now,
-    },
+  await prisma.$transaction(async tx => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${"ai-budget:" + organizationId}))`;
+    await tx.aiUsage.update({
+      where: { id, organizationId },
+      data: {
+        status: outcome.status,
+        modelServed: outcome.modelServed ?? null,
+        externalId: outcome.externalId ?? null,
+        errorCode: outcome.errorCode ?? null,
+        latencyMs: outcome.latencyMs,
+        inputTokens: outcome.usage.inputTokens,
+        outputTokens: outcome.usage.outputTokens,
+        cacheReadTokens: outcome.usage.cacheReadTokens,
+        cacheWriteTokens: outcome.usage.cacheWriteTokens,
+        reasoningTokens: outcome.usage.reasoningTokens,
+        costBasis: rate ? "ESTIMATED" : "NO_RATE",
+        rateId: rate?.id ?? null,
+        costOriginal: cost,
+        currencyOriginal: rate?.currency ?? null,
+        costMxn,
+        fxRate: costMxn && rate?.currency === "USD" && fx ? new Prisma.Decimal(fx.rate) : null,
+        fxDate: costMxn && rate?.currency === "USD" ? (fx?.date ?? null) : null,
+        fxSource: costMxn && rate?.currency === "USD" ? (fx?.source ?? null) : null,
+        completedAt: now,
+      },
+    });
+    await tx.aiBudgetReservation.updateMany({ where: { organizationId, usageId: id, released: false }, data: { released: true } });
   });
 }
 
@@ -145,13 +149,11 @@ export async function runAiCall(ctx: AiUsageContext, input: AiCallInput): Promis
     result = await activeProvider.call({ system: input.system, messages: input.messages, model: activeModel, maxOutputTokens: input.maxOutputTokens });
   } catch (err) {
     // Un error del proveedor puede haber consumido tokens que no conocemos: queda FAILED con 0 y el código del error.
-    await finish(usageId, usedProviderName, activeModel, { status: "FAILED", usage: ZERO, errorCode: (err instanceof Error ? err.message : String(err)).slice(0, 120), latencyMs: Date.now() - started });
-    await releaseReservation(usageId);
+    await finish(usageId, ctx.organizationId, usedProviderName, activeModel, { status: "FAILED", usage: ZERO, errorCode: (err instanceof Error ? err.message : String(err)).slice(0, 120), latencyMs: Date.now() - started });
     throw err;
   }
-  await finish(usageId, usedProviderName, activeModel, { status: result.refused ? "REFUSED" : "SUCCEEDED", usage: result.usage, modelServed: result.modelServed, externalId: result.externalId, latencyMs: Date.now() - started });
-  // El costo real ya está en el ledger: la reserva se libera y se revisan las alertas de consumo.
-  await releaseReservation(usageId);
+  await finish(usageId, ctx.organizationId, usedProviderName, activeModel, { status: result.refused ? "REFUSED" : "SUCCEEDED", usage: result.usage, modelServed: result.modelServed, externalId: result.externalId, latencyMs: Date.now() - started });
+  // Cost and reservation were committed atomically under the tenant admission lock.
   await evaluateBudgetAlerts(ctx.organizationId).catch(() => undefined);
   if (result.refused) return { refused: true, model: result.modelServed };
   return { text: result.text, model: result.modelServed, inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens };

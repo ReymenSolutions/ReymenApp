@@ -30,15 +30,19 @@ Se conserva un solo ledger, con referencia opcional a raíz protegida por FK de 
 
 ## Pruebas
 
-Validación focal: **33/33** entre piloto, presupuesto y gateway. Los 13 casos nuevos cubren 26 admisiones simultáneas (solo 25 aceptadas), carrera contra reserva legacy bajo el mismo lock, idempotencia, tope global/mensual/diario, constraints SQL, actores/organizaciones ajenos, rol/módulo revocados, admin inactivo, rollback conservando compromisos, no duplicar claim, caducidad/cambio de política/zona y DST de 23/25 horas.
+Validación focal: **34/34** entre piloto, presupuesto, gateway y cierre atómico. Los 13 casos nuevos de cuotas cubren 26 admisiones simultáneas (solo 25 aceptadas), carrera contra reserva legacy bajo el mismo lock, idempotencia, tope global/mensual/diario, constraints SQL, actores/organizaciones ajenos, rol/módulo revocados, admin inactivo, rollback conservando compromisos, no duplicar claim, caducidad/cambio de política/zona y DST de 23/25 horas.
 
-Registrar aquí suite completa, TypeScript/lint/build y estado de publicación después de las comprobaciones finales.
+La primera corrida completa se detuvo al fallar la prueba de concurrencia existente del presupuesto. Una prueba determinista adicional confirmó un defecto previo: ante fallo al liberar la reserva, el ledger ya había quedado SUCCEEDED. Se modificó [gateway](../../src/lib/ai/gateway.ts) para confirmar gasto y liberar reserva en una transacción con el mismo lock de admisión. La [prueba de regresión](../../src/lib/ai/gateway-settlement.test.ts) falló antes de la corrección (SUCCEEDED en vez de PENDING) y pasó después; las 34 focales pasaron con el cambio. No se relajaron límites ni aserciones.
+
+Registrar aquí suite completa final, TypeScript/lint/build y estado de publicación después de las comprobaciones finales.
 
 ## Compatibilidad, validación y rollback
 
-La admisión no tiene acción pública ni UI: son primitivas internas que la futura integración debe llamar antes del proveedor. Las funciones existentes mantienen sus contratos; el presupuesto global suma un compromiso adicional solo si existen raíces piloto pendientes. No se cambia el gateway o proveedor legacy, el contacto con clientes ni el procesamiento POS/Lealtad.
+La admisión no tiene acción pública ni UI: son primitivas internas que la futura integración debe llamar antes del proveedor. Las funciones existentes mantienen sus contratos; el presupuesto global suma un compromiso adicional solo si existen raíces piloto pendientes. El gateway legacy recibe únicamente la corrección de atomicidad descrita arriba; no se cambia su proveedor, la política de tokens/fallback, el contacto con clientes ni el procesamiento POS/Lealtad.
 
 Para validar en una BD local desechable: aplicar las 86 migraciones, generar Prisma, habilitar el flag únicamente para fixtures y ejecutar `src/lib/ai/pilot/budget.test.ts`, presupuesto/gateway y suite completa. Una cuenta ADMIN puede configurar la política; una sesión de negocio con permiso de gestionar conocimiento puede reservar/iniciar una raíz. Cambiar el flag no configura un proveedor ni envía una respuesta.
+
+La corrección de atomicidad del gateway se mantiene al apagar el flag; no altera cómo se calcula una tarifa ni resuelve los costos desconocidos del proveedor.
 
 Rollback preferido: apagar el flag y la política para detener admisiones; conservar las tablas, FK, recibos y cálculo de compromisos. Las raíces no despachadas pueden cancelarse con autoridad vigente, incluso con el flag apagado. No hacer drop/down, resets ni eliminar reservas para recuperar saldo. No volver a un binario que desconozca estas reservas si existen compromisos abiertos: primero reconciliarlos.
 
