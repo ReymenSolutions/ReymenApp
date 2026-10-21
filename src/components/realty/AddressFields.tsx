@@ -75,7 +75,9 @@ export function AddressFields({
         setColonias(info.colonias);
         setStatus("found");
         const known = info.colonias.some((c) => c.nombre === value.colonia);
-        setTyping(!!value.colonia && !known);
+        // Solo al abrir un registro guardado con una colonia escrita a mano se muestra como texto;
+        // al cambiar de CP se vuelve a elegir de la lista.
+        setTyping(firstLoad && !!value.colonia && !known);
         // Un CP nuevo cambia municipio/estado; la colonia se conserva si sigue en la lista.
         onChangeRef.current({
           municipio: info.municipio,
