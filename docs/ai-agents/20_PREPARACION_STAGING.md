@@ -68,6 +68,8 @@ Evidencia local: 3/3 pruebas de configuración y validación de sintaxis correct
 
 La primera ejecución del workflow completo construyó las imágenes y pasó migración/bootstrap, pero detectó que Docker no publica puertos de una red interna. Se añadió el Nginx separado de entrada sin dar salida externa a la app. Exigir que el check **Private staging configuration / staging-smoke** del [PR #125](https://github.com/ReymenSolutions/ReymenApp/pull/125) pase sobre la última revisión antes de instalar. La suite funcional existente se valida también en el CI habitual; no se reemplaza por las tres pruebas de configuración.
 
+La regresión legacy detectó dos defectos de preparación de pruebas: el caso de Lealtad escribía preferencias directamente en BD, sin invalidar el snapshot autenticado que lee el layout; ahora cambia tema/idioma por los controles reales, con las mismas aserciones finales. El selector de estado vacío de clientes podía coincidir con fragmentos SSR ocultos; se acota al heading accesible de main. Son correcciones separadas de fixtures/selectores, sin cambios al runtime, a los reintentos ni a los umbrales de las aserciones. Consultar los checks de la revisión final para su resultado.
+
 Rollback operacional: `sudo bash deploy/staging/run.sh stop`. Solo detiene la app y el Nginx de staging. Para detener también su base, usar el Compose de staging con `stop`; conservar volumen y `.env.staging`. No ejecutar `down -v`, reset ni restauraciones sobre producción. Si una migración falla, conservar evidencia y resolver hacia adelante en esta base aislada.
 
 ## Siguientes gates
