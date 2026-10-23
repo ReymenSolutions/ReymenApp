@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createOrgUser, setUserActive } from "@/actions/admin/users";
 import { AdminEditUserDialog } from "@/components/admin/AdminEditUserDialog";
+import { AdminDeleteUserDialog } from "@/components/admin/AdminDeleteUserDialog";
 import { usePreferences } from "@/context/preferences";
 import { getErrorMessage, translateMessage } from "@/lib/user-error";
 
@@ -223,6 +224,7 @@ export function AdminClientUsersPanel({ orgId, users }: { orgId: string; users: 
                   </Badge>
                   <AdminEditUserDialog user={{ id: user.id, name: user.name, email: user.email, role: user.role, organizationId: orgId }} fixedOrgId={orgId} />
                   <ToggleActiveButton user={user} />
+                  <AdminDeleteUserDialog user={user} />
                 </div>
               </div>
             ))}

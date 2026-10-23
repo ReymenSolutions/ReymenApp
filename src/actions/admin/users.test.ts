@@ -11,7 +11,7 @@ vi.mock("@/lib/auth", () => ({
   isAdmin: (role: string) => role === "ADMIN" || role === "SUPER_ADMIN",
 }));
 
-const { createOrgUser, updateUserAsAdmin } = await import("./users");
+const { createOrgUser, updateUserAsAdmin, createUserAsAdmin, deleteUserAsAdmin } = await import("./users");
 
 describe("admin createOrgUser", () => {
   let org: { id: string };
@@ -173,5 +173,76 @@ describe("admin updateUserAsAdmin", () => {
   it("nobody changes their own role, and the last super admin can't be demoted", async () => {
     asSuper();
     await expect(updateUserAsAdmin(superAdmin.id, { name: "Yo Mismo", email: (await prisma.user.findUniqueOrThrow({ where: { id: superAdmin.id } })).email, role: "ADMIN", organizationId: null })).rejects.toThrow(/propio rol/i);
+  });
+});
+
+describe("admin createUserAsAdmin / deleteUserAsAdmin", () => {
+  let org: { id: string };
+  let superAdmin: { id: string };
+  let admin: { id: string };
+  const extra: string[] = [];
+
+  beforeAll(async () => {
+    org = await createTestOrg("Create Delete User Org");
+    await prisma.organization.update({ where: { id: org.id }, data: { plan: "professional" } });
+    superAdmin = await createTestUser(null, "SUPER_ADMIN", "cd-super");
+    admin = await createTestUser(null, "ADMIN", "cd-admin");
+  });
+
+  afterAll(async () => {
+    await cleanupOrg(org.id);
+    await prisma.user.deleteMany({ where: { OR: [{ id: { in: [superAdmin.id, admin.id, ...extra] } }, { email: { endsWith: "@cd-test.local" } }] } });
+  });
+
+  const asSuper = () => authMock.mockResolvedValue(fakeSession({ id: superAdmin.id, role: "SUPER_ADMIN", organizationId: null }));
+  const asAdmin = () => authMock.mockResolvedValue(fakeSession({ id: admin.id, role: "ADMIN", organizationId: null }));
+
+  it("creates a client user of any role linked to an organization", async () => {
+    asAdmin();
+    for (const role of ["OWNER", "MANAGER", "AGENT", "VIEWER"]) {
+      const email = `${role.toLowerCase()}.${Date.now()}@cd-test.local`;
+      await createUserAsAdmin({ name: `Nuevo ${role}`, email, role, organizationId: org.id, password: "password123" });
+      const u = await prisma.user.findUniqueOrThrow({ where: { email } });
+      expect(u).toMatchObject({ role, organizationId: org.id });
+      expect(u.passwordHash).not.toBe("password123");
+    }
+  });
+
+  it("a client role without organization is rejected; a regular admin can't create platform admins", async () => {
+    asAdmin();
+    await expect(createUserAsAdmin({ name: "Sin Org", email: `noorg.${Date.now()}@cd-test.local`, role: "OWNER", organizationId: null, password: "password123" })).rejects.toThrow(/necesita una organización/i);
+    await expect(createUserAsAdmin({ name: "Admin Nuevo", email: `adm.${Date.now()}@cd-test.local`, role: "ADMIN", organizationId: null, password: "password123" })).rejects.toThrow(/super administrador/i);
+  });
+
+  it("a super admin creates a super admin linked to an organization, or a platform admin without one", async () => {
+    asSuper();
+    const e1 = `both.${Date.now()}@cd-test.local`;
+    await createUserAsAdmin({ name: "Reynol Prueba", email: e1, role: "SUPER_ADMIN", organizationId: org.id, password: "password123" });
+    expect(await prisma.user.findUniqueOrThrow({ where: { email: e1 } })).toMatchObject({ role: "SUPER_ADMIN", organizationId: org.id });
+    const e2 = `plat.${Date.now()}@cd-test.local`;
+    await createUserAsAdmin({ name: "Admin Plataforma", email: e2, role: "ADMIN", organizationId: null, password: "password123" });
+    expect(await prisma.user.findUniqueOrThrow({ where: { email: e2 } })).toMatchObject({ role: "ADMIN", organizationId: null });
+    await expect(createUserAsAdmin({ name: "Duplicado", email: e2.toUpperCase(), role: "ADMIN", organizationId: null, password: "password123" })).rejects.toThrow(/ya existe/i);
+  });
+
+  it("deletes a user but keeps what they wrote, without author", async () => {
+    asAdmin();
+    const u = await createTestUser(org.id, "AGENT", "cd-del");
+    const lead = await prisma.lead.create({ data: { organizationId: org.id, name: "Lead Prueba" } });
+    const note = await prisma.note.create({ data: { organizationId: org.id, leadId: lead.id, authorId: u.id, content: "nota" } });
+    expect((await deleteUserAsAdmin(u.id)).success).toBe(true);
+    expect(await prisma.user.findUnique({ where: { id: u.id } })).toBeNull();
+    expect((await prisma.note.findUniqueOrThrow({ where: { id: note.id } })).authorId).toBeNull();
+    expect(await prisma.auditLog.findFirst({ where: { action: "admin.user.delete", resourceId: u.id } })).not.toBeNull();
+  });
+
+  it("can't delete yourself, can't delete platform admins as a regular admin, and a non-admin is denied", async () => {
+    asAdmin();
+    await expect(deleteUserAsAdmin(admin.id)).rejects.toThrow(/a ti mismo/i);
+    await expect(deleteUserAsAdmin(superAdmin.id)).rejects.toThrow(/super administrador/i);
+    const owner = await createTestUser(org.id, "OWNER", "cd-owner");
+    const target = await createTestUser(org.id, "AGENT", "cd-target");
+    authMock.mockResolvedValue(fakeSession({ id: owner.id, role: "OWNER", organizationId: org.id }));
+    await expect(deleteUserAsAdmin(target.id)).rejects.toThrow(/no autorizado/i);
   });
 });

@@ -264,6 +264,8 @@ const EN: Record<string, string> = {
   "No puedes cambiar tu propio rol": "You can't change your own role",
   "No puedes cambiar tu propia organización": "You can't change your own organization",
   "Debe quedar al menos un super administrador activo": "At least one active super admin must remain",
+  "Solo un super administrador puede crear administradores de la plataforma": "Only a super admin can create platform administrators",
+  "Solo un super administrador puede eliminar a un administrador de la plataforma": "Only a super admin can delete a platform administrator",
   "No puedes editarte a ti mismo desde aquí": "You can't edit yourself from here",
   "No puedes eliminar al propietario": "You can't remove the owner",
   "No puedes eliminarte a ti mismo": "You can't remove yourself",

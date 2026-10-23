@@ -12,7 +12,7 @@ import { requireAdmin } from "@/lib/guards";
 import { UserError } from "@/lib/user-error";
 import { withPlanCapacity } from "@/lib/plan-limits";
 import { invalidateSessionCache } from "@/lib/session-guard";
-import { EDITABLE_ROLES, checkUserEdit } from "@/lib/user-edit-rules";
+import { EDITABLE_ROLES, checkUserEdit, checkUserCreate, checkUserDelete, isPlatformRole } from "@/lib/user-edit-rules";
 
 const ORG_USER_ROLES = ["OWNER", "MANAGER", "AGENT", "VIEWER"] as const;
 const STANDALONE_USER_ROLES = ["SUPER_ADMIN", "ADMIN"] as const;
@@ -232,6 +232,82 @@ export async function createStandaloneUser(data: { name: string; email: string; 
 export async function getOrgOptions() {
   await requireAdmin();
   return prisma.organization.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
+}
+
+const createUserSchema = z.object({
+  name: z.string().trim().min(2, "Mínimo 2 caracteres"),
+  email: z.string().trim().toLowerCase().email("Email inválido"),
+  role: z.enum(EDITABLE_ROLES),
+  organizationId: z.string().min(1).nullable(),
+  password: z.string().min(8, "Mínimo 8 caracteres"),
+});
+
+/**
+ * Alta desde Admin → Usuarios con cualquier rol y, si corresponde, ligado a una organización (un super admin también
+ * puede ser miembro de una). Con organización pasa por el mismo camino que el alta desde el cliente (límite del plan,
+ * correo de bienvenida y auditoría); sin organización solo se crean administradores de la plataforma.
+ */
+export async function createUserAsAdmin(data: { name: string; email: string; role: string; organizationId: string | null; password: string }) {
+  const session = await requireAdmin();
+  const parsed = createUserSchema.safeParse(data);
+  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos inválidos");
+  const input = parsed.data;
+
+  const blocked = checkUserCreate({ actorRole: session.user.role, role: input.role, organizationId: input.organizationId });
+  if (blocked) throw new UserError(blocked);
+
+  if (input.organizationId) {
+    const org = await prisma.organization.findUnique({ where: { id: input.organizationId }, select: { id: true } });
+    if (!org) throw new UserError("Organización no encontrada");
+    await createOrgUserRecord({
+      organizationId: input.organizationId,
+      name: input.name,
+      email: input.email,
+      role: input.role as UserRole,
+      password: input.password,
+      actorUserId: session.user.id,
+      auditAction: "admin.user.create",
+    });
+    revalidatePath(`/admin/clients/${input.organizationId}`);
+  } else {
+    const existing = await prisma.user.findUnique({ where: { email: input.email } });
+    if (existing) throw new UserError("Ya existe un usuario con ese email");
+    const user = await prisma.user.create({
+      data: { name: input.name, email: input.email, passwordHash: await bcrypt.hash(input.password, 12), role: input.role as UserRole, organizationId: null },
+    });
+    await logAudit({ userId: session.user.id, action: "admin.user.create", resource: "User", resourceId: user.id, metadata: { email: user.email, role: user.role } });
+  }
+  revalidatePath("/admin/users");
+  return { success: true };
+}
+
+/**
+ * Elimina definitivamente a un usuario. Lo que hizo (notas, oportunidades, mensajes, visitas) se conserva sin autor;
+ * la bitácora de auditoría guarda quién lo eliminó. Para quitarle el acceso sin perder la relación, usa Desactivar.
+ */
+export async function deleteUserAsAdmin(userId: string) {
+  const session = await requireAdmin();
+  const target = await prisma.user.findUnique({ where: { id: userId } });
+  if (!target) throw new UserError("Usuario no encontrado");
+  const activeSuperAdmins = await prisma.user.count({ where: { role: "SUPER_ADMIN", isActive: true } });
+  const blocked = checkUserDelete({ actor: { id: session.user.id, role: session.user.role }, target: { id: target.id, role: target.role, isActive: target.isActive }, activeSuperAdmins });
+  if (blocked) throw new UserError(blocked);
+
+  await prisma.user.delete({ where: { id: userId } });
+  invalidateSessionCache(userId);
+
+  await logAudit({
+    organizationId: target.organizationId ?? undefined,
+    userId: session.user.id,
+    action: "admin.user.delete",
+    resource: "User",
+    resourceId: userId,
+    metadata: { email: target.email, name: target.name, role: target.role, platformRole: isPlatformRole(target.role) },
+  });
+
+  revalidatePath("/admin/users");
+  if (target.organizationId) revalidatePath(`/admin/clients/${target.organizationId}`);
+  return { success: true };
 }
 
 export async function getAllUsers() {

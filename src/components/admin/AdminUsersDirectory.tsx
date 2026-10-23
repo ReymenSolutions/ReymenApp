@@ -15,22 +15,12 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { createStandaloneUser, setUserActive } from "@/actions/admin/users";
+import { setUserActive } from "@/actions/admin/users";
+import { AdminCreateUserDialog } from "@/components/admin/AdminCreateUserDialog";
+import { AdminDeleteUserDialog } from "@/components/admin/AdminDeleteUserDialog";
 import { AdminEditUserDialog } from "@/components/admin/AdminEditUserDialog";
 import { usePreferences } from "@/context/preferences";
 import { getErrorMessage, translateMessage } from "@/lib/user-error";
-
-const STANDALONE_ROLES = ["ADMIN", "SUPER_ADMIN"] as const;
-type StandaloneRole = (typeof STANDALONE_ROLES)[number];
-
-const ROLE_LABELS_ES: Record<StandaloneRole, string> = {
-  ADMIN: "Admin",
-  SUPER_ADMIN: "Super Admin",
-};
-const ROLE_LABELS_EN: Record<StandaloneRole, string> = {
-  ADMIN: "Admin",
-  SUPER_ADMIN: "Super Admin",
-};
 
 export interface DirectoryUser {
   id: string;
@@ -40,96 +30,6 @@ export interface DirectoryUser {
   isActive: boolean;
   organizationId: string | null;
   organizationName: string | null;
-}
-
-const createSchema = z.object({
-  name: z.string().min(2, "Mínimo 2 caracteres"),
-  email: z.string().email("Email inválido"),
-  role: z.enum(STANDALONE_ROLES),
-  password: z.string().min(8, "Mínimo 8 caracteres"),
-});
-type CreateFormData = z.infer<typeof createSchema>;
-
-function CreateStandaloneUserDialog() {
-  const { lang } = usePreferences();
-  const roleLabels = lang === "es" ? ROLE_LABELS_ES : ROLE_LABELS_EN;
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<CreateFormData>({
-    resolver: zodResolver(createSchema),
-    defaultValues: { role: "ADMIN" },
-  });
-
-  async function onSubmit(data: CreateFormData) {
-    setLoading(true);
-    try {
-      await createStandaloneUser(data);
-      toast.success(lang === "es" ? "Usuario creado" : "User created");
-      reset({ role: "ADMIN", name: "", email: "", password: "" });
-      setOpen(false);
-    } catch (e) {
-      toast.error(getErrorMessage(e, (lang === "es" ? "Error al crear usuario" : "Error creating user")));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="h-4 w-4" />
-          {lang === "es" ? "Nuevo usuario" : "New user"}
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{lang === "es" ? "Nuevo usuario sin organización" : "New user without an organization"}</DialogTitle>
-        </DialogHeader>
-        <p className="text-sm text-slate-500">
-          {lang === "es"
-            ? "Para cuentas de operación de la plataforma (admins), no asociadas a un cliente."
-            : "For platform operator accounts (admins), not tied to a client."}
-        </p>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
-          <div className="space-y-2">
-            <Label htmlFor="adminusersdirectory-f1">{lang === "es" ? "Nombre completo *" : "Full name *"}</Label>
-            <Input id="adminusersdirectory-f1" placeholder={lang === "es" ? "Ana Martínez" : "Jane Doe"} {...register("name")} />
-            {errors.name && <p className="text-xs text-red-500">{translateMessage(errors.name.message)}</p>}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="adminusersdirectory-f2">Email *</Label>
-            <Input id="adminusersdirectory-f2" type="email" placeholder="ana@reymen.io" {...register("email")} />
-            {errors.email && <p className="text-xs text-red-500">{translateMessage(errors.email.message)}</p>}
-          </div>
-          <div className="space-y-2">
-            <Label>{lang === "es" ? "Rol *" : "Role *"}</Label>
-            <Select defaultValue="ADMIN" onValueChange={(v) => setValue("role", v as StandaloneRole)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {STANDALONE_ROLES.map((r) => (
-                  <SelectItem key={r} value={r}>{roleLabels[r]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="adminusersdirectory-f3">{lang === "es" ? "Contraseña temporal *" : "Temporary password *"}</Label>
-            <Input id="adminusersdirectory-f3" type="password" placeholder={lang === "es" ? "Mínimo 8 caracteres" : "At least 8 characters"} {...register("password")} />
-            {errors.password && <p className="text-xs text-red-500">{translateMessage(errors.password.message)}</p>}
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>{lang === "es" ? "Cancelar" : "Cancel"}</Button>
-            <Button type="submit" disabled={loading}>
-              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              {lang === "es" ? "Crear" : "Create"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
 }
 
 function ToggleActiveButton({ user, onToggled }: { user: DirectoryUser; onToggled: (id: string, isActive: boolean) => void }) {
@@ -196,11 +96,11 @@ function ToggleActiveButton({ user, onToggled }: { user: DirectoryUser; onToggle
   );
 }
 
-export function AdminUsersDirectory({ users: initialUsers, canCreateStandalone, orgs }: { users: DirectoryUser[]; canCreateStandalone: boolean; orgs: { id: string; name: string }[] }) {
+export function AdminUsersDirectory({ users: initialUsers, orgs }: { users: DirectoryUser[]; orgs: { id: string; name: string }[] }) {
   const { t, lang } = usePreferences();
   const [users, setUsers] = useState(initialUsers);
 
-  // createStandaloneUser() revalidates this same route, which makes Next.js
+  // createUserAsAdmin() revalidates this same route, which makes Next.js
   // refetch the Server Component and pass fresh initialUsers down — but the
   // optimistic toggle above needs its own local copy, which otherwise
   // shadows that refresh forever. Re-sync whenever the server sends new data.
@@ -214,11 +114,9 @@ export function AdminUsersDirectory({ users: initialUsers, canCreateStandalone, 
 
   return (
     <div className="space-y-4">
-      {canCreateStandalone && (
-        <div className="flex justify-end">
-          <CreateStandaloneUserDialog />
-        </div>
-      )}
+      <div className="flex justify-end">
+        <AdminCreateUserDialog orgs={orgs} />
+      </div>
 
       {users.length === 0 ? (
         <Card>
@@ -261,6 +159,7 @@ export function AdminUsersDirectory({ users: initialUsers, canCreateStandalone, 
                     <div className="flex items-center justify-end gap-1">
                       <AdminEditUserDialog user={{ id: user.id, name: user.name, email: user.email, role: user.role, organizationId: user.organizationId }} orgs={orgs} />
                       <ToggleActiveButton user={user} onToggled={handleToggled} />
+                      <AdminDeleteUserDialog user={user} onDeleted={(id) => setUsers((prev) => prev.filter((u) => u.id !== id))} />
                     </div>
                   </td>
                 </tr>
