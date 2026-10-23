@@ -28,6 +28,8 @@ export const LINK_ICON_OPTIONS = [
   { value: 'phone', label: 'Teléfono' },
   { value: 'email', label: 'Correo' },
   { value: 'maps', label: 'Ubicación' },
+  { value: 'mercadolibre', label: 'Mercado Libre' },
+  { value: 'shopping', label: 'Compras / ventas (carrito)' },
 ] as const
 
 export type LinkIconKey = (typeof LINK_ICON_OPTIONS)[number]['value']

@@ -122,3 +122,25 @@ export function IconStar({ size = 16, color = 'currentColor' }: IconProps) {
     </svg>
   )
 }
+
+// Links con icon='shopping' (tienda, comprar, vender).
+export function IconCart({ size = 18, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="9" cy="20" r="1.4" />
+      <circle cx="18" cy="20" r="1.4" />
+      <path d="M2.5 3h2.7l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 7H6.2" />
+    </svg>
+  )
+}
+
+// Links con icon='mercadolibre'. Como el resto del archivo, una marca
+// genérica y no el logotipo oficial: círculo con las iniciales «ML».
+export function IconMercadoLibre({ size = 18, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9.5" />
+      <path d="M7.5 15.5v-7l2.2 3.4 2.3-3.4v7M14.5 8.5v7h3" />
+    </svg>
+  )
+}

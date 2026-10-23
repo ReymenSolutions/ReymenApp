@@ -14,6 +14,8 @@ import {
   IconTiktok,
   IconYoutube,
   IconStar,
+  IconCart,
+  IconMercadoLibre,
 } from './icons'
 
 // Fase 17.1: `link.icon` (profile_links.icon, whitelist en
@@ -33,6 +35,8 @@ const LINK_ICON_COMPONENTS: Record<string, (props: { size?: number; color?: stri
   phone: IconPhone,
   email: IconMail,
   maps: IconMapPin,
+  mercadolibre: IconMercadoLibre,
+  shopping: IconCart,
 }
 
 function resolveLinkIcon(icon: string | null, size: number, color: string) {
