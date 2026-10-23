@@ -1,0 +1,88 @@
+# Fase 15 -- correr desde la raíz del monorepo:
+#   docker compose -f infra/docker-compose.yml up -d --build
+#
+# Este VPS ya corre nginx-proxy + acme-companion (nginxproxy/nginx-proxy) en
+# Docker como único reverse proxy del 80/443 -- así es como ya está publicado
+# n8n.reymen.mx. NO instalamos Nginx del sistema ni corremos certbot a mano
+# (el enfoque manual con infra/nginx/*.conf + certbot, armado antes de saber
+# cómo está este VPS, quedó archivado en infra/nginx-manual-DEPRECATED/ por
+# si algún día hace falta desplegar en un VPS sin nginx-proxy -- en este VPS
+# no se usa): admin y public se conectan a la misma red
+# `proxy-net` y se anuncian con VIRTUAL_HOST/LETSENCRYPT_HOST, igual que n8n.
+# nginx-proxy los descubre solo -- no hay ningún archivo de config que tocar
+# ni reiniciar para que un dominio nuevo empiece a funcionar.
+#
+# Por eso NO se publica ningún `ports:` aquí -- nginx-proxy le habla a cada
+# contenedor por dentro de `proxy-net`, en su VIRTUAL_PORT. Publicar el
+# puerto al host (0.0.0.0 o 127.0.0.1) no hace falta para que funcione y
+# además sería inconsistente con cómo está montado n8n hoy.
+#
+# Supabase NO aparece como servicio aquí -- Fase 15 se construyó para
+# Supabase Cloud (proyecto hospedado), no self-hosted; las apps le hablan
+# por su URL pública, igual que en desarrollo local le hablan a
+# `supabase start`. Ver FASE15.md sección "Supabase Cloud" para los pasos.
+
+services:
+  admin:
+    build:
+      context: ..
+      dockerfile: apps/admin/Dockerfile
+    container_name: reymen-admin
+    restart: unless-stopped
+    env_file:
+      - ../apps/admin/.env.production
+    environment:
+      VIRTUAL_HOST: admin.reymen.mx
+      VIRTUAL_PORT: "3001"
+      LETSENCRYPT_HOST: admin.reymen.mx
+      LETSENCRYPT_EMAIL: reynol@reymen.mx
+    networks:
+      - proxy-net
+
+  ops:
+    # REYMEN Ops -- Fase 1 (Core). Dominio ops.reymen.mx elegido por
+    # consistencia con admin.reymen.mx -- si prefieres otro (app.reymen.mx,
+    # etc.) cámbialo aquí Y en el DNS antes de levantar este servicio.
+    # Necesita su propio apps/ops/.env.production en el VPS, con las mismas
+    # llaves de Supabase que ya usan admin/public (ver FASE15.md sección
+    # "Supabase Cloud" para cómo se armó ese archivo la primera vez).
+    build:
+      context: ..
+      dockerfile: apps/ops/Dockerfile
+    container_name: reymen-ops
+    restart: unless-stopped
+    env_file:
+      - ../apps/ops/.env.production
+    environment:
+      VIRTUAL_HOST: ops.reymen.mx
+      VIRTUAL_PORT: "3002"
+      LETSENCRYPT_HOST: ops.reymen.mx
+      LETSENCRYPT_EMAIL: reynol@reymen.mx
+    networks:
+      - proxy-net
+
+  public:
+    build:
+      context: ..
+      dockerfile: apps/public/Dockerfile
+    container_name: reymen-public
+    restart: unless-stopped
+    env_file:
+      - ../apps/public/.env.production
+    environment:
+      # nginx-proxy acepta varios hosts separados por coma en una sola
+      # variable -- reymen.mx, www y link los sirve el mismo contenedor
+      # (apps/public), así que van juntos aquí, no en tres servicios.
+      VIRTUAL_HOST: "link.reymen.mx"
+      VIRTUAL_PORT: "3000"
+      LETSENCRYPT_HOST: "link.reymen.mx"
+      LETSENCRYPT_EMAIL: reynol@reymen.mx
+    networks:
+      - proxy-net
+
+networks:
+  # Red ya existente en el VPS (la crea el docker-compose de nginx-proxy) --
+  # `external: true` le dice a Docker Compose que no la cree ni la borre,
+  # solo que conecte estos contenedores a la que ya está corriendo.
+  proxy-net:
+    external: true

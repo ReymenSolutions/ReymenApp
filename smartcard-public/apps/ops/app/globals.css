@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Mismo criterio que apps/admin/app/globals.css (Fase 17, accesibilidad):
+   selector de elemento + :focus-visible le gana por especificidad a
+   `.outline-none` sin necesitar !important. Se incluye desde el día uno en
+   apps/ops en vez de esperar a una fase de accesibilidad aparte. */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 2px;
+}

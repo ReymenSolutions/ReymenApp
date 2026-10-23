@@ -1,0 +1,24 @@
+{
+  "name": "@reymen/lib",
+  "private": true,
+  "version": "0.1.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./theme-tokens": "./src/theme-tokens.ts",
+    "./vcard": "./src/vcard.ts",
+    "./bot-detection": "./src/bot-detection.ts",
+    "./device": "./src/device.ts",
+    "./qr": "./src/qr.ts",
+    "./contrast": "./src/contrast.ts",
+    "./link-icons": "./src/link-icons.ts"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@types/qrcode": "^1.5.5",
+    "typescript": "^5.6.0"
+  }
+}

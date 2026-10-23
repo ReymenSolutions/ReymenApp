@@ -2,6 +2,8 @@ import coreWebVitals from "eslint-config-next/core-web-vitals";
 import nextTypescript from "eslint-config-next/typescript";
 
 const eslintConfig = [
+  // La tarjeta pública (otra app, con su propio package.json) no se valida con esta configuración.
+  { ignores: ["smartcard-public/**"] },
   ...coreWebVitals,
   ...nextTypescript,
   {

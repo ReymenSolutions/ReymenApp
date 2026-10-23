@@ -1,2 +1,5 @@
 # Respaldos de la base (deploy/update.sh): nunca deben entrar a la imagen.
 backups/
+
+# smartcard-public/ es otra app (su propio package.json); no entra a la imagen de ReymenApp.
+smartcard-public/
