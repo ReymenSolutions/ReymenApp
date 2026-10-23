@@ -9,6 +9,9 @@ import {
   resolveSmartcardMembership,
   buildSmartcardPublicUrl,
   getSmartcardProfile,
+  getProfileThemeInfo,
+  setProfileTheme,
+  type ProfileThemeInfo,
   updateProfileThemeColors,
   type SmartcardProfile,
   type ProfileLink,
@@ -573,7 +576,7 @@ export async function getSmartcardCardQrCode(cardId: string): Promise<SmartcardC
 type SmartcardActionResult = { success: true } | { success: false; error: string };
 
 export type SmartcardProfileResult =
-  | { success: true; profile: SmartcardProfile; links: ProfileLink[] }
+  | { success: true; profile: SmartcardProfile; links: ProfileLink[]; theme: ProfileThemeInfo | null }
   | { success: false; error: string };
 
 /** Loads a card's linked profile (destination_type PROFILE) for editing. */
@@ -582,7 +585,8 @@ export async function getSmartcardProfileForEdit(profileId: string): Promise<Sma
     const membership = await requireCardManagementMembership();
     const result = await getSmartcardProfile(profileId, membership.companyId);
     if (!result) throw new Error("Ese perfil no pertenece a tu empresa.");
-    return { success: true, profile: result.profile, links: result.links };
+    const theme = await getProfileThemeInfo(profileId, membership.companyId);
+    return { success: true, profile: result.profile, links: result.links, theme };
   } catch (err) {
     const message = err instanceof Error ? err.message : "No se pudo cargar el perfil. Intenta de nuevo.";
     if (!(err instanceof Error)) {
@@ -975,5 +979,18 @@ export async function addManualProfileProduct(
     };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "No se pudo agregar el producto." };
+  }
+}
+
+/** Cambia el tema (diseño y colores base) de la tarjeta a otro del catálogo. */
+export async function updateSmartcardProfileTheme(profileId: string, themeId: string): Promise<SmartcardActionResult> {
+  try {
+    const membership = await requireCardManagementMembership();
+    const ok = await setProfileTheme(profileId, membership.companyId, themeId);
+    if (!ok) throw new UserError("No se pudo cambiar el tema de esta tarjeta.");
+    revalidatePath("/portal/smartcard");
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "No se pudo cambiar el tema de esta tarjeta." };
   }
 }

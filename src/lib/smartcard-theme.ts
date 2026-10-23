@@ -124,3 +124,23 @@ export function buildThemeConfig(fields: ThemeConfigFields): Record<string, unkn
   if (fields.darkBackground) config.background = "dark";
   return config;
 }
+
+export interface CardTokens {
+  primary: string;
+  accent: string;
+  dark: boolean;
+}
+
+/**
+ * Colores con los que se ve de verdad la tarjeta pública: la configuración del tema del perfil
+ * (ej. «Real Estate») y, encima, los colores propios del perfil si son válidos — mismo orden de
+ * prioridad que mergeThemeConfig de la tarjeta (los ajustes del perfil ganan campo por campo).
+ */
+export function resolveCardTokens(themeConfig: unknown, primaryOverride?: string | null, accentOverride?: string | null): CardTokens {
+  const base = parseThemeConfig(themeConfig);
+  return {
+    primary: primaryOverride && HEX_COLOR.test(primaryOverride) ? primaryOverride : base.primaryColor,
+    accent: accentOverride && HEX_COLOR.test(accentOverride) ? accentOverride : base.accentColor,
+    dark: base.darkBackground,
+  };
+}

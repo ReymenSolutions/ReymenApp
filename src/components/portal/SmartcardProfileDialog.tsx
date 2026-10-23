@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { ExternalLink, Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -18,12 +18,13 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   getSmartcardProfileForEdit,
   updateSmartcardProfile,
+  updateSmartcardProfileTheme,
   saveProfileLink,
   deleteProfileLink,
   type SmartcardProfileInput,
 } from "@/actions/portal/smartcard";
-import type { SmartcardProfile, ProfileLink } from "@/lib/smartcard-company";
-import { passesWcagAA } from "@/lib/smartcard-theme";
+import type { SmartcardProfile, ProfileLink, ProfileThemeInfo } from "@/lib/smartcard-company";
+import { parseThemeConfig, passesWcagAA, resolveCardTokens } from "@/lib/smartcard-theme";
 import { LINK_ICON_OPTIONS } from "@/lib/smartcard-link-icons";
 import type { ProfileProduct } from "@/lib/smartcard-products";
 import { TabBar } from "@/components/shared/TabBar";
@@ -64,11 +65,6 @@ const EMPTY_INPUT: SmartcardProfileInput = {
   accentColor: "",
 };
 
-// Default del formulario cuando el perfil no trae theme_overrides todavía
-// — mismos valores base que reymen-smartcard siembra para un theme nuevo
-// (packages/lib/src/theme-tokens.ts), así el picker no abre en negro puro.
-const DEFAULT_PRIMARY_COLOR = "#111111";
-const DEFAULT_ACCENT_COLOR = "#4F46E5";
 
 function toInput(p: SmartcardProfile): SmartcardProfileInput {
   return {
@@ -167,10 +163,13 @@ export function SmartcardProfileDialog({
   profileId,
   onOpenChange,
   lang,
+  liveCardUrl = null,
 }: {
   profileId: string | null;
   onOpenChange: (open: boolean) => void;
   lang: "es" | "en";
+  /** Enlace a la tarjeta publicada (sin contar escaneo), si la tarjeta tiene código. */
+  liveCardUrl?: string | null;
 }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -183,8 +182,16 @@ export function SmartcardProfileDialog({
   const [newLinkIcon, setNewLinkIcon] = useState("");
   const [tab, setTab] = useState<"perfil" | "apariencia" | "contacto" | "links" | "productos">("perfil");
   const [products, setProducts] = useState<ProfileProduct[]>([]);
+  const [theme, setTheme] = useState<ProfileThemeInfo | null>(null);
+  const [themeId, setThemeId] = useState<string | null>(null);
+  const [savedThemeId, setSavedThemeId] = useState<string | null>(null);
 
   const t = (es: string, en: string) => (lang === "es" ? es : en);
+
+  // El tema elegido define los colores base; los del perfil (si hay) van encima.
+  const selectedTheme = theme?.options.find((o) => o.id === themeId) ?? null;
+  const themeBase = parseThemeConfig(selectedTheme?.config);
+  const tokens = resolveCardTokens(selectedTheme?.config, form.primaryColor, form.accentColor);
 
   useEffect(() => {
     if (!profileId) return;
@@ -192,6 +199,7 @@ export function SmartcardProfileDialog({
     setForm(EMPTY_INPUT);
     setLinks([]);
     setProducts([]);
+    setTheme(null);
     setTab("perfil");
     (async () => {
       const result = await getSmartcardProfileForEdit(profileId);
@@ -202,6 +210,9 @@ export function SmartcardProfileDialog({
       }
       setForm(toInput(result.profile));
       setLinks(result.links);
+      setTheme(result.theme);
+      setThemeId(result.theme?.currentId ?? null);
+      setSavedThemeId(result.theme?.currentId ?? null);
       setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -219,6 +230,13 @@ export function SmartcardProfileDialog({
     if (!result.success) {
       toast.error(result.error);
       return;
+    }
+    if (themeId && themeId !== savedThemeId) {
+      const themeResult = await updateSmartcardProfileTheme(profileId, themeId);
+      if (!themeResult.success) {
+        toast.error(themeResult.error);
+        return;
+      }
     }
     toast.success(t("Perfil actualizado.", "Profile updated."));
     onOpenChange(false);
@@ -322,20 +340,46 @@ export function SmartcardProfileDialog({
               <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
                 {t("Tema", "Theme")}
               </h3>
+              {theme && theme.options.length > 0 && (
+                <div className="mb-4 flex flex-col gap-1.5">
+                  <Label htmlFor="profile-theme">{t("Diseño de la tarjeta", "Card design")}</Label>
+                  <select
+                    id="profile-theme"
+                    value={themeId ?? ""}
+                    onChange={(e) => setThemeId(e.target.value || null)}
+                    className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm"
+                  >
+                    {themeId === null && <option value="">{t("Sin tema", "No theme")}</option>}
+                    {theme.options.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-slate-500">
+                    {selectedTheme
+                      ? t(
+                          `Esta tarjeta usa el tema «${selectedTheme.name}». Sus colores base son los que ves abajo; si cambias el tema, la tarjeta cambia de diseño y de colores base.`,
+                          `This card uses the “${selectedTheme.name}” theme. Its base colors are shown below; changing the theme changes the card's design and base colors.`
+                        )
+                      : t("Esta tarjeta no tiene un tema asignado.", "This card has no theme assigned.")}
+                  </p>
+                </div>
+              )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <ColorField
                   id="profile-primary-color"
                   label={t("Color primario", "Primary color")}
                   value={form.primaryColor ?? ""}
                   onChange={(v) => set("primaryColor", v)}
-                  fallback={DEFAULT_PRIMARY_COLOR}
+                  fallback={themeBase.primaryColor}
                 />
                 <ColorField
                   id="profile-accent-color"
                   label={t("Color de acento", "Accent color")}
                   value={form.accentColor ?? ""}
                   onChange={(v) => set("accentColor", v)}
-                  fallback={DEFAULT_ACCENT_COLOR}
+                  fallback={themeBase.accentColor}
                 />
               </div>
               {HEX_COLOR_INPUT.test(form.primaryColor ?? "") &&
@@ -350,8 +394,8 @@ export function SmartcardProfileDialog({
                 )}
               <p className="mt-2 text-xs text-slate-500">
                 {t(
-                  "Déjalos en blanco para usar los colores del tema por default de tu empresa.",
-                  "Leave them blank to use your company's default theme colors."
+                  "Si los dejas en blanco se usan los colores del tema; si eliges otros, se aplican solo a esta tarjeta.",
+                  "Leave them blank to use the theme's colors; pick others to apply them to this card only."
                 )}
               </p>
             </div>
@@ -472,12 +516,25 @@ export function SmartcardProfileDialog({
                 email: form.email ?? "",
                 website: form.website ?? "",
                 address: form.address ?? "",
-                primaryColor: form.primaryColor ?? "",
-                accentColor: form.accentColor ?? "",
+                mapsUrl: form.mapsUrl ?? "",
+                instagram: form.instagram ?? "",
+                facebook: form.facebook ?? "",
+                linkedin: form.linkedin ?? "",
+                tiktok: form.tiktok ?? "",
+                youtube: form.youtube ?? "",
               }}
+              tokens={tokens}
               links={links}
               products={products}
             />
+            {liveCardUrl && (
+              <Button asChild variant="outline" size="sm" className="mt-3 w-full">
+                <a href={liveCardUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  {t("Ver tarjeta real", "View live card")}
+                </a>
+              </Button>
+            )}
           </aside>
           </div>
         )}
