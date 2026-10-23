@@ -108,7 +108,7 @@ export function ZoneMap({
   const reference: GeoPoint = focusSite?.point ?? DEFAULT_REFERENCE;
 
   const { geoZones, unplaced } = useMemo(() => {
-    const withPos = zones.map((z) => ({ z, point: zonePoint(z.postalCode) }));
+    const withPos = zones.map((z) => ({ z, point: z.point ?? zonePoint(z.postalCode) }));
     const onMap = withPos.filter((w): w is { z: ZoneStats; point: GeoPoint } => w.point !== null);
     const values = onMap.map((w) => zoneMetricValue(w.z, metric));
     const max = Math.max(0, ...values);

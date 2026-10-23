@@ -3455,3 +3455,18 @@ model AiPilotBudgetRoot {
   @@unique([organizationId, createdById, requestKey])
   @@index([organizationId, state])
 }
+
+// Punto aproximado (centro) de un código postal para los mapas por CP (p. ej.
+// el mapa de clientes de Lealtad). Dato público y compartido entre empresas:
+// se busca una vez (colonia o CP en el geocodificador) y se guarda. latitude
+// null = se intentó y no se encontró (se reintenta después de unos días).
+model PostalCodePoint {
+  postalCode  String   @id
+  latitude    Float?
+  longitude   Float?
+  // "postal" | "colonia": qué se encontró.
+  precision   String?
+  lastTriedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

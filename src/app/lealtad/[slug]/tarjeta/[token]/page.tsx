@@ -33,7 +33,7 @@ export default async function LoyaltyCardPage({ params }: { params: Promise<{ sl
   const reward = member.availableRewards[0] ?? null;
 
   return (
-    <PublicShell businessName={org.name} logoUrl={org.logoUrl}>
+    <PublicShell businessName={org.name} logoUrl={org.logoUrl} theme={program}>
       <MemberProgramChoice slug={slug} token={token} current={program.id} selected={member.isSelected} programs={programs} lang={lang} />
       {/* Tarjeta */}
       <LoyaltyCardFace

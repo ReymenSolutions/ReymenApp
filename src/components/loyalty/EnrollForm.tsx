@@ -14,7 +14,7 @@ import { loyaltyStrings } from "@/lib/i18n-loyalty";
 import { memberCardPath } from "@/lib/loyalty/token";
 
 /** Formulario público de inscripción: nombre, WhatsApp y CP (correo opcional). Pensado para el celular. */
-export function EnrollForm({ orgSlug, businessName, branch, programId }: { programId?: string; orgSlug: string; businessName: string; branch: string | null }) {
+export function EnrollForm({ orgSlug, businessName, branch, programId, accent, onAccent }: { programId?: string; orgSlug: string; businessName: string; branch: string | null; /** Colores de la tarjeta del programa (botón). */ accent?: string; onAccent?: string }) {
   const router = useRouter();
   const { lang } = usePreferences();
   const L = pickDict(loyaltyStrings, lang);
@@ -86,7 +86,7 @@ export function EnrollForm({ orgSlug, businessName, branch, programId }: { progr
         <span>{L.consentLabel(businessName)}</span>
       </label>
       {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
-      <Button type="submit" loading={loading} className="h-12 w-full bg-orange-500 text-base font-semibold hover:bg-orange-600">
+      <Button type="submit" loading={loading} className="h-12 w-full bg-orange-500 text-base font-semibold hover:bg-orange-600 hover:opacity-90" style={accent ? { background: accent, color: onAccent } : undefined}>
         {loading ? L.joining : L.joinCta}
       </Button>
       <p className="flex items-center justify-center gap-1.5 text-xs text-slate-400">

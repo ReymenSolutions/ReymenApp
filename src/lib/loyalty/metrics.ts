@@ -8,7 +8,7 @@
 // o columnas compactas; los cálculos viven aquí para poder probarlos.
 
 import { averageTicket, progressOf, roundMoney } from "./cycle";
-import { zoneDistanceKm, type GeoPoint } from "./postal-zones";
+import { zoneDistanceKm, zonePoint, type GeoPoint } from "./postal-zones";
 
 // ─── Porcentajes que suman exactamente 100 ─────────────────────────────
 
@@ -65,6 +65,8 @@ export interface ZoneStats extends ZoneRow {
   /** Venta por cliente inscrito. */
   salesPerMember: number;
   distanceKm: number | null;
+  /** Centro aproximado del CP en el mapa (null = sin ubicación). */
+  point: GeoPoint | null;
   labels: ZoneLabel[];
 }
 
@@ -88,7 +90,8 @@ export const NEARBY_KM = 2.5;
  *    mitad del promedio de las zonas cercanas (baja penetración).
  */
 /** `origins`: puntos de venta ubicados; la distancia de cada CP es al más cercano. */
-export function summarizeZones(rows: ZoneRow[], origins: GeoPoint[] = []): ZoneSummary {
+/** `points`: centro aproximado de cada CP (ver lib/geo/postal-points.ts). */
+export function summarizeZones(rows: ZoneRow[], origins: GeoPoint[] = [], points?: Map<string, GeoPoint>): ZoneSummary {
   const clean = rows.filter((r) => r.members > 0 || r.visits > 0);
   const memberShares = sharesPct(clean.map((r) => r.members));
   const salesShares = sharesPct(clean.map((r) => r.sales));
@@ -117,7 +120,8 @@ export function summarizeZones(rows: ZoneRow[], origins: GeoPoint[] = []): ZoneS
     avgTicket: averageTicket(r.sales, r.visitsWithAmount),
     frequency: r.members > 0 ? round2(r.visits / r.members) : 0,
     salesPerMember: r.members > 0 ? roundMoney(r.sales / r.members) : 0,
-    distanceKm: zoneDistanceKm(r.postalCode, origins),
+    distanceKm: zoneDistanceKm(r.postalCode, origins, points?.get(r.postalCode) ?? null),
+    point: points?.get(r.postalCode) ?? zonePoint(r.postalCode),
     labels: [],
   }));
 
