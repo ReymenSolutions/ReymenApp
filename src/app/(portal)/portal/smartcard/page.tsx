@@ -6,6 +6,7 @@ import {
   getCompanyRoster,
   getCompanyCardStats,
   getActiveDestinationTypes,
+  smartcardPublicBaseUrl,
 } from "@/lib/smartcard-company";
 import { SmartcardPanel } from "@/components/portal/SmartcardPanel";
 import { getServerLang } from "@/lib/i18n-server";
@@ -84,6 +85,7 @@ export default async function SmartcardPage() {
       roster={roster}
       cardStats={cardStats}
       destinationTypes={destinationTypes}
+      publicBaseUrl={smartcardPublicBaseUrl()}
       timeZone={org?.timezone ?? "America/Mexico_City"}
     />
   );

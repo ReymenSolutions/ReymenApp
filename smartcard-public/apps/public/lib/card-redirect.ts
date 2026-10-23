@@ -38,12 +38,20 @@ export type CardScanResult =
  *  - cualquier otro destino -> registra el escaneo Y el evento específico
  *    de ese destino, y hace un redirect() real (nunca un rewrite: el
  *    destino es una URL externa de verdad).
+ *
+ * `track: false` (vista previa desde Reymen App, `?preview=1`): hace lo mismo
+ * pero sin registrar eventos, para que revisar la tarjeta no infle la analítica.
  */
 export async function resolveCardScan(
   supabase: SupabaseClient,
   code: string,
-  source: 'NFC' | 'QR'
+  source: 'NFC' | 'QR',
+  options: { track?: boolean } = {}
 ): Promise<CardScanResult> {
+  const track = options.track !== false
+  const log: typeof logPublicEvent = async (client, event) => {
+    if (track) await logPublicEvent(client, event)
+  }
   const card = await fetchCardForRedirect(supabase, code)
   if (!card) notFound()
 
@@ -52,7 +60,7 @@ export async function resolveCardScan(
   }
 
   const scanEventType = source === 'NFC' ? 'nfc_scan' : 'qr_scan'
-  await logPublicEvent(supabase, { event_type: scanEventType, source, card_code: code })
+  await log(supabase, { event_type: scanEventType, source, card_code: code })
 
   if (card.destination_type === 'PROFILE') {
     if (!card.profile_slug) notFound()
@@ -60,13 +68,13 @@ export async function resolveCardScan(
     const profile = await fetchPublicProfile(supabase, card.profile_slug)
     // Con p_card_code (no solo p_profile_slug) para que este profile_view
     // quede también ligado a la tarjeta física que lo originó.
-    await logPublicEvent(supabase, { event_type: 'profile_view', source, card_code: code })
+    await log(supabase, { event_type: 'profile_view', source, card_code: code })
 
     return { kind: 'profile', profile, slug: card.profile_slug }
   }
 
   const redirectEvent = REDIRECT_EVENT_BY_DESTINATION[card.destination_type] ?? 'external_redirect'
-  await logPublicEvent(supabase, { event_type: redirectEvent, source, card_code: code })
+  await log(supabase, { event_type: redirectEvent, source, card_code: code })
 
   if (!card.destination_url) notFound()
   redirect(card.destination_url)

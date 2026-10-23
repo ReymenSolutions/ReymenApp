@@ -246,10 +246,19 @@ export interface CardStatsEntry {
  * domain/path, instead of guessing it again in each caller.
  */
 export function buildSmartcardPublicUrl(cardCode: string): string {
+  return `${smartcardPublicBaseUrl()}/q/${encodeURIComponent(cardCode)}`;
+}
+
+/** Dominio público de las tarjetas, sin diagonal final. */
+export function smartcardPublicBaseUrl(): string {
   // SMARTCARD_PUBLIC_URL permite cambiar el dominio de las tarjetas sin tocar
   // código; sin la variable se usa el dominio que ya imprimen las tarjetas.
-  const base = (process.env.SMARTCARD_PUBLIC_URL?.trim() || "https://link.reymen.mx").replace(/\/+$/, "");
-  return `${base}/q/${encodeURIComponent(cardCode)}`;
+  return (process.env.SMARTCARD_PUBLIC_URL?.trim() || "https://link.reymen.mx").replace(/\/+$/, "");
+}
+
+/** Enlace para ver la tarjeta tal como la ve quien la escanea, sin sumar un escaneo a la analítica. */
+export function buildSmartcardPreviewUrl(cardCode: string): string {
+  return `${buildSmartcardPublicUrl(cardCode)}?preview=1`;
 }
 
 export interface DestinationTypeOption {

@@ -2,12 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/guards";
 import { getSmartcardCard, listSmartcardClientOptions, listSmartcardProfileOptions } from "@/lib/smartcard-admin";
-import { getActiveDestinationTypes, buildSmartcardPublicUrl } from "@/lib/smartcard-company";
+import { getActiveDestinationTypes, buildSmartcardPublicUrl, buildSmartcardPreviewUrl } from "@/lib/smartcard-company";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { SmartcardCardForm } from "@/components/admin/SmartcardCardForm";
 import { SmartcardCardDangerZone } from "@/components/admin/SmartcardCardDangerZone";
 import { SmartcardCardQrButton } from "@/components/admin/SmartcardCardQrButton";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ExternalLink } from "lucide-react";
 
 export default async function SmartcardCardDetailPage({
   params,
@@ -52,6 +54,12 @@ export default async function SmartcardCardDetailPage({
               <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">{buildSmartcardPublicUrl(card.cardCode)}</code>
             </p>
           </div>
+          <Button asChild variant="outline" size="sm">
+            <a href={buildSmartcardPreviewUrl(card.cardCode)} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="h-3.5 w-3.5" />
+              Visitar tarjeta
+            </a>
+          </Button>
           <SmartcardCardQrButton cardId={card.id} cardCode={card.cardCode} />
         </div>
       )}

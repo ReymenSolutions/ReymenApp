@@ -19,13 +19,18 @@ export async function generateMetadata({
 // compartida.
 export default async function QrEntryPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ code: string }>
+  searchParams: Promise<{ preview?: string }>
 }) {
   const { code } = await params
+  // ?preview=1 -- enlace "Visitar tarjeta" de Reymen App: se ve igual que al
+  // escanear, pero no cuenta como escaneo en la analítica.
+  const { preview } = await searchParams
   const supabase = await createServerSupabaseClient()
 
-  const result = await resolveCardScan(supabase, code, 'QR')
+  const result = await resolveCardScan(supabase, code, 'QR', { track: preview !== '1' })
 
   if (result.kind === 'inactive') return <CardInactive />
   return <ProfileView profile={result.profile} slug={result.slug} source="QR" />
