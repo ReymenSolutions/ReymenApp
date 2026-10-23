@@ -85,11 +85,13 @@ export function SmartcardCardPreview({
 }) {
   const t = (es: string, en: string) => (lang === "es" ? es : en);
   const { primary, accent, dark } = tokens;
-  const cardBg = dark ? "#1A1D18" : "#FBF6EF";
+  const custom = tokens.background;
+  const cardBg = custom ?? (dark ? "#1A1D18" : "#FBF6EF");
   const textPrimary = dark ? "#F3F1EA" : "#242821";
   const textMuted = dark ? "#A9AFA2" : "#52594B";
-  const cardBorder = dark ? "#2E322A" : "#ECE1D2";
-  const chipBg = dark ? "#20241D" : "#FFFFFF";
+  // Con fondo propio, borde y chips se derivan del fondo (igual que la tarjeta pública).
+  const cardBorder = custom ? `color-mix(in srgb, ${cardBg} 85%, ${textPrimary})` : dark ? "#2E322A" : "#ECE1D2";
+  const chipBg = custom ? (dark ? `color-mix(in srgb, ${cardBg} 92%, #FFFFFF)` : `color-mix(in srgb, ${cardBg} 40%, #FFFFFF)`) : dark ? "#20241D" : "#FFFFFF";
   const heroBg = dark ? accent : primary;
   const heroHeight = 96;
   const accentSoft = `color-mix(in srgb, ${accent} 20%, ${chipBg})`;
