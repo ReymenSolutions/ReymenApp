@@ -199,11 +199,23 @@ export default function GeoZoneMap({
         }),
       }).addTo(layer);
     }
-    // Encuadre inicial: todas las zonas y la sucursal (solo la primera vez).
-    if (!fitRef.current && zones.length > 0) {
-      const bounds = L.latLngBounds([[reference.lat, reference.lng]]);
+    // Encuadre inicial (y el de "Centrar"): la tienda al centro y todas las zonas a la vista.
+    // Con una sola sucursal, cada zona se refleja al otro lado de la tienda para que el
+    // encuadre quede simétrico alrededor de ella.
+    if (!fitRef.current) {
+      const bounds = L.latLngBounds([[reference.lat, reference.lng], [reference.lat, reference.lng]]);
+      const centered = sites.length <= 1;
       for (const site of sites) bounds.extend([site.point.lat, site.point.lng]);
-      for (const z of zones) bounds.extend(L.latLng(z.point.lat, z.point.lng).toBounds(z.radiusM * 2.2));
+      for (const z of zones) {
+        const box = L.latLng(z.point.lat, z.point.lng).toBounds(z.radiusM * 2.2);
+        bounds.extend(box);
+        if (centered) {
+          bounds.extend([2 * reference.lat - box.getSouth(), 2 * reference.lng - box.getWest()]);
+          bounds.extend([2 * reference.lat - box.getNorth(), 2 * reference.lng - box.getEast()]);
+        }
+      }
+      // Sin zonas, al menos el anillo de 1 km alrededor de la tienda.
+      if (zones.length === 0) bounds.extend(L.latLng(reference.lat, reference.lng).toBounds(2_400));
       fitRef.current = bounds;
       map.fitBounds(bounds, { padding: [24, 24] });
     }

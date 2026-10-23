@@ -204,7 +204,7 @@ export function ZoneMap({
             sites={visibleSites.map((l) => ({ key: l.key, label: l.label, point: l.point }))}
             selected={selected}
             onSelect={(cp) => setSelected((cur) => (cur === cp ? null : cp))}
-            height={compact ? 360 : 520}
+            height={compact ? 360 : 680}
             recenterLabel={L.mapRecenter}
             scrollHint={L.mapScrollHint}
           />
