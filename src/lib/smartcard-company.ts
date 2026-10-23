@@ -620,3 +620,66 @@ export async function updateProfileThemeColors(
   }
   return { ok: true };
 }
+
+/** Tema de la tarjeta: el actual del perfil y el catálogo de temas activos con su configuración. */
+export interface ProfileThemeInfo {
+  currentId: string | null;
+  options: { id: string; name: string; slug: string | null; config: unknown }[];
+}
+
+/**
+ * Tema del perfil + catálogo de temas activos, solo si el perfil es de la empresa.
+ * Con esto el portal muestra qué tema usa la tarjeta (ej. «Real Estate») y deja cambiarlo;
+ * los colores reales de la tarjeta salen de la configuración del tema + los ajustes del perfil.
+ */
+export async function getProfileThemeInfo(profileId: string, companyId: string): Promise<ProfileThemeInfo | null> {
+  const supabase = getSmartcardAdminClient();
+  if (!supabase) return null;
+  const { data: row, error } = await supabase
+    .from("profiles")
+    .select("theme_id, clients!inner(company_id)")
+    .eq("id", profileId)
+    .is("deleted_at", null)
+    .maybeSingle<{ theme_id: string | null; clients: { company_id: string } }>();
+  if (error) {
+    console.error("[smartcard-company] Error leyendo theme_id:", error.message);
+    return null;
+  }
+  if (!row || row.clients.company_id !== companyId) return null;
+
+  const { data: themes, error: themesError } = await supabase
+    .from("themes")
+    .select("id, name, slug, config")
+    .eq("is_active", true)
+    .order("name");
+  if (themesError) {
+    console.error("[smartcard-company] Error listando themes:", themesError.message);
+    return null;
+  }
+  return {
+    currentId: row.theme_id,
+    options: (themes ?? []).map((t) => ({
+      id: t.id as string,
+      name: t.name as string,
+      slug: (t.slug as string | null) ?? null,
+      config: t.config,
+    })),
+  };
+}
+
+/** Cambia el tema del perfil (solo a un tema activo del catálogo). Devuelve false si no aplica. */
+export async function setProfileTheme(profileId: string, companyId: string, themeId: string): Promise<boolean> {
+  const info = await getProfileThemeInfo(profileId, companyId);
+  if (!info || !info.options.some((o) => o.id === themeId)) return false;
+  const supabase = getSmartcardAdminClient();
+  if (!supabase) return false;
+  const { error } = await supabase
+    .from("profiles")
+    .update({ theme_id: themeId, updated_at: new Date().toISOString() })
+    .eq("id", profileId);
+  if (error) {
+    console.error("[smartcard-company] Error cambiando theme_id:", error.message);
+    return false;
+  }
+  return true;
+}

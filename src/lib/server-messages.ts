@@ -60,6 +60,7 @@ const EN: Record<string, string> = {
   "Ese producto ya está en el perfil.": "That product is already on the profile.",
   "No se pudo agregar el producto. Intenta de nuevo.": "Couldn't add the product. Please try again.",
   "El producto necesita un nombre.": "The product needs a name.",
+  "No se pudo cambiar el tema de esta tarjeta.": "Couldn't change this card's theme.",
   "El enlace del producto debe empezar con http:// o https://": "The product link must start with http:// or https://",
   "La URL de la foto debe empezar con https://": "The photo URL must start with https://",
   "Máximo 12 productos por perfil.": "Up to 12 products per profile.",

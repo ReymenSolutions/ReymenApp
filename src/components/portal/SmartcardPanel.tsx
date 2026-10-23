@@ -649,6 +649,10 @@ export function SmartcardPanel({
         profileId={editingProfileId}
         onOpenChange={(open) => !open && setEditingProfileId(null)}
         lang={lang}
+        liveCardUrl={(() => {
+          const code = cardStats.cards.find((c) => c.profileId === editingProfileId && c.cardCode)?.cardCode;
+          return code ? `${publicBaseUrl}/q/${encodeURIComponent(code)}?preview=1` : null;
+        })()}
       />
     </section>
   );
