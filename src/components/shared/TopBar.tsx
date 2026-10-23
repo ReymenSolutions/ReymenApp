@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { usePreferences, type Theme, type Lang } from "@/context/preferences";
@@ -264,6 +265,10 @@ export function TopBar({ title, onMenuClick }: TopBarProps) {
   const initials = getInitials(session?.user?.name, session?.user?.email);
   const userRole = session?.user?.role ?? "";
   const isAdminUser = !isImpersonating && (userRole === "SUPER_ADMIN" || userRole === "ADMIN");
+  // Administrador de la plataforma que además pertenece a una organización (p. ej. super admin y dueño): salta entre ambas áreas.
+  const pathname = usePathname();
+  const inAdminArea = pathname?.startsWith("/admin");
+  const canSwitchArea = isAdminUser && !!session?.user?.organizationId;
 
   const filteredPortalUsers = portalUsers.filter((u) => {
     const q = impersonateSearch.toLowerCase();
@@ -563,6 +568,16 @@ export function TopBar({ title, onMenuClick }: TopBarProps) {
                   <RefreshCw className="h-4 w-4 text-slate-400 flex-shrink-0" />
                   {t.switchAccount}
                 </button>
+                {canSwitchArea && (
+                  <Link
+                    href={inAdminArea ? "/portal/home" : "/admin/home"}
+                    onClick={() => setUserMenuOpen(false)}
+                    className="flex w-full items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    <RefreshCw className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                    {inAdminArea ? (lang === "es" ? "Ir a mi portal" : "Go to my portal") : (lang === "es" ? "Ir a Administración" : "Go to Administration")}
+                  </Link>
+                )}
                 {isAdminUser && (
                   <button
                     onClick={openImpersonateDialog}

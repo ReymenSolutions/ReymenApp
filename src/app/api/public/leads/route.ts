@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
 
   // Aviso al equipo (dueños de la organización). Un fallo del correo nunca rompe el alta.
   try {
-    const owners = await prisma.user.findMany({ where: { organizationId: org.id, role: { in: ["OWNER", "ADMIN", "MANAGER"] }, isActive: true }, select: { email: true } });
+    const owners = await prisma.user.findMany({ where: { organizationId: org.id, role: { in: ["OWNER", "SUPER_ADMIN", "ADMIN", "MANAGER"] }, isActive: true }, select: { email: true } });
     const waDigits = phone ? phone.replace(/\D/g, "") : null;
     const { html, text } = renderBrandedEmail({
       preheader: `${d.name}${d.business ? ` · ${d.business}` : ""}`,

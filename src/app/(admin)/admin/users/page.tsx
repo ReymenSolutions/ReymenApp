@@ -1,11 +1,11 @@
 import { auth } from "@/lib/auth";
 import { getServerT } from "@/lib/i18n-server";
-import { getAllUsers } from "@/actions/admin/users";
+import { getAllUsers, getOrgOptions } from "@/actions/admin/users";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { AdminUsersDirectory } from "@/components/admin/AdminUsersDirectory";
 
 export default async function AdminUsersPage() {
-  const [session, t, users] = await Promise.all([auth(), getServerT(), getAllUsers()]);
+  const [session, t, users, orgs] = await Promise.all([auth(), getServerT(), getAllUsers(), getOrgOptions()]);
   const canCreateStandalone = session?.user.role === "SUPER_ADMIN";
 
   return (
@@ -21,9 +21,11 @@ export default async function AdminUsersPage() {
           email: u.email,
           role: u.role,
           isActive: u.isActive,
+          organizationId: u.organizationId,
           organizationName: u.organization?.name ?? null,
         }))}
         canCreateStandalone={canCreateStandalone}
+        orgs={orgs}
       />
     </div>
   );

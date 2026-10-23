@@ -69,6 +69,14 @@ describe("team actions", () => {
     expect(untouched?.isActive).toBe(true);
   });
 
+  it("a platform admin who is also a member of the org can't be edited or removed from the client's portal", async () => {
+    const superMember = await createTestUser(org.id, "SUPER_ADMIN", "team-super-member");
+    authMock.mockResolvedValue(fakeSession({ id: owner.id, role: "OWNER", organizationId: org.id }));
+    await expect(removeTeamMember(superMember.id)).rejects.toThrow(/administrador de la plataforma/i);
+    await expect(updateTeamMember(superMember.id, { name: "Rebajado", role: "VIEWER" })).rejects.toThrow(/administrador de la plataforma/i);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: superMember.id } })).role).toBe("SUPER_ADMIN");
+  });
+
   it("prevents a user from removing themselves", async () => {
     authMock.mockResolvedValue(fakeSession({ id: owner.id, role: "OWNER", organizationId: org.id }));
     await expect(removeTeamMember(owner.id)).rejects.toThrow(/ti mismo/i);

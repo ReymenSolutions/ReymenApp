@@ -27,7 +27,7 @@ export async function resolveNotifyRecipients(organizationId: string, config: { 
   const { email, whatsapp } = notifyChannels(config.notify);
   const out: NotifyRecipient[] = [];
   if (email) {
-    const users = await prisma.user.findMany({ where: { organizationId, isActive: true, role: { in: ["OWNER", "MANAGER"] } }, select: { email: true, name: true }, orderBy: { createdAt: "asc" } });
+    const users = await prisma.user.findMany({ where: { organizationId, isActive: true, role: { in: ["OWNER", "SUPER_ADMIN", "MANAGER"] } }, select: { email: true, name: true }, orderBy: { createdAt: "asc" } });
     for (const u of users) out.push({ channel: "email", email: u.email, name: u.name });
   }
   if (whatsapp && config.whatsappTo && E164.test(config.whatsappTo)) out.push({ channel: "whatsapp", phone: config.whatsappTo, name: null });

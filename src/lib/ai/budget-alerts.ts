@@ -41,7 +41,7 @@ async function notify(organizationId: string, threshold: number, percent: number
     if (threshold >= 75) await notifyAdmins({ subject: `IA: ${name} al ${threshold} % de su presupuesto`, html: `<p>${summary}</p>`, text: summary });
     if (threshold >= 90) {
       // Aviso comercial al cliente: sin costos internos, solo su uso.
-      const owners = await prisma.user.findMany({ where: { organizationId, role: "OWNER", isActive: true }, select: { email: true } });
+      const owners = await prisma.user.findMany({ where: { organizationId, role: { in: ["OWNER", "SUPER_ADMIN"] }, isActive: true }, select: { email: true } });
       const text = threshold === 100 ? "Tu plan alcanzó su capacidad de IA de este periodo. Tus agentes pasan a atención humana y se reanudan al renovarse tu plan o al adquirir capacidad adicional." : `Tu plan lleva el ${threshold} % de su capacidad de IA de este periodo. Puedes consultar tu consumo en Reymen y adquirir capacidad adicional cuando la necesites.`;
       await Promise.all(owners.map((o) => sendEmail({ to: o.email, subject: `Tu consumo de IA: ${threshold} %`, html: `<p>${text}</p>`, text }).catch(() => undefined)));
     }

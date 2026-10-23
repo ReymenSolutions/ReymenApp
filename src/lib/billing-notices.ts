@@ -48,7 +48,7 @@ export async function runBillingNotices(now: Date = new Date()): Promise<NoticeR
     const plan = await getPlan(org.plan);
     const copy = noticeCopy(kind, org.billingPeriodEnd, monthlyPriceMxn(plan, org.customMonthlyPriceMxn !== null ? Number(org.customMonthlyPriceMxn) : null));
     const link = appUrl("/portal/settings#facturacion");
-    const owners = await prisma.user.findMany({ where: { organizationId: org.id, role: "OWNER", isActive: true }, select: { email: true } });
+    const owners = await prisma.user.findMany({ where: { organizationId: org.id, role: { in: ["OWNER", "SUPER_ADMIN"] }, isActive: true }, select: { email: true } });
     await Promise.all(owners.map((o) => sendEmail({ to: o.email, subject: copy.subject, html: `<p>${copy.text}</p><p><a href="${link}">Ver mi suscripción</a></p>`, text: `${copy.text}\n${link}` }).catch(() => undefined)));
     if (status.state === "OVERDUE") {
       const t = `${org.name}: ${copy.subject.toLowerCase()} (venció el ${dateEs(org.billingPeriodEnd)}).`;

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, Pencil, Plus, Power, PowerOff, Users } from "lucide-react";
+import { Loader2, Plus, Power, PowerOff, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,8 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { createOrgUser, updateOrgUser, setUserActive } from "@/actions/admin/users";
+import { createOrgUser, setUserActive } from "@/actions/admin/users";
+import { AdminEditUserDialog } from "@/components/admin/AdminEditUserDialog";
 import { usePreferences } from "@/context/preferences";
 import { getErrorMessage, translateMessage } from "@/lib/user-error";
 
@@ -50,12 +51,6 @@ const createSchema = z.object({
   password: z.string().min(8, "Mínimo 8 caracteres"),
 });
 type CreateFormData = z.infer<typeof createSchema>;
-
-const editSchema = z.object({
-  name: z.string().min(2, "Mínimo 2 caracteres"),
-  role: z.enum(ORG_ROLES),
-});
-type EditFormData = z.infer<typeof editSchema>;
 
 function CreateUserDialog({ orgId }: { orgId: string }) {
   const { lang } = usePreferences();
@@ -131,77 +126,6 @@ function CreateUserDialog({ orgId }: { orgId: string }) {
         </form>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function EditUserDialog({ user }: { user: AdminClientUser }) {
-  const { lang } = usePreferences();
-  const roleLabels = lang === "es" ? ROLE_LABELS_ES : ROLE_LABELS_EN;
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const safeRole = (ORG_ROLES.includes(user.role as OrgRole) ? user.role : "AGENT") as OrgRole;
-
-  const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<EditFormData>({
-    resolver: zodResolver(editSchema),
-    defaultValues: { name: user.name ?? "", role: safeRole },
-  });
-
-  function openDialog() {
-    reset({ name: user.name ?? "", role: safeRole });
-    setOpen(true);
-  }
-
-  async function onSubmit(data: EditFormData) {
-    setLoading(true);
-    try {
-      await updateOrgUser(user.id, data);
-      toast.success(lang === "es" ? "Usuario actualizado" : "User updated");
-      setOpen(false);
-    } catch (e) {
-      toast.error(getErrorMessage(e, (lang === "es" ? "Error al actualizar usuario" : "Error updating user")));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <>
-      <Button variant="ghost" size="sm" onClick={openDialog} className="h-7 w-7 p-0 text-slate-400 hover:text-brand-600">
-        <Pencil className="h-3.5 w-3.5" />
-      </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{lang === "es" ? "Editar usuario" : "Edit user"}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="adminclientuserspanel-f4">{lang === "es" ? "Nombre completo *" : "Full name *"}</Label>
-              <Input id="adminclientuserspanel-f4" {...register("name")} />
-              {errors.name && <p className="text-xs text-red-500">{translateMessage(errors.name.message)}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label>{lang === "es" ? "Rol *" : "Role *"}</Label>
-              <Select defaultValue={safeRole} onValueChange={(v) => setValue("role", v as OrgRole)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {ORG_ROLES.map((r) => (
-                    <SelectItem key={r} value={r}>{roleLabels[r]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>{lang === "es" ? "Cancelar" : "Cancel"}</Button>
-              <Button type="submit" disabled={loading}>
-                {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-                {lang === "es" ? "Guardar cambios" : "Save changes"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </>
   );
 }
 
@@ -297,7 +221,7 @@ export function AdminClientUsersPanel({ orgId, users }: { orgId: string; users: 
                   <Badge variant={user.isActive ? "success" : "destructive"}>
                     {user.isActive ? t.statusActive : t.inactive}
                   </Badge>
-                  <EditUserDialog user={user} />
+                  <AdminEditUserDialog user={{ id: user.id, name: user.name, email: user.email, role: user.role, organizationId: orgId }} fixedOrgId={orgId} />
                   <ToggleActiveButton user={user} />
                 </div>
               </div>
