@@ -23,8 +23,20 @@ describe("postal-points", () => {
     expect((await loadPostalPoints(["64630", "00000"])).get("64630")).toEqual({ lat: 25.7, lng: -100.39 });
   });
 
+  it("si la primera colonia no aparece, prueba con otra del mismo CP", async () => {
+    await prisma.postalCodePoint.deleteMany({ where: { postalCode: "64630" } });
+    geo.geocodeStructured.mockReset();
+    geo.geocodeStructured
+      .mockResolvedValueOnce({ results: [{ lat: 25.67, lng: -100.31, label: "Monterrey" }], precision: "municipality" })
+      .mockResolvedValueOnce({ results: [{ lat: 25.71, lng: -100.4, label: "San Jemo" }], precision: "colonia" });
+    expect(await locatePostalCode("org-test", "64630")).toEqual({ lat: 25.71, lng: -100.4 });
+    expect(geo.geocodeStructured).toHaveBeenCalledTimes(2);
+    expect(geo.geocodeStructured.mock.calls[0][1].colonia).not.toBe(geo.geocodeStructured.mock.calls[1][1].colonia);
+  });
+
   it("no usa un resultado que solo ubicó el municipio, y recuerda que no se encontró", async () => {
-    geo.geocodeStructured.mockResolvedValueOnce({ results: [{ lat: 25.67, lng: -100.31, label: "Monterrey" }], precision: "municipality" });
+    geo.geocodeStructured.mockReset();
+    geo.geocodeStructured.mockResolvedValue({ results: [{ lat: 25.67, lng: -100.31, label: "Monterrey" }], precision: "municipality" });
     expect(await locatePostalCode("org-test", "99998")).toBeNull();
     const row = await prisma.postalCodePoint.findUnique({ where: { postalCode: "99998" } });
     expect(row?.latitude).toBeNull();
