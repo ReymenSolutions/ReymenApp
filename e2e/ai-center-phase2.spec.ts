@@ -100,9 +100,9 @@ test.describe("Phase 2 responsive AI Center", () => {
   });
   test("channel modes do not claim verified health; automatic mode requires accessible confirmation", async ({ page }) => {
     await page.goto("/portal/ai-channels"); await expect(page.getByText("Conexión sin verificar", { exact: true })).toHaveCount(6);
-    const group = page.getByRole("radiogroup", { name: "WhatsApp", exact: true }); await group.getByRole("radio", { name: "Sugerir", exact: true }).focus();
+    const group = page.getByRole("radiogroup", { name: "WhatsApp", exact: true }); await group.getByRole("radio", { name: "Con aprobación", exact: true }).focus();
     await page.keyboard.press("ArrowRight"); await expect(page.getByRole("dialog")).toBeVisible(); await page.keyboard.press("Escape");
-    await expect(group.getByRole("radio", { name: "Automático", exact: true })).toBeFocused();
+    await expect(group.getByRole("radio", { name: "Autónomo", exact: true })).toBeFocused();
     expect(await prisma.agentChannelSetting.findUnique({ where: { organizationId_channel: { organizationId, channel: "whatsapp" } } })).toMatchObject({ mode: "SUGGEST" });
     await expect(page.getByText(/ANTHROPIC_API_KEY|n8n/)).toHaveCount(0);
   });

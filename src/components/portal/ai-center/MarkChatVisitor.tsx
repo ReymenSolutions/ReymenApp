@@ -22,7 +22,7 @@ export function MarkChatVisitor() {
   const closed = view?.status === "RESOLVED" || view?.status === "CLOSED";
   return <section className="min-w-0 space-y-4" aria-label="Website Chat privado">
     {!view && !error && <p role="status">Abriendo chat…</p>}
-    {view && <><p className="rounded-lg bg-slate-50 p-3 text-sm">{closed ? "Conversación cerrada." : view.human ? "La conversación está en atención humana." : "Un operador revisará las respuestas antes de enviarlas."}</p><ol className="max-h-[55dvh] space-y-3 overflow-y-auto" aria-label="Mensajes del chat">{view.messages.map(m => <li key={m.id} className="break-words rounded-lg border border-slate-200 p-3"><p className="text-xs font-semibold">{m.role === "USER" ? "Tú" : "Equipo del negocio"}</p><p className="whitespace-pre-wrap">{m.content}</p></li>)}</ol></>}
+    {view && <><p className="rounded-lg bg-slate-50 p-3 text-sm">{closed ? "Conversación cerrada." : view.human || view.mode === "OFF" ? "La conversación está en atención humana." : view.mode === "AUTO" ? "Lía te responderá automáticamente; puedes pedir atención de una persona." : "Un operador revisará las respuestas antes de enviarlas."}</p><ol className="max-h-[55dvh] space-y-3 overflow-y-auto" aria-label="Mensajes del chat">{view.messages.map(m => <li key={m.id} className="break-words rounded-lg border border-slate-200 p-3"><p className="text-xs font-semibold">{m.role === "USER" ? "Tú" : "Equipo del negocio"}</p><p className="whitespace-pre-wrap">{m.content}</p></li>)}</ol></>}
     {error && <p role="alert" className="text-sm">{error}</p>}
     <form className="space-y-3" onSubmit={async event => {
       event.preventDefault(); if (busy || !content.trim()) return;

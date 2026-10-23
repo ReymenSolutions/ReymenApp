@@ -142,7 +142,7 @@ jobs:
               specs=(e2e/channel-connections-rollback.spec.ts e2e/knowledge-access-rollback.spec.ts e2e/mark-sandbox-rollback.spec.ts)
               ;;
             private-chat)
-              export REYMEN_STAGING=true AI_MARK_PRIVATE_CHAT_ENABLED=true AI_MARK_PRIVATE_REVIEW_ENABLED=true AI_KNOWLEDGE_ACCESS_ENABLED=true
+              export REYMEN_STAGING=true AI_MARK_PRIVATE_CHAT_ENABLED=true AI_MARK_PRIVATE_REVIEW_ENABLED=true AI_KNOWLEDGE_ACCESS_ENABLED=true AI_AGENT_CENTER_UI_ENABLED=true
               specs=(e2e/mark-private-chat.spec.ts e2e/mark-private-review.spec.ts)
               ;;
             private-pilot-admin)

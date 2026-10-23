@@ -2,7 +2,7 @@ import { channelConnectionsEnabled } from "@/lib/channel-connections/service";
 import { listChannelConnections } from "@/actions/channel-connections";
 import { Connections } from "@/components/portal/ai-center/Connections";
 import { centerContext } from "@/lib/ai/agents/center-context";
-import { aiCenterCopy, channelLabel } from "@/lib/ai/agents/center-copy";
+import { aiCenterCopy } from "@/lib/ai/agents/center-copy";
 import { getCenterChannelActivity } from "@/lib/ai/agents/center-data";
 import { getAgentModes } from "@/lib/agent-mode";
 import { getAgentCap } from "@/lib/agent-cap";
@@ -13,8 +13,9 @@ import { formatDateTime } from "@/lib/utils";
 import { AiCenterFrame } from "@/components/portal/ai-center/Frame";
 import { AgentModesPanel } from "@/components/portal/AgentModesPanel";
 import { AssistantConfigForm } from "@/components/portal/AssistantConfigForm";
-import { MetricGrid } from "@/components/shared/MetricGrid";
-import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
+import { privateChatEnabled, readPrivateChatSettings } from "@/lib/ai/pilot/chat";
+import { MarkChatModeControl } from "@/components/portal/ai-center/MarkChatModeControl";
+import { INBOX_CHANNELS } from "@/lib/channels";
 import { Badge } from "@/components/ui/badge";
 export default async function ChannelsPage() {
   const { session, organizationId, lang } = await centerContext(); const c = aiCenterCopy(lang), canEdit = can(session.user.role, "knowledge_base:manage");
@@ -22,14 +23,24 @@ export default async function ChannelsPage() {
   const accountsEnabled = channelConnectionsEnabled();
   const accounts = canEdit && accountsEnabled ? await listChannelConnections() : [];
   const agents = canEdit && accountsEnabled ? await prisma.agentInstance.findMany({ where: { organizationId, status: "LEGACY", definitionKey: "legacy-assistant", legacyAssistantId: assistant?.isActive ? assistant.id : "" }, select: { id: true, publicName: true } }) : [];
-  const activityBlock = <>
-    <MetricGrid columns={2} density="comfortable">{activity.map(row => <Card key={row.channel}><CardHeader><CardTitle>{channelLabel(row.channel, lang)}</CardTitle></CardHeader><CardContent className="space-y-3"><Badge variant="secondary" className="whitespace-normal">{c.connection}</Badge><p className="text-sm text-slate-600">{row.receivedAt ? `${c.received}: ${formatDateTime(row.receivedAt, lang)}` : c.noActivity}</p>{row.channel === "enquiry" && <p className="text-sm text-slate-500">{c.enquiryNote}</p>}</CardContent></Card>)}</MetricGrid>
-    <p className="text-sm text-slate-500">{c.connectionNote}</p>
-  </>;
+  const pilotMember = privateChatEnabled() && can(session.user.role, "conversations:view") ? await prisma.user.findFirst({ where: { id: session.user.id, organizationId, isActive: true }, select: { id: true } }) : null;
+  const pilot = pilotMember ? await readPrivateChatSettings(organizationId, session.user.id) : null;
+  const connectionStatus = (channel: string) => {
+    const rows = accounts.filter(account => account.channel === channel);
+    if (!rows.length) return c.connection;
+    if (rows.every(account => account.effectiveState === "HEALTHY")) return lang === "es" ? "Conexión verificada por el conector" : "Connection verified by connector";
+    if (rows.some(account => ["DEGRADED", "STALE"].includes(account.effectiveState))) return lang === "es" ? "Conexión: requiere revisión" : "Connection needs review";
+    if (rows.every(account => account.effectiveState === "PAUSED")) return lang === "es" ? "Conexión en pausa" : "Connection paused";
+    return c.connection;
+  };
+  const details = Object.fromEntries(activity.map(row => [row.channel, <div key={row.channel} className="mt-3 space-y-2"><Badge variant="secondary" className="whitespace-normal">{connectionStatus(row.channel)}</Badge><p className="text-sm text-slate-600">{row.receivedAt ? `${c.received}: ${formatDateTime(row.receivedAt, lang)}` : c.noActivity}</p>{row.channel === "enquiry" && <p className="text-sm text-slate-500">{c.enquiryNote}</p>}</div>]));
+  const footers = Object.fromEntries(INBOX_CHANNELS.map(channel => [channel, <div key={channel} className="space-y-4">
+    {channel === "webchat" && pilot && <div className="border-t border-slate-200 pt-4"><MarkChatModeControl initial={pilot} /></div>}
+    {canEdit && accountsEnabled && <details><summary className="min-h-11 cursor-pointer text-sm font-medium">{lang === "es" ? "Administrar conexión" : "Manage connection"}</summary><Connections initial={accounts} agents={agents} channelFilter={channel} embedded /></details>}
+    {channel === "whatsapp" && canEdit && <details><summary className="min-h-11 cursor-pointer text-sm font-medium">{c.number}</summary><p className="text-sm text-slate-500">{c.numberNote}</p><AssistantConfigForm assistant={assistant} canEdit numberOnly /></details>}
+  </div>]));
   return <AiCenterFrame lang={lang} role={session.user.role} title={c.channels} description={c.channelIntro}>
-    {canEdit && accountsEnabled && <Connections initial={accounts} agents={agents} />}
-    {accountsEnabled ? <details><summary className="min-h-11 cursor-pointer text-sm font-semibold text-slate-900">{lang === "es" ? "Actividad histórica por canal (no verifica la conexión)" : "Historical channel activity (does not verify the connection)"}</summary>{activityBlock}</details> : activityBlock}
-    <AgentModesPanel initial={modes} cap={{ cap: cap.cap, overBy: cap.overBy }} canEdit={canEdit} aiConfigured={isDraftProviderConfigured()} plainLanguage />
-    {canEdit && <Card><CardHeader><CardTitle>{c.number}</CardTitle><p className="text-sm text-slate-500">{c.numberNote}</p></CardHeader><CardContent><AssistantConfigForm assistant={assistant} canEdit numberOnly /></CardContent></Card>}
+    <p className="text-sm text-slate-500">{c.connectionNote}</p>
+    <AgentModesPanel initial={modes} cap={{ cap: cap.cap, overBy: cap.overBy }} canEdit={canEdit} aiConfigured={isDraftProviderConfigured()} plainLanguage channelDetails={details} channelFooter={footers} secondaryChannels={pilot ? ["webchat"] : []} />
   </AiCenterFrame>;
 }

@@ -1,6 +1,6 @@
 # Lía: Website Chat privado con aprobación humana
 
-Fecha: 2026-10-23. Continuación del piloto de revisión de `23_MARK_REVISION_PRIVADA_ANTHROPIC.md`. Esta implementación no despliega producción ni activa canales comerciales.
+Fecha: 2026-10-23. Actualización posterior: [25 · Modos de Lía y Canales](25_MODOS_LIA_Y_CANALES.md) añade Autónomo/Con aprobación/Desactivado. Continuación del piloto de revisión de `23_MARK_REVISION_PRIVADA_ANTHROPIC.md`. Esta implementación no despliega producción ni activa canales comerciales.
 
 ## Nombres actuales
 
