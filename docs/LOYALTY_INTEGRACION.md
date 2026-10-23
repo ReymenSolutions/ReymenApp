@@ -204,5 +204,5 @@ sola vez en el geocodificador (su colonia principal según SEPOMEX, o el CP; nun
 el municipio solo) y se guarda en `PostalCodePoint` (tabla compartida, dato
 público; migración `20261124091000_postal_code_points`). En cada carga del mapa
 se ubican hasta 3 CP nuevos antes de responder y hasta 25 más después; un CP que
-no se encontró se reintenta a los 7 días (`src/lib/geo/postal-points.ts`). Con
+no se encontró se reintenta a los 2 días (con hasta 3 colonias del CP) (`src/lib/geo/postal-points.ts`). Con
 eso se dibujan las zonas y se calcula la distancia a la sucursal.

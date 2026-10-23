@@ -19,7 +19,7 @@ export interface PostalPoint {
 }
 
 /** Si no se encontró, se reintenta después de esto. */
-const RETRY_MS = 7 * 24 * 3_600_000;
+const RETRY_MS = 2 * 24 * 3_600_000;
 /** CP que se ubican antes de responder (cada uno tarda ~1 s). */
 const INLINE_BUDGET = 3;
 /** CP que se ubican después de responder, por carga. */
@@ -41,17 +41,17 @@ export async function locatePostalCode(organizationId: string, cp: string): Prom
   let precision: string | null = null;
   try {
     const info = await lookupPostalCode(cp);
-    const { results, precision: p } = await geocodeStructured(organizationId, {
-      street: "",
-      colonia: info?.colonias[0]?.nombre ?? "",
-      municipio: info?.municipio ?? "",
-      estado: info?.estado ?? "",
-      cp,
-    });
-    // Solo sirve si se ubicó la colonia o el CP; el municipio quedaría en el centro de la ciudad.
-    if (results[0] && (p === "colonia" || p === "postal")) {
-      point = { lat: results[0].lat, lng: results[0].lng };
-      precision = p;
+    // Se prueba con hasta 3 colonias del CP (la búsqueda del CP y del municipio quedan en caché,
+    // así que cada colonia extra cuesta una sola consulta).
+    const colonias = info?.colonias.slice(0, 3).map((c) => c.nombre) ?? [];
+    for (const colonia of colonias.length ? colonias : [""]) {
+      const { results, precision: p } = await geocodeStructured(organizationId, { street: "", colonia, municipio: info?.municipio ?? "", estado: info?.estado ?? "", cp });
+      // Solo sirve si se ubicó la colonia o el CP; el municipio quedaría en el centro de la ciudad.
+      if (results[0] && (p === "colonia" || p === "postal")) {
+        point = { lat: results[0].lat, lng: results[0].lng };
+        precision = p;
+        break;
+      }
     }
   } catch (err) {
     console.error("[geo/postal-points]", cp, err instanceof Error ? err.message : err);
