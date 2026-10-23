@@ -43,6 +43,50 @@ export async function assertProfile(organizationId: string, profileId: string) {
 
 // ─── Zonas y ajustes ────────────────────────────────────────────────────
 
+export interface ColoniaAddress {
+  colonia: string;
+  postalCode: string | null;
+  municipality: string | null;
+}
+
+/**
+ * La zona de una propiedad (y de lo que busca un prospecto) es su colonia:
+ * nadie la elige a mano. Devuelve la zona de esa colonia y la crea si no
+ * existe. Se identifica por colonia + CP (hay colonias con el mismo nombre en
+ * varios municipios, p. ej. "Centro"); una zona con ese nombre y sin CP (de
+ * antes) se reusa y se le completa el CP.
+ */
+export async function ensureColoniaZone(organizationId: string, userId: string, a: ColoniaAddress): Promise<{ id: string; name: string; created: boolean }> {
+  const name = a.colonia.trim().replace(/\s+/g, " ").slice(0, 80);
+  const nameKey = zoneKey(name);
+  if (name.length < 2 || !nameKey) throw new UserError("Elige la colonia de la propiedad.");
+  const cp = a.postalCode && /^\d{5}$/.test(a.postalCode) ? a.postalCode : null;
+
+  const candidates = await prisma.realtyZone.findMany({
+    where: { organizationId, OR: [{ key: nameKey }, { key: { startsWith: `${nameKey}-` } }] },
+    select: { id: true, name: true, key: true, postalCode: true },
+  });
+  const sameName = candidates.filter((z) => zoneKey(z.name.replace(/\s*\([^)]*\)\s*$/, "")) === nameKey);
+  const found = sameName.find((z) => z.postalCode === cp) ?? sameName.find((z) => !z.postalCode || !cp);
+  if (found) {
+    if (!found.postalCode && cp) await prisma.realtyZone.update({ where: { id: found.id }, data: { postalCode: cp } });
+    return { id: found.id, name: found.name, created: false };
+  }
+
+  // Otra colonia con el mismo nombre (otro CP): se distingue por municipio o CP.
+  const taken = new Set(candidates.map((z) => z.key));
+  let displayName = name;
+  let key = nameKey;
+  if (taken.has(key)) {
+    displayName = `${name} (${a.municipality?.trim() || cp || "2"})`.slice(0, 80);
+    key = zoneKey(`${name} ${cp ?? a.municipality ?? ""}`) || `${nameKey}-2`;
+    for (let i = 2; taken.has(key); i++) key = `${zoneKey(`${name} ${cp ?? ""}`)}-${i}`;
+  }
+  const zone = await prisma.realtyZone.create({ data: { organizationId, name: displayName, key, postalCode: cp, latitude: null, longitude: null }, select: { id: true } });
+  await logAudit({ organizationId, userId, action: "realty.zone.create", resource: "RealtyZone", resourceId: zone.id, metadata: { name: displayName, via: "colonia" } });
+  return { id: zone.id, name: displayName, created: true };
+}
+
 export async function saveZone(organizationId: string, userId: string, input: { id?: string; name: string; postalCode?: string | null; latitude: number | null; longitude: number | null }) {
   const key = zoneKey(input.name);
   if (!key) throw new UserError("Nombre de zona inválido");
@@ -91,7 +135,8 @@ export interface PropertyInput {
   status: RealtyPropertyStatus;
   price: number;
   currency: string;
-  zoneId: string;
+  /** Solo propiedades de antes sin colonia: con colonia, la zona se calcula de ella. */
+  zoneId?: string | null;
   postalCode: string | null;
   neighborhood: string | null;
   municipality: string | null;
@@ -115,11 +160,23 @@ export interface PropertyInput {
 }
 
 export async function saveProperty(organizationId: string, userId: string, input: PropertyInput): Promise<string> {
-  await assertZone(organizationId, input.zoneId);
   if (input.branchId) await assertBranch(organizationId, input.branchId);
   if (input.advisorUserId) await assertOrgUser(organizationId, input.advisorUserId);
-  const { id, published, status, ...rest } = input;
-  const data = { ...rest, price: new Prisma.Decimal(input.price) };
+  // La zona es la colonia. Sin colonia solo se acepta en una propiedad de antes, que conserva su zona.
+  let zoneId: string;
+  if (input.neighborhood?.trim()) {
+    zoneId = (await ensureColoniaZone(organizationId, userId, { colonia: input.neighborhood, postalCode: input.postalCode, municipality: input.municipality })).id;
+  } else if (input.id) {
+    zoneId = (await assertProperty(organizationId, input.id)).zoneId;
+  } else if (input.zoneId) {
+    await assertZone(organizationId, input.zoneId);
+    zoneId = input.zoneId;
+  } else {
+    throw new UserError("Elige la colonia de la propiedad.");
+  }
+  const { id, published, status, zoneId: _ignored, ...rest } = input;
+  void _ignored;
+  const data = { ...rest, zoneId, price: new Prisma.Decimal(input.price) };
   let propertyId: string;
   if (id) {
     const before = await assertProperty(organizationId, id);

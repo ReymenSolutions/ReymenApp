@@ -2635,6 +2635,10 @@ model LoyaltyProgram {
   referenceLabel String?
   referenceLat   Float?
   referenceLng   Float?
+  // Diseño de la tarjeta del cliente (null = colores de la marca). Hex #RRGGBB y una clave de CARD_ICONS.
+  cardColor      String?
+  cardAccent     String?
+  cardIcon       String?
   // Programa creado por el seed de demostración: las pantallas lo marcan como "datos demo".
   isDemo         Boolean              @default(false)
   createdAt      DateTime             @default(now())
@@ -3450,4 +3454,19 @@ model AiPilotBudgetRoot {
   @@unique([organizationId, id])
   @@unique([organizationId, createdById, requestKey])
   @@index([organizationId, state])
+}
+
+// Punto aproximado (centro) de un código postal para los mapas por CP (p. ej.
+// el mapa de clientes de Lealtad). Dato público y compartido entre empresas:
+// se busca una vez (colonia o CP en el geocodificador) y se guarda. latitude
+// null = se intentó y no se encontró (se reintenta después de unos días).
+model PostalCodePoint {
+  postalCode  String   @id
+  latitude    Float?
+  longitude   Float?
+  // "postal" | "colonia": qué se encontró.
+  precision   String?
+  lastTriedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

@@ -12,7 +12,7 @@ import { getServerLang } from "@/lib/i18n-server";
 import { pickDict } from "@/lib/i18n-dict";
 import { loyaltyStrings } from "@/lib/i18n-loyalty";
 import { shortDate } from "@/lib/loyalty/format";
-import { ProgressDots } from "@/components/loyalty/ProgressBar";
+import { LoyaltyCardFace } from "@/components/loyalty/LoyaltyCardFace";
 import { PublicMessage, PublicShell } from "@/components/loyalty/PublicShell";
 
 // La tarjeta es personal: no se indexa y no manda el token como Referer a otros sitios.
@@ -33,22 +33,25 @@ export default async function LoyaltyCardPage({ params }: { params: Promise<{ sl
   const reward = member.availableRewards[0] ?? null;
 
   return (
-    <PublicShell businessName={org.name} logoUrl={org.logoUrl}>
+    <PublicShell businessName={org.name} logoUrl={org.logoUrl} theme={program}>
       <MemberProgramChoice slug={slug} token={token} current={program.id} selected={member.isSelected} programs={programs} lang={lang} />
       {/* Tarjeta */}
-      <div className="bg-gradient-to-br from-brand-900 to-brand-950 px-6 pb-6 pt-5 text-white">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-orange-300">{program.name}</p>
-        <p className="mt-3 text-lg text-brand-100">{L.hello(firstName(member.name))}</p>
-        <p className="text-4xl font-bold tabular-nums">{L.visitsOf(p.current, p.goal)}</p>
-        <div className="mt-3 rounded-xl bg-white/10 p-3">
-          <ProgressDots current={p.current} goal={p.goal} size="lg" />
-        </div>
-        {!reward && (
-          <p className="mt-3 text-base font-semibold">
-            {L.remainingVisits(p.remaining)} <span className="font-normal text-brand-100">· {program.rule.rewardName}</span>
-          </p>
-        )}
-      </div>
+      <LoyaltyCardFace
+        size="lg"
+        style={program}
+        topLabel={program.name}
+        greeting={L.hello(firstName(member.name))}
+        headline={L.visitsOf(p.current, p.goal)}
+        current={p.current}
+        goal={p.goal}
+        footer={
+          !reward ? (
+            <span className="font-semibold">
+              {L.remainingVisits(p.remaining)} <span className="font-normal">· {program.rule.rewardName}</span>
+            </span>
+          ) : null
+        }
+      />
 
       {member.deficitVisits > 0 && <p role="status" className="mx-6 my-4 text-sm">{lang === "es" ? `Visitas por compensar tras cancelaciones: ${member.deficitVisits}.` : `Visits to replace after cancellations: ${member.deficitVisits}.`}</p>}
       {reward && (

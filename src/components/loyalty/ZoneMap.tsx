@@ -2,14 +2,17 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useMemo, useState } from "react";
-import { MapPin, Target, CheckCircle2, Gem, Repeat, X } from "lucide-react";
+import { useState } from "react";
+import { MapPin, Target, CheckCircle2, Gem, Repeat, X, Store } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePreferences } from "@/context/preferences";
 import { pickDict } from "@/lib/i18n-dict";
 import { loyaltyStrings, type LoyaltyDict } from "@/lib/i18n-loyalty";
 import { MAP_METRICS, zoneMetricValue, type MapMetric, type ZoneLabel, type ZoneStats } from "@/lib/loyalty/metrics";
-import { DEFAULT_REFERENCE, zonePoint, type GeoPoint } from "@/lib/loyalty/postal-zones";
+import { DEFAULT_REFERENCE, distanceKm, zonePoint, type GeoPoint } from "@/lib/loyalty/postal-zones";
+
+/** Más lejos que esto de la sucursal, un CP no se dibuja (ver farAway). */
+const MAP_MAX_KM = 40;
 import type { LoyaltyLocationView } from "@/lib/loyalty/locations-shared";
 import type { GeoZone } from "./GeoZoneMap";
 import { money, num, pct } from "@/lib/loyalty/format";
@@ -107,9 +110,25 @@ export function ZoneMap({
   const hasReference = focusSite !== null;
   const reference: GeoPoint = focusSite?.point ?? DEFAULT_REFERENCE;
 
-  const { geoZones, unplaced } = useMemo(() => {
-    const withPos = zones.map((z) => ({ z, point: zonePoint(z.postalCode) }));
-    const onMap = withPos.filter((w): w is { z: ZoneStats; point: GeoPoint } => w.point !== null);
+  // Un CP muy lejos de la sucursal (otra ciudad, o un CP mal escrito) alejaría el mapa
+  // hasta perder la zona del negocio: no se dibuja, sigue en la tabla con su distancia.
+  const farKey = hasReference
+    ? zones
+        .filter((z) => {
+          const p = z.point ?? zonePoint(z.postalCode);
+          return p !== null && distanceKm(reference, p) > MAP_MAX_KM;
+        })
+        .map((z) => z.postalCode)
+        .join(",")
+    : "";
+  // Sin useMemo: el mapa se redibuja de todos modos al cambiar la métrica o la selección,
+  // que son los únicos cambios de estado de este componente.
+  const { geoZones, unplaced, farAway } = (() => {
+    const far = new Set(farKey ? farKey.split(",") : []);
+    const withPos = zones.map((z) => ({ z, point: z.point ?? zonePoint(z.postalCode) }));
+    const located = withPos.filter((w): w is { z: ZoneStats; point: GeoPoint } => w.point !== null);
+    const onMap = located.filter((w) => !far.has(w.z.postalCode));
+    const farAway = [...far];
     const values = onMap.map((w) => zoneMetricValue(w.z, metric));
     const max = Math.max(0, ...values);
     const geoZones: GeoZone[] = onMap.map((w, i) => {
@@ -139,8 +158,8 @@ export function ZoneMap({
         ariaLabel: `${L.zoneDetail(z.postalCode)}: ${metricLabel(metric, L)} ${formatMetric(metric, v)}${badges ? ` · ${badges}` : ""}`,
       };
     });
-    return { geoZones, unplaced: withPos.length - onMap.length };
-  }, [zones, metric, L]);
+    return { geoZones, unplaced: withPos.length - located.length, farAway };
+  })();
 
   const active = selected ? zones.find((z) => z.postalCode === selected) ?? null : null;
 
@@ -185,7 +204,7 @@ export function ZoneMap({
             sites={visibleSites.map((l) => ({ key: l.key, label: l.label, point: l.point }))}
             selected={selected}
             onSelect={(cp) => setSelected((cur) => (cur === cp ? null : cp))}
-            height={compact ? 360 : 520}
+            height={compact ? 360 : 680}
             recenterLabel={L.mapRecenter}
             scrollHint={L.mapScrollHint}
           />
@@ -210,7 +229,7 @@ export function ZoneMap({
               <Target className="h-3 w-3 text-violet-600" aria-hidden="true" /> {L.zoneOpportunity}
             </span>
             <span className="flex items-center gap-1">
-              <span className="h-2.5 w-2.5 rounded-full bg-slate-900" aria-hidden="true" /> {L.mapBranch}
+              <Store className="h-3.5 w-3.5 text-[#1a3ef5]" aria-hidden="true" /> {L.mapBranch}
             </span>
             {visibleSites.length === 1 ? <span>{L.mapRings}</span> : visibleSites.length > 1 ? <span>{L.mapManySites}</span> : null}
           </div>
@@ -227,6 +246,7 @@ export function ZoneMap({
         {L.mapIllustrative}
         {!hasReference && <> {L.mapApproxReference}</>}
         {unplaced > 0 && <> {L.mapUnplaced(unplaced)}</>}
+        {farAway.length > 0 && <> {L.mapFarAway(farAway, MAP_MAX_KM)}</>}
       </p>
     </div>
   );

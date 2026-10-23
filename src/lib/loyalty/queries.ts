@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import type { BranchFilter } from "@/lib/branches";
 import { averageTicket, progressOf, roundMoney } from "./cycle";
 import { MAIN_LOCATION_KEY } from "./locations-shared";
+import { postalPointsFor } from "@/lib/geo/postal-points";
 import { activityCutoffs, activityStatus, buildInsights, pctOf, segmentCounts, summarizeZones, type MemberLite, type ZoneRow } from "./metrics";
 import type { Period } from "./period";
 import { trendPct } from "./period";
@@ -208,9 +209,12 @@ export async function getLoyaltyAnalytics(args: {
     where: { organizationId: org, ...(branch === undefined ? {} : { branchKey: branch ?? MAIN_LOCATION_KEY }) },
     select: { latitude: true, longitude: true },
   });
+  // Centro aproximado de cada CP (se busca una vez y se guarda; ver lib/geo/postal-points.ts).
+  const points = await postalPointsFor(org, [...zoneMap.keys()]);
   const zones = summarizeZones(
     [...zoneMap.values()],
-    locationRows.map((l) => ({ lat: l.latitude, lng: l.longitude }))
+    locationRows.map((l) => ({ lat: l.latitude, lng: l.longitude })),
+    points
   );
 
   // ── Segmentos (columnas compactas por miembro) ──
