@@ -192,3 +192,17 @@ columnas opcionales); vacío = el diseño de siempre. No cambia la regla, así q
 no crea versión nueva. La vista previa y la tarjeta pública usan el mismo
 componente (`LoyaltyCardFace`), y el color del texto se elige solo para que se
 lea sobre el fondo. Hasta 12 visitas, cada visita se ve como un sello con el ícono.
+
+La página de inscripción (`/lealtad/<negocio>`) y la tarjeta usan el mismo
+diseño: el fondo toma el color de la tarjeta, la cabecera muestra el ícono del
+programa, la inscripción enseña "Así será tu tarjeta" y el botón usa el color de acento.
+
+## Ubicación de cada código postal en el mapa de clientes
+
+No hay un catálogo oficial de centroides de CP instalado. Cada CP se busca una
+sola vez en el geocodificador (su colonia principal según SEPOMEX, o el CP; nunca
+el municipio solo) y se guarda en `PostalCodePoint` (tabla compartida, dato
+público; migración `20261124091000_postal_code_points`). En cada carga del mapa
+se ubican hasta 3 CP nuevos antes de responder y hasta 25 más después; un CP que
+no se encontró se reintenta a los 7 días (`src/lib/geo/postal-points.ts`). Con
+eso se dibujan las zonas y se calcula la distancia a la sucursal.

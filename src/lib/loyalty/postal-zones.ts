@@ -73,8 +73,8 @@ export function distanceKm(a: GeoPoint, b: GeoPoint): number {
  * Distancia (km, 1 decimal) del CP al punto de venta más cercano de `origins`.
  * Null si el CP no tiene punto en el mapa o no hay ningún punto de venta ubicado.
  */
-export function zoneDistanceKm(postalCode: string, origins: GeoPoint[]): number | null {
-  const p = zonePoint(postalCode);
+export function zoneDistanceKm(postalCode: string, origins: GeoPoint[], point?: GeoPoint | null): number | null {
+  const p = point ?? zonePoint(postalCode);
   if (!p || origins.length === 0) return null;
   const km = Math.min(...origins.map((o) => distanceKm(o, p)));
   return Math.round(km * 10) / 10;
