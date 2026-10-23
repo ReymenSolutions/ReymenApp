@@ -12,7 +12,33 @@ import { getErrorMessage } from "@/lib/user-error";
 import { usePreferences } from "@/context/preferences";
 import { pickDict } from "@/lib/i18n-dict";
 import { loyaltyStrings } from "@/lib/i18n-loyalty";
-import { ProgressDots } from "./ProgressBar";
+import { CARD_ICONS, DEFAULT_CARD_ACCENT, DEFAULT_CARD_COLOR, DEFAULT_CARD_ICON, contrast, isHexColor } from "@/lib/loyalty/card-style";
+import { cn } from "@/lib/utils";
+import { CARD_ICON_COMPONENTS, LoyaltyCardFace } from "./LoyaltyCardFace";
+
+/** Paletas listas para elegir con un clic (fondo, acento). */
+const PRESETS: [string, string][] = [
+  [DEFAULT_CARD_COLOR, DEFAULT_CARD_ACCENT],
+  ["#14532D", "#FACC15"],
+  ["#7F1D1D", "#FDE68A"],
+  ["#3B0764", "#F472B6"],
+  ["#111827", "#22D3EE"],
+  ["#FFF7ED", "#C2410C"],
+  ["#F0FDF4", "#15803D"],
+  ["#78350F", "#FCD34D"],
+];
+
+function ColorInput({ id, label, value, fallback, onChange }: { id: string; label: string; value: string; fallback: string; onChange: (v: string) => void }) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="flex items-center gap-2">
+        <input type="color" aria-label={label} value={isHexColor(value) ? value : fallback} onChange={(e) => onChange(e.target.value.toUpperCase())} className="h-10 w-10 shrink-0 cursor-pointer rounded-md border border-slate-200 bg-transparent p-0.5" />
+        <Input id={id} value={value} onChange={(e) => onChange(e.target.value)} placeholder={fallback} maxLength={7} className="font-mono uppercase" />
+      </div>
+    </div>
+  );
+}
 
 type RewardType = "FREE_ITEM" | "DISCOUNT_PERCENT" | "DISCOUNT_AMOUNT" | "CUSTOM";
 
@@ -30,6 +56,10 @@ export interface ProgramFormValues {
   rewardHeadline: string;
   scope: "ORGANIZATION" | "BRANCH";
   branchId: string;
+  /** Diseño de la tarjeta; vacío = el de siempre. */
+  cardColor: string;
+  cardAccent: string;
+  cardIcon: string;
 }
 
 const SELECT = "h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm";
@@ -58,7 +88,7 @@ export function ProgramForm({
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await saveLoyaltyProgram({ ...v, visitGoal: Number(v.visitGoal) });
+      const res = await saveLoyaltyProgram({ ...v, visitGoal: Number(v.visitGoal), cardIcon: v.cardIcon as never });
       if (res.ruleChanged && !res.created) toast.success(L.savedNewVersion(res.version));
       else toast.success(L.savedToast);
       router.refresh();
@@ -148,6 +178,62 @@ export function ProgramForm({
               </div>
             </div>
           </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+            <p className="text-sm font-semibold text-slate-900">{L.cardDesignTitle}</p>
+            <p className="text-xs text-slate-500">{L.cardDesignHint}</p>
+            <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={L.cardPresets}>
+              {PRESETS.map(([bg, ac]) => {
+                const on = (v.cardColor || DEFAULT_CARD_COLOR).toUpperCase() === bg.toUpperCase() && (v.cardAccent || DEFAULT_CARD_ACCENT).toUpperCase() === ac.toUpperCase();
+                return (
+                  <button
+                    key={bg + ac}
+                    type="button"
+                    aria-pressed={on}
+                    aria-label={`${bg} / ${ac}`}
+                    onClick={() => setV((s) => ({ ...s, cardColor: bg === DEFAULT_CARD_COLOR ? "" : bg, cardAccent: ac === DEFAULT_CARD_ACCENT ? "" : ac }))}
+                    className={cn("flex h-9 w-12 overflow-hidden rounded-lg border-2", on ? "border-brand-600" : "border-slate-200")}
+                  >
+                    <span className="h-full w-2/3" style={{ background: bg }} />
+                    <span className="h-full w-1/3" style={{ background: ac }} />
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <ColorInput id="p-ccolor" label={L.cardColor} value={v.cardColor} fallback={DEFAULT_CARD_COLOR} onChange={(c) => set("cardColor", c)} />
+              <ColorInput id="p-caccent" label={L.cardAccent} value={v.cardAccent} fallback={DEFAULT_CARD_ACCENT} onChange={(c) => set("cardAccent", c)} />
+            </div>
+            {isHexColor(v.cardColor || DEFAULT_CARD_COLOR) && isHexColor(v.cardAccent || DEFAULT_CARD_ACCENT) && contrast(v.cardColor || DEFAULT_CARD_COLOR, v.cardAccent || DEFAULT_CARD_ACCENT) < 2 && (
+              <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">{L.cardLowContrast}</p>
+            )}
+            <p className="mb-2 mt-4 text-sm font-medium text-slate-900">{L.cardIcon}</p>
+            <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={L.cardIcon}>
+              {CARD_ICONS.map((key) => {
+                const Icon = CARD_ICON_COMPONENTS[key];
+                const on = (v.cardIcon || DEFAULT_CARD_ICON) === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    aria-label={key}
+                    title={key}
+                    onClick={() => set("cardIcon", key === DEFAULT_CARD_ICON ? "" : key)}
+                    className={cn("flex h-10 w-10 items-center justify-center rounded-lg border", on ? "border-brand-600 bg-brand-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:border-brand-600")}
+                  >
+                    <Icon className="h-5 w-5" aria-hidden="true" />
+                  </button>
+                );
+              })}
+            </div>
+            {(v.cardColor || v.cardAccent || v.cardIcon) && (
+              <button type="button" onClick={() => setV((s) => ({ ...s, cardColor: "", cardAccent: "", cardIcon: "" }))} className="mt-3 text-xs font-medium text-brand-600 hover:underline">
+                {L.cardReset}
+              </button>
+            )}
+          </div>
         </fieldset>
         {!readOnly && (
           <Button type="submit" loading={saving}>
@@ -159,19 +245,17 @@ export function ProgramForm({
       {/* Vista previa de la tarjeta del cliente */}
       <div className="lg:col-span-2">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{L.previewTitle}</p>
-        <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-brand-900 to-brand-950 p-5 text-white shadow-lg">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-orange-300">{businessName}</p>
-          <p className="mt-1 text-lg font-bold">{v.name || L.programNamePh}</p>
-          <p className="mt-4 text-sm text-brand-100">{L.hello("Mariana")}</p>
-          <p className="text-3xl font-bold tabular-nums">{L.visitsOf(Math.min(7, goal - 1), goal)}</p>
-          <div className="mt-3 rounded-lg bg-white/10 p-2.5">
-            <ProgressDots current={Math.min(7, goal - 1)} goal={goal} />
-          </div>
-          <p className="mt-3 text-sm text-brand-100">
-            {L.remainingVisits(goal - Math.min(7, goal - 1))} · {v.rewardName || L.rewardNamePh}
-          </p>
-          {v.rewardHeadline && <p className="mt-1 text-xs italic text-orange-200">“{v.rewardHeadline}”</p>}
-        </div>
+        <LoyaltyCardFace
+          style={{ cardColor: v.cardColor, cardAccent: v.cardAccent, cardIcon: v.cardIcon }}
+          topLabel={businessName}
+          title={v.name || L.programNamePh}
+          greeting={L.hello("Mariana")}
+          headline={L.visitsOf(Math.min(7, goal - 1), goal)}
+          current={Math.min(7, goal - 1)}
+          goal={goal}
+          footer={<>{L.remainingVisits(goal - Math.min(7, goal - 1))} · {v.rewardName || L.rewardNamePh}</>}
+          quote={v.rewardHeadline || null}
+        />
       </div>
     </div>
   );

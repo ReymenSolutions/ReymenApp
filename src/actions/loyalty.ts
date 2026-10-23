@@ -5,6 +5,7 @@
 // lado del servidor) → mutar con el organizationId de la SESIÓN (nunca del
 // formulario) → auditar (dentro de service.ts) → revalidatePath.
 
+import { CARD_ICONS } from "@/lib/loyalty/card-style";
 import { recoverLegacyPosVisits } from "@/lib/loyalty/recovery";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
@@ -62,6 +63,10 @@ const programSchema = z.object({
   rewardHeadline: z.string().trim().max(120).optional(),
   scope: z.enum(["ORGANIZATION", "BRANCH"]).default("ORGANIZATION"),
   branchId: z.string().optional(),
+  // Diseño de la tarjeta: vacío = el de siempre.
+  cardColor: z.string().trim().regex(/^#[0-9a-fA-F]{6}$/).optional().or(z.literal("")).transform((v) => v || null),
+  cardAccent: z.string().trim().regex(/^#[0-9a-fA-F]{6}$/).optional().or(z.literal("")).transform((v) => v || null),
+  cardIcon: z.enum(CARD_ICONS).optional().or(z.literal("")).transform((v) => v || null),
 });
 
 export async function saveLoyaltyProgram(data: z.input<typeof programSchema>) {
@@ -81,6 +86,9 @@ export async function saveLoyaltyProgram(data: z.input<typeof programSchema>) {
     rewardHeadline: d.rewardHeadline || null,
     scope: d.scope,
     branchId: d.scope === "BRANCH" ? parseBranch(d.branchId) : null,
+    cardColor: d.cardColor ?? null,
+    cardAccent: d.cardAccent ?? null,
+    cardIcon: d.cardIcon ?? null,
   });
   revalidateLoyalty();
   return { version: result.version, ruleChanged: result.ruleChanged, created: result.created };

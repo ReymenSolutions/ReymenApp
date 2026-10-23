@@ -2635,6 +2635,10 @@ model LoyaltyProgram {
   referenceLabel String?
   referenceLat   Float?
   referenceLng   Float?
+  // Diseño de la tarjeta del cliente (null = colores de la marca). Hex #RRGGBB y una clave de CARD_ICONS.
+  cardColor      String?
+  cardAccent     String?
+  cardIcon       String?
   // Programa creado por el seed de demostración: las pantallas lo marcan como "datos demo".
   isDemo         Boolean              @default(false)
   createdAt      DateTime             @default(now())

@@ -33,6 +33,9 @@ export default async function LoyaltyProgramPage({ searchParams }: { searchParam
         rewardHeadline: program.rule.rewardHeadline ?? "",
         scope: program.scope,
         branchId: program.branchId ?? "",
+        cardColor: program.cardColor ?? "",
+        cardAccent: program.cardAccent ?? "",
+        cardIcon: program.cardIcon ?? "",
       }
     : {
         createNew: true,
@@ -46,6 +49,9 @@ export default async function LoyaltyProgramPage({ searchParams }: { searchParam
         rewardHeadline: "",
         scope: "ORGANIZATION",
         branchId: "",
+        cardColor: "",
+        cardAccent: "",
+        cardIcon: "",
       };
 
   let links: { main: PublicLink; branches: PublicLink[] } | null = null;
