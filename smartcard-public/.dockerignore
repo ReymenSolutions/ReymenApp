@@ -1,0 +1,19 @@
+# Fase 15 (producción) -- el contexto de build de cada Dockerfile es la raíz
+# del monorepo completo (necesita ver packages/ y todos los apps/*), así que
+# esto es lo único que evita mandarle a Docker gigabytes de basura que no
+# hace falta (node_modules se reinstala limpio dentro de la imagen; .next se
+# regenera; nada de esto cambia el resultado del build, solo lo hace lento).
+node_modules
+**/node_modules
+.next
+**/.next
+.git
+.vscode
+*.md
+.env
+.env.local
+**/.env.local
+npm-debug.log*
+.DS_Store
+supabase/.branches
+supabase/.temp

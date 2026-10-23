@@ -1,0 +1,1 @@
+select proname from pg_proc where proname = 'log_admin_action';

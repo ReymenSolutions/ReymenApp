@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Fase 17 (accesibilidad): outline de foco visible para todo elemento
+   interactivo de este sitio. Antes no existía ninguna regla propia -- se
+   dependía por completo del outline por default del navegador sobre las
+   formas hechas a mano en ProfileView.tsx (botones circulares/pill con
+   `style={{...}}`), que en la práctica queda recortado o casi invisible.
+   Un solo color fijo de alto contraste (no depende del tema de cada
+   tarjeta -- accent_color/primary_color los elige cada cliente y podrían
+   coincidir con casi cualquier color) con offset, para que el halo nunca
+   quede pegado al borde de la forma que envuelve. */
+a:focus-visible,
+button:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 3px;
+  border-radius: 4px;
+}

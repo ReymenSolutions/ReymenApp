@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Fase 17 (accesibilidad): la clase `outline-none` se repite en cada
+   input/select/textarea del panel (buscar "outline-none focus:border-neutral-500"
+   en apps/admin/app/**) y quita el outline nativo del navegador,
+   sustituyéndolo solo por un cambio sutil de color de borde -- insuficiente
+   como indicador de foco (WCAG 2.4.7 / 1.4.11). Esta regla gana por
+   especificidad sin tener que tocar cada archivo: un selector de elemento +
+   `:focus-visible` (clases=1, elementos=1) le gana a una sola clase como
+   `.outline-none` (clases=1, elementos=0), sin necesitar `!important`. */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 2px;
+}

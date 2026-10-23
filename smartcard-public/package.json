@@ -1,0 +1,18 @@
+{
+  "name": "reymen-smartcard",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:public": "npm run dev --workspace=apps/public",
+    "dev:admin": "npm run dev --workspace=apps/admin",
+    "dev:ops": "npm run dev --workspace=apps/ops",
+    "build:public": "npm run build --workspace=apps/public",
+    "build:admin": "npm run build --workspace=apps/admin",
+    "build:ops": "npm run build --workspace=apps/ops",
+    "create-superadmin": "node scripts/create-superadmin.mjs"
+  }
+}
