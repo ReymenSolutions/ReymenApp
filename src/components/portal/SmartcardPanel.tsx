@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Loader2, CreditCard, Users, Activity, Pencil, QrCode } from "lucide-react";
+import { Loader2, CreditCard, Users, Activity, Pencil, QrCode, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { MetricGrid } from "@/components/shared/MetricGrid";
 import { Badge } from "@/components/ui/badge";
@@ -146,12 +146,15 @@ export function SmartcardPanel({
   roster,
   cardStats,
   destinationTypes,
+  publicBaseUrl = "https://link.reymen.mx",
   timeZone = "America/Mexico_City",
 }: {
   membership: SmartcardMembership;
   roster: CompanyRosterEntry[];
   cardStats: CompanyCardStats;
   destinationTypes: DestinationTypeOption[];
+  /** Dominio público de las tarjetas (para "Ver tarjeta"). */
+  publicBaseUrl?: string;
   timeZone?: string;
 }) {
   const { lang } = usePreferences();
@@ -410,6 +413,13 @@ export function SmartcardPanel({
                         <div className="flex flex-wrap justify-between gap-x-3"><dt className="text-slate-500">{lang === "es" ? "Última actividad" : "Last activity"}</dt><dd>{c.lastActivityAt ? new Date(c.lastActivityAt).toLocaleDateString(lang === "es" ? "es-MX" : "en-US", { year: "numeric", month: "short", day: "numeric", timeZone }) : lang === "es" ? "Sin actividad" : "No activity"}</dd></div>
                       </dl>
                       <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-2">
+                        {c.cardCode && c.status.toLowerCase() === "active" && (
+                          <Button asChild variant="outline" size="sm" className="min-h-11">
+                            <a href={`${publicBaseUrl}/q/${encodeURIComponent(c.cardCode)}?preview=1`} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="h-4 w-4 shrink-0" />{lang === "es" ? "Ver tarjeta" : "View card"}
+                            </a>
+                          </Button>
+                        )}
                         <Button variant="outline" size="sm" className="min-h-11" aria-expanded={isExpanded} aria-controls={`card-events-${c.cardId}`} onClick={() => setExpandedCardId(isExpanded ? null : c.cardId)}>
                           {isExpanded ? lang === "es" ? "Ocultar actividad" : "Hide activity" : lang === "es" ? "Ver actividad" : "View activity"}
                         </Button>
