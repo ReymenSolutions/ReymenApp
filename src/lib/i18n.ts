@@ -356,7 +356,12 @@ export const strings = {
     // ── Admin audit ───────────────────────────────────────────
     // ── Admin client operations center (Fase 8) ──────────────
     adminNeedsAttention: "Necesita atención",
-    adminAllClear: "Todo en orden",
+    adminTabOverview: "Resumen",
+    adminTabAi: "WhatsApp / IA",
+    adminTabModules: "Módulos",
+    adminTabBilling: "Suscripción",
+    adminTabConsumption: "Consumo",
+    adminClientSections: "Secciones del cliente",
     adminAutomationErrorsNote: "automatizaciones con error",
     adminEscalatedNote: "conversaciones escaladas sin atender",
     adminOpenRequestsNote: "solicitudes abiertas",
@@ -907,7 +912,12 @@ export const strings = {
     // ── Admin audit ───────────────────────────────────────────
     // ── Admin client operations center (Fase 8) ──────────────
     adminNeedsAttention: "Needs attention",
-    adminAllClear: "All clear",
+    adminTabOverview: "Overview",
+    adminTabAi: "WhatsApp / AI",
+    adminTabModules: "Modules",
+    adminTabBilling: "Subscription",
+    adminTabConsumption: "Consumption",
+    adminClientSections: "Client sections",
     adminAutomationErrorsNote: "automations with errors",
     adminEscalatedNote: "escalated conversations unattended",
     adminOpenRequestsNote: "open requests",
