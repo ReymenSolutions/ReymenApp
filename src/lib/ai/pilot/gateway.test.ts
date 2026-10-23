@@ -41,7 +41,7 @@ beforeEach(async () => {
   await prisma.aiRate.create({ data: { provider: "anthropic", model, currency: "MXN", inputPerMTok: 100, outputPerMTok: 1000, effectiveFrom: new Date("2020-01-01Z"), source: "test-pilot-gateway" } });
 });
 afterEach(async () => {
-  vi.restoreAllMocks(); vi.unstubAllEnvs();
+  vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.unstubAllGlobals();
   for (const id of orgs.splice(0)) {
     await prisma.aiUsage.deleteMany({ where: { organizationId: id } });
     await prisma.aiPilotBudgetRoot.deleteMany({ where: { organizationId: id } });
@@ -56,6 +56,29 @@ afterEach(async () => {
 });
 
 describe("durable private pilot financial gateway", () => {
+  it("snapshots USD conversion through the fixed private FX endpoint before provider dispatch", async () => {
+    const f = await fixture(); vi.stubEnv("AI_MARK_PILOT_PROXY_URL", "http://ingress:8081");
+    await prisma.aiRate.updateMany({ where: { source: "test-pilot-gateway" }, data: { currency: "USD", inputPerMTok: 2, outputPerMTok: 10 } });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ date: "2026-10-21", rates: { MXN: 20 } }), { status: 200 })); vi.stubGlobal("fetch", fetchMock);
+    await runPilotAiCall(f.ctx, input);
+    expect(fetchMock).toHaveBeenCalledWith("http://ingress:8081/fx", expect.objectContaining({ cache: "no-store" }));
+    const row = await prisma.aiUsage.findFirstOrThrow({ where: { organizationId: f.org.id } });
+    expect(Number(row.fxRate)).toBe(20); expect(row.fxSource).toBe("frankfurter"); expect(Number(row.costMxn)).toBe(0.0044);
+  });
+  it("missing or invalid private FX blocks before creating a claim or charging the provider", async () => {
+    const f = await fixture(); vi.stubEnv("AI_MARK_PILOT_PROXY_URL", "http://ingress:8081");
+    await prisma.aiRate.updateMany({ where: { source: "test-pilot-gateway" }, data: { currency: "USD", inputPerMTok: 2, outputPerMTok: 10 } });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ date: "2026-10-21", rates: { MXN: -1 } }), { status: 200 })));
+    await expect(runPilotAiCall(f.ctx, input)).rejects.toThrow(/no_fx/);
+    expect(await prisma.aiUsage.count({ where: { organizationId: f.org.id } })).toBe(0); expect(mocks.call).not.toHaveBeenCalled();
+  });
+  it("never follows an arbitrary private FX proxy URL", async () => {
+    const f = await fixture(); vi.stubEnv("AI_MARK_PILOT_PROXY_URL", "http://untrusted-host");
+    await prisma.aiRate.updateMany({ where: { source: "test-pilot-gateway" }, data: { currency: "USD" } });
+    const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
+    await expect(runPilotAiCall(f.ctx, input)).rejects.toThrow(/proxy_invalid/);
+    expect(fetchMock).not.toHaveBeenCalled(); expect(mocks.call).not.toHaveBeenCalled();
+  });
   it("attributes two calls to a tenant/root/config/step, settles actual cost once and releases only unused capacity", async () => {
     const f = await fixture();
     await runPilotAiCall(f.ctx, input);

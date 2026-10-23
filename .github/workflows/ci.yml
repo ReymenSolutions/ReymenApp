@@ -142,8 +142,8 @@ jobs:
               specs=(e2e/channel-connections-rollback.spec.ts e2e/knowledge-access-rollback.spec.ts e2e/mark-sandbox-rollback.spec.ts)
               ;;
             private-pilot-admin)
-              export REYMEN_STAGING=true
-              specs=(e2e/private-pilot-admin.spec.ts)
+              export REYMEN_STAGING=true AI_MARK_PRIVATE_REVIEW_ENABLED=true AI_KNOWLEDGE_ACCESS_ENABLED=true
+              specs=(e2e/private-pilot-admin.spec.ts e2e/mark-private-review.spec.ts)
               ;;
           esac
           npx playwright test "${specs[@]}" --workers=1
