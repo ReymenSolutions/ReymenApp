@@ -7,11 +7,12 @@ import { computeCost, toMxn } from "../cost";
 import { callAnthropicPilot } from "../providers/anthropic-pilot";
 import type { NormalizedUsage, ProviderResult } from "../types";
 import { assertPilotAuthority, lockPilotBudget, loadPilotQuotaState, PILOT_LIMITS } from "./budget";
+import { assertKnowledgeCurrent } from "../knowledge/retrieval";
 
 type Tx = Prisma.TransactionClient;
 const D = (value: Prisma.Decimal.Value) => new Prisma.Decimal(value);
 const id = z.string().min(1).max(128);
-const contextSchema = z.object({ organizationId: id, actorId: id, rootId: id, agentInstanceId: id, configVersion: z.number().int().positive(), step: z.union([z.literal(1), z.literal(2)]) }).strict();
+const contextSchema = z.object({ organizationId: id, actorId: id, rootId: id, agentInstanceId: id, configVersion: z.number().int().positive(), step: z.union([z.literal(1), z.literal(2)]), knowledgeVersion: z.number().int().positive().optional() }).strict();
 export type PilotCallContext = z.infer<typeof contextSchema>;
 const inputSchema = z.object({ system: z.string().max(12000), messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().min(1).max(12000) }).strict()).min(1).max(8), maxOutputTokens: z.number().int().min(1).max(512) }).strict();
 const tokens = z.number().int().nonnegative().max(2147483647);
@@ -25,6 +26,7 @@ function gate() {
 }
 
 async function activeRoot(tx: Tx, c: PilotCallContext, now: Date) {
+  if (c.knowledgeVersion !== undefined && process.env.AI_MARK_PRIVATE_REVIEW_ENABLED !== "true") fail("pilot_review_disabled");
   await assertPilotAuthority(tx, c.organizationId, c.actorId);
   const root = await tx.aiPilotBudgetRoot.findFirst({ where: { id: c.rootId, organizationId: c.organizationId, createdById: c.actorId } });
   if (!root || root.state !== "IN_FLIGHT") fail("pilot_root_not_dispatchable");
@@ -44,7 +46,9 @@ async function quote(model: string, input: z.infer<typeof inputSchema>) {
   if (!rate) fail("pilot_no_rate");
   const rates = [rate.inputPerMTok, rate.outputPerMTok, rate.cacheReadPerMTok, rate.cacheWritePerMTok, rate.reasoningPerMTok].filter((v): v is Prisma.Decimal => v !== null);
   if (rates.some(v => !v.isFinite() || v.lt(0))) fail("pilot_invalid_rate");
-  const rawFx = rate.currency === "USD" ? await getMxnPerUsdRate() : null;
+  const proxy = process.env.AI_MARK_PILOT_PROXY_URL;
+  let rawFx = rate.currency === "USD" ? await getMxnPerUsdRateThroughProxy(proxy) : null;
+  if (rawFx && (!Number.isFinite(rawFx.rate) || rawFx.rate <= 0)) rawFx = null;
   const fx = rawFx ? { ...rawFx, rate: Number(D(rawFx.rate).toDecimalPlaces(6, Prisma.Decimal.ROUND_CEIL)) } : null;
   // No tools, attachments, caching or hidden fallback. UTF-8 bytes plus framing allowance,
   // rather than the legacy chars/token heuristic, bound the submitted text conservatively.
@@ -55,6 +59,17 @@ async function quote(model: string, input: z.infer<typeof inputSchema>) {
   const mxn = toMxn(original, rate.currency, fx?.rate ?? null);
   if (mxn === null || !mxn.isFinite() || mxn.lt(0)) fail("pilot_no_fx");
   return { rate, fx, estimate: mxn.toDecimalPlaces(8, Prisma.Decimal.ROUND_CEIL) };
+}
+
+async function getMxnPerUsdRateThroughProxy(proxy: string | undefined) {
+  if (!proxy) return getMxnPerUsdRate();
+  if (process.env.REYMEN_STAGING !== "true" || proxy !== "http://ingress:8081") fail("pilot_proxy_invalid");
+  try {
+    const response = await fetch(`${proxy}/fx`, { signal: AbortSignal.timeout(5000), cache: "no-store" });
+    if (!response.ok) return null;
+    const body = await response.json() as { date?: string; rates?: { MXN?: number } };
+    return typeof body.rates?.MXN === "number" && /^\d{4}-\d{2}-\d{2}$/.test(body.date ?? "") ? { rate: body.rates.MXN, source: "frankfurter" as const, date: body.date! } : null;
+  } catch { return null; }
 }
 
 async function uncertain(organizationId: string, usageId: string) {
@@ -114,6 +129,7 @@ export async function runPilotAiCall(context: PilotCallContext, rawInput: z.infe
   const row = await prisma.$transaction(async tx => {
     await lockPilotBudget(tx, c.organizationId); gate();
     const root = await activeRoot(tx, c, new Date());
+    if (c.knowledgeVersion !== undefined) await assertKnowledgeCurrent(tx, c.organizationId, c.knowledgeVersion);
     const calls = await tx.aiUsage.findMany({ where: { organizationId: c.organizationId, pilotRootId: c.rootId } });
     if (calls.some(v => v.pilotStep === c.step)) fail("pilot_duplicate_step");
     if (calls.some(v => v.status === "PENDING" || v.costMxn === null || v.pilotStep === null) || calls.length !== c.step - 1) fail("pilot_step_out_of_order");
@@ -133,6 +149,7 @@ export async function runPilotAiCall(context: PilotCallContext, rawInput: z.infe
   try {
     // The durable claim above is the sole dispatch admission. Crashes retain the root hold.
     gate();
+    if (c.knowledgeVersion !== undefined && process.env.AI_MARK_PRIVATE_REVIEW_ENABLED !== "true") fail("pilot_review_disabled");
     const result = await callAnthropicPilot({ ...input, model });
     if (result.modelServed !== model) fail("pilot_unexpected_model");
     receiptId.parse(result.externalId);

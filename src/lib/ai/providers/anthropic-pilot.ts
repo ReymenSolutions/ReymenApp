@@ -5,7 +5,9 @@ import type { ProviderCall, ProviderResult } from "../types";
 export async function callAnthropicPilot(input: ProviderCall): Promise<ProviderResult> {
   const apiKey = process.env.AI_MARK_PILOT_ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("pilot_provider_not_configured");
-  const client = new Anthropic({ apiKey, baseURL: "https://api.anthropic.com", maxRetries: 0, timeout: 5000, logLevel: "off" });
+  const proxy = process.env.AI_MARK_PILOT_PROXY_URL;
+  if (proxy && (process.env.REYMEN_STAGING !== "true" || proxy !== "http://ingress:8081")) throw new Error("pilot_proxy_invalid");
+  const client = new Anthropic({ apiKey, baseURL: proxy || "https://api.anthropic.com", maxRetries: 0, timeout: 5000, logLevel: "off" });
   const response = await client.messages.create({
     model: input.model, system: input.system, messages: input.messages,
     max_tokens: input.maxOutputTokens, stream: false,

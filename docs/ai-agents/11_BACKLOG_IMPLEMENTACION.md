@@ -210,3 +210,7 @@ Se añade la ruta financiera de staging con atribución por instancia/revisión/
 ### Administración privada de staging
 
 Se implementa preparación pausada e idempotente de Mark y revisión administrativa de reservas/conciliación en una ruta exclusiva de staging. No activa proveedor, conocimiento, CRM ni entrega. Cierra parcialmente la operación manual de conciliación; persisten los gates del gateway y piloto real. Ver [22](22_ADMINISTRACION_PILOTO_PRIVADO.md).
+
+### Driver privado de Anthropic y fuentes para Mark
+
+Se añade generación de borrador con una llamada, consentimiento de costo/información ficticia, fuentes publicadas asignadas expresamente a Mark, verificación de versión y rol antes de mostrar el resultado, sin CRM ni entrega. El overlay optativo limita la salida de red a Anthropic y FX. La primera generación real, calidad y costo observados quedan pendientes de la validación del operador; no se da AG-011 ni el piloto de conversaciones por completo. Ver [23](23_MARK_REVISION_PRIVADA_ANTHROPIC.md).
