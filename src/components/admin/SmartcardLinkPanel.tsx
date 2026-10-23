@@ -17,6 +17,7 @@ import {
   unlinkSmartcardCompanyAction,
 } from "@/actions/admin/smartcard-link";
 import { SMARTCARD_LINK_ROLES, type SmartcardLinkRole, type SmartcardLinkState } from "@/lib/smartcard-link-shared";
+import { TabBar } from "@/components/shared/TabBar";
 import { usePreferences } from "@/context/preferences";
 import { getErrorMessage } from "@/lib/user-error";
 
@@ -39,6 +40,9 @@ const COPY = {
     unlink: "Desvincular",
     unlinkConfirm: "¿Desvincular? El cliente dejará de ver SmartCard en Reymen. Sus tarjetas y datos se quedan en SmartCard.",
     members: "Quién ve SmartCard",
+    tabsLabel: "Secciones de SmartCard",
+    tabCompany: "Empresa",
+    tabAccess: "Accesos",
     membersHint: "Solo lo ven los usuarios de este cliente que estén aquí como activos.",
     noMembers: "Nadie todavía.",
     notInReymen: "no es usuario de este cliente",
@@ -81,6 +85,9 @@ const COPY = {
     unlink: "Unlink",
     unlinkConfirm: "Unlink? The client will stop seeing SmartCard in Reymen. Their cards and data stay in SmartCard.",
     members: "Who sees SmartCard",
+    tabsLabel: "SmartCard sections",
+    tabCompany: "Company",
+    tabAccess: "Access",
     membersHint: "Only this client's users listed here as active can see it.",
     noMembers: "Nobody yet.",
     notInReymen: "isn't a user of this client",
@@ -131,6 +138,7 @@ export function SmartcardLinkPanel({
   const [companyId, setCompanyId] = useState("");
   const [userId, setUserId] = useState("");
   const [role, setRole] = useState<SmartcardLinkRole>("owner");
+  const [sub, setSub] = useState<"empresa" | "accesos">("empresa");
 
   function run(action: () => Promise<unknown>, done: (result: unknown) => string) {
     startTransition(async () => {
@@ -204,6 +212,18 @@ export function SmartcardLinkPanel({
     const available = users.filter((u) => !memberEmails.has(u.email.toLowerCase()));
     body = (
       <div className="space-y-4">
+        <TabBar
+          tabs={[
+            { key: "empresa", label: t.tabCompany },
+            { key: "accesos", label: t.tabAccess, count: state.members.length },
+          ]}
+          value={sub}
+          onChange={(k) => setSub(k as "empresa" | "accesos")}
+          label={t.tabsLabel}
+          idBase="scl"
+        />
+        {sub === "empresa" && (
+        <div role="tabpanel" id="scl-panel-empresa" aria-labelledby="scl-tab-empresa" className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-slate-700">
             {t.linkedTo} <span className="font-medium text-slate-900">{state.company.name}</span>{" "}
@@ -243,6 +263,11 @@ export function SmartcardLinkPanel({
           </div>
         )}
 
+        </div>
+        )}
+
+        {sub === "accesos" && (
+        <div role="tabpanel" id="scl-panel-accesos" aria-labelledby="scl-tab-accesos" className="space-y-4">
         <div className="space-y-2">
           <p className="text-sm font-medium text-slate-900">{t.members}</p>
           <p className="text-xs text-slate-500">{t.membersHint}</p>
@@ -330,6 +355,8 @@ export function SmartcardLinkPanel({
               {t.give}
             </Button>
           </div>
+        )}
+        </div>
         )}
       </div>
     );
