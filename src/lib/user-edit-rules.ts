@@ -35,3 +35,18 @@ export function checkUserEdit({ actor, target, next, activeSuperAdmins }: Input)
   }
   return null;
 }
+
+/** Alta desde Admin → Usuarios: solo un super administrador crea administradores de la plataforma; un rol de cliente exige organización. */
+export function checkUserCreate({ actorRole, role, organizationId }: { actorRole: string; role: string; organizationId: string | null }): string | null {
+  if (isPlatformRole(role) && actorRole !== "SUPER_ADMIN") return "Solo un super administrador puede crear administradores de la plataforma";
+  if (!isPlatformRole(role) && !organizationId) return "Este rol necesita una organización";
+  return null;
+}
+
+/** Baja definitiva de un usuario. */
+export function checkUserDelete({ actor, target, activeSuperAdmins }: { actor: { id: string; role: string }; target: { id: string; role: string; isActive: boolean }; activeSuperAdmins: number }): string | null {
+  if (actor.id === target.id) return "No puedes eliminarte a ti mismo";
+  if (isPlatformRole(target.role) && actor.role !== "SUPER_ADMIN") return "Solo un super administrador puede eliminar a un administrador de la plataforma";
+  if (target.role === "SUPER_ADMIN" && target.isActive && activeSuperAdmins <= 1) return "Debe quedar al menos un super administrador activo";
+  return null;
+}

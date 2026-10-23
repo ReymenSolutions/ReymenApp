@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkUserEdit } from "./user-edit-rules";
+import { checkUserEdit, checkUserCreate, checkUserDelete } from "./user-edit-rules";
 
 const org = "org_1";
 const base = { activeSuperAdmins: 2 };
@@ -29,5 +29,32 @@ describe("checkUserEdit", () => {
   });
   it("no se puede dejar la plataforma sin super administrador", () => {
     expect(checkUserEdit({ activeSuperAdmins: 1, actor: { id: "a", role: "SUPER_ADMIN" }, target: { id: "u", role: "SUPER_ADMIN", organizationId: null }, next: { role: "ADMIN", organizationId: null } })).toMatch(/al menos un super/i);
+  });
+});
+
+describe("checkUserCreate", () => {
+  it("un admin crea usuarios de cliente con organización, pero no administradores", () => {
+    expect(checkUserCreate({ actorRole: "ADMIN", role: "AGENT", organizationId: org })).toBeNull();
+    expect(checkUserCreate({ actorRole: "ADMIN", role: "ADMIN", organizationId: null })).toMatch(/super administrador/i);
+    expect(checkUserCreate({ actorRole: "ADMIN", role: "OWNER", organizationId: null })).toMatch(/necesita una organización/i);
+  });
+  it("un super admin crea cualquier rol, también un super admin ligado a una organización", () => {
+    expect(checkUserCreate({ actorRole: "SUPER_ADMIN", role: "SUPER_ADMIN", organizationId: org })).toBeNull();
+    expect(checkUserCreate({ actorRole: "SUPER_ADMIN", role: "ADMIN", organizationId: null })).toBeNull();
+  });
+});
+
+describe("checkUserDelete", () => {
+  it("nadie se elimina a sí mismo", () => {
+    expect(checkUserDelete({ actor: { id: "a", role: "SUPER_ADMIN" }, target: { id: "a", role: "SUPER_ADMIN", isActive: true }, activeSuperAdmins: 2 })).toMatch(/a ti mismo/i);
+  });
+  it("un admin elimina usuarios de cliente pero no administradores", () => {
+    const actor = { id: "a", role: "ADMIN" };
+    expect(checkUserDelete({ actor, target: { id: "u", role: "AGENT", isActive: true }, activeSuperAdmins: 2 })).toBeNull();
+    expect(checkUserDelete({ actor, target: { id: "u", role: "ADMIN", isActive: true }, activeSuperAdmins: 2 })).toMatch(/super administrador/i);
+  });
+  it("no se elimina al último super admin activo", () => {
+    expect(checkUserDelete({ actor: { id: "a", role: "SUPER_ADMIN" }, target: { id: "u", role: "SUPER_ADMIN", isActive: true }, activeSuperAdmins: 1 })).toMatch(/al menos un super/i);
+    expect(checkUserDelete({ actor: { id: "a", role: "SUPER_ADMIN" }, target: { id: "u", role: "SUPER_ADMIN", isActive: false }, activeSuperAdmins: 1 })).toBeNull();
   });
 });

@@ -16,7 +16,7 @@ import { usePreferences } from "@/context/preferences";
 import { getErrorMessage } from "@/lib/user-error";
 import { EDITABLE_ROLES, isPlatformRole } from "@/lib/user-edit-rules";
 
-const ROLE_LABELS: Record<(typeof EDITABLE_ROLES)[number], { es: string; en: string }> = {
+export const ROLE_LABELS: Record<(typeof EDITABLE_ROLES)[number], { es: string; en: string }> = {
   SUPER_ADMIN: { es: "Super Admin", en: "Super Admin" },
   ADMIN: { es: "Admin", en: "Admin" },
   OWNER: { es: "Propietario", en: "Owner" },
