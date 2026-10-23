@@ -459,6 +459,8 @@ export interface SmartcardProfile {
   youtube: string | null;
   primaryColor: string | null;
   accentColor: string | null;
+  /** Fondo de la tarjeta forzado desde el perfil (theme_overrides.background); null = el del tema. */
+  background: "light" | "dark" | null;
 }
 
 export interface ProfileLink {
@@ -476,6 +478,12 @@ const PROFILE_SELECT =
 /** theme_overrides es jsonb libre en forma (controlado en contenido por
  * quien escribe, ver updateSmartcardProfile) — se lee de forma defensiva,
  * cualquier llave que no sea el string esperado se trata como ausente. */
+function readThemeOverrideBackground(overrides: unknown): "light" | "dark" | null {
+  if (!overrides || typeof overrides !== "object") return null;
+  const value = (overrides as Record<string, unknown>).background;
+  return value === "light" || value === "dark" ? value : null;
+}
+
 function readThemeOverrideColor(overrides: unknown, key: "primary_color" | "accent_color"): string | null {
   if (!overrides || typeof overrides !== "object") return null;
   const value = (overrides as Record<string, unknown>)[key];
@@ -506,6 +514,7 @@ function mapProfileRow(p: Record<string, unknown>): SmartcardProfile {
     youtube: p.youtube as string | null,
     primaryColor: readThemeOverrideColor(p.theme_overrides, "primary_color"),
     accentColor: readThemeOverrideColor(p.theme_overrides, "accent_color"),
+    background: readThemeOverrideBackground(p.theme_overrides),
   };
 }
 
@@ -579,7 +588,7 @@ export async function getSmartcardProfile(
 export async function updateProfileThemeColors(
   profileId: string,
   companyId: string,
-  colors: { primaryColor: string | null; accentColor: string | null }
+  colors: { primaryColor: string | null; accentColor: string | null; background?: "light" | "dark" | null }
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = getSmartcardAdminClient();
   if (!supabase) return { ok: false, error: "SmartCard aún no está configurado en este entorno." };
@@ -608,6 +617,10 @@ export async function updateProfileThemeColors(
   else delete next.primary_color;
   if (colors.accentColor) next.accent_color = colors.accentColor;
   else delete next.accent_color;
+  if (colors.background !== undefined) {
+    if (colors.background) next.background = colors.background;
+    else delete next.background;
+  }
 
   const { error: writeError } = await supabase
     .from("profiles")

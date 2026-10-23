@@ -136,11 +136,16 @@ export interface CardTokens {
  * (ej. «Real Estate») y, encima, los colores propios del perfil si son válidos — mismo orden de
  * prioridad que mergeThemeConfig de la tarjeta (los ajustes del perfil ganan campo por campo).
  */
-export function resolveCardTokens(themeConfig: unknown, primaryOverride?: string | null, accentOverride?: string | null): CardTokens {
+export function resolveCardTokens(
+  themeConfig: unknown,
+  primaryOverride?: string | null,
+  accentOverride?: string | null,
+  backgroundOverride?: "light" | "dark" | null
+): CardTokens {
   const base = parseThemeConfig(themeConfig);
   return {
     primary: primaryOverride && HEX_COLOR.test(primaryOverride) ? primaryOverride : base.primaryColor,
     accent: accentOverride && HEX_COLOR.test(accentOverride) ? accentOverride : base.accentColor,
-    dark: base.darkBackground,
+    dark: backgroundOverride ? backgroundOverride === "dark" : base.darkBackground,
   };
 }

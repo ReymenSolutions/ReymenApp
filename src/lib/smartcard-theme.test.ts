@@ -10,6 +10,11 @@ describe("resolveCardTokens", () => {
     expect(resolveCardTokens(realEstate, "#112233", null)).toEqual({ primary: "#112233", accent: "#D4A373", dark: false });
     expect(resolveCardTokens(realEstate, "rojo", "#FFCC00").primary).toBe("#1B4332");
   });
+  it("el fondo del perfil gana sobre el del tema", () => {
+    expect(resolveCardTokens({ background: "dark" }, null, null, "light").dark).toBe(false);
+    expect(resolveCardTokens(realEstate, null, null, "dark").dark).toBe(true);
+    expect(resolveCardTokens({ background: "dark" }, null, null, null).dark).toBe(true);
+  });
   it("tema oscuro y sin tema", () => {
     expect(resolveCardTokens({ background: "dark" }).dark).toBe(true);
     expect(resolveCardTokens(null).primary).toBe("#111111");
