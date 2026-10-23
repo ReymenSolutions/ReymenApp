@@ -30,9 +30,9 @@ El tipo de cambio se consulta antes de reclamar un paso y queda fijado en el reg
 
 Solo después de CI aprobado y código integrado:
 
-1. Actualizar checkout, ejecutar `bash deploy/staging/run.sh build` y mantener la misma base/volumen. Este incremento no agrega migraciones.
-2. Como dueño del checkout: `bash deploy/staging/configure-review.sh`. Introducir el ID exacto y pegar la clave en la terminal privada. No compartir `.env.staging`, `docker inspect` de entorno ni `docker compose config` renderizado.
-3. Como dueño del checkout: `python3 deploy/staging/check-provider.py`. Requerir confirmación del modelo exacto. Si falla, no activar el overlay ni probar generación.
+1. Actualizar checkout, ejecutar `bash deploy/staging/run.sh build`, `database` y `migrate` conservando la misma base/volumen. Este incremento no agrega migraciones; main incorporó dos migraciones de Lealtad que se validaron solo en la base sintética local (89 en total). No aplicar estas instrucciones a producción.
+2. Con permisos sobre `.env.staging` (usar `sudo` si se creó como root): `bash deploy/staging/configure-review.sh`. Introducir el ID exacto y pegar la clave en la terminal privada. No compartir `.env.staging`, `docker inspect` de entorno ni `docker compose config` renderizado.
+3. Con los mismos permisos: `python3 deploy/staging/check-provider.py`. Requerir confirmación del modelo exacto. Si falla, no activar el overlay ni probar generación.
 4. `bash deploy/staging/review.sh start`; comprobar `/api/health`. Este paso habilita infraestructura, no la política presupuestaria del negocio ni canales.
 5. OWNER de **Reymen Piloto**: crear artículos con horarios/precios ficticios en `/portal/knowledge-base`, revisar y publicar su versión con los controles existentes. No cargar datos reales.
 6. Superadmin: `/admin/ai-pilot`, seleccionar **Reymen Piloto**, asignar cada versión publicada a Mark y revisar tarifa/presupuesto. Aceptar el costo y habilitar admisión de pruebas privadas. No ampliar el presupuesto general sin una decisión explícita si resulta insuficiente.
@@ -50,6 +50,15 @@ Conservar reservas, usos, auditoría, fuentes y base. No ejecutar reset, bootstr
 
 ## Evidencia y límites
 
-Resultados finales de regresión/build/navegador se registran antes de publicar. Pruebas del driver simulan Anthropic y usan una base local desechable; no prueban disponibilidad del modelo ni facturación real.
+Validación del 23 de octubre de 2026, tras integrar `main` en `35932d1`:
+
+- Suite completa: **219 archivos, 1551 pruebas aprobadas**, con dos workers y base local sintética. Incluye FX restringido, concurrencia, permisos, fuente revocada durante generación, costo incierto y ausencia de consultas CRM/envíos.
+- Typecheck y build de producción: aprobados. Lint: cero errores y 51 advertencias existentes.
+- Chromium sobre ese build: tres casos aprobados con staging/revisión habilitados (preparación, fuente publicada, ausencia de cargo sin coincidencias, permisos y móvil); dos aprobados con staging/revisión apagados (ambas pantallas no disponibles). Los casos del entorno contrario se omiten expresamente en cada ejecución; CI ejecuta ambos escenarios.
+- Scripts de aislamiento y secretos: cinco comprobaciones aprobadas; sintaxis Bash correcta. Credenciales ficticias y metadatos simulados, sin llamada al proveedor.
+- Las 89 migraciones de main se aplicaron correctamente a la base sintética. No se ejecutaron migraciones en el VPS.
+- CI añade el roundtrip de overlay con clave ficticia: ruta/método no permitidos rechazados y listener privado inaccesible después de regresar al staging aislado. Ese smoke depende del resultado de GitHub; no se presenta como ejecutado localmente.
+
+Las pruebas del driver simulan Anthropic; no prueban disponibilidad de `claude-sonnet-5-5` ni facturación real. La interfaz privada nueva está en español. La primera prueba pagada debe validar el modelo, su precio contratado y la respuesta con el operador.
 
 Se mantiene pendiente la primera ejecución pagada revisada, evaluación de calidad/latencia/costo real, retención para datos reales, CRM con identidad final verificada, integración a conversaciones con control humano/cancelación y piloto de canal. No hay autorización de despliegue productivo, envío al cliente ni agentes adicionales. El incremento deja explícitamente separados el laboratorio simulado, el driver de revisión pagada y la futura entrega a conversaciones.

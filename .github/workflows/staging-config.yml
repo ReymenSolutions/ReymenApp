@@ -22,8 +22,9 @@ jobs:
           node-version: 22
       - name: Validate private configuration
         run: |
-          bash -n deploy/staging/init.sh deploy/staging/run.sh
+          bash -n deploy/staging/init.sh deploy/staging/run.sh deploy/staging/review.sh deploy/staging/configure-review.sh
           node --test deploy/staging/safety.test.mjs
+          node --test deploy/staging/review-safety.test.mjs
           bash deploy/staging/init.sh
       - name: Build isolated staging
         run: bash deploy/staging/run.sh build
@@ -40,6 +41,13 @@ jobs:
         run: |
           bash deploy/staging/run.sh start
           curl --fail --retry 20 --retry-delay 3 --retry-connrefused http://127.0.0.1:3301/api/health
+      - name: Verify opt-in proxy and return to isolated default (no real keys)
+        run: |
+          STAGING_MARK_MODEL=fixture-model STAGING_MARK_ANTHROPIC_API_KEY=sk-ant-synthetic-fixture-only bash deploy/staging/review.sh start
+          docker exec reymen-mark-staging-app-1 node -e 'Promise.all([fetch("http://ingress:8081/blocked").then(r=>{if(r.status!==404)throw Error("unexpected route")}),fetch("http://ingress:8081/v1/messages").then(r=>{if(r.status!==403)throw Error("unexpected method")})]).catch(()=>process.exit(1))'
+          bash deploy/staging/run.sh start
+          curl --fail --retry 10 --retry-delay 2 --retry-connrefused http://127.0.0.1:3301/api/health
+          docker exec reymen-mark-staging-app-1 node -e 'fetch("http://ingress:8081/blocked").then(()=>process.exit(1)).catch(()=>{})'
       - name: Stop staging while retaining its data
         if: always()
         run: |
