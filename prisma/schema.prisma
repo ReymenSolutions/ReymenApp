@@ -158,6 +158,8 @@ model Organization {
 // ─── USERS & AUTH ─────────────────────────────────────────────────
 
 model User {
+  markChatPilots MarkChatPilot[] @relation("MarkChatPilotCreator")
+  markChatTurns MarkChatTurn[] @relation("MarkChatTurnCreator")
   id                   String    @id @default(cuid())
   email                String    @unique
   name                 String?
@@ -524,6 +526,7 @@ enum EventStatus {
 // ─── CONVERSATIONS ────────────────────────────────────────────────
 
 model Conversation {
+  markChatPilot MarkChatPilot?
   id                 String             @id @default(cuid())
   organizationId     String
   channel            String
@@ -563,6 +566,7 @@ model Conversation {
   channelConnection ChannelConnection? @relation(fields: [organizationId, channelConnectionId], references: [organizationId, id], onDelete: Restrict)
 
   @@index([organizationId])
+  @@unique([organizationId, id])
   @@index([organizationId, phoneKey])
   @@index([leadId])
   @@index([organizationId, status])
@@ -582,6 +586,7 @@ enum ConversationStatus {
 }
 
 model Message {
+  markChatTurns MarkChatTurn[]
   id             String                 @id @default(cuid())
   conversationId String
   role           MessageRole
@@ -606,6 +611,7 @@ model Message {
   sender       User?        @relation("MessageSender", fields: [senderId], references: [id])
 
   @@unique([conversationId, externalId])
+  @@unique([conversationId, id])
   @@index([conversationId])
 }
 
@@ -970,6 +976,7 @@ enum ReplyDraftStatus {
 /// Borrador de respuesta que la IA redacta para el último mensaje del cliente. Nunca se envía solo: una persona
 /// lo edita y presiona Enviar ("Usar respuesta"). Uno por mensaje del cliente.
 model ReplyDraft {
+  markChatTurn MarkChatTurn?
   id               String           @id @default(cuid())
   organizationId   String
   conversationId   String
@@ -991,6 +998,7 @@ model ReplyDraft {
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@unique([conversationId, basedOnMessageId])
+  @@unique([organizationId, id])
   @@index([organizationId, status])
 }
 
@@ -3469,4 +3477,44 @@ model PostalCodePoint {
   lastTriedAt DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// Private staging Website Chat. Hash-only visitor capabilities; no commercial connector.
+model MarkChatPilot {
+  id String @id @default(cuid())
+  organizationId String
+  conversationId String @unique
+  createdById String
+  requestKey String
+  tokenHash String @unique
+  expiresAt DateTime
+  active Boolean @default(true)
+  revision Int @default(1)
+  createdAt DateTime @default(now())
+  conversation Conversation @relation(fields: [organizationId, conversationId], references: [organizationId, id], onDelete: Restrict)
+  creator User @relation("MarkChatPilotCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  turns MarkChatTurn[]
+  @@unique([organizationId, conversationId])
+  @@unique([organizationId, createdById, requestKey])
+}
+
+model MarkChatTurn {
+  id String @id @default(cuid())
+  organizationId String
+  conversationId String
+  basedOnMessageId String
+  draftId String @unique
+  generatedById String
+  requestKey String @unique
+  expectedRevision Int
+  knowledgeVersion Int?
+  sources Json?
+  usageId String?
+  createdAt DateTime @default(now())
+  pilot MarkChatPilot @relation(fields: [organizationId, conversationId], references: [organizationId, conversationId], onDelete: Restrict)
+  inbound Message @relation(fields: [conversationId, basedOnMessageId], references: [conversationId, id], onDelete: Restrict)
+  draft ReplyDraft @relation(fields: [organizationId, draftId], references: [organizationId, id], onDelete: Restrict)
+  creator User @relation("MarkChatTurnCreator", fields: [generatedById], references: [id], onDelete: Restrict)
+  @@unique([conversationId, basedOnMessageId])
+  @@unique([organizationId, draftId])
 }

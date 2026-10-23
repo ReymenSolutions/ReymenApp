@@ -12,7 +12,7 @@ import { assertKnowledgeCurrent } from "../knowledge/retrieval";
 type Tx = Prisma.TransactionClient;
 const D = (value: Prisma.Decimal.Value) => new Prisma.Decimal(value);
 const id = z.string().min(1).max(128);
-const contextSchema = z.object({ organizationId: id, actorId: id, rootId: id, agentInstanceId: id, configVersion: z.number().int().positive(), step: z.union([z.literal(1), z.literal(2)]), knowledgeVersion: z.number().int().positive().optional() }).strict();
+const contextSchema = z.object({ organizationId: id, actorId: id, rootId: id, agentInstanceId: id, configVersion: z.number().int().positive(), step: z.union([z.literal(1), z.literal(2)]), knowledgeVersion: z.number().int().positive().optional(), privateChatTurnId: id.optional() }).strict();
 export type PilotCallContext = z.infer<typeof contextSchema>;
 const inputSchema = z.object({ system: z.string().max(12000), messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().min(1).max(12000) }).strict()).min(1).max(8), maxOutputTokens: z.number().int().min(1).max(512) }).strict();
 const tokens = z.number().int().nonnegative().max(2147483647);
@@ -25,11 +25,27 @@ function gate() {
   if (!process.env.AI_MARK_PILOT_ANTHROPIC_API_KEY) fail("pilot_provider_not_configured");
 }
 
+async function lockChatTurn(tx: Tx, c: PilotCallContext) {
+  if (!c.privateChatTurnId) return;
+  const turn = await tx.markChatTurn.findFirst({ where: { id: c.privateChatTurnId, organizationId: c.organizationId } });
+  if (!turn) fail("pilot_chat_turn_unavailable");
+  await tx.$queryRaw`SELECT id FROM "Conversation" WHERE id=${turn.conversationId} AND "organizationId"=${c.organizationId} FOR UPDATE`;
+}
+
 async function activeRoot(tx: Tx, c: PilotCallContext, now: Date) {
+  let chatRequestKey: string | undefined;
   if (c.knowledgeVersion !== undefined && process.env.AI_MARK_PRIVATE_REVIEW_ENABLED !== "true") fail("pilot_review_disabled");
   await assertPilotAuthority(tx, c.organizationId, c.actorId);
+  if (c.privateChatTurnId) {
+    if (process.env.AI_MARK_PRIVATE_CHAT_ENABLED !== "true") fail("pilot_chat_disabled");
+    const turn = await tx.markChatTurn.findFirst({ where: { id: c.privateChatTurnId, organizationId: c.organizationId, generatedById: c.actorId }, include: { pilot: { include: { conversation: true } }, draft: true } });
+    if (!turn || !turn.pilot.active || now >= turn.pilot.expiresAt || turn.pilot.revision !== turn.expectedRevision || turn.pilot.conversation.channel !== "webchat" || turn.pilot.conversation.status !== "OPEN" || !turn.pilot.conversation.aiHandled || turn.pilot.conversation.assignedToId || turn.draft.status !== "GENERATING") fail("pilot_chat_turn_changed");
+    const latest = await tx.message.findFirst({ where: { conversationId: turn.conversationId, role: { in: ["USER", "AGENT", "ASSISTANT"] } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true } });
+    if (latest?.id !== turn.basedOnMessageId) fail("pilot_chat_turn_changed");
+    chatRequestKey = turn.requestKey;
+  }
   const root = await tx.aiPilotBudgetRoot.findFirst({ where: { id: c.rootId, organizationId: c.organizationId, createdById: c.actorId } });
-  if (!root || root.state !== "IN_FLIGHT") fail("pilot_root_not_dispatchable");
+  if (!root || root.state !== "IN_FLIGHT" || chatRequestKey && root.requestKey !== chatRequestKey) fail("pilot_root_not_dispatchable");
   const s = await loadPilotQuotaState(tx, c.organizationId, now);
   if (now < root.dayStart || now >= root.dayEnd || now >= root.cycleEnd || root.policyVersion !== s.policy.version || root.timezone !== s.timezone || root.cycleStart.getTime() !== s.global.cycleStart.getTime()) fail("pilot_root_expired");
   if (s.daily.add(s.held).gt(s.policy.dailyMxn) || s.monthly.add(s.held).gt(s.policy.monthlyMxn) || s.global.raw.spent.add(s.global.raw.reserved).gt(s.global.raw.available)) fail("pilot_budget_changed");
@@ -117,16 +133,17 @@ async function settle(tx: Tx, row: AiUsage, outcome: { status: "SUCCEEDED" | "RE
   return saved;
 }
 
-/** Server-internal, private evaluation only. No HTTP action/channel calls this yet. */
+/** Server-internal private evaluation; the optional chat context is bound to a durable turn. */
 export async function runPilotAiCall(context: PilotCallContext, rawInput: z.infer<typeof inputSchema>): Promise<ProviderResult> {
   gate();
   const c = contextSchema.parse(context), input = inputSchema.parse(rawInput);
   if (input.messages[input.messages.length - 1].role !== "user" || input.system.length + input.messages.reduce((n, m) => n + m.content.length, 0) > 12000) fail("pilot_input_invalid");
   const model = process.env.AI_MARK_PILOT_MODEL?.trim();
   if (!model || !/^[a-zA-Z0-9._-]{1,120}$/.test(model)) fail("pilot_model_not_configured");
-  await prisma.$transaction(async tx => { await lockPilotBudget(tx, c.organizationId); await activeRoot(tx, c, new Date()); });
+  await prisma.$transaction(async tx => { await lockChatTurn(tx, c); await lockPilotBudget(tx, c.organizationId); await activeRoot(tx, c, new Date()); });
   const pricing = await quote(model, input);
   const row = await prisma.$transaction(async tx => {
+    await lockChatTurn(tx, c);
     await lockPilotBudget(tx, c.organizationId); gate();
     const root = await activeRoot(tx, c, new Date());
     if (c.knowledgeVersion !== undefined) await assertKnowledgeCurrent(tx, c.organizationId, c.knowledgeVersion);

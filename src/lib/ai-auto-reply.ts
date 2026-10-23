@@ -15,6 +15,8 @@ import { messagePreview } from "@/lib/channels";
 import { buildBusinessContext } from "@/lib/rulebook";
 import { buildDraftMessages, generateText, isDraftProviderConfigured } from "@/lib/ai-draft";
 import { AiBudgetError } from "@/lib/ai/budget";
+import { customerNeedsHuman } from "./ai/human-request";
+export { customerNeedsHuman } from "./ai/human-request";
 
 // ── Reglas de seguridad del modo Automático ──────────────────────────────────
 // El agente solo contesta lo rutinario dentro del rulebook; ante cualquier duda, o si el cliente pide a una persona,
@@ -26,14 +28,8 @@ export const AUTO_REPLIES_PER_HOUR = 3;
 const HUMAN_ACTIVE_MS = 24 * 60 * 60 * 1000;
 const MAX_REPLY_CHARS = 1000;
 
-const HUMAN_REQUEST = /\b(humano|persona real|una persona|asesor|agente humano|gerente|encargado|supervisor|queja|reclam\w*|reembols\w*|devoluci\w*|cancel\w*|demanda|abogado|profeco|estafa|fraude|human|real person|manager|complain\w*|refund|lawyer|sue you|scam|fraud)\b/i;
 const URL_RE = /https?:\/\/|www\./i;
 const PAYMENT_RE = /\b(dep[oó]sito|transferencia|clabe|tarjeta|paypal|anticipo|pago anticipado|deposit|wire|credit card|bank account|payment link)\b/i;
-
-/** ¿El cliente pide a una persona o trae un tema delicado? Entonces no contesta el agente. */
-export function customerNeedsHuman(text: string): boolean {
-  return HUMAN_REQUEST.test(text);
-}
 
 /** Motivo por el que una respuesta redactada no debe salir sola (o null si pasa). */
 export function unsafeReason(reply: string): string | null {
@@ -86,6 +82,7 @@ async function lockTurn(tx: Prisma.TransactionClient, organizationId: string, co
 
 /** This read happens under the conversation row lock, including immediately before dispatch. */
 async function eligibleTurn(tx: Prisma.TransactionClient, organizationId: string, payload: AutoJobPayload, latestId: string, now: Date) {
+  if (await tx.markChatPilot.findFirst({ where: { organizationId, conversationId: payload.conversationId }, select: { id: true } })) return null;
   const conv = await tx.conversation.findFirst({ where: { id: payload.conversationId, organizationId }, include: { organization: { select: { isActive: true } }, lead: { select: { status: true } } } });
   if (!conv || !conv.organization.isActive || conv.status !== "OPEN" || !conv.aiHandled || conv.assignedToId || !await connectionAiAllowed(tx, organizationId, conv)) return null;
   const [entitlement, mode, recent] = await Promise.all([

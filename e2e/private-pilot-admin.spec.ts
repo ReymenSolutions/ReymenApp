@@ -38,17 +38,17 @@ test("private administrative controls remain unavailable outside staging", async
   await page.goto(`/admin/ai-pilot?organization=${organizationId}`);
   // App Router can stream the shell with HTTP 200 before rendering notFound().
   await expect(page.getByRole("heading", { name: "404", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Preparar Mark pausado|Prepare paused Mark/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Preparar Lía en pausa|Prepare paused Lía/ })).toHaveCount(0);
   expect(await p.agentInstance.count({ where: { organizationId } })).toBe(0);
 });
 test("admin prepares Mark once without a provider call, delivery or budget activation", async ({ page }) => {
   test.skip(process.env.REYMEN_STAGING !== "true", "Requires the isolated staging CI scenario");
   await login(page, admin);
   await page.goto(`/admin/ai-pilot?organization=${organizationId}`);
-  await page.getByRole("button", { name: /Preparar Mark pausado|Prepare paused Mark/ }).click();
-  await expect(page.getByRole("button", { name: /^Mark preparado$|^Mark prepared$/ })).toBeDisabled();
+  await page.getByRole("button", { name: /Preparar Lía en pausa|Prepare paused Lía/ }).click();
+  await expect(page.getByRole("button", { name: /^Lía preparada$|^Lía prepared$/ })).toBeDisabled();
   await page.reload();
-  await expect(page.getByRole("button", { name: /^Mark preparado$|^Mark prepared$/ })).toBeDisabled();
+  await expect(page.getByRole("button", { name: /^Lía preparada$|^Lía prepared$/ })).toBeDisabled();
   const instance = await p.agentInstance.findUniqueOrThrow({ where: { organizationId_definitionKey: { organizationId, definitionKey: "mark" } }, include: { channelRoutes: true } });
   expect(instance.status).toBe("PAUSED"); expect(instance.channelRoutes).toEqual([]);
   expect((await p.aiPilotBudgetPolicy.findUniqueOrThrow({ where: { organizationId } })).enabled).toBe(false);
@@ -64,5 +64,5 @@ test("business owners cannot open the platform pilot controls", async ({ page })
   await login(page, owner);
   await page.goto(`/admin/ai-pilot?organization=${organizationId}`);
   await expect(page).toHaveURL(/\/portal\//);
-  await expect(page.getByRole("button", { name: /Preparar Mark pausado|Prepare paused Mark/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Preparar Lía en pausa|Prepare paused Lía/ })).toHaveCount(0);
 });

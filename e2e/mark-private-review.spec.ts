@@ -31,10 +31,10 @@ test("paid-review page is absent unless staging and the dedicated review flag ar
 test("explicit published-source assignment and an unmatched question cause no paid call", async ({ page, context }) => {
   test.skip(process.env.REYMEN_STAGING !== "true" || process.env.AI_MARK_PRIVATE_REVIEW_ENABLED !== "true", "Dedicated private-review scenario only");
   await login(page, admin); await page.goto(`/admin/ai-pilot?organization=${organizationId}`);
-  await page.getByRole("button", { name: /Preparar Mark pausado|Prepare paused Mark/ }).click();
-  await expect(page.getByRole("button", { name: /^Mark preparado$|^Mark prepared$/ })).toBeDisabled();
-  await page.getByLabel("Fuente publicada para Mark").selectOption("0"); await page.getByRole("button", { name: "Asignar versión a Mark" }).click();
-  await expect(page.getByText(/Fuentes activas para Mark: 1/)).toBeVisible();
+  await page.getByRole("button", { name: /Preparar Lía en pausa|Prepare paused Lía/ }).click();
+  await expect(page.getByRole("button", { name: /^Lía preparada$|^Lía prepared$/ })).toBeDisabled();
+  await page.getByLabel("Fuente publicada para Lía").selectOption("0"); await page.getByRole("button", { name: "Asignar versión a Lía" }).click();
+  await expect(page.getByText(/Fuentes activas para Lía: 1/)).toBeVisible();
   await context.clearCookies(); await login(page, owner); await page.goto("/portal/mark-pilot");
   await page.getByLabel("Pregunta ficticia", { exact: true }).fill("zqxvnotmatching");
   await page.getByRole("checkbox").nth(0).check(); await page.getByRole("checkbox").nth(1).check();

@@ -13,7 +13,7 @@ beforeEach(() => { for (const mock of Object.values(mocks)) mock.mockReset().moc
 it("prepares a paused instance without presenting an activation or paid-call control", async () => {
   render(<PrivateMarkAdmin view={base} lang="es" page={0} />);
   expect(screen.getByText(/no llama a Anthropic/)).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "Preparar Mark pausado" }));
+  fireEvent.click(screen.getByRole("button", { name: "Preparar Lía en pausa" }));
   await waitFor(() => expect(mocks.prepare).toHaveBeenCalledWith({ organizationId: "test-business" }));
   await waitFor(() => expect(mocks.refresh).toHaveBeenCalled());
   expect(screen.queryByRole("button", { name: /activar|cobrar/i })).not.toBeInTheDocument();
@@ -23,7 +23,7 @@ it("shows an empty business state and disables preparation without the module", 
   const { rerender } = render(<PrivateMarkAdmin view={{ organizations: [], organization: null, instance: null, policy: null, pending: [], pendingCount: 0, roots: [], budget: null }} lang="en" page={0} />);
   expect(screen.getByText("No test businesses are available yet.")).toBeVisible();
   rerender(<PrivateMarkAdmin view={{ ...base, organization: { ...base.organization!, moduleEnabled: false } }} lang="en" page={0} />);
-  expect(screen.getByRole("button", { name: "Prepare paused Mark" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Prepare paused Lía" })).toBeDisabled();
 });
 it("requires reviewed evidence and sends an explicit no-charge outcome without an automatic retry", async () => {
   const view = { ...base, pendingCount: 1, pending: [{ id: "usage-fixture", pilotRootId: "root-fixture", pilotStep: 1, model: "test-model", createdAt: "2026-10-21T12:00:00.000Z", pilotEstimateMxn: "0.1" }] };

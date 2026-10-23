@@ -23,33 +23,33 @@ test.afterAll(async () => {
   await p.$disconnect();
 });
 test("Mark uses fictional data, respects the read permission and stores a receipt without input text", async ({ page }) => {
-  await page.goto("/portal/ai-lab"); const panel = page.getByRole("region", { name: "Mark · pruebas con datos de ejemplo", exact: true });
+  await page.goto("/portal/ai-lab"); const panel = page.getByRole("region", { name: "Lía · pruebas con datos de ejemplo", exact: true });
   await expect(panel.getByText(/No evalúa un modelo ni una conexión real/)).toBeVisible();
-  const result = panel.getByRole("status", { name: "Resultado de prueba de Mark", exact: true });
-  await panel.getByRole("button", { name: "Probar Mark", exact: true }).click(); await expect(result).toContainText("de lunes a viernes de 9:00 a 18:00");
-  await panel.getByLabel("Pregunta de prueba", { exact: true }).fill("mis visitas"); await panel.getByRole("button", { name: "Probar Mark", exact: true }).click(); await expect(result).toContainText("La consulta no tiene permiso");
-  await panel.getByLabel("Consultar compras del cliente ficticio", { exact: true }).check(); await panel.getByRole("button", { name: "Probar Mark", exact: true }).click(); await expect(result).toContainText("2 visitas y $150");
+  const result = panel.getByRole("status", { name: "Resultado de prueba de Lía", exact: true });
+  await panel.getByRole("button", { name: "Probar Lía", exact: true }).click(); await expect(result).toContainText("de lunes a viernes de 9:00 a 18:00");
+  await panel.getByLabel("Pregunta de prueba", { exact: true }).fill("mis visitas"); await panel.getByRole("button", { name: "Probar Lía", exact: true }).click(); await expect(result).toContainText("La consulta no tiene permiso");
+  await panel.getByLabel("Consultar compras del cliente ficticio", { exact: true }).check(); await panel.getByRole("button", { name: "Probar Lía", exact: true }).click(); await expect(result).toContainText("2 visitas y $150");
   await panel.getByRole("button", { name: "Detener y limpiar", exact: true }).click(); await expect(result).toHaveCount(0);
-  await panel.getByLabel("Pregunta de prueba", { exact: true }).fill("hablar con una persona"); await panel.getByRole("button", { name: "Probar Mark", exact: true }).click(); await expect(result).toContainText("El cliente pidió ayuda");
+  await panel.getByLabel("Pregunta de prueba", { exact: true }).fill("hablar con una persona"); await panel.getByRole("button", { name: "Probar Lía", exact: true }).click(); await expect(result).toContainText("El cliente pidió ayuda");
   const privateInput = "no_guarden_este_8112345678";
-  await panel.getByLabel("Pregunta de prueba", { exact: true }).fill(privateInput); await panel.getByRole("button", { name: "Probar Mark", exact: true }).click(); await expect(result).toContainText("Falta información");
+  await panel.getByLabel("Pregunta de prueba", { exact: true }).fill(privateInput); await panel.getByRole("button", { name: "Probar Lía", exact: true }).click(); await expect(result).toContainText("Falta información");
   const runs = await p.agentSandboxRun.findMany({ where: { organizationId } }); expect(runs).toHaveLength(5); expect(JSON.stringify(runs)).not.toContain(privateInput);
   expect(await p.aiUsage.count({ where: { organizationId } })).toBe(0); expect(await p.conversation.count({ where: { organizationId } })).toBe(0); expect(await p.customer.count({ where: { organizationId } })).toBe(0); expect(await p.agentInstance.count({ where: { organizationId } })).toBe(0);
 });
 test("transport errors preserve input and never claim that a response was sent", async ({ page }) => {
-  await page.goto("/portal/ai-lab"); const panel = page.getByRole("region", { name: "Mark · pruebas con datos de ejemplo", exact: true });
+  await page.goto("/portal/ai-lab"); const panel = page.getByRole("region", { name: "Lía · pruebas con datos de ejemplo", exact: true });
   await page.route("**/portal/ai-lab**", route => route.request().method() === "POST" ? route.fulfill({ status: 500, body: "failure" }) : route.continue());
-  await panel.getByLabel("Pregunta de prueba", { exact: true }).fill("Pregunta conservada"); await panel.getByRole("button", { name: "Probar Mark", exact: true }).click();
+  await panel.getByLabel("Pregunta de prueba", { exact: true }).fill("Pregunta conservada"); await panel.getByRole("button", { name: "Probar Lía", exact: true }).click();
   await expect(panel.getByRole("alert")).toContainText("No se pudo completar la prueba"); await expect(panel.getByLabel("Pregunta de prueba", { exact: true })).toHaveValue("Pregunta conservada");
-  await expect(panel.getByRole("status", { name: "Resultado de prueba de Mark", exact: true })).toHaveCount(0);
+  await expect(panel.getByRole("status", { name: "Resultado de prueba de Lía", exact: true })).toHaveCount(0);
 });
 test("Mark test controls remain responsive, localized and unavailable to a viewer", async ({ page, context }) => {
   for (const width of [320, 390, 768, 1280]) {
-    await page.setViewportSize({ width, height: 900 }); await page.goto("/portal/ai-lab"); await expect(page.getByRole("heading", { name: "Mark · pruebas con datos de ejemplo", exact: true })).toBeVisible();
+    await page.setViewportSize({ width, height: 900 }); await page.goto("/portal/ai-lab"); await expect(page.getByRole("heading", { name: "Lía · pruebas con datos de ejemplo", exact: true })).toBeVisible();
     expect(await page.locator("main").evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   }
   await page.setViewportSize({ width: 390, height: 844 }); await expect.poll(async () => page.locator("aside.sidebar").evaluate(el => el.getBoundingClientRect().right)).toBeLessThanOrEqual(1); await page.getByLabel("Pregunta de prueba", { exact: true }).scrollIntoViewIfNeeded(); await page.screenshot({ path: "/tmp/reymen-phase5-mark-mobile.png" });
   const menu = page.locator("header > div").last().locator(":scope > button").last(); await menu.click(); await page.getByRole("button", { name: "EN", exact: true }).click(); await menu.click(); await page.goto("/portal/ai-lab");
-  await expect(page.getByRole("heading", { name: "Mark · tests with sample data", exact: true })).toBeVisible();
-  await context.clearCookies(); await login(page, viewer); await page.goto("/portal/ai-lab"); await expect(page).toHaveURL(/\/portal\/dashboard/); await expect(page.getByRole("heading", { name: /Mark ·/ })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Lía · tests with sample data", exact: true })).toBeVisible();
+  await context.clearCookies(); await login(page, viewer); await page.goto("/portal/ai-lab"); await expect(page).toHaveURL(/\/portal\/dashboard/); await expect(page.getByRole("heading", { name: /Lía ·/ })).toHaveCount(0);
 });

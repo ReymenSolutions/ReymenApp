@@ -13,6 +13,7 @@ x-staging-environment: &staging-environment
   AI_AGENT_CENTER_UI_ENABLED: "true"
   AI_CHANNEL_CONNECTIONS_ENABLED: "false"
   AI_KNOWLEDGE_ACCESS_ENABLED: "false"
+  AI_MARK_PRIVATE_CHAT_ENABLED: "false"
   AI_MARK_SANDBOX_ENABLED: "true"
   AI_MARK_PILOT_BUDGET_ENABLED: "false"
   ANTHROPIC_API_KEY: ""

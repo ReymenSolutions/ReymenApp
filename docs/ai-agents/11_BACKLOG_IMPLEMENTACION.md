@@ -214,3 +214,7 @@ Se implementa preparación pausada e idempotente de Mark y revisión administrat
 ### Driver privado de Anthropic y fuentes para Mark
 
 Se añade generación de borrador con una llamada, consentimiento de costo/información ficticia, fuentes publicadas asignadas expresamente a Mark, verificación de versión y rol antes de mostrar el resultado, sin CRM ni entrega. El overlay optativo limita la salida de red a Anthropic y FX. La primera generación real, calidad y costo observados quedan pendientes de la validación del operador; no se da AG-011 ni el piloto de conversaciones por completo. Ver [23](23_MARK_REVISION_PRIVADA_ANTHROPIC.md).
+
+## Actualización 2026-10-23 — Website Chat privado y nombres
+
+Implementación en rama dedicada: [24_CHAT_PRIVADO_Y_NOMBRES.md](24_CHAT_PRIVADO_Y_NOMBRES.md). Lía sustituye el nombre visible Mark; Sol (Soporte), Nodo (Operaciones), Atlas (Investigación) y Nova (Marketing y contenido) son la nomenclatura vigente, sin activación de nuevos runtimes. Website Chat privado incorpora conversación durable, aprobación humana, revocación y recuperación sin replay de llamadas. Pendiente de prueba pagada en staging por el operador; CRM con identidad verificada y widget comercial continúan fuera del piloto.

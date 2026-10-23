@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { createTestOrg, createTestUser, cleanupOrg } from "@/test/helpers";
+import { knowledgeGovernance } from "../knowledge/data";
 import { preparePrivateMark, getPrivatePilotAdmin } from "./admin";
 import { PRIVATE_MARK_CONFIG, PRIVATE_MARK_DEFINITION, pilotConfigHash } from "./definition";
 import { beginPilotRoot, configurePilotBudget, reservePilotRoot } from "./budget";
@@ -39,6 +40,11 @@ describe("private pilot administrative preparation", () => {
     const f = await fixture();
     const result = await preparePrivateMark(f.org.id, f.admin.id);
     const instance = await prisma.agentInstance.findUniqueOrThrow({ where: { id: result.instanceId }, include: { revisions: true, channelRoutes: true } });
+    expect(instance.publicName).toBe("Lía");
+    // Existing deployments keep their v1 name/snapshot; only the UI aliases it.
+    await prisma.agentInstance.update({ where: { id: instance.id }, data: { publicName: "Mark" } });
+    expect(await preparePrivateMark(f.org.id, f.admin.id)).toMatchObject({ instanceId: instance.id, created: false });
+    expect((await knowledgeGovernance(f.org.id, [])).instances).toContainEqual({ id: instance.id, publicName: "Lía" });
     expect(instance.status).toBe("PAUSED"); expect(instance.legacyAssistantId).toBeNull(); expect(instance.channelRoutes).toEqual([]);
     expect(instance.revisions[0].snapshot).toEqual(PRIVATE_MARK_CONFIG);
     expect(instance.revisions[0].sourceHash).toBe(pilotConfigHash(PRIVATE_MARK_CONFIG));

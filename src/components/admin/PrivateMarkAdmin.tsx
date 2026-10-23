@@ -21,17 +21,17 @@ export function PrivateMarkAdmin({ view, lang, page }: { view: PrivatePilotAdmin
     });
   }
   return <div className="min-w-0 space-y-5">
-    <p className="rounded-lg bg-brand-50 p-4 text-sm text-brand-900">{es ? "Solo entorno de pruebas. Preparar Mark lo deja pausado y no llama a Anthropic, consulta clientes ni envía mensajes. Las pruebas actuales del laboratorio siguen siendo simuladas." : "Staging only. Preparing Mark leaves it paused and does not call Anthropic, read customers or send messages. Current lab tests remain simulated."}</p>
+    <p className="rounded-lg bg-brand-50 p-4 text-sm text-brand-900">{es ? "Solo entorno de pruebas. Preparar Lía lo deja pausado y no llama a Anthropic, consulta clientes ni envía mensajes. Las pruebas actuales del laboratorio siguen siendo simuladas." : "Staging only. Preparing Lía leaves it paused and does not call Anthropic, read customers or send messages. Current lab tests remain simulated."}</p>
     <form method="get" action="/admin/ai-pilot" className="flex flex-wrap items-end gap-3">
       <div className="min-w-0 flex-1 space-y-2"><Label htmlFor="pilot-organization">{es ? "Negocio de prueba" : "Test business"}</Label><select id="pilot-organization" name="organization" defaultValue={organization?.id} className="min-h-11 w-full min-w-0 rounded-md border border-slate-200 bg-white px-3 text-base">{view.organizations.map(org => <option key={org.id} value={org.id}>{org.name}</option>)}</select></div>
       <Button type="submit" className="min-h-11" disabled={!view.organizations.length || busy}>{es ? "Ver estado" : "View status"}</Button>
     </form>
     {notice && <p role="status" className="break-words rounded-lg border border-slate-200 p-3 text-sm">{notice}</p>}
     {!organization ? <p className="rounded-lg border border-slate-200 p-4">{es ? "Todavía no hay negocios de prueba disponibles." : "No test businesses are available yet."}</p> : <>
-      <Card><CardHeader><CardTitle>{es ? "1. Preparar Mark" : "1. Prepare Mark"}</CardTitle></CardHeader><CardContent className="space-y-3">
+      <Card><CardHeader><CardTitle>{es ? "1. Preparar Lía" : "1. Prepare Lía"}</CardTitle></CardHeader><CardContent className="space-y-3">
         <p className="text-sm text-slate-600">{view.instance ? (es ? "Instancia preparada. La entrega de mensajes continúa desactivada." : "Instance prepared. Message delivery remains disabled.") : (es ? "Crea una configuración privada para este negocio, con revisión humana y sin acceso a compras de clientes." : "Create a private configuration for this business, with human review and no customer-purchase access.")}</p>
         {!organization.moduleEnabled && <p className="text-sm text-amber-800">{es ? "Este negocio necesita acceso al módulo de asistentes IA." : "This business needs the AI assistant module."}</p>}
-        <Button className="min-h-11" disabled={busy || !!view.instance || !organization.moduleEnabled} onClick={() => perform(() => preparePrivateMarkAction({ organizationId: organization.id }))}>{view.instance ? (es ? "Mark preparado" : "Mark prepared") : (es ? "Preparar Mark pausado" : "Prepare paused Mark")}</Button>
+        <Button className="min-h-11" disabled={busy || !!view.instance || !organization.moduleEnabled} onClick={() => perform(() => preparePrivateMarkAction({ organizationId: organization.id }))}>{view.instance ? (es ? "Lía preparada" : "Lía prepared") : (es ? "Preparar Lía en pausa" : "Prepare paused Lía")}</Button>
       </CardContent></Card>
       <Card><CardHeader><CardTitle>{es ? "2. Revisar presupuesto" : "2. Review budget"}</CardTitle></CardHeader><CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-3 [&>*:last-child:nth-child(odd)]:col-span-2 sm:grid-cols-3 sm:[&>*:last-child:nth-child(odd)]:col-span-1">

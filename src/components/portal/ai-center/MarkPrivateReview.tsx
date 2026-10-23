@@ -6,7 +6,7 @@ type Result = Awaited<ReturnType<typeof testPrivateMark>>;
 export function MarkPrivateReview() {
   const [question, setQuestion] = useState(""), [fictional, setFictional] = useState(false), [cost, setCost] = useState(false), [busy, start] = useTransition();
   const [result, setResult] = useState<Result | null>(null), [error, setError] = useState(""), [used, setUsed] = useState(false);
-  return <section className="min-w-0 space-y-4 rounded-xl border border-slate-200 p-4" aria-label="Prueba privada de Mark con Anthropic">
+  return <section className="min-w-0 space-y-4 rounded-xl border border-slate-200 p-4" aria-label="Prueba privada de Lía con Anthropic">
     <p>Esta prueba puede generar un cargo real de Anthropic. Produce un borrador para revisión interna; no envía mensajes ni consulta clientes, compras o recompensas.</p>
     <form className="space-y-4" onSubmit={e => { e.preventDefault(); if (busy || used) return; const requestKey = crypto.randomUUID(); setUsed(true); setResult(null); setError(""); start(async () => { try { setResult(await testPrivateMark({ requestKey, question, confirmFictional: fictional as true, confirmCost: cost as true })); } catch { setError("No se pudo completar o cambió la autorización. No se repetirá la llamada. Si el costo es incierto, la reserva se conserva y un administrador debe revisarla en el panel del piloto."); } }); }}>
       <label className="block space-y-2"><span>Pregunta ficticia</span><textarea className="min-h-28 w-full rounded-md border border-slate-200 bg-transparent p-3 text-base" required maxLength={500} value={question} onChange={e => setQuestion(e.target.value)} disabled={busy || used} /></label>

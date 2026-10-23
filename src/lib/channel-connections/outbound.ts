@@ -6,6 +6,7 @@ import { UserError } from "@/lib/user-error";
 
 /** Caller owns the connection lock until transport admission completes; pause cannot race admission. */
 export async function sendConversationOutbound(tx: Prisma.TransactionClient, organizationId: string, conv: { id: string; channel: string; channelConnectionId: string | null }, messageId: string, data: Record<string, unknown>) {
+  if (await tx.markChatPilot.findFirst({ where: { organizationId, conversationId: conv.id }, select: { id: true } })) throw new UserError("El piloto privado usa su propio envío revisado");
   if (!conv.channelConnectionId) return triggerN8nWorkflow(outboundWorkflowPath(conv.channel), { organizationId, event: "message.send", data });
   await lockConnection(tx, organizationId, conv.channelConnectionId);
   const connection = await assertRoutable(tx, organizationId, conv.channelConnectionId, conv.channel, true);

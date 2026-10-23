@@ -19,6 +19,14 @@ import { UserError } from "@/lib/user-error";
 import { assertInboxAccess } from "@/lib/inbox";
 import { markReplyDraftUsed } from "@/lib/ai-draft";
 import { outboundWorkflowPath, messagePreview } from "@/lib/channels";
+import { isPrivateChat, controlPrivateChat } from "@/lib/ai/pilot/chat";
+
+async function privateControl(organizationId: string, actorId: string, conversationId: string, action: Parameters<typeof controlPrivateChat>[3], targetId?: string | null) {
+  if (!await isPrivateChat(organizationId, conversationId)) return null;
+  const result = await controlPrivateChat(organizationId, actorId, conversationId, action, targetId);
+  revalidatePath(`/portal/conversations/${conversationId}`); revalidatePath("/portal/conversations");
+  return result;
+}
 
 async function requireOrgAndWhatsapp() {
   const session = await auth();
@@ -30,6 +38,7 @@ async function requireOrgAndWhatsapp() {
 export async function escalateConversation(conversationId: string) {
   const session = await requireOrgPermission("conversations:escalate");
   await assertInboxAccess(session.user.organizationId);
+  const pilot = await privateControl(session.user.organizationId, session.user.id, conversationId, "escalate"); if (pilot) return pilot;
 
   const conv = await prisma.conversation.findFirst({
     where: { id: conversationId, organizationId: session.user.organizationId },
@@ -94,6 +103,7 @@ export async function getOlderMessages(conversationId: string, beforeMessageId: 
 export async function resolveConversation(conversationId: string) {
   const session = await requireOrgPermission("conversations:resolve");
   await assertInboxAccess(session.user.organizationId);
+  const pilot = await privateControl(session.user.organizationId, session.user.id, conversationId, "resolve"); if (pilot) return pilot;
 
   const conv = await prisma.conversation.findFirst({
     where: { id: conversationId, organizationId: session.user.organizationId },
@@ -129,6 +139,7 @@ export async function sendManualMessage(data: {
   draftId?: string;
 }) {
   const session = await requireOrgAndWhatsapp();
+  if (await isPrivateChat(session.user.organizationId!, data.conversationId)) throw new UserError("Responde desde el panel privado de Lía para este piloto");
   if (!can(session.user.role as UserRole, "conversations:reply")) throw new UserError("No autorizado");
 
   const content = data.content.trim();
@@ -235,6 +246,7 @@ export async function sendManualMessage(data: {
 /** A human agent takes over from the AI assistant, claiming the conversation if nobody else has it. */
 export async function takeHumanControl(conversationId: string) {
   const session = await requireOrgAndWhatsapp();
+  const pilot = await privateControl(session.user.organizationId!, session.user.id, conversationId, "take"); if (pilot) return pilot;
   if (!can(session.user.role as UserRole, "conversations:reply")) throw new UserError("No autorizado");
 
   const conv = await prisma.conversation.findFirst({
@@ -269,6 +281,7 @@ export async function takeHumanControl(conversationId: string) {
 /** Hands the conversation back to the AI assistant and clears the human assignment. */
 export async function releaseToAI(conversationId: string) {
   const session = await requireOrgAndWhatsapp();
+  const pilot = await privateControl(session.user.organizationId!, session.user.id, conversationId, "release"); if (pilot) return pilot;
   if (!can(session.user.role as UserRole, "conversations:reply")) throw new UserError("No autorizado");
 
   const conv = await prisma.conversation.findFirst({
@@ -297,6 +310,7 @@ export async function releaseToAI(conversationId: string) {
 /** Assigns (or unassigns, with userId=null) a conversation to a specific teammate. */
 export async function assignConversation(conversationId: string, userId: string | null) {
   const session = await requireOrgAndWhatsapp();
+  const pilot = await privateControl(session.user.organizationId!, session.user.id, conversationId, "assign", userId); if (pilot) return pilot;
   if (!can(session.user.role as UserRole, "conversations:assign")) throw new UserError("No autorizado");
 
   const conv = await prisma.conversation.findFirst({

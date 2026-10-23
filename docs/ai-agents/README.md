@@ -82,3 +82,5 @@ El trabajo acumulado se publica en [PR #123](https://github.com/ReymenSolutions/
 ## Base de presupuesto de piloto
 
 El siguiente incremento separado prepara reservas de $25 MXN/día, $500/ciclo y $1/raíz, con opt-in y compromisos durables: [19_BASE_PRESUPUESTO_PILOTO.md](19_BASE_PRESUPUESTO_PILOTO.md). No activa un proveedor ni completa la contabilidad incierta o la atribución por instancia de Fase 8.
+
+- [24 · Chat privado y nombres actuales](24_CHAT_PRIVADO_Y_NOMBRES.md): Lía, Sol, Nodo, Atlas y Nova; piloto de Website Chat con revisión humana.
