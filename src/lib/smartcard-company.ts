@@ -456,6 +456,7 @@ export interface ProfileLink {
   id: string;
   title: string;
   url: string;
+  icon?: string | null;
   sortOrder: number;
 }
 
@@ -528,7 +529,7 @@ export async function getSmartcardProfile(
 
   const { data: linkRows, error: linksError } = await supabase
     .from("profile_links")
-    .select("id, title, url, sort_order")
+    .select("id, title, url, icon, sort_order")
     .eq("profile_id", profileId)
     .eq("is_active", true)
     // Los productos (type = 'product', ver smartcard-products.ts) se editan aparte.
@@ -545,6 +546,7 @@ export async function getSmartcardProfile(
       id: l.id as string,
       title: l.title as string,
       url: l.url as string,
+      icon: (l.icon as string | null) ?? null,
       sortOrder: l.sort_order as number,
     })),
   };

@@ -59,6 +59,9 @@ const EN: Record<string, string> = {
   "Los productos todavía no están habilitados en SmartCard. Contacta a soporte de Reymen.": "Products aren't enabled in SmartCard yet. Please contact Reymen support.",
   "Ese producto ya está en el perfil.": "That product is already on the profile.",
   "No se pudo agregar el producto. Intenta de nuevo.": "Couldn't add the product. Please try again.",
+  "El producto necesita un nombre.": "The product needs a name.",
+  "El enlace del producto debe empezar con http:// o https://": "The product link must start with http:// or https://",
+  "La URL de la foto debe empezar con https://": "The photo URL must start with https://",
   "Máximo 12 productos por perfil.": "Up to 12 products per profile.",
   // ── REYMEN Ops Real Estate ──
   "La búsqueda de direcciones está desactivada. Ubica el pin a mano en el mapa.": "Address search is turned off. Place the pin by hand on the map.",

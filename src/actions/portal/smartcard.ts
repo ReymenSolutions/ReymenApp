@@ -15,6 +15,8 @@ import {
 } from "@/lib/smartcard-company";
 import { findOrCreateSmartcardAuthUser } from "@/lib/smartcard-link";
 import { HEX_COLOR } from "@/lib/smartcard-theme";
+import { isValidLinkIcon } from "@/lib/smartcard-link-icons";
+import { characteristicsToSubtitle } from "@/lib/smartcard-product-input";
 import { inviteTeamMember } from "@/actions/team";
 import { UserError } from "@/lib/user-error";
 import { listCatalog, resolveCatalogItem } from "@/lib/catalog";
@@ -726,7 +728,7 @@ export type SaveProfileLinkResult = { success: true; linkId: string } | { succes
  */
 export async function saveProfileLink(
   profileId: string,
-  link: { id?: string; title: string; url: string }
+  link: { id?: string; title: string; url: string; icon?: string | null }
 ): Promise<SaveProfileLinkResult> {
   try {
     const membership = await requireCardManagementMembership();
@@ -735,6 +737,7 @@ export async function saveProfileLink(
 
     const title = link.title.trim();
     const url = link.url.trim();
+    const icon = link.icon && isValidLinkIcon(link.icon) ? link.icon : null;
     if (!title) throw new Error("El link necesita un título.");
     if (!/^https?:\/\//i.test(url)) throw new Error("La URL debe empezar con http:// o https://");
 
@@ -752,7 +755,7 @@ export async function saveProfileLink(
 
       const { error } = await supabase
         .from("profile_links")
-        .update({ title, url, updated_at: new Date().toISOString() })
+        .update({ title, url, icon, updated_at: new Date().toISOString() })
         .eq("id", link.id);
       if (error) {
         console.error("[smartcard/actions] Error actualizando profile_link:", error.message);
@@ -765,7 +768,7 @@ export async function saveProfileLink(
     const nextSortOrder = existing.links.length > 0 ? Math.max(...existing.links.map((l) => l.sortOrder)) + 1 : 0;
     const { data: created, error } = await supabase
       .from("profile_links")
-      .insert({ profile_id: profileId, title, url, sort_order: nextSortOrder, is_active: true })
+      .insert({ profile_id: profileId, title, url, icon, sort_order: nextSortOrder, is_active: true })
       .select("id")
       .single();
 
@@ -907,6 +910,68 @@ export async function addProfileProduct(profileId: string, ref: string): Promise
     return {
       success: true,
       product: { id: data.id as string, ref: item.ref, title: cols.title, subtitle: cols.subtitle, priceLabel: cols.price_label, imageUrl: cols.image_url, url: cols.url, sortOrder },
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "No se pudo agregar el producto." };
+  }
+}
+
+export interface ManualProductInput {
+  title: string;
+  /** Texto libre tal como se verá ("$890 MXN"). */
+  priceLabel?: string;
+  /** Enlace de compra (tienda, Mercado Libre, WhatsApp...). */
+  url: string;
+  imageUrl?: string;
+  characteristics?: string[];
+}
+
+/**
+ * Agrega un producto escrito a mano (tiendas en línea que no tienen un módulo
+ * de catálogo, ej. un e-commerce de sérums). Se guarda como los demás
+ * productos (profile_links type = 'product') pero sin source_ref, así que
+ * ninguna sincronización lo toca ni lo oculta.
+ */
+export async function addManualProfileProduct(
+  profileId: string,
+  input: ManualProductInput
+): Promise<{ success: true; product: ProfileProduct } | { success: false; error: string }> {
+  try {
+    await requireProductEditor(profileId);
+    const title = input.title.trim().slice(0, 140);
+    const url = input.url.trim();
+    const imageUrl = (input.imageUrl ?? "").trim();
+    if (!title) throw new UserError("El producto necesita un nombre.");
+    if (!/^https?:\/\//i.test(url)) throw new UserError("El enlace del producto debe empezar con http:// o https://");
+    if (imageUrl && !/^https:\/\//i.test(imageUrl)) throw new UserError("La URL de la foto debe empezar con https://");
+
+    const current = await listProfileProducts(profileId);
+    if (current === null) throw new UserError("Los productos todavía no están habilitados en SmartCard. Contacta a soporte de Reymen.");
+    if (current.length >= MAX_PROFILE_PRODUCTS) throw new UserError("Máximo 12 productos por perfil.");
+
+    const supabase = getSmartcardAdminClient();
+    if (!supabase) throw new UserError("SmartCard aún no está configurado en este entorno.");
+    const sortOrder = current.length > 0 ? Math.max(...current.map((p) => p.sortOrder)) + 1 : 0;
+    const cols = {
+      title,
+      url,
+      subtitle: characteristicsToSubtitle(input.characteristics ?? []),
+      price_label: input.priceLabel?.trim().slice(0, 60) || null,
+      image_url: imageUrl || null,
+    };
+    const { data, error } = await supabase
+      .from("profile_links")
+      .insert({ profile_id: profileId, type: PRODUCT_LINK_TYPE, source_ref: null, sort_order: sortOrder, is_active: true, ...cols })
+      .select("id")
+      .single();
+    if (error || !data) {
+      console.error("[smartcard/actions] Error agregando producto manual:", error?.message);
+      throw new UserError("No se pudo agregar el producto. Intenta de nuevo.");
+    }
+    revalidatePath("/portal/smartcard");
+    return {
+      success: true,
+      product: { id: data.id as string, ref: null, title, subtitle: cols.subtitle, priceLabel: cols.price_label, imageUrl: cols.image_url, url, sortOrder },
     };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "No se pudo agregar el producto." };
