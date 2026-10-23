@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { createHash } from "node:crypto";
-import { postPrivateVisitor, privateChatEnabled, readPrivateVisitor } from "@/lib/ai/pilot/chat";
+import { postPrivateVisitor, privateChatEnabled, readPrivateVisitor, processPrivateChatJob } from "@/lib/ai/pilot/chat";
 export const dynamic = "force-dynamic";
 const headers = { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" };
 async function token(request: NextRequest) {
@@ -24,4 +24,4 @@ function failure(error: unknown) {
   return NextResponse.json({ error: "Chat no disponible. Comprueba el enlace privado y su vigencia." }, { status: error instanceof Error && error.message === "limited" ? 429 : 404, headers });
 }
 export async function GET(request: NextRequest) { try { return NextResponse.json(await readPrivateVisitor(await token(request)), { headers }); } catch (error) { return failure(error); } }
-export async function POST(request: NextRequest) { try { const key = await token(request); return NextResponse.json(await postPrivateVisitor(key, await boundedJson(request)), { headers }); } catch (error) { return failure(error); } }
+export async function POST(request: NextRequest) { try { const key = await token(request); const result = await postPrivateVisitor(key, await boundedJson(request)); if (result.jobId) after(() => processPrivateChatJob(result.jobId!).catch(() => console.error("[lia-chat] pending work retained"))); return NextResponse.json({ id: result.id }, { headers }); } catch (error) { return failure(error); } }

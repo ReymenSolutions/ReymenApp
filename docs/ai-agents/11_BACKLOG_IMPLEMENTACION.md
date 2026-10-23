@@ -218,3 +218,7 @@ Se añade generación de borrador con una llamada, consentimiento de costo/infor
 ## Actualización 2026-10-23 — Website Chat privado y nombres
 
 Implementación en rama dedicada: [24_CHAT_PRIVADO_Y_NOMBRES.md](24_CHAT_PRIVADO_Y_NOMBRES.md). Lía sustituye el nombre visible Mark; Sol (Soporte), Nodo (Operaciones), Atlas (Investigación) y Nova (Marketing y contenido) son la nomenclatura vigente, sin activación de nuevos runtimes. Website Chat privado incorpora conversación durable, aprobación humana, revocación y recuperación sin replay de llamadas. Pendiente de prueba pagada en staging por el operador; CRM con identidad verificada y widget comercial continúan fuera del piloto.
+
+## Modos de Lía y tarjetas unificadas — 2026-10-23
+
+Ver [25_MODOS_LIA_Y_CANALES.md](25_MODOS_LIA_Y_CANALES.md): implementación de modos del piloto privado, ejecución autónoma durable con presupuesto, recomendación bajo control humano y seis tarjetas de canales. Pendientes: validación pagada del operador en staging y futura integración comercial/CRM con identidad verificada. Sin despliegue de producción.

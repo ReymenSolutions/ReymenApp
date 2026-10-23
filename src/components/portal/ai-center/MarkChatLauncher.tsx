@@ -7,7 +7,7 @@ export function MarkChatLauncher() {
   const [confirmed, setConfirmed] = useState(false), [busy, start] = useTransition(), [chat, setChat] = useState<Awaited<ReturnType<typeof createMarkChat>> | null>(null), [error, setError] = useState("");
   const requestKey = useRef("");
   return <section className="min-w-0 space-y-4 rounded-xl border border-slate-200 p-4">
-    <p>El enlace abre un visitante ficticio de Website Chat. Los mensajes aparecen en Conversaciones. Crear el enlace o escribir como visitante no llama a Anthropic: un operador solicita cada borrador y aprueba cada envío.</p>
+    <p>El enlace abre un visitante ficticio de Website Chat. Los mensajes aparecen en Conversaciones. Crear el enlace no consume IA. En modo Autónomo, los mensajes nuevos generan respuestas con consumo de IA; en Con aprobación, el operador solicita y aprueba los borradores. Puedes cambiar el modo en Canales o dentro de la conversación.</p>
     <label className="flex min-h-11 items-start gap-3"><input type="checkbox" className="mt-1 h-5 w-5 shrink-0" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} disabled={busy} /><span>Confirmo que este piloto usará solo información ficticia.</span></label>
     <Button disabled={busy || !confirmed || !!chat} onClick={() => { setError(""); requestKey.current ||= crypto.randomUUID(); start(async () => { try { setChat(await createMarkChat({ requestKey: requestKey.current, confirmFictional: true })); } catch { setError("No se pudo crear el piloto. Revisa permisos y configuración de staging."); } }); }}>Crear conversación privada</Button>
     {error && <p role="alert">{error}</p>}

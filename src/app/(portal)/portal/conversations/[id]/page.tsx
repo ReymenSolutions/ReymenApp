@@ -14,7 +14,7 @@ import { ConversationActions } from "@/components/portal/ConversationActions";
 import { MessageThread } from "@/components/portal/MessageThread";
 import { formatDateTime } from "@/lib/utils";
 import type { UserRole } from "@prisma/client";
-import { isPrivateChat, privateChatEnabled, assertPrivateChatViewer } from "@/lib/ai/pilot/chat";
+import { isPrivateChat, privateChatEnabled, assertPrivateChatViewer, readPrivateChatSettings } from "@/lib/ai/pilot/chat";
 import { MarkChatReviewPanel } from "@/components/portal/ai-center/MarkChatReviewPanel";
 
 const MESSAGE_PAGE_SIZE = 50;
@@ -67,6 +67,7 @@ export default async function ConversationDetailPage({
   const canAssign = can(role, "conversations:assign");
   const privatePilot = await isPrivateChat(session.user.organizationId, conv.id);
   if (privatePilot) await assertPrivateChatViewer(session.user.organizationId, session.user.id);
+  const pilotSettings = privatePilot && privateChatEnabled() ? await readPrivateChatSettings(session.user.organizationId, session.user.id) : null;
   const aiDrafts = !privatePilot && await draftsAvailable(session.user.organizationId, conv.channel);
 
   return (
@@ -102,7 +103,7 @@ export default async function ConversationDetailPage({
         <Badge variant="secondary" className="capitalize">{conv.channel}</Badge>
         {conv.aiHandled ? (
           <span className="flex items-center gap-1 text-xs text-slate-500">
-            <Bot className="h-3 w-3" /> {lang === "es" ? "Manejado por IA" : "Handled by AI"}
+            <Bot className="h-3 w-3" /> {pilotSettings ? (pilotSettings.mode === "OFF" ? (lang === "es" ? "IA desactivada" : "AI disabled") : pilotSettings.mode === "AUTO" ? (lang === "es" ? "Lía · Autónomo" : "Lía · Autonomous") : (lang === "es" ? "Lía · Con aprobación" : "Lía · With approval")) : (lang === "es" ? "Manejado por IA" : "Handled by AI")}
           </span>
         ) : (
           <span className="text-xs text-slate-500">

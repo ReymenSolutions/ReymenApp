@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Power, Lightbulb, Zap } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -17,9 +17,9 @@ const COPY = {
     desc: "Elige por canal. Todos usan el mismo Rulebook y la misma base de conocimiento.",
     channels: { whatsapp: "WhatsApp", instagram: "Instagram", messenger: "Messenger", webchat: "Chat del sitio web", email: "Correo", enquiry: "Consultas (formularios)" } as Record<string, string>,
     modes: {
-      OFF: { label: "Apagado", hint: "No hace nada: ni borradores ni respuestas." },
-      SUGGEST: { label: "Sugerir", hint: "Redacta un borrador; tú lo editas y lo envías." },
-      AUTO: { label: "Automático", hint: "Responde solo lo que tu Rulebook cubre; lo demás lo pasa a una persona." },
+      OFF: { label: "Desactivado", hint: "No hace nada: ni borradores ni respuestas." },
+      SUGGEST: { label: "Con aprobación", hint: "Redacta un borrador; tú lo editas y lo envías." },
+      AUTO: { label: "Autónomo", hint: "Responde solo lo que tu Rulebook cubre; lo demás lo pasa a una persona." },
     } as Record<AgentMode, { label: string; hint: string }>,
     confirmTitle: "¿Que el agente responda solo en este canal?",
     confirmBody: "Enviará respuestas a tus clientes sin que nadie las revise. Solo contesta lo que tu Rulebook cubre; si el cliente se queja, pide a una persona o el agente duda, pasa la conversación a tu equipo. Nunca manda enlaces ni pide pagos. Puedes apagarlo cuando quieras.",
@@ -38,9 +38,9 @@ const COPY = {
     desc: "Choose per channel. They all use the same Rulebook and knowledge base.",
     channels: { whatsapp: "WhatsApp", instagram: "Instagram", messenger: "Messenger", webchat: "Website chat", email: "Email", enquiry: "Enquiries (forms)" } as Record<string, string>,
     modes: {
-      OFF: { label: "Off", hint: "Does nothing: no drafts and no replies." },
-      SUGGEST: { label: "Suggest", hint: "Writes a draft; you edit it and send it." },
-      AUTO: { label: "Automatic", hint: "Replies on its own only what your Rulebook covers; hands the rest to a person." },
+      OFF: { label: "Disabled", hint: "Does nothing: no drafts and no replies." },
+      SUGGEST: { label: "With approval", hint: "Writes a draft; you edit it and send it." },
+      AUTO: { label: "Autonomous", hint: "Replies on its own only what your Rulebook covers; hands the rest to a person." },
     } as Record<AgentMode, { label: string; hint: string }>,
     confirmTitle: "Let the agent reply on its own on this channel?",
     confirmBody: "It will send replies to your customers without anyone reviewing them. It only answers what your Rulebook covers; if the customer complains, asks for a person or the agent is unsure, the conversation goes to your team. It never sends links or asks for payments. You can turn it off any time.",
@@ -59,7 +59,7 @@ const COPY = {
 const ICON = { OFF: Power, SUGGEST: Lightbulb, AUTO: Zap } as const;
 const ORDER: AgentMode[] = ["OFF", "SUGGEST", "AUTO"];
 
-export function AgentModesPanel({ initial, cap, canEdit, aiConfigured, plainLanguage = false }: { initial: Record<string, AgentMode>; cap: { cap: number | null; overBy: number }; canEdit: boolean; aiConfigured: boolean; plainLanguage?: boolean }) {
+export function AgentModesPanel({ initial, cap, canEdit, aiConfigured, plainLanguage = false, channelDetails, channelFooter, secondaryChannels = [] }: { initial: Record<string, AgentMode>; cap: { cap: number | null; overBy: number }; canEdit: boolean; aiConfigured: boolean; plainLanguage?: boolean; channelDetails?: Record<string, ReactNode>; channelFooter?: Record<string, ReactNode>; secondaryChannels?: string[] }) {
   const { lang } = usePreferences();
   const base = COPY[lang === "en" ? "en" : "es"];
   const t = plainLanguage ? { ...base,
@@ -101,27 +101,32 @@ export function AgentModesPanel({ initial, cap, canEdit, aiConfigured, plainLang
     });
   }
 
+  const Wrapper = channelDetails ? "section" : Card, Header = channelDetails ? "div" : CardHeader, Content = channelDetails ? "div" : CardContent;
   return (
-    <Card className="mb-6">
-      <CardHeader>
+    <Wrapper className="mb-6 space-y-4">
+      <Header>
         <CardTitle className="text-base">{t.title}</CardTitle>
         <p className="text-sm text-slate-500">{t.desc}</p>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {!aiConfigured && <p className="rounded-card border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">{t.noKey}</p>}
+      </Header>
+      <Content className={channelDetails ? "grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2" : "space-y-3"}>
+        {!aiConfigured && <p className="col-span-full rounded-card border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">{t.noKey}</p>}
         {cap.cap !== null && (
-          <p role={atCap ? "status" : undefined} className={`rounded-card border p-2 text-xs ${activeCount > cap.cap ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 bg-slate-50 text-slate-600"}`}>
+          <p role={atCap ? "status" : undefined} className={`col-span-full rounded-card border p-2 text-xs ${activeCount > cap.cap ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 bg-slate-50 text-slate-600"}`}>
             {activeCount > cap.cap ? t.capOver(activeCount, cap.cap) : t.capLine(activeCount, cap.cap)}
             {activeCount === cap.cap && ` · ${t.capReached}`}
           </p>
         )}
         {!canEdit && <p className="text-xs text-slate-500">{t.readOnly}</p>}
-        {Object.keys(initial).map((channel) => (
-          <div key={channel} className="flex flex-col gap-2 rounded-card border border-slate-200 p-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        {Object.keys(initial).map((channel) => {
+          const ModeContainer = secondaryChannels.includes(channel) ? "details" : "div";
+          return <div key={channel} data-channel-card={channel} className={channelDetails ? "min-w-0 space-y-4 rounded-xl border border-slate-200 bg-white p-4" : "flex flex-col gap-2 rounded-card border border-slate-200 p-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"}>
             <div className="min-w-0">
-              <p className="text-sm font-medium text-slate-900">{t.channels[channel] ?? channel}</p>
-              <p className="text-xs text-slate-500">{t.modes[modes[channel]].hint}</p>
+              {channelDetails ? <h2 className="text-base font-semibold text-slate-900">{t.channels[channel] ?? channel}</h2> : <p className="text-sm font-medium text-slate-900">{t.channels[channel] ?? channel}</p>}
+              {channelDetails?.[channel]}
+              <p className="text-xs text-slate-500">{secondaryChannels.includes(channel) ? (lang === "es" ? "El modo de Lía se configura a continuación. La conexión comercial conserva su propio control." : "Configure Lía below. The commercial connection keeps its own control.") : t.modes[modes[channel]].hint}</p>
             </div>
+            <ModeContainer>
+            {secondaryChannels.includes(channel) && <summary className="min-h-11 cursor-pointer text-sm font-medium">{lang === "es" ? "Asistente anterior · conexión comercial" : "Previous assistant · commercial connection"}</summary>}
             <div role="radiogroup" aria-label={t.channels[channel] ?? channel} className="inline-flex max-w-full flex-wrap shrink-0 rounded-lg bg-slate-100 p-0.5"
               onKeyDown={e => { if (!plainLanguage || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) return; e.preventDefault(); const buttons = [...e.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')]; const index = buttons.indexOf(e.target as HTMLButtonElement); const next = e.key === "Home" ? 0 : e.key === "End" ? buttons.length - 1 : (index + (["ArrowLeft", "ArrowUp"].includes(e.key) ? -1 : 1) + buttons.length) % buttons.length; buttons[next]?.focus(); buttons[next]?.click(); }}>
               {ORDER.map((mode) => {
@@ -145,6 +150,8 @@ export function AgentModesPanel({ initial, cap, canEdit, aiConfigured, plainLang
                 );
               })}
             </div>
+            </ModeContainer>
+            {channelFooter?.[channel]}
             {!plainLanguage && confirming === channel && (
               <div role="alertdialog" aria-label={t.confirmTitle} className="w-full rounded-card border border-amber-200 bg-amber-50 p-3 sm:order-last">
                 <p className="text-sm font-medium text-amber-900">{t.confirmTitle}</p>
@@ -155,13 +162,13 @@ export function AgentModesPanel({ initial, cap, canEdit, aiConfigured, plainLang
                 </div>
               </div>
             )}
-          </div>
-        ))}
-      </CardContent>
+          </div>;
+        })}
+      </Content>
       {plainLanguage && <Dialog open={confirming !== null} onOpenChange={open => { if (!open) setConfirming(null); }}><DialogContent touchClose closeLabel={lang === "es" ? "Cerrar ventana" : "Close dialog"} onCloseAutoFocus={e => { e.preventDefault(); confirmationTrigger.current?.focus(); }}>
         <DialogHeader className="pr-10"><DialogTitle>{t.confirmTitle}</DialogTitle><DialogDescription>{t.confirmBody}</DialogDescription></DialogHeader>
         <div className="flex flex-wrap gap-3"><Button type="button" className="min-h-11" onClick={() => { if (confirming) choose(confirming, "AUTO", true); }}>{t.confirm}</Button><Button variant="outline" className="min-h-11" type="button" onClick={() => setConfirming(null)}>{t.cancel}</Button></div>
       </DialogContent></Dialog>}
-    </Card>
+    </Wrapper>
   );
 }

@@ -2,7 +2,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireAiManager, requireOrgPermission } from "@/lib/guards";
-import { createPrivateChat, controlPrivateChat, generatePrivateChatDraft, readPrivateChatOperator, recoverPrivateChat, sendPrivateChatReply, renewPrivateChatLink } from "@/lib/ai/pilot/chat";
+import { createPrivateChat, controlPrivateChat, generatePrivateChatDraft, readPrivateChatOperator, recoverPrivateChat, sendPrivateChatReply, renewPrivateChatLink, configurePrivateChatMode } from "@/lib/ai/pilot/chat";
 const id = z.string().min(1).max(128);
 function refresh(conversationId: string) { revalidatePath(`/portal/conversations/${conversationId}`); revalidatePath("/portal/conversations"); }
 export async function createMarkChat(raw: { requestKey: string; confirmFictional: boolean }) {
@@ -13,10 +13,10 @@ export async function getMarkChat(conversationId: string) {
   const s = await requireOrgPermission("conversations:view");
   return readPrivateChatOperator(s.user.organizationId, s.user.id, id.parse(conversationId));
 }
-export async function generateMarkChat(raw: { conversationId: string; basedOnMessageId: string; confirmCost: boolean; confirmFictional: boolean }) {
+export async function generateMarkChat(raw: { conversationId: string; basedOnMessageId: string; confirmCost: boolean; confirmFictional: boolean; humanRequested?: boolean }) {
   const s = await requireAiManager();
-  const input = z.object({ conversationId: id, basedOnMessageId: id, confirmCost: z.literal(true), confirmFictional: z.literal(true) }).strict().parse(raw);
-  const result = await generatePrivateChatDraft(s.user.organizationId, s.user.id, input.conversationId, input.basedOnMessageId, input.confirmCost);
+  const input = z.object({ conversationId: id, basedOnMessageId: id, confirmCost: z.literal(true), confirmFictional: z.literal(true), humanRequested: z.boolean().optional() }).strict().parse(raw);
+  const result = await generatePrivateChatDraft(s.user.organizationId, s.user.id, input.conversationId, input.basedOnMessageId, input.confirmCost, { humanRequested: input.humanRequested });
   refresh(input.conversationId); return result;
 }
 export async function renewMarkChatLink(conversationId: string) {
@@ -38,4 +38,10 @@ export async function recoverMarkChat(conversationId: string) {
   const s = await requireAiManager();
   const result = await recoverPrivateChat(s.user.organizationId, s.user.id, id.parse(conversationId));
   refresh(conversationId); return result;
+}
+
+export async function setMarkChatMode(raw: { mode: "OFF" | "SUGGEST" | "AUTO"; version: number; confirmCost?: boolean; confirmFictional?: boolean }) {
+  const s = await requireAiManager();
+  const result = await configurePrivateChatMode(s.user.organizationId, s.user.id, raw);
+  revalidatePath("/portal/ai-channels"); revalidatePath("/portal/conversations", "layout"); return result;
 }

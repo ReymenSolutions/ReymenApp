@@ -15,6 +15,7 @@ test.beforeAll(async () => {
 });
 test.afterAll(async () => {
   if (organizationId) {
+    await p.markChatSettings.deleteMany({ where: { organizationId } });
     await p.markChatTurn.deleteMany({ where: { organizationId } }); await p.markChatPilot.deleteMany({ where: { organizationId } });
     await p.message.deleteMany({ where: { conversation: { organizationId } } }); await p.conversation.deleteMany({ where: { organizationId } });
     await p.auditLog.deleteMany({ where: { organizationId } }); await p.organizationModule.deleteMany({ where: { organizationId } });
@@ -49,4 +50,19 @@ test("visitor requests human support, operator responds, and revocation preserve
     expect(await p.aiUsage.count({ where: { organizationId } })).toBe(0); expect(await p.aiPilotBudgetRoot.count({ where: { organizationId } })).toBe(0);
     expect(await p.message.count({ where: { conversation: { organizationId } } })).toBe(2);
   } finally { await visitorContext.close(); }
+});
+test("channel cards are unified and Lía modes are versioned, with autonomous consent and OFF persisted", async ({ page }) => {
+  test.skip(process.env.REYMEN_STAGING !== "true" || process.env.AI_MARK_PRIVATE_CHAT_ENABLED !== "true", "Private chat flag only");
+  await login(page); await page.goto("/portal/ai-channels");
+  // Center UI must be enabled for this scenario.
+  const cards = page.locator("[data-channel-card]"); await expect(cards).toHaveCount(6);
+  const webchat = page.locator('[data-channel-card="webchat"]');
+  const mode = webchat.getByRole("combobox", { name: /^(Modo de Lía|Lía mode)$/ }); await mode.selectOption("AUTO");
+  const save = webchat.getByRole("button", { name: /Guardar modo de Lía|Save Lía mode/ }); await expect(save).toBeDisabled();
+  await expect(webchat.getByRole("checkbox", { name: /Confirmo que usaré|I confirm fictional/ })).toBeVisible();
+  await mode.selectOption("OFF"); await save.click();
+  await expect(webchat.getByRole("status")).toContainText(/Modo guardado|Mode saved/);
+  expect(await p.markChatSettings.findUnique({ where: { organizationId } })).toMatchObject({ mode: "OFF", version: 1 });
+  await page.reload(); await expect(webchat.getByRole("combobox", { name: /^(Modo de Lía|Lía mode)$/ })).toHaveValue("OFF");
+  for (const width of [320, 390, 768]) { await page.setViewportSize({ width, height: 900 }); expect(await page.locator("main").evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true); }
 });
