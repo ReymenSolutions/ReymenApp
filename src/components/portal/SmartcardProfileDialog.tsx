@@ -63,6 +63,7 @@ const EMPTY_INPUT: SmartcardProfileInput = {
   youtube: "",
   primaryColor: "",
   accentColor: "",
+  background: null,
 };
 
 
@@ -89,6 +90,7 @@ function toInput(p: SmartcardProfile): SmartcardProfileInput {
     youtube: p.youtube ?? "",
     primaryColor: p.primaryColor ?? "",
     accentColor: p.accentColor ?? "",
+    background: p.background ?? null,
   };
 }
 
@@ -191,7 +193,7 @@ export function SmartcardProfileDialog({
   // El tema elegido define los colores base; los del perfil (si hay) van encima.
   const selectedTheme = theme?.options.find((o) => o.id === themeId) ?? null;
   const themeBase = parseThemeConfig(selectedTheme?.config);
-  const tokens = resolveCardTokens(selectedTheme?.config, form.primaryColor, form.accentColor);
+  const tokens = resolveCardTokens(selectedTheme?.config, form.primaryColor, form.accentColor, form.background);
 
   useEffect(() => {
     if (!profileId) return;
@@ -382,13 +384,31 @@ export function SmartcardProfileDialog({
                   fallback={themeBase.accentColor}
                 />
               </div>
-              {HEX_COLOR_INPUT.test(form.primaryColor ?? "") &&
-                HEX_COLOR_INPUT.test(form.accentColor ?? "") &&
-                !passesWcagAA(form.primaryColor as string, form.accentColor as string) && (
+              <div className="mt-4 flex flex-col gap-1.5">
+                <Label htmlFor="profile-background">{t("Fondo de la tarjeta", "Card background")}</Label>
+                <select
+                  id="profile-background"
+                  value={form.background ?? ""}
+                  onChange={(e) => setForm((f) => ({ ...f, background: e.target.value === "light" || e.target.value === "dark" ? e.target.value : null }))}
+                  className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm"
+                >
+                  <option value="">{t(`Según el tema (${themeBase.darkBackground ? "oscuro" : "claro"})`, `Follow the theme (${themeBase.darkBackground ? "dark" : "light"})`)}</option>
+                  <option value="light">{t("Claro (crema)", "Light (cream)")}</option>
+                  <option value="dark">{t("Oscuro", "Dark")}</option>
+                </select>
+                <p className="text-xs text-slate-500">
+                  {t(
+                    "Elige «Claro» para tener fondo crema con tus propios colores, sin importar el tema.",
+                    "Pick “Light” for a cream background with your own colors, whatever the theme."
+                  )}
+                </p>
+              </div>
+              {HEX_COLOR_INPUT.test(form.accentColor ?? "") &&
+                !passesWcagAA(form.accentColor as string, tokens.dark ? "#1A1D18" : "#FBF6EF", true) && (
                   <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
                     {t(
-                      "Estos dos colores tienen poco contraste entre sí — el texto podría costar trabajo leerlo. Puedes guardar igual, pero te recomendamos elegir colores más distintos.",
-                      "These two colors have low contrast with each other — text may be hard to read. You can still save, but choosing more distinct colors is recommended."
+                      "El color de acento se confunde con el fondo de la tarjeta; los botones y detalles podrían no distinguirse bien. Puedes guardar igual, pero conviene un color más fuerte (o cambiar el fondo).",
+                      "The accent color blends into the card background, so buttons and details may be hard to see. You can still save, but a stronger color (or another background) is recommended."
                     )}
                   </p>
                 )}

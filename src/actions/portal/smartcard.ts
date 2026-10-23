@@ -691,6 +691,11 @@ export async function updateSmartcardProfile(
       throw new Error(`"${accentColor}" no es un color válido (formato #RRGGBB).`);
     }
 
+    const background = input.background ?? null;
+    if (background !== null && background !== "light" && background !== "dark") {
+      throw new Error("El fondo de la tarjeta no es válido.");
+    }
+
     const supabase = getSmartcardAdminClient();
     if (!supabase) throw new Error("SmartCard aún no está configurado en este entorno.");
 
@@ -707,6 +712,7 @@ export async function updateSmartcardProfile(
     const themeResult = await updateProfileThemeColors(profileId, membership.companyId, {
       primaryColor: primaryColor || null,
       accentColor: accentColor || null,
+      background,
     });
     if (!themeResult.ok) throw new Error(themeResult.error);
 
