@@ -18,6 +18,7 @@ import {
 } from "./service";
 import { getProperty, getProspect, listProperties, listProspects, loadSnapshot } from "./queries";
 import { getPublicProperty, recordPublicEvent } from "./public";
+import { zoneCentroids } from "./zone-geo";
 
 const H = 3_600_000;
 
@@ -160,6 +161,14 @@ describe("la zona es la colonia", () => {
     await saveProperty(ctx.org.id, ctx.user.id, { ...baseProperty(ctx.zoneId, { neighborhood: "Álvaro Obregón", postalCode: "64150" }), id });
     const p = await prisma.realtyProperty.findUniqueOrThrow({ where: { id }, select: { zone: { select: { name: true } } } });
     expect(p.zone.name).toBe("Álvaro Obregón");
+  });
+
+  it("una colonia sin punto propio se ubica en el centro aproximado de sus propiedades", async () => {
+    const id = await saveProperty(ctx.org.id, ctx.user.id, baseProperty(ctx.zoneId, { neighborhood: "Mitras Centro", postalCode: "64460", latitude: 25.69871, longitude: -100.34432 }));
+    const { zoneId } = await prisma.realtyProperty.findUniqueOrThrow({ where: { id } });
+    const points = await zoneCentroids(ctx.org.id, [zoneId]);
+    // Redondeado a ~1 km: no apunta a la casa.
+    expect(points.get(zoneId)).toEqual({ lat: 25.7, lng: -100.34 });
   });
 
   it("sin colonia no se puede dar de alta", async () => {
