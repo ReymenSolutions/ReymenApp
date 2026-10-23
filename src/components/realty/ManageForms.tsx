@@ -9,12 +9,12 @@ import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { deleteRealtyCampaign, deleteRealtyZone, saveRealtyCampaign, saveRealtySettings, saveRealtyZone } from "@/actions/realty";
+import { deleteRealtyCampaign, deleteRealtyZone, ensureRealtyColoniaZone, saveRealtyCampaign, saveRealtySettings, saveRealtyZone } from "@/actions/realty";
 import { getErrorMessage } from "@/lib/user-error";
 import { usePreferences } from "@/context/preferences";
 import { pickDict } from "@/lib/i18n-dict";
 import { enumLabel, realtyStrings } from "@/lib/i18n-realty";
-import { SELECT } from "./ProspectForm";
+import { SELECT } from "./select";
 import { GeoPicker, type GeoValue } from "./GeoPicker";
 import { AddressFields, type AddressValue } from "./AddressFields";
 
@@ -166,8 +166,15 @@ export function ZoneRow({ zone }: { zone: { id?: string; name: string; postalCod
   const [geoPending, setGeoPending] = useState(false);
   // Una zona nueva abre CP + mapa; en las existentes se abre con "Ubicar" / "Cambiar".
   const [showGeo, setShowGeo] = useState(isNew);
+  // Una zona nueva es una colonia (se agrega con su CP); en una existente se puede renombrar o ubicar.
   const save = (p: GeoValue | null, after?: () => void) =>
-    run(() => saveRealtyZone({ id: zone.id, name, postalCode: addr.cp || null, latitude: p?.lat ?? null, longitude: p?.lng ?? null }), after);
+    run(
+      () =>
+        isNew
+          ? ensureRealtyColoniaZone({ colonia: addr.colonia, postalCode: addr.cp || null, municipality: addr.municipio || null, state: addr.estado || null, latitude: p?.lat ?? null, longitude: p?.lng ?? null })
+          : saveRealtyZone({ id: zone.id, name, postalCode: addr.cp || null, latitude: p?.lat ?? null, longitude: p?.lng ?? null }),
+      after,
+    );
   const onAddr = (patch: Partial<AddressValue>) => {
     setAddr((a) => ({ ...a, ...patch }));
     if (patch.colonia !== undefined && !nameTouched) setName(patch.colonia);
@@ -199,6 +206,7 @@ export function ZoneRow({ zone }: { zone: { id?: string; name: string; postalCod
         </div>
       )}
       <div className="flex flex-wrap items-end gap-2">
+        {!isNew && (
         <div className="min-w-[12rem] flex-1 space-y-1">
           <Label className="text-xs" htmlFor={`z-n-${zone.id ?? "new"}`}>{R.zoneName}</Label>
           <Input
@@ -214,7 +222,8 @@ export function ZoneRow({ zone }: { zone: { id?: string; name: string; postalCod
             placeholder={isNew ? R.zonePlaceholder : undefined}
           />
         </div>
-        <Button type="submit" size="sm" loading={busy} className="h-9 bg-[#031738] hover:bg-[#04275A]">{isNew ? R.addZone : R.save}</Button>
+        )}
+        <Button type="submit" size="sm" loading={busy} disabled={isNew && addr.colonia.trim().length < 2} className="h-9 bg-[#031738] hover:bg-[#04275A]">{isNew ? R.addZone : R.save}</Button>
         {!isNew && (
           <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => run(() => deleteRealtyZone(zone.id!))} className="h-9 text-red-600" aria-label={R.delete}>
             <Trash2 className="h-4 w-4" />

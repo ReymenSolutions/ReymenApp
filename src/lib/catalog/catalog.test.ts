@@ -44,7 +44,7 @@ describe("catálogo de Real Estate", () => {
     currency: "MXN",
     zoneId,
     postalCode: "64610",
-    neighborhood: "Cumbres Elite",
+    neighborhood: "Cumbres",
     municipality: "Monterrey",
     state: "Nuevo León",
     addressLine: "Calle Secreta 123",
@@ -92,7 +92,7 @@ describe("catálogo de Real Estate", () => {
     expect(titles).not.toContain("Borrador");
     const casa = g.items.find((i) => i.title === "Casa en Cumbres")!;
     expect(casa.priceLabel).toBe("$4,500,000");
-    expect(casa.subtitle).toBe("Casa · 3 rec · Cumbres Elite");
+    expect(casa.subtitle).toBe("Casa · 3 rec · Cumbres");
     expect(casa.url).toMatch(/^https:\/\/app\.test\/p\/.+\?src=smartcard$/);
     expect(g.items.find((i) => i.title === "Depa en renta")!.priceLabel).toBe("$18,000 / mes");
   });

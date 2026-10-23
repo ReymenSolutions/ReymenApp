@@ -16,6 +16,7 @@ import {
   deleteCampaign,
   deletePropertyPhoto,
   deleteZone,
+  ensureColoniaZone,
   recomputeAllMatches,
   recordClosing,
   saveCampaign,
@@ -31,6 +32,7 @@ import { MAX_UPLOAD_BYTES } from "@/lib/realty/media";
 import { geocodeAddress, geocodeStructured } from "@/lib/realty/geocode";
 import { lookupPostalCode } from "@/lib/realty/postal";
 import { schedulePropertySmartcardSync } from "@/lib/realty/smartcard-sync";
+import { scheduleZoneGeocode } from "@/lib/realty/zone-geo";
 import { prisma } from "@/lib/prisma";
 
 function revalidateRealty(extra: string[] = []) {
@@ -56,7 +58,8 @@ const propertySchema = z.object({
   status: z.enum(PROPERTY_STATUSES as [string, ...string[]]),
   price: z.coerce.number().positive().max(10_000_000_000),
   currency,
-  zoneId: z.string().min(1),
+  // La zona se calcula de la colonia; solo se acepta para propiedades de antes sin colonia.
+  zoneId: optId,
   postalCode: z.string().trim().regex(/^\d{5}$/).nullable().optional().or(z.literal("")).transform((v) => (v ? v : null)),
   neighborhood: optText(120),
   municipality: optText(120),
@@ -95,6 +98,10 @@ export async function saveRealtyProperty(data: z.input<typeof propertySchema>) {
   });
   revalidateRealty();
   schedulePropertySmartcardSync(session.user.organizationId, id);
+  if (d.neighborhood) {
+    const p = await prisma.realtyProperty.findFirst({ where: { id, organizationId: session.user.organizationId }, select: { zoneId: true } });
+    if (p) scheduleZoneGeocode(session.user.organizationId, p.zoneId, { colonia: d.neighborhood, postalCode: d.postalCode, municipality: d.municipality, state: d.state });
+  }
   return { id };
 }
 
@@ -366,6 +373,30 @@ const structuredSchema = z.object({
   estado: z.string().trim().max(80).default(""),
   cp: z.string().trim().max(5).default(""),
 });
+
+const coloniaSchema = z.object({
+  colonia: z.string().trim().min(2).max(120),
+  postalCode: z.string().trim().regex(/^\d{5}$/).nullable().optional().or(z.literal("")).transform((v) => (v ? v : null)),
+  municipality: optText(120),
+  state: optText(80),
+  latitude: coord(90),
+  longitude: coord(180),
+});
+
+/** Zona de una colonia (la crea si no existe). La usan el prospecto y Configuración. */
+export async function ensureRealtyColoniaZone(data: z.input<typeof coloniaSchema>) {
+  const session = await requireRealtyOperator();
+  const parsed = coloniaSchema.safeParse(data);
+  if (!parsed.success) throw new UserError("Elige la colonia.");
+  const d = parsed.data;
+  const zone = await ensureColoniaZone(session.user.organizationId, session.user.id, { colonia: d.colonia, postalCode: d.postalCode, municipality: d.municipality });
+  if (d.latitude !== null && d.longitude !== null) {
+    // Punto confirmado en el mapa (Configuración): manda sobre el aproximado.
+    await prisma.realtyZone.updateMany({ where: { id: zone.id, organizationId: session.user.organizationId }, data: { latitude: d.latitude, longitude: d.longitude } });
+  } else scheduleZoneGeocode(session.user.organizationId, zone.id, { colonia: d.colonia, postalCode: d.postalCode, municipality: d.municipality, state: d.state });
+  revalidateRealty();
+  return { id: zone.id, name: zone.name, postalCode: d.postalCode };
+}
 
 /** Ubica una dirección por partes (CP, colonia, calle); dice qué tan fino quedó el punto. */
 export async function geocodeRealtyStructured(data: z.input<typeof structuredSchema>) {

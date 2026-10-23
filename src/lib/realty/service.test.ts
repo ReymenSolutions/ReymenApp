@@ -39,7 +39,7 @@ const baseProperty = (zoneId: string, over: Partial<PropertyInput> = {}): Proper
   currency: "MXN",
   zoneId,
   postalCode: "64610",
-  neighborhood: "Cumbres Elite",
+  neighborhood: "Cumbres",
   municipality: "Monterrey",
   state: "Nuevo León",
   addressLine: "Calle Secreta 123",
@@ -128,9 +128,49 @@ describe("prospecto = Lead del CRM (sin duplicar contactos)", () => {
   });
 });
 
+describe("la zona es la colonia", () => {
+  let ctx: Awaited<ReturnType<typeof realtyOrg>>;
+  beforeAll(async () => {
+    ctx = await realtyOrg("ZonaColonia");
+  });
+  afterAll(async () => {
+    await cleanupOrg(ctx.org.id);
+  });
+
+  it("asigna (o crea) la zona de la colonia y no usa la que llega del formulario", async () => {
+    const id = await saveProperty(ctx.org.id, ctx.user.id, baseProperty(ctx.zoneId, { neighborhood: "Vista Hermosa", postalCode: "64620" }));
+    const p = await prisma.realtyProperty.findUniqueOrThrow({ where: { id }, select: { zone: { select: { name: true, postalCode: true } } } });
+    expect(p.zone).toEqual({ name: "Vista Hermosa", postalCode: "64620" });
+    // Otra propiedad en la misma colonia reusa la zona.
+    const id2 = await saveProperty(ctx.org.id, ctx.user.id, baseProperty(ctx.zoneId, { neighborhood: "vista hermosa", postalCode: "64620", title: "Otra casa" }));
+    const zones = await prisma.realtyZone.findMany({ where: { organizationId: ctx.org.id, name: { startsWith: "Vista Hermosa" } } });
+    expect(zones).toHaveLength(1);
+    expect((await prisma.realtyProperty.findUniqueOrThrow({ where: { id: id2 } })).zoneId).toBe(zones[0].id);
+  });
+
+  it("colonias con el mismo nombre y otro CP son zonas distintas", async () => {
+    await saveProperty(ctx.org.id, ctx.user.id, baseProperty(ctx.zoneId, { neighborhood: "Centro", postalCode: "64000", municipality: "Monterrey" }));
+    await saveProperty(ctx.org.id, ctx.user.id, baseProperty(ctx.zoneId, { neighborhood: "Centro", postalCode: "66230", municipality: "San Pedro Garza García", title: "Casa en el centro de SP" }));
+    const names = (await prisma.realtyZone.findMany({ where: { organizationId: ctx.org.id, name: { startsWith: "Centro" } }, orderBy: { name: "asc" } })).map((z) => z.name);
+    expect(names).toEqual(["Centro", "Centro (San Pedro Garza García)"]);
+  });
+
+  it("al cambiar la colonia, la propiedad cambia de zona", async () => {
+    const id = await saveProperty(ctx.org.id, ctx.user.id, baseProperty(ctx.zoneId, { neighborhood: "Santa Cecilia", postalCode: "64150" }));
+    await saveProperty(ctx.org.id, ctx.user.id, { ...baseProperty(ctx.zoneId, { neighborhood: "Álvaro Obregón", postalCode: "64150" }), id });
+    const p = await prisma.realtyProperty.findUniqueOrThrow({ where: { id }, select: { zone: { select: { name: true } } } });
+    expect(p.zone.name).toBe("Álvaro Obregón");
+  });
+
+  it("sin colonia no se puede dar de alta", async () => {
+    await expect(saveProperty(ctx.org.id, ctx.user.id, baseProperty("", { neighborhood: null }))).rejects.toThrow("Elige la colonia");
+  });
+});
+
 describe("aislamiento entre organizaciones", () => {
   it("B no puede usar la zona, propiedad ni prospecto de A", async () => {
-    await expect(saveProperty(B.org.id, B.user.id, baseProperty(A.zoneId))).rejects.toThrow("Zona no encontrada");
+    // Sin colonia (propiedad de antes) se usaría la zona que llega: la de otra organización se rechaza.
+    await expect(saveProperty(B.org.id, B.user.id, baseProperty(A.zoneId, { neighborhood: null }))).rejects.toThrow("Zona no encontrada");
     await expect(assertProperty(B.org.id, propertyId)).rejects.toThrow("Propiedad no encontrada");
     await expect(saveProspect(B.org.id, B.user.id, baseProspect(A.zoneId))).rejects.toThrow("Zona no encontrada");
     await expect(scheduleVisit(B.org.id, B.user.id, { propertyId, profileId: null, advisorUserId: null, startTime: new Date(Date.now() + 48 * H), durationMinutes: 45, notes: null })).rejects.toThrow();

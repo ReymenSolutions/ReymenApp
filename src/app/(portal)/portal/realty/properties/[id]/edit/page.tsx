@@ -18,7 +18,6 @@ export default async function EditPropertyPage({ params }: { params: Promise<{ i
         zones={zones}
         advisors={advisors}
         branches={ctx.branches}
-        canManage={ctx.canManage}
         initial={{
           id: p.id,
           title: p.title,

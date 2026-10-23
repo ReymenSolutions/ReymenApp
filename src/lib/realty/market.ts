@@ -85,6 +85,8 @@ export function zoneBalances(zones: ZoneRef[], profiles: DemandProfile[], proper
       const s = supply.filter((p) => p.zoneId === z.id).length;
       return { zoneId: z.id, zoneName: z.name, demand, supply: s, ratio: demandRatio(demand, s), status: balanceStatus(demand, s), primaryDemand };
     })
+    // Cada colonia es una zona: las que no tienen ni demanda ni oferta no aportan nada al tablero.
+    .filter((b) => b.demand > 0 || b.supply > 0)
     .sort((a, b) => b.demand - a.demand || a.zoneName.localeCompare(b.zoneName));
 }
 
