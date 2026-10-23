@@ -9,6 +9,7 @@ import { one, realtyPeriod, type PeriodParams } from "@/lib/realty/page-helpers"
 import { LoyaltyFilters } from "@/components/loyalty/LoyaltyFilters";
 import { BALANCE_FILL, BalanceBadge, Empty, PairBars, SectionCard } from "@/components/realty/RealtyBits";
 import { ZoneDemandMapLoader } from "@/components/realty/ZoneDemandMapLoader";
+import { zoneCentroids } from "@/lib/realty/zone-geo";
 import { cn } from "@/lib/utils";
 
 export default async function MarketPulsePage({ searchParams }: { searchParams: Promise<PeriodParams & { op?: string }> }) {
@@ -21,10 +22,13 @@ export default async function MarketPulsePage({ searchParams }: { searchParams: 
   const a = analyze(snap, period);
   const zones = op === "SALE" ? a.zonesSale : op === "RENT" ? a.zonesRent : a.zonesAll;
   const coords = new Map(snap.zones.map((z) => [z.id, z]));
+  // Zonas (colonias) sin punto propio todavía: se ubican en el centro aproximado de sus propiedades.
+  const fallback = await zoneCentroids(ctx.orgId, zones.filter((z) => coords.get(z.zoneId)?.latitude == null).map((z) => z.zoneId));
   const mapZones = zones.flatMap((z) => {
     const c = coords.get(z.zoneId);
-    if (!c || c.latitude === null || c.longitude === null) return [];
-    return [{ id: z.zoneId, name: z.zoneName, lat: c.latitude, lng: c.longitude, demand: z.demand, supply: z.supply, fill: BALANCE_FILL[z.status], statusLabel: enumLabel(R, "bal", z.status) }];
+    const point = c && c.latitude !== null && c.longitude !== null ? { lat: c.latitude, lng: c.longitude } : fallback.get(z.zoneId);
+    if (!point) return [];
+    return [{ id: z.zoneId, name: z.zoneName, lat: point.lat, lng: point.lng, demand: z.demand, supply: z.supply, fill: BALANCE_FILL[z.status], statusLabel: enumLabel(R, "bal", z.status) }];
   });
   const qs = (o: string | null) => {
     const p = new URLSearchParams();

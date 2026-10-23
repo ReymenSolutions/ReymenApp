@@ -40,6 +40,10 @@ export interface GeoSite {
   point: GeoPoint;
 }
 
+/** Pin de la sucursal (tienda), en el azul de la marca, con la punta en el punto exacto. */
+const STORE_PIN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44" aria-hidden="true"><path d="M18 43c-1-1.6-14-15.2-14-25.3C4 9.6 10.3 3 18 3s14 6.6 14 14.7C32 27.8 19 41.4 18 43z" fill="#1a3ef5" stroke="#fff" stroke-width="2.5"/><g transform="translate(9 8.5)" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7 3.5 2h11L16 7"/><path d="M2 7c0 1.2 1 2.2 2.3 2.2S6.6 8.2 6.6 7c0 1.2 1 2.2 2.4 2.2s2.4-1 2.4-2.2c0 1.2 1 2.2 2.3 2.2S16 8.2 16 7"/><path d="M3.3 9.2V16h11.4V9.2"/><path d="M7.5 16v-3.6h3V16"/></g></svg>`;
+const STORE_PIN_HTML = `<span style="display:block;filter:drop-shadow(0 2px 3px rgb(0 0 0 / 0.35))">${STORE_PIN_SVG}</span>`;
+
 export default function GeoZoneMap({
   zones,
   reference,
@@ -121,14 +125,15 @@ export default function GeoZoneMap({
         keyboard: false,
         zIndexOffset: 1000,
         title: site.label,
+        // Pin con ícono de tienda: la sucursal no se confunde con los círculos de las zonas.
         icon: L.divIcon({
           className: "",
-          html: `<span class="flex h-6 w-6 items-center justify-center rounded-full border-[3px] border-white bg-slate-900 shadow-md"><span class="h-2 w-2 rounded-full bg-white"></span></span>`,
-          iconSize: [24, 24],
-          iconAnchor: [12, 12],
+          html: STORE_PIN_HTML,
+          iconSize: [36, 44],
+          iconAnchor: [18, 42],
         }),
       })
-        .bindTooltip(escapeHtml(site.label), { permanent: true, direction: "bottom", offset: [0, 10], className: "loyalty-branch-label" })
+        .bindTooltip(escapeHtml(site.label), { permanent: true, direction: "bottom", offset: [0, 4], className: "loyalty-branch-label" })
         .addTo(base);
     }
 

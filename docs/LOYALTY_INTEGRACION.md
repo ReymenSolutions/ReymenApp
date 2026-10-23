@@ -181,3 +181,14 @@ Los resultados finales y comandos se registran al cierre de esta tarea. Los fall
 El recorrido E2E conjunto tuvo inicialmente 10 éxitos y un timeout: la creación del contacto sí terminó, pero la primera compilación de su página tardó 5,1 s, superando los 4 s de la prueba, que volvía a buscar el botón en otra página. Se reemplazó el bucle que repetía la mutación por un solo clic y una expectativa de URL de hasta 15 s. Su repetición aislada pasó en 9,7 s. No se modificó el comportamiento de creación de contactos para superar esa prueba.
 
 Logs de esta sesión disponibles localmente en `/workspace/.onboarding/logs/loyalty-*` (fuera del repositorio); captura revisada `loyalty-mobile-dark.png`. No incluyen una certificación de producción, un test físico de POS offline ni entrega real por servicios externos.
+
+## Diseño de la tarjeta del cliente
+
+En **Lealtad → Programas** cada programa tiene **Diseño de la tarjeta**: color de
+la tarjeta, color de acento (los sellos) e ícono (café, pizza, tijeras, etc.),
+con combinaciones listas para elegir. Se guarda en `LoyaltyProgram.cardColor`,
+`cardAccent` y `cardIcon` (migración `20261124090000_loyalty_card_style`, solo
+columnas opcionales); vacío = el diseño de siempre. No cambia la regla, así que
+no crea versión nueva. La vista previa y la tarjeta pública usan el mismo
+componente (`LoyaltyCardFace`), y el color del texto se elige solo para que se
+lea sobre el fondo. Hasta 12 visitas, cada visita se ve como un sello con el ícono.

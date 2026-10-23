@@ -136,7 +136,7 @@ se asigna la zona de su colonia (colonia + CP) y, si no existe, se crea sola
 el mapa se busca después (`src/lib/realty/zone-geo.ts`). Colonias con el mismo
 nombre en otro CP son zonas distintas ("Centro (San Pedro Garza García)"). En
 el prospecto, las colonias de interés se eligen de las existentes o se agregan
-por CP. Market Pulse solo lista colonias con demanda u oferta. Una propiedad de
+por CP. Market Pulse solo lista colonias con demanda u oferta. Si una colonia todavía no tiene punto en el mapa (la búsqueda falló), se dibuja en el centro de sus propiedades redondeado a ~1 km. Una propiedad de
 antes sin colonia conserva la zona que tenía.
 
 **Buscar en el mapa** usa esas partes, de lo más fino a lo más general: la casa

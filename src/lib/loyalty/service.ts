@@ -63,6 +63,10 @@ export interface ProgramInput {
   rewardHeadline: string | null;
   scope: "ORGANIZATION" | "BRANCH";
   branchId: string | null;
+  /** Diseño de la tarjeta (no crea versión nueva de la regla). */
+  cardColor?: string | null;
+  cardAccent?: string | null;
+  cardIcon?: string | null;
 }
 
 /**
@@ -97,6 +101,9 @@ export async function saveProgram(organizationId: string, userId: string | null,
           status: input.status,
           scope: input.scope,
           branchId,
+          cardColor: input.cardColor ?? null,
+          cardAccent: input.cardAccent ?? null,
+          cardIcon: input.cardIcon ?? null,
           currentVersion: 1,
           versions: {
             create: {
@@ -143,7 +150,17 @@ export async function saveProgram(organizationId: string, userId: string | null,
     }
     await tx.loyaltyProgram.update({
       where: { id: existing.id },
-      data: { name: input.name, description: input.description, status: input.status, scope: input.scope, branchId, currentVersion: version },
+      data: {
+        name: input.name,
+        description: input.description,
+        status: input.status,
+        scope: input.scope,
+        branchId,
+        currentVersion: version,
+        ...(input.cardColor !== undefined ? { cardColor: input.cardColor } : {}),
+        ...(input.cardAccent !== undefined ? { cardAccent: input.cardAccent } : {}),
+        ...(input.cardIcon !== undefined ? { cardIcon: input.cardIcon } : {}),
+      },
     });
     return { programId: existing.id, version, created: false, ruleChanged };
   });
