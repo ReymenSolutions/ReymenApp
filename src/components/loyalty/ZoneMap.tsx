@@ -3,7 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
-import { MapPin, Target, CheckCircle2, Gem, Repeat, X } from "lucide-react";
+import { MapPin, Target, CheckCircle2, Gem, Repeat, X, Store } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePreferences } from "@/context/preferences";
 import { pickDict } from "@/lib/i18n-dict";
@@ -210,7 +210,7 @@ export function ZoneMap({
               <Target className="h-3 w-3 text-violet-600" aria-hidden="true" /> {L.zoneOpportunity}
             </span>
             <span className="flex items-center gap-1">
-              <span className="h-2.5 w-2.5 rounded-full bg-slate-900" aria-hidden="true" /> {L.mapBranch}
+              <Store className="h-3.5 w-3.5 text-[#1a3ef5]" aria-hidden="true" /> {L.mapBranch}
             </span>
             {visibleSites.length === 1 ? <span>{L.mapRings}</span> : visibleSites.length > 1 ? <span>{L.mapManySites}</span> : null}
           </div>
