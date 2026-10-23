@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createStandaloneUser, setUserActive } from "@/actions/admin/users";
+import { AdminEditUserDialog } from "@/components/admin/AdminEditUserDialog";
 import { usePreferences } from "@/context/preferences";
 import { getErrorMessage, translateMessage } from "@/lib/user-error";
 
@@ -37,6 +38,7 @@ export interface DirectoryUser {
   email: string;
   role: string;
   isActive: boolean;
+  organizationId: string | null;
   organizationName: string | null;
 }
 
@@ -194,7 +196,7 @@ function ToggleActiveButton({ user, onToggled }: { user: DirectoryUser; onToggle
   );
 }
 
-export function AdminUsersDirectory({ users: initialUsers, canCreateStandalone }: { users: DirectoryUser[]; canCreateStandalone: boolean }) {
+export function AdminUsersDirectory({ users: initialUsers, canCreateStandalone, orgs }: { users: DirectoryUser[]; canCreateStandalone: boolean; orgs: { id: string; name: string }[] }) {
   const { t, lang } = usePreferences();
   const [users, setUsers] = useState(initialUsers);
 
@@ -256,7 +258,10 @@ export function AdminUsersDirectory({ users: initialUsers, canCreateStandalone }
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
-                    <ToggleActiveButton user={user} onToggled={handleToggled} />
+                    <div className="flex items-center justify-end gap-1">
+                      <AdminEditUserDialog user={{ id: user.id, name: user.name, email: user.email, role: user.role, organizationId: user.organizationId }} orgs={orgs} />
+                      <ToggleActiveButton user={user} onToggled={handleToggled} />
+                    </div>
                   </td>
                 </tr>
               ))}

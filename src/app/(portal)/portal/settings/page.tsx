@@ -150,7 +150,7 @@ export default async function PortalSettingsPage() {
             <div className="space-y-2">
               {org.users.map((user) => {
                 const isCurrentUser = user.id === session.user.id;
-                const isOwner = user.role === "OWNER";
+                const isOwner = user.role === "OWNER" || user.role === "SUPER_ADMIN" || user.role === "ADMIN"; // no se edita desde aquí
                 return (
                   <div
                     key={user.id}

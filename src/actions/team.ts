@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/audit";
 import { createOrgUserRecord } from "@/lib/org-users";
 import type { UserRole } from "@prisma/client";
 import { UserError } from "@/lib/user-error";
+import { isAdmin } from "@/lib/roles";
 
 const inviteSchema = z.object({
   name: z.string().min(2, "Mínimo 2 caracteres"),
@@ -56,6 +57,7 @@ export async function removeTeamMember(userId: string) {
   if (!user) throw new UserError("Usuario no encontrado");
   if (user.id === session.user.id) throw new UserError("No puedes eliminarte a ti mismo");
   if (user.role === "OWNER") throw new UserError("No puedes eliminar al propietario");
+  if (isAdmin(user.role)) throw new UserError("Este usuario es administrador de la plataforma; se gestiona desde Administración");
 
   await prisma.user.update({
     where: { id: userId },
@@ -95,6 +97,7 @@ export async function updateTeamMember(userId: string, data: { name: string; rol
   if (!user) throw new UserError("Usuario no encontrado");
   if (user.id === session.user.id) throw new UserError("No puedes editarte a ti mismo desde aquí");
   if (user.role === "OWNER") throw new UserError("No puedes modificar al propietario");
+  if (isAdmin(user.role)) throw new UserError("Este usuario es administrador de la plataforma; se gestiona desde Administración");
 
   const updated = await prisma.user.update({
     where: { id: userId },
