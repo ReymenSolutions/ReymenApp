@@ -63,7 +63,7 @@ const EMPTY_INPUT: SmartcardProfileInput = {
   youtube: "",
   primaryColor: "",
   accentColor: "",
-  background: null,
+  backgroundColor: "",
 };
 
 
@@ -90,7 +90,7 @@ function toInput(p: SmartcardProfile): SmartcardProfileInput {
     youtube: p.youtube ?? "",
     primaryColor: p.primaryColor ?? "",
     accentColor: p.accentColor ?? "",
-    background: p.background ?? null,
+    backgroundColor: p.backgroundColor ?? "",
   };
 }
 
@@ -116,6 +116,9 @@ function Field({
     </div>
   );
 }
+
+// Valor de la última opción del selector de diseño (no es un id de tema).
+const CUSTOM_DESIGN = "__custom__";
 
 const HEX_COLOR_INPUT = /^#[0-9a-fA-F]{6}$/;
 
@@ -187,13 +190,18 @@ export function SmartcardProfileDialog({
   const [theme, setTheme] = useState<ProfileThemeInfo | null>(null);
   const [themeId, setThemeId] = useState<string | null>(null);
   const [savedThemeId, setSavedThemeId] = useState<string | null>(null);
+  // Última opción de «Diseño de la tarjeta»: tus propios colores y fondo sobre el diseño base. Con cualquier otro
+  // diseño se usa tal cual (al guardar se borran los colores propios).
+  const [isCustom, setIsCustom] = useState(false);
 
   const t = (es: string, en: string) => (lang === "es" ? es : en);
 
   // El tema elegido define los colores base; los del perfil (si hay) van encima.
   const selectedTheme = theme?.options.find((o) => o.id === themeId) ?? null;
   const themeBase = parseThemeConfig(selectedTheme?.config);
-  const tokens = resolveCardTokens(selectedTheme?.config, form.primaryColor, form.accentColor, form.background);
+  const tokens = isCustom
+    ? resolveCardTokens(selectedTheme?.config, form.primaryColor, form.accentColor, form.backgroundColor)
+    : resolveCardTokens(selectedTheme?.config);
 
   useEffect(() => {
     if (!profileId) return;
@@ -211,6 +219,7 @@ export function SmartcardProfileDialog({
         return;
       }
       setForm(toInput(result.profile));
+      setIsCustom(Boolean(result.profile.primaryColor || result.profile.accentColor || result.profile.backgroundColor));
       setLinks(result.links);
       setTheme(result.theme);
       setThemeId(result.theme?.currentId ?? null);
@@ -227,7 +236,9 @@ export function SmartcardProfileDialog({
   async function handleSave() {
     if (!profileId) return;
     setSaving(true);
-    const result = await updateSmartcardProfile(profileId, form);
+    // Con un diseño predefinido se limpian los colores/fondo propios para que se vea tal cual.
+    const payload = isCustom ? form : { ...form, primaryColor: "", accentColor: "", backgroundColor: "" };
+    const result = await updateSmartcardProfile(profileId, payload);
     setSaving(false);
     if (!result.success) {
       toast.error(result.error);
@@ -340,84 +351,88 @@ export function SmartcardProfileDialog({
             <div role="tabpanel" id="spd-panel-apariencia" aria-labelledby="spd-tab-apariencia" hidden={tab !== "apariencia"} className="flex flex-col gap-6">
             <div>
               <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-                {t("Tema", "Theme")}
+                {t("Diseño de la tarjeta", "Card design")}
               </h3>
-              {theme && theme.options.length > 0 && (
-                <div className="mb-4 flex flex-col gap-1.5">
-                  <Label htmlFor="profile-theme">{t("Diseño de la tarjeta", "Card design")}</Label>
-                  <select
-                    id="profile-theme"
-                    value={themeId ?? ""}
-                    onChange={(e) => setThemeId(e.target.value || null)}
-                    className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm"
-                  >
-                    {themeId === null && <option value="">{t("Sin tema", "No theme")}</option>}
-                    {theme.options.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.name}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-slate-500">
-                    {selectedTheme
-                      ? t(
-                          `Esta tarjeta usa el tema «${selectedTheme.name}». Sus colores base son los que ves abajo; si cambias el tema, la tarjeta cambia de diseño y de colores base.`,
-                          `This card uses the “${selectedTheme.name}” theme. Its base colors are shown below; changing the theme changes the card's design and base colors.`
-                        )
-                      : t("Esta tarjeta no tiene un tema asignado.", "This card has no theme assigned.")}
-                  </p>
-                </div>
-              )}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <ColorField
-                  id="profile-primary-color"
-                  label={t("Color primario", "Primary color")}
-                  value={form.primaryColor ?? ""}
-                  onChange={(v) => set("primaryColor", v)}
-                  fallback={themeBase.primaryColor}
-                />
-                <ColorField
-                  id="profile-accent-color"
-                  label={t("Color de acento", "Accent color")}
-                  value={form.accentColor ?? ""}
-                  onChange={(v) => set("accentColor", v)}
-                  fallback={themeBase.accentColor}
-                />
-              </div>
-              <div className="mt-4 flex flex-col gap-1.5">
-                <Label htmlFor="profile-background">{t("Fondo de la tarjeta", "Card background")}</Label>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="profile-theme">{t("Diseño", "Design")}</Label>
                 <select
-                  id="profile-background"
-                  value={form.background ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, background: e.target.value === "light" || e.target.value === "dark" ? e.target.value : null }))}
+                  id="profile-theme"
+                  value={isCustom ? CUSTOM_DESIGN : (themeId ?? "")}
+                  onChange={(e) => {
+                    if (e.target.value === CUSTOM_DESIGN) {
+                      setIsCustom(true);
+                    } else {
+                      setIsCustom(false);
+                      setThemeId(e.target.value || null);
+                    }
+                  }}
                   className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm"
                 >
-                  <option value="">{t(`Según el tema (${themeBase.darkBackground ? "oscuro" : "claro"})`, `Follow the theme (${themeBase.darkBackground ? "dark" : "light"})`)}</option>
-                  <option value="light">{t("Claro (crema)", "Light (cream)")}</option>
-                  <option value="dark">{t("Oscuro", "Dark")}</option>
+                  {themeId === null && !isCustom && <option value="">{t("Sin diseño", "No design")}</option>}
+                  {(theme?.options ?? []).map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                    </option>
+                  ))}
+                  <option value={CUSTOM_DESIGN}>{t("Personalizado", "Custom")}</option>
                 </select>
                 <p className="text-xs text-slate-500">
-                  {t(
-                    "Elige «Claro» para tener fondo crema con tus propios colores, sin importar el tema.",
-                    "Pick “Light” for a cream background with your own colors, whatever the theme."
-                  )}
+                  {isCustom
+                    ? t(
+                        `Tus propios colores y fondo, sobre el diseño base «${selectedTheme?.name ?? "—"}». Si dejas un color en blanco se usa el del diseño.`,
+                        `Your own colors and background, on top of the “${selectedTheme?.name ?? "—"}” base design. Leave a color blank to use the design's.`
+                      )
+                    : t(
+                        "El diseño se usa tal cual, con sus colores y su fondo. Elige «Personalizado» para poner los tuyos; no se pierden al cambiar de diseño.",
+                        "The design is used as is, with its own colors and background. Pick “Custom” to set yours; they aren't lost when you switch designs."
+                      )}
                 </p>
               </div>
-              {HEX_COLOR_INPUT.test(form.accentColor ?? "") &&
-                !passesWcagAA(form.accentColor as string, tokens.dark ? "#1A1D18" : "#FBF6EF", true) && (
-                  <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                    {t(
-                      "El color de acento se confunde con el fondo de la tarjeta; los botones y detalles podrían no distinguirse bien. Puedes guardar igual, pero conviene un color más fuerte (o cambiar el fondo).",
-                      "The accent color blends into the card background, so buttons and details may be hard to see. You can still save, but a stronger color (or another background) is recommended."
+
+              {isCustom && (
+                <div className="mt-4 flex flex-col gap-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <ColorField
+                      id="profile-primary-color"
+                      label={t("Color primario", "Primary color")}
+                      value={form.primaryColor ?? ""}
+                      onChange={(v) => set("primaryColor", v)}
+                      fallback={themeBase.primaryColor}
+                    />
+                    <ColorField
+                      id="profile-accent-color"
+                      label={t("Color de acento", "Accent color")}
+                      value={form.accentColor ?? ""}
+                      onChange={(v) => set("accentColor", v)}
+                      fallback={themeBase.accentColor}
+                    />
+                  </div>
+                  <div>
+                    <ColorField
+                      id="profile-background-color"
+                      label={t("Color de fondo", "Background color")}
+                      value={form.backgroundColor ?? ""}
+                      onChange={(v) => set("backgroundColor", v)}
+                      fallback={themeBase.darkBackground ? "#1A1D18" : "#FBF6EF"}
+                    />
+                    <p className="mt-1 text-xs text-slate-500">
+                      {t(
+                        "Cualquier color: los textos se ajustan solos para leerse bien. En blanco se usa el fondo del diseño.",
+                        "Any color: texts adjust automatically to stay readable. Blank uses the design's background."
+                      )}
+                    </p>
+                  </div>
+                  {HEX_COLOR_INPUT.test(form.accentColor ?? "") &&
+                    !passesWcagAA(form.accentColor as string, tokens.background ?? (tokens.dark ? "#1A1D18" : "#FBF6EF"), true) && (
+                      <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        {t(
+                          "El color de acento se confunde con el fondo de la tarjeta; los botones y detalles podrían no distinguirse bien. Puedes guardar igual, pero conviene un color más fuerte (o cambiar el fondo).",
+                          "The accent color blends into the card background, so buttons and details may be hard to see. You can still save, but a stronger color (or another background) is recommended."
+                        )}
+                      </p>
                     )}
-                  </p>
-                )}
-              <p className="mt-2 text-xs text-slate-500">
-                {t(
-                  "Si los dejas en blanco se usan los colores del tema; si eliges otros, se aplican solo a esta tarjeta.",
-                  "Leave them blank to use the theme's colors; pick others to apply them to this card only."
-                )}
-              </p>
+                </div>
+              )}
             </div>
 
             </div>

@@ -35,6 +35,8 @@ export interface ThemeConfigFields {
   font: string
   border_radius: string
   dark_background: boolean
+  /** Fondo propio de la tarjeta (theme_overrides.background_color, #RRGGBB); null = el del tema (claro/oscuro). */
+  background_color: string | null
 }
 
 function readFields(c: Record<string, unknown>): ThemeConfigFields {
@@ -45,6 +47,7 @@ function readFields(c: Record<string, unknown>): ThemeConfigFields {
     font: typeof c.font === 'string' ? c.font : 'inter',
     border_radius: typeof c.border_radius === 'string' ? c.border_radius : 'md',
     dark_background: c.background === 'dark',
+    background_color: typeof c.background_color === 'string' && /^#[0-9a-fA-F]{6}$/.test(c.background_color) ? c.background_color : null,
   }
 }
 

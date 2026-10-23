@@ -129,6 +129,8 @@ export interface CardTokens {
   primary: string;
   accent: string;
   dark: boolean;
+  /** Fondo propio de la tarjeta; null = el claro/oscuro del diseño. */
+  background: string | null;
 }
 
 /**
@@ -140,12 +142,15 @@ export function resolveCardTokens(
   themeConfig: unknown,
   primaryOverride?: string | null,
   accentOverride?: string | null,
-  backgroundOverride?: "light" | "dark" | null
+  backgroundOverride?: string | null
 ): CardTokens {
   const base = parseThemeConfig(themeConfig);
+  const custom = backgroundOverride && HEX_COLOR.test(backgroundOverride) ? backgroundOverride : null;
   return {
     primary: primaryOverride && HEX_COLOR.test(primaryOverride) ? primaryOverride : base.primaryColor,
     accent: accentOverride && HEX_COLOR.test(accentOverride) ? accentOverride : base.accentColor,
-    dark: backgroundOverride ? backgroundOverride === "dark" : base.darkBackground,
+    // Con fondo propio, claro/oscuro se decide por contraste (igual que la tarjeta pública).
+    dark: custom ? (contrastRatio(custom, "#FFFFFF") ?? 0) > (contrastRatio(custom, "#000000") ?? 0) : base.darkBackground,
+    background: custom,
   };
 }

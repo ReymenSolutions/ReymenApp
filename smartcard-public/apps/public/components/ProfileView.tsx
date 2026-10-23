@@ -1,5 +1,5 @@
 import type { PublicProfile } from '@reymen/database'
-import { mergeThemeConfig } from '@reymen/lib'
+import { mergeThemeConfig, contrastRatio } from '@reymen/lib'
 import {
   IconPhone,
   IconWhatsapp,
@@ -82,11 +82,17 @@ export function ProfileView({
   // el clic en sí es una petición nueva y sin sesión.
   const srcParam = source === 'DIRECT' ? '' : `?src=${source}`
   const tokens = mergeThemeConfig(profile.theme.config, profile.theme.overrides)
-  const cardBg = tokens.dark_background ? '#1A1D18' : '#FBF6EF'
-  const textPrimary = tokens.dark_background ? '#F3F1EA' : '#242821'
-  const textMuted = tokens.dark_background ? '#A9AFA2' : '#52594B'
-  const cardBorder = tokens.dark_background ? '#2E322A' : '#ECE1D2'
-  const chipBg = tokens.dark_background ? '#20241D' : '#FFFFFF'
+  // Con fondo propio (background_color) se decide claro/oscuro por contraste y los
+  // demás tonos (texto, bordes, chips) se derivan de ese color; sin él, los del tema.
+  const customBg = tokens.background_color
+  const isDark = customBg
+    ? (contrastRatio(customBg, '#FFFFFF') ?? 0) > (contrastRatio(customBg, '#000000') ?? 0)
+    : tokens.dark_background
+  const cardBg = customBg ?? (isDark ? '#1A1D18' : '#FBF6EF')
+  const textPrimary = isDark ? '#F3F1EA' : '#242821'
+  const textMuted = isDark ? '#A9AFA2' : '#52594B'
+  const cardBorder = customBg ? `color-mix(in srgb, ${cardBg} 85%, ${textPrimary})` : isDark ? '#2E322A' : '#ECE1D2'
+  const chipBg = customBg ? (isDark ? `color-mix(in srgb, ${cardBg} 92%, #FFFFFF)` : `color-mix(in srgb, ${cardBg} 40%, #FFFFFF)`) : isDark ? '#20241D' : '#FFFFFF'
   // Panel de fondo detrás del avatar -- va SOLO hasta la mitad del avatar
   // (ver `heroHeight`/`marginTop` más abajo: el avatar queda montado justo
   // en el borde de abajo), no una franja alta con formas decorativas como en
@@ -96,7 +102,7 @@ export function ProfileView({
   // en un theme oscuro se usa `accent_color` en su lugar, porque ahí
   // `primary_color` está pensado para teñir íconos sobre chips oscuros
   // (llega a ser blanco puro), no para rellenar un panel grande.
-  const heroBg = tokens.dark_background ? tokens.accent_color : tokens.primary_color
+  const heroBg = isDark ? tokens.accent_color : tokens.primary_color
   const heroHeight = 96
   const avatarSize = 112
 

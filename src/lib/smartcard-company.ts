@@ -459,8 +459,8 @@ export interface SmartcardProfile {
   youtube: string | null;
   primaryColor: string | null;
   accentColor: string | null;
-  /** Fondo de la tarjeta forzado desde el perfil (theme_overrides.background); null = el del tema. */
-  background: "light" | "dark" | null;
+  /** Fondo propio de la tarjeta (theme_overrides.background_color, #RRGGBB); null = el del diseño. */
+  backgroundColor: string | null;
 }
 
 export interface ProfileLink {
@@ -478,10 +478,14 @@ const PROFILE_SELECT =
 /** theme_overrides es jsonb libre en forma (controlado en contenido por
  * quien escribe, ver updateSmartcardProfile) — se lee de forma defensiva,
  * cualquier llave que no sea el string esperado se trata como ausente. */
-function readThemeOverrideBackground(overrides: unknown): "light" | "dark" | null {
+/** background_color propio; si solo hay el `background` claro/oscuro de una versión anterior, se traduce a su color. */
+function readThemeOverrideBackground(overrides: unknown): string | null {
   if (!overrides || typeof overrides !== "object") return null;
-  const value = (overrides as Record<string, unknown>).background;
-  return value === "light" || value === "dark" ? value : null;
+  const o = overrides as Record<string, unknown>;
+  if (typeof o.background_color === "string" && /^#[0-9a-fA-F]{6}$/.test(o.background_color)) return o.background_color;
+  if (o.background === "light") return "#FBF6EF";
+  if (o.background === "dark") return "#1A1D18";
+  return null;
 }
 
 function readThemeOverrideColor(overrides: unknown, key: "primary_color" | "accent_color"): string | null {
@@ -514,7 +518,7 @@ function mapProfileRow(p: Record<string, unknown>): SmartcardProfile {
     youtube: p.youtube as string | null,
     primaryColor: readThemeOverrideColor(p.theme_overrides, "primary_color"),
     accentColor: readThemeOverrideColor(p.theme_overrides, "accent_color"),
-    background: readThemeOverrideBackground(p.theme_overrides),
+    backgroundColor: readThemeOverrideBackground(p.theme_overrides),
   };
 }
 
@@ -588,7 +592,7 @@ export async function getSmartcardProfile(
 export async function updateProfileThemeColors(
   profileId: string,
   companyId: string,
-  colors: { primaryColor: string | null; accentColor: string | null; background?: "light" | "dark" | null }
+  colors: { primaryColor: string | null; accentColor: string | null; backgroundColor?: string | null }
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = getSmartcardAdminClient();
   if (!supabase) return { ok: false, error: "SmartCard aún no está configurado en este entorno." };
@@ -617,9 +621,11 @@ export async function updateProfileThemeColors(
   else delete next.primary_color;
   if (colors.accentColor) next.accent_color = colors.accentColor;
   else delete next.accent_color;
-  if (colors.background !== undefined) {
-    if (colors.background) next.background = colors.background;
-    else delete next.background;
+  if (colors.backgroundColor !== undefined) {
+    if (colors.backgroundColor) next.background_color = colors.backgroundColor;
+    else delete next.background_color;
+    // El `background` claro/oscuro de una versión anterior queda reemplazado por el color.
+    delete next.background;
   }
 
   const { error: writeError } = await supabase
