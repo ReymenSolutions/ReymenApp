@@ -23,6 +23,7 @@ export const MAX_PROFILE_PRODUCTS = 12;
 
 export interface ProfileProduct {
   id: string;
+  /** null = producto escrito a mano (sin módulo dueño). */
   ref: string | null;
   title: string;
   subtitle: string | null;

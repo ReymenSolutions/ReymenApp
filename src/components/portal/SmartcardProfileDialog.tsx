@@ -24,7 +24,11 @@ import {
 } from "@/actions/portal/smartcard";
 import type { SmartcardProfile, ProfileLink } from "@/lib/smartcard-company";
 import { passesWcagAA } from "@/lib/smartcard-theme";
+import { LINK_ICON_OPTIONS } from "@/lib/smartcard-link-icons";
+import type { ProfileProduct } from "@/lib/smartcard-products";
+import { TabBar } from "@/components/shared/TabBar";
 import { SmartcardProductsSection } from "./SmartcardProductsSection";
+import { SmartcardCardPreview } from "./SmartcardCardPreview";
 
 /**
  * Self-service editor for a SmartCard PROFILE (2026-09-29) — the rich
@@ -176,6 +180,9 @@ export function SmartcardProfileDialog({
   const [newLinkUrl, setNewLinkUrl] = useState("");
   const [addingLink, setAddingLink] = useState(false);
   const [busyLinkId, setBusyLinkId] = useState<string | null>(null);
+  const [newLinkIcon, setNewLinkIcon] = useState("");
+  const [tab, setTab] = useState<"perfil" | "apariencia" | "contacto" | "links" | "productos">("perfil");
+  const [products, setProducts] = useState<ProfileProduct[]>([]);
 
   const t = (es: string, en: string) => (lang === "es" ? es : en);
 
@@ -184,6 +191,8 @@ export function SmartcardProfileDialog({
     setLoading(true);
     setForm(EMPTY_INPUT);
     setLinks([]);
+    setProducts([]);
+    setTab("perfil");
     (async () => {
       const result = await getSmartcardProfileForEdit(profileId);
       if (!result.success) {
@@ -218,15 +227,16 @@ export function SmartcardProfileDialog({
   async function handleAddLink() {
     if (!profileId) return;
     setAddingLink(true);
-    const result = await saveProfileLink(profileId, { title: newLinkTitle, url: newLinkUrl });
+    const result = await saveProfileLink(profileId, { title: newLinkTitle, url: newLinkUrl, icon: newLinkIcon || null });
     setAddingLink(false);
     if (!result.success) {
       toast.error(result.error);
       return;
     }
-    setLinks((prev) => [...prev, { id: result.linkId, title: newLinkTitle.trim(), url: newLinkUrl.trim(), sortOrder: prev.length }]);
+    setLinks((prev) => [...prev, { id: result.linkId, title: newLinkTitle.trim(), url: newLinkUrl.trim(), icon: newLinkIcon || null, sortOrder: prev.length }]);
     setNewLinkTitle("");
     setNewLinkUrl("");
+    setNewLinkIcon("");
   }
 
   async function handleDeleteLink(linkId: string) {
@@ -243,7 +253,7 @@ export function SmartcardProfileDialog({
 
   return (
     <Dialog open={profileId !== null} onOpenChange={(open) => !open && onOpenChange(false)}>
-      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t("Editar perfil", "Edit profile")}</DialogTitle>
           <DialogDescription>
@@ -259,7 +269,22 @@ export function SmartcardProfileDialog({
             <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
           </div>
         ) : (
-          <div className="flex flex-col gap-6">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="min-w-0">
+            <TabBar
+              tabs={[
+                { key: "perfil", label: t("Perfil", "Profile") },
+                { key: "apariencia", label: t("Apariencia", "Appearance") },
+                { key: "contacto", label: t("Contacto y redes", "Contact & social") },
+                { key: "links", label: "Links", count: links.length },
+                { key: "productos", label: t("Productos", "Products"), count: products.length },
+              ]}
+              value={tab}
+              onChange={(k) => setTab(k as typeof tab)}
+              label={t("Secciones del perfil", "Profile sections")}
+              idBase="spd"
+            />
+            <div role="tabpanel" id="spd-panel-perfil" aria-labelledby="spd-tab-perfil" hidden={tab !== "perfil"} className="flex flex-col gap-6">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <Field
@@ -290,6 +315,9 @@ export function SmartcardProfileDialog({
               )}
             </p>
 
+            </div>
+
+            <div role="tabpanel" id="spd-panel-apariencia" aria-labelledby="spd-tab-apariencia" hidden={tab !== "apariencia"} className="flex flex-col gap-6">
             <div>
               <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
                 {t("Tema", "Theme")}
@@ -328,6 +356,9 @@ export function SmartcardProfileDialog({
               </p>
             </div>
 
+            </div>
+
+            <div role="tabpanel" id="spd-panel-contacto" aria-labelledby="spd-tab-contacto" hidden={tab !== "contacto"} className="flex flex-col gap-6">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field id="profile-phone" label={t("Teléfono", "Phone")} value={form.phone ?? ""} onChange={(v) => set("phone", v)} />
               <Field id="profile-whatsapp" label="WhatsApp" value={form.whatsapp ?? ""} onChange={(v) => set("whatsapp", v)} />
@@ -349,6 +380,9 @@ export function SmartcardProfileDialog({
               <Field id="profile-youtube" label="YouTube" value={form.youtube ?? ""} onChange={(v) => set("youtube", v)} placeholder="https://..." />
             </div>
 
+            </div>
+
+            <div role="tabpanel" id="spd-panel-links" aria-labelledby="spd-tab-links" hidden={tab !== "links"}>
             <div>
               <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
                 {t(`Links del perfil público (${links.length})`, `Public profile links (${links.length})`)}
@@ -358,7 +392,10 @@ export function SmartcardProfileDialog({
                   <div key={l.id} className="flex items-center gap-2 rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-medium text-slate-700">{l.title}</div>
-                      <div className="truncate text-xs text-slate-500">{l.url}</div>
+                      <div className="truncate text-xs text-slate-500">
+                        {l.url}
+                        {l.icon && ` · ${LINK_ICON_OPTIONS.find((o) => o.value === l.icon)?.label ?? l.icon}`}
+                      </div>
                     </div>
                     <Button
                       variant="ghost"
@@ -389,6 +426,18 @@ export function SmartcardProfileDialog({
                   placeholder="https://..."
                   className="sm:flex-1"
                 />
+                <select
+                  value={newLinkIcon}
+                  onChange={(e) => setNewLinkIcon(e.target.value)}
+                  aria-label={t("Ícono del link", "Link icon")}
+                  className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm sm:w-44"
+                >
+                  {LINK_ICON_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.value === "" ? t("Ícono genérico", "Generic icon") : o.label}
+                    </option>
+                  ))}
+                </select>
                 <Button
                   variant="outline"
                   size="sm"
@@ -401,7 +450,35 @@ export function SmartcardProfileDialog({
               </div>
             </div>
 
-            {profileId && <SmartcardProductsSection profileId={profileId} lang={lang} />}
+            </div>
+
+            <div role="tabpanel" id="spd-panel-productos" aria-labelledby="spd-tab-productos" hidden={tab !== "productos"}>
+              {profileId && <SmartcardProductsSection profileId={profileId} lang={lang} onProductsChange={setProducts} />}
+            </div>
+          </div>
+
+          <aside className="lg:sticky lg:top-0 lg:self-start">
+            <SmartcardCardPreview
+              lang={lang}
+              data={{
+                displayName: form.displayName,
+                jobTitle: form.jobTitle ?? "",
+                company: form.company ?? "",
+                bio: form.bio ?? "",
+                photoUrl: form.photoUrl ?? "",
+                logoUrl: form.logoUrl ?? "",
+                phone: form.phone ?? "",
+                whatsapp: form.whatsapp ?? "",
+                email: form.email ?? "",
+                website: form.website ?? "",
+                address: form.address ?? "",
+                primaryColor: form.primaryColor ?? "",
+                accentColor: form.accentColor ?? "",
+              }}
+              links={links}
+              products={products}
+            />
+          </aside>
           </div>
         )}
 
