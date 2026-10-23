@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { usePreferences } from "@/context/preferences";
+import { TabBar } from "@/components/shared/TabBar";
 import { SmartcardProfileDialog } from "@/components/portal/SmartcardProfileDialog";
 import {
   inviteSmartcardTeamMember,
@@ -184,6 +185,14 @@ export function SmartcardPanel({
   // expand/collapse toggle per row reusing that same data, no new query.
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
 
+  // Pestañas: Resumen, Tarjetas y Equipo (antes todo iba en una sola página larga).
+  const [tab, setTab] = useState<"resumen" | "tarjetas" | "equipo">("resumen");
+  const tabs = [
+    { key: "resumen", label: lang === "es" ? "Resumen" : "Overview" },
+    { key: "tarjetas", label: lang === "es" ? "Tarjetas" : "Cards", count: cardStats.totalCards },
+    { key: "equipo", label: lang === "es" ? "Equipo" : "Team" },
+  ];
+
   function openEditCard(c: CardStatsEntry) {
     setEditingCard(c);
     setEditType(c.destinationType);
@@ -302,6 +311,10 @@ export function SmartcardPanel({
         </p>
       </div>
 
+      <TabBar tabs={tabs} value={tab} onChange={(k) => setTab(k as typeof tab)} label={lang === "es" ? "Secciones de SmartCard" : "SmartCard sections"} idBase="sc" />
+
+      {tab === "resumen" && (
+        <div role="tabpanel" id="sc-panel-resumen" aria-labelledby="sc-tab-resumen" className="space-y-4">
       <Card>
         <CardHeader className="p-3 sm:p-4 flex-row items-center gap-2">
           <CreditCard className="h-4 w-4 text-slate-400" />
@@ -325,6 +338,7 @@ export function SmartcardPanel({
           )}
         </CardContent>
       </Card>
+
 
       <Card>
         <CardHeader className="p-3 sm:p-4 flex-row items-center gap-2">
@@ -354,10 +368,28 @@ export function SmartcardPanel({
                 <EventBreakdown counts={cardStats.byType} labels={EVENT_TYPE_LABELS} lang={lang} />
               </div>
 
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+        </div>
+      )}
+
+      {tab === "tarjetas" && (
+        <div role="tabpanel" id="sc-panel-tarjetas" aria-labelledby="sc-tab-tarjetas" className="space-y-4">
+      <Card>
+        <CardHeader className="p-3 sm:p-4 flex-row items-center gap-2">
+          <CreditCard className="h-4 w-4 text-slate-400" />
+          <CardTitle>{lang === "es" ? "Tarjetas" : "Cards"}</CardTitle>
+        </CardHeader>
+        <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+          {cardStats.totalCards === 0 ? (
+            <p className="rounded-md bg-slate-50 px-3 py-3 text-sm text-slate-500">
+              {lang === "es" ? "Todavía no hay tarjetas emitidas para esta empresa." : "No cards have been issued for this company yet."}
+            </p>
+          ) : (
               <div>
-                <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-                  {lang === "es" ? "Por tarjeta" : "By card"}
-                </h3>
                 <MetricGrid columns={2} density="comfortable">
                   {cardStats.cards.map((c) => {
                     const isExpanded = expandedCardId === c.cardId;
@@ -395,11 +427,14 @@ export function SmartcardPanel({
                   })}
                 </MetricGrid>
               </div>
-            </div>
           )}
         </CardContent>
       </Card>
+        </div>
+      )}
 
+      {tab === "equipo" && (
+        <div role="tabpanel" id="sc-panel-equipo" aria-labelledby="sc-tab-equipo" className="space-y-4">
       <Card>
         <CardHeader className="p-3 sm:p-4 flex-row flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -515,6 +550,9 @@ export function SmartcardPanel({
           )}
         </CardContent>
       </Card>
+        </div>
+      )}
+
 
       <Dialog open={editingCard !== null} onOpenChange={(open) => !open && setEditingCard(null)}>
         <DialogContent>
