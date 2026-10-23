@@ -10,6 +10,7 @@ datasource db {
 // ─── TENANT ──────────────────────────────────────────────────────
 
 model Organization {
+  markChatSettings MarkChatSettings?
   aiPilotBudgetPolicy AiPilotBudgetPolicy?
   aiPilotBudgetRoots AiPilotBudgetRoot[]
   agentSandboxRuns AgentSandboxRun[]
@@ -158,6 +159,7 @@ model Organization {
 // ─── USERS & AUTH ─────────────────────────────────────────────────
 
 model User {
+  markChatSettings MarkChatSettings[]
   markChatPilots MarkChatPilot[] @relation("MarkChatPilotCreator")
   markChatTurns MarkChatTurn[] @relation("MarkChatTurnCreator")
   id                   String    @id @default(cuid())
@@ -3507,6 +3509,9 @@ model MarkChatTurn {
   generatedById String
   requestKey String @unique
   expectedRevision Int
+  modeVersion Int @default(0)
+  humanRequested Boolean @default(false)
+  automatic Boolean @default(false)
   knowledgeVersion Int?
   sources Json?
   usageId String?
@@ -3517,4 +3522,15 @@ model MarkChatTurn {
   creator User @relation("MarkChatTurnCreator", fields: [generatedById], references: [id], onDelete: Restrict)
   @@unique([conversationId, basedOnMessageId])
   @@unique([organizationId, draftId])
+}
+
+// Separate from legacy channel modes and immutable pilot configuration snapshots.
+model MarkChatSettings {
+  organizationId String @id
+  mode AgentMode @default(SUGGEST)
+  version Int @default(1)
+  updatedById String
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  actor User @relation(fields: [updatedById], references: [id], onDelete: Restrict)
 }

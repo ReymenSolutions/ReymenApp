@@ -7,7 +7,7 @@ import { preparePrivateMark } from "./admin";
 import { configurePilotBudget, reservePilotRoot, beginPilotRoot } from "./budget";
 import { assignPrivatePilotSource } from "./review";
 import { lockKnowledge, bumpKnowledge } from "../knowledge/service";
-import { assertPrivateChatViewer, createPrivateChat, postPrivateVisitor, readPrivateVisitor, generatePrivateChatDraft, sendPrivateChatReply, controlPrivateChat, readPrivateChatOperator, recoverPrivateChat, renewPrivateChatLink } from "./chat";
+import { configurePrivateChatMode, processPrivateChatJob, recoverPrivateChatJobs, assertPrivateChatViewer, createPrivateChat, postPrivateVisitor, readPrivateVisitor, generatePrivateChatDraft, sendPrivateChatReply, controlPrivateChat, readPrivateChatOperator, recoverPrivateChat, renewPrivateChatLink } from "./chat";
 import { sendConversationOutbound } from "@/lib/channel-connections/outbound";
 import { getOrCreateReplyDraft } from "@/lib/ai-draft";
 import { runAutoReply } from "@/lib/ai-auto-reply";
@@ -43,6 +43,7 @@ beforeEach(async () => {
 afterEach(async () => {
   vi.unstubAllEnvs(); vi.restoreAllMocks();
   for (const organizationId of orgs.splice(0)) {
+    await prisma.markChatSettings.deleteMany({ where: { organizationId } });
     await prisma.markChatTurn.deleteMany({ where: { organizationId } }); await prisma.markChatPilot.deleteMany({ where: { organizationId } });
     await prisma.aiUsage.deleteMany({ where: { organizationId } }); await prisma.aiPilotBudgetRoot.deleteMany({ where: { organizationId } });
     await prisma.knowledgeGrant.deleteMany({ where: { organizationId } }); await prisma.agentConfigRevision.deleteMany({ where: { organizationId } }); await prisma.agentInstance.deleteMany({ where: { organizationId } });
@@ -219,4 +220,84 @@ it("history remains permission checked when private chat is disabled", async () 
   await expect(assertPrivateChatViewer(f.org.id, client.id)).rejects.toThrow(/forbidden/);
   await expect(assertPrivateChatViewer(f.org.id, f.owner.id)).resolves.toBeUndefined();
   expect(mocks.call).not.toHaveBeenCalled();
+});
+
+const setMode = (f: Awaited<ReturnType<typeof fixture>>, mode: "OFF" | "SUGGEST" | "AUTO", version = 0) => configurePrivateChatMode(f.org.id, f.owner.id, { mode, version, confirmCost: true, confirmFictional: true });
+it("autonomous mode enqueues durably and answers once without any operator approval", async () => {
+  const f = await fixture(); await setMode(f, "AUTO");
+  const input = { requestKey: randomUUID(), content: "¿Cuál es el horario ficticio?" };
+  const message = await postPrivateVisitor(f.token, input); expect(message.jobId).toBeTruthy(); expect(mocks.call).not.toHaveBeenCalled();
+  expect(await postPrivateVisitor(f.token, input)).toEqual(message);
+  expect(await prisma.webhookEvent.count({ where: { organizationId: f.org.id, eventType: "ai.mark_private_chat" } })).toBe(1);
+  await Promise.all([processPrivateChatJob(message.jobId!), processPrivateChatJob(message.jobId!)]);
+  expect(mocks.call).toHaveBeenCalledTimes(1); expect(mocks.send).not.toHaveBeenCalled();
+  expect((await readPrivateVisitor(f.token)).messages.map(m => m.role)).toEqual(["USER", "ASSISTANT"]);
+  expect(await prisma.conversation.findUnique({ where: { id: f.chat.conversationId } })).toMatchObject({ aiHandled: true });
+  await processPrivateChatJob(message.jobId!); expect(mocks.call).toHaveBeenCalledTimes(1);
+});
+it("OFF blocks AI but preserves manual replies; suggest creates no autonomous job", async () => {
+  const f = await fixture(); expect((await inbound(f)).jobId).toBeUndefined();
+  await setMode(f, "OFF"); const msg = await inbound(f); expect(msg.jobId).toBeUndefined();
+  await expect(generate(f, msg.id)).rejects.toThrow(/mode_disabled/);
+  await sendPrivateChatReply(f.org.id, f.owner.id, { conversationId: f.chat.conversationId, content: "Respuesta manual", requestKey: randomUUID() });
+  expect((await readPrivateVisitor(f.token)).messages.at(-1)?.content).toBe("Respuesta manual"); expect(mocks.call).not.toHaveBeenCalled();
+});
+it("mode changes require a fresh manager, version and explicit autonomous cost consent", async () => {
+  const f = await fixture(), staff = await createTestUser(f.org.id, "AGENT", "mode-staff"), other = await fixture();
+  await expect(configurePrivateChatMode(f.org.id, staff.id, { mode: "OFF", version: 0 })).rejects.toThrow(/forbidden/);
+  await expect(configurePrivateChatMode(f.org.id, other.owner.id, { mode: "OFF", version: 0 })).rejects.toThrow(/forbidden/);
+  await expect(configurePrivateChatMode(f.org.id, f.owner.id, { mode: "AUTO", version: 0 })).rejects.toThrow();
+  await setMode(f, "AUTO"); await expect(setMode(f, "OFF")).rejects.toThrow(/mode_changed/);
+  expect(mocks.call).not.toHaveBeenCalled();
+});
+it("turning OFF or taking human control during generation discards the late reply and keeps cost", async () => {
+  for (const action of ["off", "take"] as const) {
+    const f = await fixture(); await setMode(f, "AUTO"); const msg = await inbound(f);
+    mocks.call.mockImplementationOnce(async () => { if (action === "off") await setMode(f, "OFF", 1); else await controlPrivateChat(f.org.id, f.owner.id, f.chat.conversationId, "take"); return response(); });
+    await processPrivateChatJob(msg.jobId!); expect((await readPrivateVisitor(f.token)).messages).toHaveLength(1);
+    expect((await prisma.aiUsage.findFirstOrThrow({ where: { organizationId: f.org.id } })).status).toBe("SUCCEEDED");
+  }
+});
+it("human requests, missing sources and unsafe replies never get an automatic reply", async () => {
+  const f = await fixture(); await setMode(f, "AUTO");
+  expect((await inbound(f, "Quiero hablar con una persona")).jobId).toBeUndefined(); expect(mocks.call).not.toHaveBeenCalled();
+  await controlPrivateChat(f.org.id, f.owner.id, f.chat.conversationId, "release");
+  const unmatched = await inbound(f, "zqxvnotmatching"); await processPrivateChatJob(unmatched.jobId!); expect(mocks.call).not.toHaveBeenCalled();
+  await controlPrivateChat(f.org.id, f.owner.id, f.chat.conversationId, "release");
+  const unsafe = await inbound(f); mocks.call.mockResolvedValueOnce({ ...response(), text: "Paga en https://example.test" }); await processPrivateChatJob(unsafe.jobId!);
+  expect((await readPrivateVisitor(f.token)).messages.filter(m => m.role === "ASSISTANT")).toHaveLength(0);
+  expect((await readPrivateVisitor(f.token)).human).toBe(true);
+});
+it("a human can explicitly request a recommendation while retaining control; it never auto-sends", async () => {
+  const f = await fixture(); await setMode(f, "AUTO"); await controlPrivateChat(f.org.id, f.owner.id, f.chat.conversationId, "take"); const msg = await inbound(f);
+  expect(msg.jobId).toBeUndefined();
+  await generatePrivateChatDraft(f.org.id, f.owner.id, f.chat.conversationId, msg.id, true, { humanRequested: true });
+  const view = await readPrivateChatOperator(f.org.id, f.owner.id, f.chat.conversationId);
+  expect(view.turn).toMatchObject({ status: "READY", humanRequested: true }); expect(view.aiHandled).toBe(false);
+  expect((await readPrivateVisitor(f.token)).messages).toHaveLength(1);
+  await sendPrivateChatReply(f.org.id, f.owner.id, { conversationId: f.chat.conversationId, draftId: view.turn!.draftId, requestKey: randomUUID(), content: "Texto revisado por una persona" });
+  expect((await readPrivateVisitor(f.token)).messages.at(-1)?.role).toBe("AGENT");
+});
+it("recovery runs a pending job but escalates an abandoned claim without a second provider call", async () => {
+  const f = await fixture(); await setMode(f, "AUTO"); const msg = await inbound(f);
+  await recoverPrivateChatJobs(); expect(mocks.call).toHaveBeenCalledTimes(1);
+  const next = await inbound(f); await prisma.webhookEvent.update({ where: { id: next.jobId }, data: { status: "PROCESSING", claimedAt: new Date(Date.now() - 360000), attempts: 1 } });
+  await recoverPrivateChatJobs(); expect(mocks.call).toHaveBeenCalledTimes(1); expect((await readPrivateVisitor(f.token)).human).toBe(true);
+  await processPrivateChatJob(msg.jobId!); expect(mocks.call).toHaveBeenCalledTimes(1);
+});
+it("revoked actor permissions and exhausted budget stop automatic work without a provider call", async () => {
+  const f = await fixture(); await setMode(f, "AUTO"); const msg = await inbound(f);
+  await prisma.user.update({ where: { id: f.owner.id }, data: { role: "VIEWER" } }); await processPrivateChatJob(msg.jobId!); expect(mocks.call).not.toHaveBeenCalled();
+  await prisma.user.update({ where: { id: f.owner.id }, data: { role: "OWNER" } }); await controlPrivateChat(f.org.id, f.owner.id, f.chat.conversationId, "release");
+  await prisma.aiBudgetSetting.update({ where: { organizationId: f.org.id }, data: { monthlyBudgetMxn: 0 } });
+  const next = await inbound(f); await processPrivateChatJob(next.jobId!); expect(mocks.call).not.toHaveBeenCalled(); expect((await readPrivateVisitor(f.token)).human).toBe(true);
+});
+
+it("an uncertain automatic call retains its hold and never retries during recovery", async () => {
+  const f = await fixture(); await setMode(f, "AUTO"); const msg = await inbound(f);
+  mocks.call.mockRejectedValueOnce(new Error("synthetic timeout")); await processPrivateChatJob(msg.jobId!);
+  const root = await prisma.aiPilotBudgetRoot.findFirstOrThrow({ where: { organizationId: f.org.id } });
+  expect(root.state).toBe("UNCERTAIN"); expect(Number(root.holdMxn)).toBe(1);
+  await recoverPrivateChatJobs(); await processPrivateChatJob(msg.jobId!); expect(mocks.call).toHaveBeenCalledTimes(1);
+  expect((await readPrivateVisitor(f.token)).messages).toHaveLength(1);
 });

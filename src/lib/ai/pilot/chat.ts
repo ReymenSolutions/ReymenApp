@@ -1,12 +1,14 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
-import type { Prisma } from "@prisma/client";
+import type { AgentMode, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { can, type Action } from "@/lib/permissions";
 import { appUrl } from "@/lib/app-url";
 import { messagePreview } from "@/lib/channels";
 import { customerNeedsHuman } from "@/lib/ai/human-request";
 import { assertPrivateReviewSources, runPrivateMarkReview } from "./review";
+import { unsafeReason } from "@/lib/ai-auto-reply";
+import { AUTO_JOB_SOURCE } from "@/lib/ai-job-contract";
 import { lockPilotBudget } from "./budget";
 
 type Tx = Prisma.TransactionClient;
@@ -50,6 +52,45 @@ export async function assertPrivateChatViewer(organizationId: string, actorId: s
   await prisma.$transaction(tx => authority(tx, organizationId, actorId, "conversations:view"));
 }
 
+export const PRIVATE_CHAT_JOB_TYPE = "ai.mark_private_chat";
+const modeSchema = z.enum(["OFF", "SUGGEST", "AUTO"]);
+async function modeSettings(tx: Tx, organizationId: string) {
+  const row = await tx.markChatSettings.findUnique({ where: { organizationId } });
+  return { mode: row?.mode ?? "SUGGEST", version: row?.version ?? 0, actorId: row?.updatedById ?? null };
+}
+export async function readPrivateChatSettings(organizationId: string, actorId: string) {
+  gate(); return prisma.$transaction(async tx => {
+    const user = await authority(tx, organizationId, actorId, "conversations:view");
+    const settings = await modeSettings(tx, organizationId);
+    return { mode: settings.mode, version: settings.version, canManage: can(user.role, "knowledge_base:manage") };
+  });
+}
+export async function configurePrivateChatMode(organizationId: string, actorId: string, raw: { mode: AgentMode; version: number; confirmCost?: boolean; confirmFictional?: boolean }) {
+  gate(); const input = z.object({ mode: modeSchema, version: z.number().int().nonnegative(), confirmCost: z.boolean().optional(), confirmFictional: z.boolean().optional() }).strict().parse(raw);
+  if (input.mode === "AUTO") { z.literal(true).parse(input.confirmCost); z.literal(true).parse(input.confirmFictional); }
+  return prisma.$transaction(async tx => {
+    // Serialize creation and mode changes; all conversation locks precede budget/knowledge.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${"mark-chat-create:" + organizationId}))`;
+    await tx.$queryRaw`SELECT c.id FROM "Conversation" c JOIN "MarkChatPilot" p ON p."conversationId"=c.id AND p."organizationId"=c."organizationId" WHERE c."organizationId"=${organizationId} ORDER BY c.id FOR UPDATE OF c`;
+    await authority(tx, organizationId, actorId, "knowledge_base:manage");
+    const previous = await modeSettings(tx, organizationId);
+    if (previous.version !== input.version) throw new Error("pilot_chat_mode_changed");
+    if (input.mode === "AUTO") {
+      await lockPilotBudget(tx, organizationId);
+      const policy = await tx.aiPilotBudgetPolicy.findUnique({ where: { organizationId } });
+      const knowledge = await tx.knowledgeAccessPolicy.findUnique({ where: { organizationId } });
+      if (!policy?.enabled || !knowledge?.enabled) throw new Error("pilot_chat_setup_required");
+      await assertPrivateReviewSources(tx, organizationId, knowledge.version);
+      if (!await tx.knowledgeGrant.count({ where: { organizationId, enabled: true, instance: { definitionKey: "mark" }, article: { isActive: true }, revision: { publishedAt: { not: null } } } })) throw new Error("pilot_chat_setup_required");
+    }
+    const settings = await tx.markChatSettings.upsert({ where: { organizationId }, create: { organizationId, mode: input.mode, updatedById: actorId }, update: { mode: input.mode, updatedById: actorId, version: { increment: 1 } } });
+    await tx.markChatPilot.updateMany({ where: { organizationId }, data: { revision: { increment: 1 } } });
+    await tx.replyDraft.updateMany({ where: { organizationId, conversation: { markChatPilot: { isNot: null } }, status: { in: ["GENERATING", "READY"] } }, data: { status: "DISMISSED", content: "", error: "pilot_mode_changed" } });
+    await tx.auditLog.create({ data: { organizationId, userId: actorId, action: "ai.mark_chat.mode", resource: "MarkChatSettings", resourceId: organizationId, metadata: { mode: settings.mode, version: settings.version } } });
+    return { mode: settings.mode, version: settings.version };
+  }, { timeout: 15000 });
+}
+
 export async function createPrivateChat(organizationId: string, actorId: string, raw: { requestKey: string; confirmFictional: boolean }) {
   gate(); const input = z.object({ requestKey: z.string().uuid(), confirmFictional: z.literal(true) }).strict().parse(raw);
   const token = randomBytes(32).toString("base64url");
@@ -90,8 +131,8 @@ async function visitor(tx: Tx, token: string) {
 export async function readPrivateVisitor(token: string) {
   return prisma.$transaction(async tx => {
     const pilot = await visitor(tx, token);
-    const messages = await tx.message.findMany({ where: { conversationId: pilot.conversationId, role: { in: ["USER", "AGENT"] } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 100, select: { id: true, role: true, content: true, createdAt: true } });
-    return { status: pilot.conversation.status, human: !pilot.conversation.aiHandled, messages: messages.reverse().map(m => ({ ...m, createdAt: m.createdAt.toISOString() })) };
+    const messages = await tx.message.findMany({ where: { conversationId: pilot.conversationId, role: { in: ["USER", "AGENT", "ASSISTANT"] } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 100, select: { id: true, role: true, content: true, createdAt: true } });
+    return { mode: (await modeSettings(tx, pilot.organizationId)).mode, status: pilot.conversation.status, human: !pilot.conversation.aiHandled, messages: messages.reverse().map(m => ({ ...m, createdAt: m.createdAt.toISOString() })) };
   });
 }
 export async function postPrivateVisitor(token: string, raw: { requestKey: string; content: string }) {
@@ -100,7 +141,10 @@ export async function postPrivateVisitor(token: string, raw: { requestKey: strin
     const pilot = await visitor(tx, token), conv = pilot.conversation;
     const externalId = `mark-visitor:${input.requestKey}`;
     const previous = await tx.message.findUnique({ where: { conversationId_externalId: { conversationId: conv.id, externalId } } });
-    if (previous) { if (previous.content !== input.content) throw new Error("pilot_message_key_conflict"); return { id: previous.id }; }
+    if (previous) { if (previous.content !== input.content) throw new Error("pilot_message_key_conflict");
+      const job = await tx.webhookEvent.findUnique({ where: { organizationId_source_externalEventId: { organizationId: pilot.organizationId, source: AUTO_JOB_SOURCE, externalEventId: `mark-chat:${previous.id}` } }, select: { id: true } });
+      return { id: previous.id, jobId: job?.id };
+    }
     if (["RESOLVED", "CLOSED"].includes(conv.status)) throw new Error("pilot_chat_closed");
     if (await tx.message.count({ where: { conversationId: conv.id } }) >= 200) throw new Error("pilot_chat_message_limit");
     const message = await tx.message.create({ data: { conversationId: conv.id, role: "USER", content: input.content, externalId, createdAt: await messageTime(tx, conv.id) } });
@@ -109,7 +153,10 @@ export async function postPrivateVisitor(token: string, raw: { requestKey: strin
     await dismiss(tx, pilot.organizationId, conv.id, human ? "customer_requested_human" : "new_customer_message");
     await tx.conversation.update({ where: { id: conv.id }, data: { lastMessageAt: message.createdAt, lastMessagePreview: messagePreview(input.content), lastMessageRole: "USER", unreadCount: { increment: 1 }, ...(human ? { status: "ESCALATED", aiHandled: false, escalatedAt: new Date() } : {}) } });
     if (human) await audit(tx, pilot.organizationId, conv.id, "ai.mark_chat.customer_requested_human");
-    return { id: message.id };
+    const settings = await modeSettings(tx, pilot.organizationId);
+    const job = settings.mode === "AUTO" && settings.actorId && !human && conv.aiHandled && !conv.assignedToId && conv.status === "OPEN"
+      ? await tx.webhookEvent.create({ data: { organizationId: pilot.organizationId, source: AUTO_JOB_SOURCE, eventType: PRIVATE_CHAT_JOB_TYPE, externalEventId: `mark-chat:${message.id}`, payload: { conversationId: conv.id, messageId: message.id, revision: pilot.revision + 1, modeVersion: settings.version, actorId: settings.actorId } } }) : null;
+    return { id: message.id, jobId: job?.id };
   });
 }
 
@@ -129,19 +176,32 @@ export async function controlPrivateChat(organizationId: string, actorId: string
   });
 }
 
-export async function generatePrivateChatDraft(organizationId: string, actorId: string, conversationId: string, basedOnMessageId: string, confirmCost: boolean) {
+export async function generatePrivateChatDraft(organizationId: string, actorId: string, conversationId: string, basedOnMessageId: string, confirmCost: boolean, options: { humanRequested?: boolean; automatic?: { jobId: string; revision: number; modeVersion: number } } = {}) {
   z.literal(true).parse(confirmCost);
   const claim = await prisma.$transaction(async tx => {
     await authority(tx, organizationId, actorId, "knowledge_base:manage");
     const pilot = await locked(tx, organizationId, conversationId), conv = pilot.conversation;
-    if (conv.status !== "OPEN" || !conv.aiHandled || conv.assignedToId) throw new Error("pilot_chat_human_control");
+    const settings = await modeSettings(tx, organizationId);
+    if (settings.mode === "OFF" || !options.automatic && !options.humanRequested && settings.mode !== "SUGGEST") throw new Error("pilot_chat_mode_disabled");
+    if (["CLOSED", "RESOLVED"].includes(conv.status) || !options.humanRequested && (conv.status !== "OPEN" || !conv.aiHandled || conv.assignedToId)) throw new Error("pilot_chat_human_control");
+    if (conv.assignedToId && conv.assignedToId !== actorId) throw new Error("pilot_chat_assigned_to_other");
+    if (options.automatic) {
+      const work = await tx.webhookEvent.findFirst({ where: { id: options.automatic.jobId, organizationId, source: AUTO_JOB_SOURCE, eventType: PRIVATE_CHAT_JOB_TYPE, status: "PROCESSING" } });
+      if (!work || settings.mode !== "AUTO" || settings.version !== options.automatic.modeVersion || pilot.revision !== options.automatic.revision || settings.actorId !== actorId) throw new Error("pilot_chat_turn_changed");
+    }
     const inbound = await latest(tx, conv.id);
     if (!inbound || inbound.role !== "USER" || inbound.id !== basedOnMessageId) throw new Error("pilot_chat_no_customer_turn");
     if (customerNeedsHuman(inbound.content)) throw new Error("pilot_chat_human_required");
     const previous = await tx.markChatTurn.findUnique({ where: { conversationId_basedOnMessageId: { conversationId, basedOnMessageId: inbound.id } } });
     if (previous) throw new Error("pilot_chat_turn_already_claimed");
+    let expectedRevision = pilot.revision;
+    if (options.humanRequested) {
+      await tx.markChatPilot.update({ where: { id: pilot.id }, data: { revision: { increment: 1 } } });
+      await tx.conversation.update({ where: { id: conv.id }, data: { aiHandled: false, assignedToId: actorId } });
+      expectedRevision++;
+    }
     const draft = await tx.replyDraft.create({ data: { organizationId, conversationId, basedOnMessageId: inbound.id } });
-    const turn = await tx.markChatTurn.create({ data: { organizationId, conversationId, basedOnMessageId: inbound.id, draftId: draft.id, generatedById: actorId, requestKey: randomUUID(), expectedRevision: pilot.revision } });
+    const turn = await tx.markChatTurn.create({ data: { organizationId, conversationId, basedOnMessageId: inbound.id, draftId: draft.id, generatedById: actorId, requestKey: randomUUID(), expectedRevision, modeVersion: settings.version, humanRequested: options.humanRequested ?? false, automatic: !!options.automatic } });
     await audit(tx, organizationId, conv.id, "ai.mark_chat.generate", actorId);
     return { ...turn, question: inbound.content };
   });
@@ -151,7 +211,8 @@ export async function generatePrivateChatDraft(organizationId: string, actorId: 
       await authority(tx, organizationId, actorId, "knowledge_base:manage");
       const pilot = await locked(tx, organizationId, conversationId);
       const current = await tx.replyDraft.findUniqueOrThrow({ where: { id: claim.draftId } });
-      if (pilot.revision !== claim.expectedRevision || current.status !== "GENERATING" || !pilot.conversation.aiHandled || pilot.conversation.status !== "OPEN" || pilot.conversation.assignedToId || (await latest(tx, conversationId))?.id !== claim.basedOnMessageId) throw new Error("pilot_chat_turn_changed");
+      const settings = await modeSettings(tx, organizationId);
+      if (settings.mode === "OFF" || settings.version !== claim.modeVersion || pilot.revision !== claim.expectedRevision || current.status !== "GENERATING" || ["CLOSED", "RESOLVED"].includes(pilot.conversation.status) || !claim.humanRequested && (!pilot.conversation.aiHandled || pilot.conversation.status !== "OPEN" || pilot.conversation.assignedToId) || (await latest(tx, conversationId))?.id !== claim.basedOnMessageId) throw new Error("pilot_chat_turn_changed");
       if (result.kind !== "draft" || !result.text.trim()) {
         await tx.replyDraft.update({ where: { id: claim.draftId }, data: { status: "FAILED", error: result.kind } });
         await tx.conversation.update({ where: { id: conversationId }, data: { status: "ESCALATED", aiHandled: false, escalatedAt: new Date() } });
@@ -190,7 +251,8 @@ export async function sendPrivateChatReply(organizationId: string, actorId: stri
     if (conv.assignedToId && conv.assignedToId !== actorId && !can(user.role, "conversations:assign")) throw new Error("pilot_chat_assigned_to_other");
     if (input.draftId) {
       const turn = await tx.markChatTurn.findFirst({ where: { organizationId, conversationId: conv.id, draftId: input.draftId }, include: { draft: true } });
-      if (!turn || turn.draft.status !== "READY" || pilot.revision !== turn.expectedRevision || !conv.aiHandled || conv.assignedToId || conv.status !== "OPEN" || (await latest(tx, conv.id))?.id !== turn.basedOnMessageId || turn.knowledgeVersion === null) throw new Error("pilot_chat_draft_stale");
+      const settings = await modeSettings(tx, organizationId);
+      if (!turn || settings.mode === "OFF" || settings.version !== turn.modeVersion || turn.draft.status !== "READY" || pilot.revision !== turn.expectedRevision || !turn.humanRequested && (!conv.aiHandled || conv.assignedToId || conv.status !== "OPEN") || (await latest(tx, conv.id))?.id !== turn.basedOnMessageId || turn.knowledgeVersion === null) throw new Error("pilot_chat_draft_stale");
       await lockPilotBudget(tx, organizationId); await assertPrivateReviewSources(tx, organizationId, turn.knowledgeVersion);
       await tx.replyDraft.update({ where: { id: input.draftId }, data: { status: "USED", finalContent: input.content, usedAt: new Date(), usedById: actorId } });
     }
@@ -208,16 +270,17 @@ export async function readPrivateChatOperator(organizationId: string, actorId: s
     const user = await authority(tx, organizationId, actorId, "conversations:view");
     const pilot = await locked(tx, organizationId, conversationId, false);
     const inbound = await latest(tx, conversationId);
+    const settings = await modeSettings(tx, organizationId);
     let turn = inbound?.role === "USER" ? await tx.markChatTurn.findUnique({ where: { conversationId_basedOnMessageId: { conversationId, basedOnMessageId: inbound.id } }, include: { draft: true } }) : null;
     if (turn?.draft.status === "READY") {
-      let valid = pilot.active && pilot.expiresAt > new Date() && pilot.revision === turn.expectedRevision && pilot.conversation.aiHandled && !pilot.conversation.assignedToId && pilot.conversation.status === "OPEN" && turn.knowledgeVersion !== null;
+      let valid = pilot.active && pilot.expiresAt > new Date() && pilot.revision === turn.expectedRevision && (turn.humanRequested || pilot.conversation.aiHandled && !pilot.conversation.assignedToId && pilot.conversation.status === "OPEN") && !["CLOSED", "RESOLVED"].includes(pilot.conversation.status) && settings.mode !== "OFF" && settings.version === turn.modeVersion && turn.knowledgeVersion !== null;
       if (valid) { try { await lockPilotBudget(tx, organizationId); await assertPrivateReviewSources(tx, organizationId, turn.knowledgeVersion!); } catch { valid = false; } }
       if (!valid) { await dismiss(tx, organizationId, conversationId, "pilot_draft_no_longer_authorized"); turn = { ...turn, draft: { ...turn.draft, content: "", status: "DISMISSED" } }; }
     }
     const messages = await tx.message.findMany({ where: { conversationId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 50, select: { id: true, role: true, content: true } });
     const usage = turn?.usageId ? await tx.aiUsage.findFirst({ where: { id: turn.usageId, organizationId }, select: { costMxn: true } }) : null;
     const sources = turn?.sources ? z.array(z.object({ articleId: id, title: z.string(), version: z.number().int().positive() })).max(4).parse(turn.sources) : [];
-    return { status: pilot.conversation.status, aiHandled: pilot.conversation.aiHandled, active: pilot.active && pilot.expiresAt > new Date(), canGenerate: can(user.role, "knowledge_base:manage"), canReply: can(user.role, "conversations:reply"), messages: messages.reverse(), inboundId: inbound?.role === "USER" ? inbound.id : null, turn: turn ? { draftId: turn.draftId, status: turn.draft.status, content: turn.draft.status === "READY" ? turn.draft.content : "", costMxn: usage?.costMxn?.toString() ?? null, sources, createdAt: turn.createdAt.toISOString() } : null };
+    return { mode: settings.mode, modeVersion: settings.version, humanRequest: inbound?.role === "USER" && customerNeedsHuman(inbound.content), status: pilot.conversation.status, aiHandled: pilot.conversation.aiHandled, active: pilot.active && pilot.expiresAt > new Date(), canGenerate: can(user.role, "knowledge_base:manage"), canReply: can(user.role, "conversations:reply"), messages: messages.reverse(), inboundId: inbound?.role === "USER" ? inbound.id : null, turn: turn ? { draftId: turn.draftId, humanRequested: turn.humanRequested, status: turn.draft.status, content: turn.draft.status === "READY" ? turn.draft.content : "", costMxn: usage?.costMxn?.toString() ?? null, sources, createdAt: turn.createdAt.toISOString() } : null };
   });
 }
 
@@ -234,4 +297,59 @@ export async function recoverPrivateChat(organizationId: string, actorId: string
     }
     return { recovered: stale.count };
   });
+}
+
+const jobPayload = z.object({ conversationId: id, messageId: id, revision: z.number().int().positive(), modeVersion: z.number().int().positive(), actorId: id }).strict();
+/** Same durable inbox as existing AI work; never replay a claimed generation. */
+export async function processPrivateChatJob(jobId: string) {
+  if (!privateChatEnabled()) return;
+  const job = await prisma.webhookEvent.findFirst({ where: { id: jobId, source: AUTO_JOB_SOURCE, eventType: PRIVATE_CHAT_JOB_TYPE } });
+  if (!job || job.status !== "PENDING") return;
+  const parsed = jobPayload.safeParse(job.payload);
+  if (!parsed.success) { await prisma.webhookEvent.updateMany({ where: { id: job.id, status: "PENDING" }, data: { status: "PROCESSED", processedAt: new Date(), errorMessage: "invalid_private_chat_job" } }); return; }
+  const input = parsed.data;
+  const claim = await prisma.webhookEvent.updateMany({ where: { id: job.id, status: "PENDING", attempts: 0 }, data: { status: "PROCESSING", attempts: 1, claimedAt: new Date() } });
+  if (!claim.count) return;
+  try {
+    const result = await generatePrivateChatDraft(job.organizationId, input.actorId, input.conversationId, input.messageId, true, { automatic: { jobId, revision: input.revision, modeVersion: input.modeVersion } });
+    if (!result.success) throw new Error("no_draft");
+    await prisma.$transaction(async tx => {
+      const pilot = await locked(tx, job.organizationId, input.conversationId), conv = pilot.conversation;
+      await authority(tx, job.organizationId, input.actorId, "knowledge_base:manage");
+      const settings = await modeSettings(tx, job.organizationId);
+      const work = await tx.webhookEvent.findFirst({ where: { id: job.id, status: "PROCESSING", attempts: 1 } });
+      const turn = await tx.markChatTurn.findUnique({ where: { conversationId_basedOnMessageId: { conversationId: conv.id, basedOnMessageId: input.messageId } }, include: { draft: true } });
+      if (!work || settings.mode !== "AUTO" || settings.version !== input.modeVersion || settings.actorId !== input.actorId || pilot.revision !== input.revision || conv.status !== "OPEN" || !conv.aiHandled || conv.assignedToId || (await latest(tx, conv.id))?.id !== input.messageId || !turn?.automatic || turn.humanRequested || turn.draft.status !== "READY" || turn.knowledgeVersion === null) throw new Error("pilot_chat_turn_changed");
+      if (unsafeReason(turn.draft.content)) throw new Error("pilot_chat_unsafe_reply");
+      await lockPilotBudget(tx, job.organizationId); await assertPrivateReviewSources(tx, job.organizationId, turn.knowledgeVersion);
+      const message = await tx.message.create({ data: { conversationId: conv.id, role: "ASSISTANT", content: turn.draft.content, deliveryStatus: "SENT", externalId: `mark-auto:${input.messageId}`, createdAt: await messageTime(tx, conv.id) } });
+      await tx.replyDraft.update({ where: { id: turn.draftId }, data: { status: "USED", finalContent: turn.draft.content, usedAt: new Date() } });
+      await tx.markChatPilot.update({ where: { id: pilot.id }, data: { revision: { increment: 1 } } });
+      await tx.conversation.update({ where: { id: conv.id }, data: { lastMessageAt: message.createdAt, lastMessageRole: "ASSISTANT", lastMessagePreview: messagePreview(message.content) } });
+      await tx.webhookEvent.update({ where: { id: job.id }, data: { status: "PROCESSED", processedAt: new Date() } });
+      await audit(tx, job.organizationId, conv.id, "ai.mark_chat.automatic_reply", input.actorId);
+    });
+  } catch { await stopPrivateChatJob(job.id, job.organizationId, input); }
+}
+async function stopPrivateChatJob(jobId: string, organizationId: string, input: z.infer<typeof jobPayload>) {
+  await prisma.$transaction(async tx => {
+    const pilot = await locked(tx, organizationId, input.conversationId, false);
+    const stopped = await tx.webhookEvent.updateMany({ where: { id: jobId, organizationId, source: AUTO_JOB_SOURCE, eventType: PRIVATE_CHAT_JOB_TYPE, status: "PROCESSING" }, data: { status: "PROCESSED", processedAt: new Date(), errorMessage: "private_chat_review_required" } });
+    if (stopped.count && pilot.revision === input.revision) {
+      await dismiss(tx, organizationId, input.conversationId, "private_chat_worker_interrupted");
+      await tx.markChatPilot.update({ where: { id: pilot.id }, data: { revision: { increment: 1 } } });
+      if (!["RESOLVED", "CLOSED"].includes(pilot.conversation.status)) await tx.conversation.update({ where: { id: input.conversationId }, data: { status: "ESCALATED", aiHandled: false, escalatedAt: new Date() } });
+      await audit(tx, organizationId, input.conversationId, "ai.mark_chat.worker_stopped");
+    }
+  });
+}
+/** Only unclaimed work can call the model. Stale claims go to human review, retaining holds. */
+export async function recoverPrivateChatJobs() {
+  if (!privateChatEnabled()) return { processed: 0 };
+  const jobs = await prisma.webhookEvent.findMany({ where: { source: AUTO_JOB_SOURCE, eventType: PRIVATE_CHAT_JOB_TYPE, OR: [{ status: "PENDING" }, { status: "PROCESSING", claimedAt: { lt: new Date(Date.now() - 300000) } }] }, orderBy: { createdAt: "asc" }, take: 3 });
+  for (const job of jobs) {
+    if (job.status === "PENDING") await processPrivateChatJob(job.id);
+    else { const parsed = jobPayload.safeParse(job.payload); if (parsed.success) await stopPrivateChatJob(job.id, job.organizationId, parsed.data); }
+  }
+  return { processed: jobs.length };
 }

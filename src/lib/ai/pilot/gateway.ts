@@ -39,7 +39,8 @@ async function activeRoot(tx: Tx, c: PilotCallContext, now: Date) {
   if (c.privateChatTurnId) {
     if (process.env.AI_MARK_PRIVATE_CHAT_ENABLED !== "true") fail("pilot_chat_disabled");
     const turn = await tx.markChatTurn.findFirst({ where: { id: c.privateChatTurnId, organizationId: c.organizationId, generatedById: c.actorId }, include: { pilot: { include: { conversation: true } }, draft: true } });
-    if (!turn || !turn.pilot.active || now >= turn.pilot.expiresAt || turn.pilot.revision !== turn.expectedRevision || turn.pilot.conversation.channel !== "webchat" || turn.pilot.conversation.status !== "OPEN" || !turn.pilot.conversation.aiHandled || turn.pilot.conversation.assignedToId || turn.draft.status !== "GENERATING") fail("pilot_chat_turn_changed");
+    const settings = await tx.markChatSettings.findUnique({ where: { organizationId: c.organizationId } });
+    if (!turn || (settings?.mode ?? "SUGGEST") === "OFF" || (settings?.version ?? 0) !== turn.modeVersion || turn.automatic && (settings?.mode !== "AUTO" || settings.updatedById !== c.actorId) || !turn.pilot.active || now >= turn.pilot.expiresAt || turn.pilot.revision !== turn.expectedRevision || turn.pilot.conversation.channel !== "webchat" || ["CLOSED", "RESOLVED"].includes(turn.pilot.conversation.status) || !turn.humanRequested && (turn.pilot.conversation.status !== "OPEN" || !turn.pilot.conversation.aiHandled || turn.pilot.conversation.assignedToId) || turn.draft.status !== "GENERATING") fail("pilot_chat_turn_changed");
     const latest = await tx.message.findFirst({ where: { conversationId: turn.conversationId, role: { in: ["USER", "AGENT", "ASSISTANT"] } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true } });
     if (latest?.id !== turn.basedOnMessageId) fail("pilot_chat_turn_changed");
     chatRequestKey = turn.requestKey;
