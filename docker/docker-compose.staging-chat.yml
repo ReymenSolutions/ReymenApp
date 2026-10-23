@@ -1,0 +1,5 @@
+# Explicit private Website Chat opt-in, layered after the paid-review overlay.
+services:
+  app:
+    environment:
+      AI_MARK_PRIVATE_CHAT_ENABLED: "true"

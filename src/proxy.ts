@@ -30,6 +30,9 @@ export default auth(async (req) => {
   const isFeedbackRoute = pathname.startsWith("/feedback/");
   // API pública del sitio (reymen.mx): leads, chat y planes; se protegen solas (origen, límites, campo trampa).
   const isPublicApiRoute = pathname.startsWith("/api/public");
+  // Private pilot visitor: the page checks staging flags and the API validates
+  // its expiring bearer capability. Operators still require portal sessions.
+  const isPrivateChatVisitor = pathname === "/mark-chat" || pathname === "/api/mark-chat";
   // Realty: landing pública de una propiedad (/p/<slug>), sus eventos y sus fotos publicadas
   // (la ruta de fotos revisa sola si la propiedad es pública o si la sesión es de la organización).
   const isPublicRealtyRoute = pathname.startsWith("/p/") || pathname.startsWith("/api/realty/public/") || pathname.startsWith("/api/realty/media/");
@@ -41,7 +44,7 @@ export default auth(async (req) => {
   // route) so n8n's pull requests must not be redirected to /login here, and
   // the health check must be reachable by load balancers/uptime monitors
   // without a session
-  if (isAuthPage || isWebhookRoute || isApiV1Route || isAuthApiRoute || isCronRoute || isHealthRoute || isFeedbackRoute || isPublicLoyaltyRoute || isPublicRealtyRoute || isPublicApiRoute) {
+  if (isAuthPage || isWebhookRoute || isApiV1Route || isAuthApiRoute || isCronRoute || isHealthRoute || isFeedbackRoute || isPublicLoyaltyRoute || isPublicRealtyRoute || isPublicApiRoute || isPrivateChatVisitor) {
     return NextResponse.next();
   }
 

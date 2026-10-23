@@ -6,5 +6,5 @@ import { PageHeader } from "@/components/shared/PageHeader";
 export default async function MarkPrivatePilotPage() {
   if (!privateReviewEnabled()) notFound();
   await requireAiManager();
-  return <div className="min-w-0 space-y-5"><PageHeader title="Mark · revisión privada con Anthropic" description="Prueba con información ficticia y sin entrega de mensajes." /><MarkPrivateReview /></div>;
+  return <div className="min-w-0 space-y-5"><PageHeader title="Lía · revisión privada con Anthropic" description="Prueba con información ficticia y sin entrega de mensajes." /><MarkPrivateReview /></div>;
 }

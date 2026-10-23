@@ -37,7 +37,7 @@ export async function preparePrivateMark(organizationId: string, actorId: string
     }
     await tx.aiPilotBudgetPolicy.upsert({ where: { organizationId }, update: {}, create: { organizationId, enabled: false, updatedById: actorId } });
     const instance = await tx.agentInstance.create({ data: {
-      organizationId, definitionKey: "mark", definitionVersion: 1, publicName: "Mark", status: "PAUSED",
+      organizationId, definitionKey: "mark", definitionVersion: 1, publicName: "Lía", status: "PAUSED",
       revisions: { create: { version: 1, sourceHash: pilotConfigHash(PRIVATE_MARK_CONFIG), snapshot: PRIVATE_MARK_CONFIG, createdById: actorId } },
     } });
     await tx.auditLog.create({ data: { organizationId, userId: actorId, action: "ai.private_pilot.prepare", resource: "AgentInstance", resourceId: instance.id, metadata: { version: 1, mode: "review_only", paused: true } } });

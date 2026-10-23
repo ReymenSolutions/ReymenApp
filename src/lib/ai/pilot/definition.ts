@@ -2,13 +2,15 @@ import { createHash } from "node:crypto";
 
 /** Private evaluation metadata only; not a registered commercial runtime or channel route. */
 export const PRIVATE_MARK_DEFINITION = {
-  key: "mark", version: 1, displayName: "Mark · private pilot", specialty: "private-customer-support",
+  key: "mark", version: 1, displayName: "Lía · Atención y ventas · private pilot", specialty: "private-customer-support",
   manifest: {
     schemaVersion: 1, runtime: "private-review-pilot", mode: "review_only",
     tools: ["knowledge.search"], effects: [], provider: "anthropic",
     maxCalls: 2, maxOutputTokens: 512, customerReadsEnabled: false,
   },
 };
+// Historical v1 snapshot: keep Mark here so deployed revisions and source hashes stay valid.
+// The public display identity is resolved by agents/identities.ts.
 export const PRIVATE_MARK_CONFIG = {
   mode: "review_only", provider: "anthropic", publicName: "Mark",
   customerReadsEnabled: false, channelDeliveryEnabled: false,

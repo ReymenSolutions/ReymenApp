@@ -22,7 +22,7 @@ jobs:
           node-version: 22
       - name: Validate private configuration
         run: |
-          bash -n deploy/staging/init.sh deploy/staging/run.sh deploy/staging/review.sh deploy/staging/configure-review.sh
+          bash -n deploy/staging/init.sh deploy/staging/run.sh deploy/staging/review.sh deploy/staging/chat.sh deploy/staging/configure-review.sh
           node --test deploy/staging/safety.test.mjs
           node --test deploy/staging/review-safety.test.mjs
           bash deploy/staging/init.sh
@@ -45,6 +45,10 @@ jobs:
         run: |
           STAGING_MARK_MODEL=fixture-model STAGING_MARK_ANTHROPIC_API_KEY=sk-ant-synthetic-fixture-only bash deploy/staging/review.sh start
           docker exec reymen-mark-staging-app-1 node -e 'Promise.all([fetch("http://ingress:8081/blocked").then(r=>{if(r.status!==404)throw Error("unexpected route")}),fetch("http://ingress:8081/v1/messages").then(r=>{if(r.status!==403)throw Error("unexpected method")})]).catch(()=>process.exit(1))'
+          STAGING_MARK_MODEL=fixture-model STAGING_MARK_ANTHROPIC_API_KEY=sk-ant-synthetic-fixture-only bash deploy/staging/chat.sh start
+          docker exec reymen-mark-staging-app-1 node -e 'if(process.env.AI_MARK_PRIVATE_CHAT_ENABLED!=="true")process.exit(1)'
+          STAGING_MARK_MODEL=fixture-model STAGING_MARK_ANTHROPIC_API_KEY=sk-ant-synthetic-fixture-only bash deploy/staging/review.sh start
+          docker exec reymen-mark-staging-app-1 node -e 'if(process.env.AI_MARK_PRIVATE_CHAT_ENABLED!=="false")process.exit(1)'
           bash deploy/staging/run.sh start
           curl --fail --retry 10 --retry-delay 2 --retry-connrefused http://127.0.0.1:3301/api/health
           docker exec reymen-mark-staging-app-1 node -e 'fetch("http://ingress:8081/blocked").then(()=>process.exit(1)).catch(()=>{})'

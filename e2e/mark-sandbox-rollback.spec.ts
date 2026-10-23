@@ -12,7 +12,7 @@ test("Mark sandbox flag rollback preserves the previous tester and sandbox histo
     const user = await p.user.create({ data: { email, role: "OWNER", organizationId: org.id, passwordHash: await bcrypt.hash(password, 12) } });
     await p.agentSandboxRun.create({ data: { organizationId: org.id, createdById: user.id, requestKey: randomBytes(16).toString("hex"), inputHash: "fixture", fixtureVersion: "mark-fixtures-v1", definitionVersion: 1, status: "CANCELLED", expiresAt: new Date(0) } });
     await page.goto("/login"); await page.locator('input[type="email"]').fill(email); await page.locator('input[type="password"]').fill(password); await page.locator('button[type="submit"]').click(); await page.waitForURL(url => !url.pathname.startsWith("/login"));
-    await page.goto("/portal/ai-lab"); await expect(page.getByRole("heading", { name: /Mark ·/ })).toHaveCount(0); await expect(page.locator("main h1")).toBeVisible();
+    await page.goto("/portal/ai-lab"); await expect(page.getByRole("heading", { name: /Lía ·/ })).toHaveCount(0); await expect(page.locator("main h1")).toBeVisible();
     expect(await p.agentSandboxRun.count({ where: { organizationId: org.id } })).toBe(1);
   } finally {
     await p.agentSandboxRun.deleteMany({ where: { organizationId: org.id } }); await p.auditLog.deleteMany({ where: { organizationId: org.id } }); await p.organizationModule.deleteMany({ where: { organizationId: org.id } }); await p.user.deleteMany({ where: { organizationId: org.id } }); await p.organization.delete({ where: { id: org.id } }); await p.$disconnect();

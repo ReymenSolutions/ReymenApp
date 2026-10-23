@@ -15,7 +15,7 @@ export default async function PrivatePilotAdminPage({ searchParams }: { searchPa
   const view = await getPrivatePilotAdmin(session.user.id, query.organization, page);
   const setup = view.organization ? await getPrivateReviewSetup(view.organization.id, session.user.id) : null;
   return <div className="min-w-0 space-y-5">
-    <PageHeader title={lang === "es" ? "Piloto privado de Mark" : "Private Mark pilot"} description={lang === "es" ? "Preparación y revisión de consumo en el entorno de pruebas." : "Preparation and usage review in the staging environment."} />
+    <PageHeader title={lang === "es" ? "Piloto privado de Lía" : "Private Lía pilot"} description={lang === "es" ? "Preparación y revisión de consumo en el entorno de pruebas." : "Preparation and usage review in the staging environment."} />
     <PrivateMarkAdmin view={view} lang={lang} page={page} />
     {setup && view.organization && <PrivateMarkSetup organizationId={view.organization.id} budgetVersion={view.policy?.version ?? null} setup={setup} />}
   </div>;

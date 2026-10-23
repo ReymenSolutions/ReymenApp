@@ -128,6 +128,7 @@ function toState(draft: ReplyDraft): DraftState {
  * nada que responder ("none"). Con `force` se descarta el actual y se redacta otra versión.
  */
 export async function getOrCreateReplyDraft(organizationId: string, conversationId: string, opts: { force?: boolean; now?: Date } = {}): Promise<DraftState> {
+  if (await prisma.markChatPilot.findFirst({ where: { organizationId, conversationId }, select: { id: true } })) return { state: "off" };
   const now = opts.now ?? new Date();
 
   const conversation = await prisma.conversation.findFirst({

@@ -14,6 +14,8 @@ import { ConversationActions } from "@/components/portal/ConversationActions";
 import { MessageThread } from "@/components/portal/MessageThread";
 import { formatDateTime } from "@/lib/utils";
 import type { UserRole } from "@prisma/client";
+import { isPrivateChat, privateChatEnabled, assertPrivateChatViewer } from "@/lib/ai/pilot/chat";
+import { MarkChatReviewPanel } from "@/components/portal/ai-center/MarkChatReviewPanel";
 
 const MESSAGE_PAGE_SIZE = 50;
 
@@ -63,7 +65,9 @@ export default async function ConversationDetailPage({
   const role = session.user.role as UserRole;
   const canReply = can(role, "conversations:reply");
   const canAssign = can(role, "conversations:assign");
-  const aiDrafts = await draftsAvailable(session.user.organizationId, conv.channel);
+  const privatePilot = await isPrivateChat(session.user.organizationId, conv.id);
+  if (privatePilot) await assertPrivateChatViewer(session.user.organizationId, session.user.id);
+  const aiDrafts = !privatePilot && await draftsAvailable(session.user.organizationId, conv.channel);
 
   return (
     <div>
@@ -86,8 +90,8 @@ export default async function ConversationDetailPage({
             aiHandled={conv.aiHandled}
             assignedTo={conv.assignedTo}
             teamUsers={teamUsers}
-            canReply={canReply}
-            canAssign={canAssign}
+            canReply={canReply && (!privatePilot || privateChatEnabled())}
+            canAssign={canAssign && (!privatePilot || privateChatEnabled())}
           />
         }
       />
@@ -118,14 +122,14 @@ export default async function ConversationDetailPage({
       </div>
 
       {/* Message thread */}
-      <MessageThread
+      {privatePilot && privateChatEnabled() ? <MarkChatReviewPanel conversationId={conv.id} /> : <MessageThread
         conversationId={conv.id}
         contactName={conv.contactName}
         initialMessages={conv.messages}
         hasMoreInitially={conv.hasMoreMessages}
-        canReply={canReply && conv.status !== "RESOLVED" && conv.status !== "CLOSED"}
+        canReply={!privatePilot && canReply && conv.status !== "RESOLVED" && conv.status !== "CLOSED"}
         aiDrafts={aiDrafts}
-      />
+      />}
     </div>
   );
 }

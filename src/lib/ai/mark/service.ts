@@ -10,7 +10,7 @@ import { fixtureDecision, fixtureRead } from "./fixtures";
 const RUN_TTL_MS = 60_000;
 const pending = ["QUEUED", "RUNNING"] as const;
 export function assertMarkSandboxEnabled() {
-  if (!markSandboxEnabled()) throw new UserError("Las pruebas de Mark aún no están habilitadas");
+  if (!markSandboxEnabled()) throw new UserError("Las pruebas de Lía aún no están habilitadas");
 }
 /** Fresh DB authority at admission and each boundary; never forwards the operator's session to a tool. */
 export async function sandboxAuthority(organizationId: string, actorId: string) {
