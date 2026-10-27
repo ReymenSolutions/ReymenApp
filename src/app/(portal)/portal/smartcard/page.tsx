@@ -7,7 +7,9 @@ import {
   getCompanyCardStats,
   getActiveDestinationTypes,
   smartcardPublicBaseUrl,
+  supportsCardAssignment,
 } from "@/lib/smartcard-company";
+import { getRosterPeople } from "@/lib/smartcard-roster";
 import { SmartcardPanel } from "@/components/portal/SmartcardPanel";
 import { getServerLang } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
@@ -73,17 +75,33 @@ export default async function SmartcardPage() {
     );
   }
 
+  // Dueño, administrador y gerente ven todas las tarjetas y al equipo con
+  // nombre; un asesor o personal solo ve la tarjeta que tiene asignada.
+  const isManager = ["owner", "admin", "manager"].includes(result.membership.roleCode);
+  const assignmentReady = await supportsCardAssignment();
   const [roster, cardStats, destinationTypes] = await Promise.all([
     getCompanyRoster(result.membership.companyId, result.membership.userId),
-    getCompanyCardStats(result.membership.companyId, { throwOnError: true }),
+    getCompanyCardStats(result.membership.companyId, {
+      throwOnError: true,
+      withAssignment: assignmentReady,
+      assignedTo: isManager ? undefined : result.membership.userId,
+    }),
     getActiveDestinationTypes({ throwOnError: true }),
   ]);
+  const people = isManager
+    ? await getRosterPeople(
+        session.user.organizationId,
+        roster.filter((m) => m.status === "active").map((m) => m.userId)
+      )
+    : {};
 
   return (
     <SmartcardPanel
       membership={result.membership}
       roster={roster}
       cardStats={cardStats}
+      people={people}
+      assignmentReady={assignmentReady}
       destinationTypes={destinationTypes}
       publicBaseUrl={smartcardPublicBaseUrl()}
       timeZone={org?.timezone ?? "America/Mexico_City"}
