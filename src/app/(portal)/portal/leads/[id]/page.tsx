@@ -9,6 +9,7 @@ import { getLeadAiActions } from "@/lib/lead-ai-actions";
 import { findPotentialDuplicateLeads } from "@/lib/duplicate-detection";
 import { can } from "@/lib/permissions";
 import { LeadRow as Row, LeadSection as Section, LeadStat as Stat } from "@/components/portal/LeadSections";
+import { LeadTabs, type LeadTabKey } from "@/components/portal/LeadTabs";
 import { LeadHeaderCard } from "@/components/portal/LeadHeaderCard";
 import { LeadAgentSuggestions } from "@/components/portal/LeadAgentSuggestions";
 import { LeadTagsEditor } from "@/components/portal/LeadTagsEditor";
@@ -26,13 +27,15 @@ import { getLeadSearchViews, getLeadSuggestionViews } from "@/lib/realty/lead-pr
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { UserRole } from "@prisma/client";
 
-export default async function LeadDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ t?: string }> }) {
+export default async function LeadDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ t?: string; tab?: string }> }) {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
   await requireModule(session.user.organizationId, "CRM");
 
   const { id } = await params;
-  const { t: timelineParam } = await searchParams;
+  const { t: timelineParam, tab: tabParam } = await searchParams;
+  // «Ver más» del historial recarga la página con ?t=; ?tab= deja abierta la pestaña correcta.
+  const initialTab: LeadTabKey = tabParam === "activity" || tabParam === "data" ? tabParam : "summary";
   const timelineLimit = Math.min(300, Math.max(TIMELINE_PAGE, Number(timelineParam) || TIMELINE_PAGE));
   const orgId = session.user.organizationId;
 
@@ -90,6 +93,10 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
         tags: "Etiquetas",
         tagsHint: "Palabras para encontrarlo y agruparlo después.",
         extra: "Datos adicionales",
+        tabSummary: "Resumen",
+        tabActivity: "Actividad",
+        tabData: "Datos",
+        tabsLabel: "Secciones de la ficha",
       }
     : {
         back: t.leadsTitle,
@@ -115,6 +122,10 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
         tags: "Tags",
         tagsHint: "Words to find and group them later.",
         extra: "Additional details",
+        tabSummary: "Summary",
+        tabActivity: "Activity",
+        tabData: "Details",
+        tabsLabel: "Contact sections",
       };
   const openOpps = opportunities.filter((o) => !o.closedAt);
   const currencies = [...new Set(openOpps.filter((o) => o.amount != null).map((o) => o.currency))];
@@ -145,92 +156,105 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
         <Stat label={L.statLast} value={lastActivity ? formatDate(lastActivity, lang) : L.none} />
       </div>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <div className="space-y-5 lg:col-span-2">
-          <Section icon={GitBranch} title={L.oppTitle} hint={L.oppHint} action={canManageOpps ? <CreateOpportunityDialog stages={stageOptions} users={users} fixedLead={fixedLead} /> : undefined}>
-            {opportunities.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-slate-200 px-4 py-5 text-center text-sm text-slate-500">{L.oppEmpty}</p>
-            ) : (
-              <div className="space-y-2">
-                {opportunities.map((opp) => (
-                  <div key={opp.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 p-3 text-sm">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-slate-900">{opp.title}</p>
-                      <p className="text-xs text-slate-500">
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-700">{opp.pipelineStage.name}</span>
-                        {" · "}{opp.owner?.name ?? opp.owner?.email ?? "—"}
-                        {opp.estimatedCloseDate && ` · ${formatDate(opp.estimatedCloseDate, lang)}`}
-                      </p>
-                    </div>
-                    <span className="flex-shrink-0 font-semibold text-slate-900">{opp.amount != null ? formatCurrency(opp.amount, opp.currency) : "—"}</span>
+      <LeadTabs
+        initial={initialTab}
+        label={L.tabsLabel}
+        labels={{ summary: L.tabSummary, activity: L.tabActivity, data: L.tabData }}
+        counts={{ activity: notes.length, data: duplicates.length }}
+        panels={{
+          summary: (
+            <div className={searchViews ? "grid grid-cols-1 items-start gap-5 lg:grid-cols-2" : ""}>
+              <Section icon={GitBranch} title={L.oppTitle} hint={L.oppHint} action={canManageOpps ? <CreateOpportunityDialog stages={stageOptions} users={users} fixedLead={fixedLead} /> : undefined}>
+                {opportunities.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-slate-200 px-4 py-5 text-center text-sm text-slate-500">{L.oppEmpty}</p>
+                ) : (
+                  <div className="space-y-2">
+                    {opportunities.map((opp) => (
+                      <div key={opp.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 p-3 text-sm">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-slate-900">{opp.title}</p>
+                          <p className="text-xs text-slate-500">
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-700">{opp.pipelineStage.name}</span>
+                            {" · "}{opp.owner?.name ?? opp.owner?.email ?? "—"}
+                            {opp.estimatedCloseDate && ` · ${formatDate(opp.estimatedCloseDate, lang)}`}
+                          </p>
+                        </div>
+                        <span className="flex-shrink-0 font-semibold text-slate-900">{opp.amount != null ? formatCurrency(opp.amount, opp.currency) : "—"}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </Section>
+                )}
+              </Section>
 
-          {searchViews && (
-            <Section icon={Home} title={es ? "Lo que busca" : "What they're looking for"} hint={L.searchHint}>
-              <LeadSearchProfiles views={searchViews} suggestions={searchSuggestions} leadId={lead.id} canOperate={canOperateRealty} lang={lang === "en" ? "en" : "es"} hideTitle />
-            </Section>
-          )}
+              {searchViews && (
+                <Section icon={Home} title={es ? "Lo que busca" : "What they're looking for"} hint={L.searchHint}>
+                  <LeadSearchProfiles views={searchViews} suggestions={searchSuggestions} leadId={lead.id} canOperate={canOperateRealty} lang={lang === "en" ? "en" : "es"} hideTitle />
+                </Section>
+              )}
 
-          <Section icon={StickyNote} title={L.notesTitle} hint={L.notesHint}>
-            <LeadNotesPanel
-              leadId={lead.id}
-              initialNotes={notes.map((n) => ({
-                id: n.id,
-                content: n.content,
-                createdAt: n.createdAt,
-                authorName: n.author?.name ?? n.author?.email ?? null,
-                canDelete: n.authorId === session.user.id || ["OWNER", "ADMIN", "SUPER_ADMIN", "MANAGER"].includes(session.user.role),
-              }))}
-            />
-          </Section>
-
-          <Section icon={ArrowRightLeft} title={L.timelineTitle} hint={L.timelineHint}>
-            <LeadTimeline events={timeline.events} hasMore={timeline.hasMore} moreHref={`/portal/leads/${lead.id}?t=${timelineLimit + TIMELINE_PAGE}`} lang={lang === "en" ? "en" : "es"} />
-          </Section>
-        </div>
-
-        <div className="space-y-5 lg:col-span-1">
-          <Section icon={Contact} title={L.dataTitle} hint={L.dataHint}>
-            <dl className="space-y-2.5">
-              <Row label={L.email}>{lead.email ?? "—"}</Row>
-              <Row label={L.phone}>{lead.phone ?? "—"}</Row>
-              <Row label={L.source}>{lead.source ?? "manual"}</Row>
-              <Row label={L.created}>{formatDate(lead.createdAt, lang)}</Row>
-            </dl>
-            {lead.notes && <p className="mt-3 border-t border-slate-100 pt-3 text-sm text-slate-600">{lead.notes}</p>}
-            <div className="mt-3 border-t border-slate-100 pt-3">
-              <p className="text-sm font-medium text-slate-700">{L.tags}</p>
-              <p className="mb-2 text-xs text-slate-500">{L.tagsHint}</p>
-              <LeadTagsEditor leadId={lead.id} initialTags={lead.tags} />
             </div>
-            <div className="mt-3 border-t border-slate-100 pt-3">
-              <LeadDoNotContactToggle leadId={lead.id} initialDoNotContact={lead.doNotContact} />
-            </div>
-          </Section>
+          ),
+          activity: (
+            <>
+              <Section icon={StickyNote} title={L.notesTitle} hint={L.notesHint}>
+                <LeadNotesPanel
+                  leadId={lead.id}
+                  initialNotes={notes.map((n) => ({
+                    id: n.id,
+                    content: n.content,
+                    createdAt: n.createdAt,
+                    authorName: n.author?.name ?? n.author?.email ?? null,
+                    canDelete: n.authorId === session.user.id || ["OWNER", "ADMIN", "SUPER_ADMIN", "MANAGER"].includes(session.user.role),
+                  }))}
+                />
+              </Section>
 
-          {customFields.length > 0 && (
-            <Section icon={Contact} title={L.extra} hint={es ? "Campos propios de tu negocio." : "Fields specific to your business."}>
-              <LeadCustomFieldsPanel
-                leadId={lead.id}
-                canEdit={can(session.user.role as UserRole, "leads:create")}
-                fields={customFields.map((f) => ({
-                  key: f.key,
-                  label: f.label,
-                  type: f.type,
-                  options: f.options,
-                  value: inputValue(f, (lead.customFields as Record<string, unknown> | null)?.[f.key]),
-                }))}
-              />
-            </Section>
-          )}
-
-          <LeadDuplicatesPanel leadId={lead.id} duplicates={duplicates.map((d) => ({ id: d.id, name: d.name, email: d.email, phone: d.phone }))} />
+              <Section icon={ArrowRightLeft} title={L.timelineTitle} hint={L.timelineHint}>
+                <LeadTimeline events={timeline.events} hasMore={timeline.hasMore} moreHref={`/portal/leads/${lead.id}?tab=activity&t=${timelineLimit + TIMELINE_PAGE}`} lang={lang === "en" ? "en" : "es"} />
+              </Section>
+            </>
+          ),
+          data: (
+            <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
+      <Section icon={Contact} title={L.dataTitle} hint={L.dataHint}>
+        <dl className="space-y-2.5">
+          <Row label={L.email}>{lead.email ?? "—"}</Row>
+          <Row label={L.phone}>{lead.phone ?? "—"}</Row>
+          <Row label={L.source}>{lead.source ?? "manual"}</Row>
+          <Row label={L.created}>{formatDate(lead.createdAt, lang)}</Row>
+        </dl>
+        {lead.notes && <p className="mt-3 border-t border-slate-100 pt-3 text-sm text-slate-600">{lead.notes}</p>}
+        <div className="mt-3 border-t border-slate-100 pt-3">
+          <p className="text-sm font-medium text-slate-700">{L.tags}</p>
+          <p className="mb-2 text-xs text-slate-500">{L.tagsHint}</p>
+          <LeadTagsEditor leadId={lead.id} initialTags={lead.tags} />
         </div>
-      </div>
+        <div className="mt-3 border-t border-slate-100 pt-3">
+          <LeadDoNotContactToggle leadId={lead.id} initialDoNotContact={lead.doNotContact} />
+        </div>
+      </Section>
+
+      {customFields.length > 0 && (
+        <Section icon={Contact} title={L.extra} hint={es ? "Campos propios de tu negocio." : "Fields specific to your business."}>
+          <LeadCustomFieldsPanel
+            leadId={lead.id}
+            canEdit={can(session.user.role as UserRole, "leads:create")}
+            fields={customFields.map((f) => ({
+              key: f.key,
+              label: f.label,
+              type: f.type,
+              options: f.options,
+              value: inputValue(f, (lead.customFields as Record<string, unknown> | null)?.[f.key]),
+            }))}
+          />
+        </Section>
+      )}
+
+      <LeadDuplicatesPanel leadId={lead.id} duplicates={duplicates.map((d) => ({ id: d.id, name: d.name, email: d.email, phone: d.phone }))} />
+            </div>
+          ),
+        }}
+      />
     </div>
   );
 }
