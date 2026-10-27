@@ -45,7 +45,8 @@ test.describe("clientes del negocio", () => {
 
     await page.goto("/portal/customers");
     await expect(page.getByText("Marta Compradora")).toBeVisible();
-    await expect(page.getByText("3 visitas")).toBeVisible();
+    // Cada cliente es una tarjeta: nombre, compras y visitas.
+    await expect(page.getByRole("listitem").filter({ hasText: "Marta Compradora" })).toContainText(/Visitas\s*3/);
 
     await page.getByPlaceholder(/buscar por nombre/i).fill("zzz");
     await page.keyboard.press("Enter");

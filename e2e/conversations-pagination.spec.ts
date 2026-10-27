@@ -81,9 +81,9 @@ test.describe("conversations list pagination and message thread load-older", () 
     await login(page);
     await page.goto("/portal/conversations");
     await expect(page.locator("table tbody tr")).toHaveCount(50);
-    await expect(page.getByText(/Página 1 de 2/)).toBeVisible();
+    await expect(page.getByText("Mostrando 1–50 de 55")).toBeVisible();
 
-    await page.click('a:has-text("Siguiente")');
+    await page.getByRole("button", { name: "Siguiente" }).click();
     await page.waitForURL(/page=2/);
     await expect(page.locator("table tbody tr")).toHaveCount(5);
   });
