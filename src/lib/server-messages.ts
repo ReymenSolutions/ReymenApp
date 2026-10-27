@@ -114,6 +114,7 @@ const EN: Record<string, string> = {
   "Visita no encontrada": "Showing not found",
   "Ya existe una zona con ese nombre.": "A zone with that name already exists.",
   "Zona no encontrada": "Zone not found",
+  "Sugerencia no encontrada": "Suggestion not found",
   "Ya hay una visita a esta propiedad en ese horario.": "There's already a showing of this listing at that time.",
   "El asesor ya tiene una visita en ese horario.": "The agent already has a showing at that time.",
   "Confirma el PIN del cajero para canjear.": "Confirm the cashier PIN to redeem.",

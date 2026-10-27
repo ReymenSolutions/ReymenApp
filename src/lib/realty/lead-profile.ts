@@ -7,6 +7,7 @@ import { hasModule } from "@/lib/modules";
 import { pickDict } from "@/lib/i18n-dict";
 import { enumLabel, realtyStrings } from "@/lib/i18n-realty";
 import { budgetText } from "./page-helpers";
+import { listPendingSuggestions } from "./profile-suggestion";
 
 export interface LeadSearchView {
   id: string;
@@ -68,5 +69,34 @@ export async function getLeadSearchViews(organizationId: string, leadId: string,
     sourceProperty: r.sourceProperty,
     advisor: r.advisor?.name ?? r.advisor?.email ?? null,
     bestMatch: r.matches[0]?.totalScore ?? null,
+  }));
+}
+
+/** Propuesta de la IA lista para mostrarse (textos ya formateados). */
+export interface LeadSuggestionView {
+  id: string;
+  operation: string;
+  type: string | null;
+  budget: string;
+  zones: string[];
+  extras: string[];
+  bedrooms: number | null;
+  timeline: string | null;
+  reason: string;
+}
+
+export async function getLeadSuggestionViews(organizationId: string, leadId: string, lang: "es" | "en"): Promise<LeadSuggestionView[]> {
+  const R = pickDict(realtyStrings, lang);
+  const rows = await listPendingSuggestions(organizationId, leadId);
+  return rows.map((r) => ({
+    id: r.id,
+    operation: enumLabel(R, "op", r.operation),
+    type: r.propertyType ? enumLabel(R, "type", r.propertyType) : null,
+    budget: budgetText(r.minBudget, r.maxBudget),
+    zones: r.zoneNames,
+    extras: r.preferences.map((f) => enumLabel(R, "feat", f)),
+    bedrooms: r.minBedrooms,
+    timeline: r.moveTimeline,
+    reason: r.reason,
   }));
 }

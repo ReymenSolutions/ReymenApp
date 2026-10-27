@@ -1,5 +1,11 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+const accept = vi.fn(async () => ({ id: "p9" }));
+const reject = vi.fn(async () => ({ success: true }));
+vi.mock("@/actions/realty", () => ({ acceptRealtyProfileSuggestion: (...a: unknown[]) => (accept as (...x: unknown[]) => unknown)(...a), rejectRealtyProfileSuggestion: (...a: unknown[]) => (reject as (...x: unknown[]) => unknown)(...a) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 import { LeadSearchProfiles } from "./LeadSearchProfiles";
 import type { LeadSearchView } from "@/lib/realty/lead-profile";
 
@@ -36,5 +42,25 @@ describe("LeadSearchProfiles", () => {
     expect(screen.getByText("Inactive")).toBeVisible();
     expect(screen.getByText("No neighborhood")).toBeVisible();
     expect(screen.getByRole("link", { name: /View prospect/ })).toBeVisible();
+  });
+
+  const sug = { id: "s1", operation: "Compra", type: "Casa", budget: "$3.5M–$4.5M", zones: ["Cumbres"], extras: ["Alberca"], bedrooms: 3, timeline: null, reason: "Busca casa en Cumbres" };
+
+  it("muestra la propuesta de la IA con Aceptar, Editar y Descartar", async () => {
+    render(<LeadSearchProfiles views={[]} suggestions={[sug]} leadId="l1" canOperate lang="es" />);
+    expect(screen.getByText(/La IA detectó lo que busca/)).toBeVisible();
+    expect(screen.getByText("3+ recámaras")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Editar" })).toHaveAttribute("href", "/portal/realty/prospects/new?leadId=l1&suggestion=s1");
+    await userEvent.click(screen.getByRole("button", { name: "Aceptar" }));
+    expect(accept).toHaveBeenCalledWith("s1");
+  });
+
+  it("descartar llama a la acción y sin permiso de operar no se muestra la propuesta", async () => {
+    const { unmount } = render(<LeadSearchProfiles views={[]} suggestions={[sug]} leadId="l1" canOperate lang="es" />);
+    await userEvent.click(screen.getByRole("button", { name: "Descartar" }));
+    expect(reject).toHaveBeenCalledWith("s1");
+    unmount();
+    render(<LeadSearchProfiles views={[]} suggestions={[sug]} leadId="l1" canOperate={false} lang="es" />);
+    expect(screen.queryByText(/La IA detectó/)).not.toBeInTheDocument();
   });
 });

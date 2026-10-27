@@ -2,13 +2,14 @@ import Link from "next/link";
 import { Home, Plus } from "lucide-react";
 import { pickDict } from "@/lib/i18n-dict";
 import { realtyStrings } from "@/lib/i18n-realty";
-import type { LeadSearchView } from "@/lib/realty/lead-profile";
+import type { LeadSearchView, LeadSuggestionView } from "@/lib/realty/lead-profile";
+import { ProfileSuggestionCard } from "./ProfileSuggestionCard";
 
 /**
  * «Lo que busca» en la ficha de un contacto del CRM: compra/renta, tipo, presupuesto y colonias de su perfil de Real Estate
  * (o un botón para agregarlo). Solo presenta datos ya formateados: sirve igual en la ficha (servidor) y en el panel lateral.
  */
-export function LeadSearchProfiles({ views, leadId, canOperate, lang, compact = false }: { views: LeadSearchView[]; leadId: string; canOperate: boolean; lang: "es" | "en"; compact?: boolean }) {
+export function LeadSearchProfiles({ views, suggestions = [], leadId, canOperate, lang, compact = false }: { views: LeadSearchView[]; suggestions?: LeadSuggestionView[]; leadId: string; canOperate: boolean; lang: "es" | "en"; compact?: boolean }) {
   const R = pickDict(realtyStrings, lang);
   const addHref = `/portal/realty/prospects/new?leadId=${encodeURIComponent(leadId)}`;
   return (
@@ -17,6 +18,7 @@ export function LeadSearchProfiles({ views, leadId, canOperate, lang, compact = 
         <Home className="h-3.5 w-3.5" aria-hidden="true" />
         {R.leadSearchTitle}
       </h3>
+      {canOperate && suggestions.map((sg) => <ProfileSuggestionCard key={sg.id} s={sg} leadId={leadId} lang={lang} compact={compact} />)}
       {views.length === 0 ? (
         <div className="space-y-2">
           <p className="text-xs text-slate-500">{R.leadSearchNone}</p>
