@@ -2725,6 +2725,7 @@ model LoyaltyMember {
   enrollmentBranch Branch?         @relation("LoyaltyMemberEnrollmentBranch", fields: [enrollmentBranchId], references: [id], onDelete: SetNull)
   visits           LoyaltyVisit[]
   rewards          LoyaltyReward[]
+  walletDevices    LoyaltyWalletDevice[]
 
   @@unique([programId, whatsappKey])
   @@unique([programId, customerId])
@@ -3533,4 +3534,22 @@ model MarkChatSettings {
   updatedAt DateTime @updatedAt
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   actor User @relation(fields: [updatedById], references: [id], onDelete: Restrict)
+}
+
+/// iPhone que agregó la tarjeta de un miembro a Apple Wallet. Apple lo registra
+/// por el servicio web del pase (/api/wallet/apple) y con su pushToken se le
+/// avisa por APNs que hay una versión nueva cuando cambia el progreso.
+model LoyaltyWalletDevice {
+  id              String   @id @default(cuid())
+  memberId        String
+  deviceLibraryId String
+  passTypeId      String
+  pushToken       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  member LoyaltyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceLibraryId, passTypeId, memberId])
+  @@index([memberId])
 }
