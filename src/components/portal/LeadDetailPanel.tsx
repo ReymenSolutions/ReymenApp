@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { LeadTagsEditor } from "@/components/portal/LeadTagsEditor";
 import { LeadTimeline } from "@/components/portal/LeadTimeline";
 import { LeadAgentActions } from "@/components/portal/LeadAgentActions";
+import { LeadSearchProfiles } from "@/components/realty/LeadSearchProfiles";
 import { usePreferences } from "@/context/preferences";
 import { getLeadPanel, type LeadPanelData } from "@/actions/lead-panel";
 import { createNote } from "@/actions/notes";
@@ -314,6 +315,8 @@ function PanelContent({ data, openedAt, onReload }: { data: LeadPanelData; opene
         <section aria-label={t.tags}>
           <LeadTagsEditor leadId={lead.id} initialTags={lead.tags} />
         </section>
+
+        {data.realty && <LeadSearchProfiles views={data.realty.views} leadId={lead.id} canOperate={data.realty.canOperate} lang={lang === "en" ? "en" : "es"} compact />}
 
         <LeadAgentActions actions={data.aiActions} canManage={data.canManageOpps} onChanged={onReload} />
 

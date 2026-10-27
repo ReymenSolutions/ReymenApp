@@ -4,7 +4,9 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getServerT, getServerLang } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
-import { requireModule } from "@/lib/modules";
+import { hasModule, requireModule } from "@/lib/modules";
+import { pickDict } from "@/lib/i18n-dict";
+import { realtyStrings } from "@/lib/i18n-realty";
 import { can } from "@/lib/permissions";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,12 +31,14 @@ function parseStatus(status: string | undefined): LeadStatus | "ALL" {
 
 async function getLeads(
   orgId: string,
-  { query, status, page }: { query?: string; status: LeadStatus | "ALL"; page: number }
+  { query, status, page, realty }: { query?: string; status: LeadStatus | "ALL"; page: number; realty?: boolean }
 ) {
   const where: Prisma.LeadWhereInput = {
     organizationId: orgId,
     deletedAt: null,
     ...(status !== "ALL" ? { status } : {}),
+    // Solo contactos con un perfil de búsqueda de Real Estate activo.
+    ...(realty ? { realtyProfiles: { some: { active: true } } } : {}),
     ...(query
       ? {
           OR: [
@@ -63,20 +67,23 @@ async function getLeads(
 export default async function PortalLeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; page?: string; realty?: string }>;
 }) {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
   await requireModule(session.user.organizationId, "CRM");
 
-  const { q, status: statusParam, page: pageParam } = await searchParams;
+  const { q, status: statusParam, page: pageParam, realty: realtyParam } = await searchParams;
   const page = Math.max(1, Number(pageParam) || 1);
   const status = parseStatus(statusParam);
+
+  const realtyActive = await hasModule(session.user.organizationId, "REALTY");
+  const realtyOnly = realtyActive && realtyParam === "1";
 
   const [t, lang, { leads, total, totalUnfiltered }, duplicateGroups, customFields, me] = await Promise.all([
     getServerT(),
     getServerLang(),
-    getLeads(session.user.organizationId, { query: q, status, page }),
+    getLeads(session.user.organizationId, { query: q, status, page, realty: realtyOnly }),
     countDuplicateGroups(session.user.organizationId),
     getActiveCustomFields(session.user.organizationId),
     prisma.user.findUnique({ where: { id: session.user.id }, select: { leadColumns: true } }),
@@ -115,6 +122,23 @@ export default async function PortalLeadsPage({
       />
       <CrmTabs />
       <p className="mb-5 rounded-lg bg-slate-50 p-4 text-sm text-slate-600 dark:bg-slate-900 dark:text-slate-300">{lang === "es" ? "Aquí das seguimiento a conversaciones y personas interesadas. Para consultar compras y recompensas de alguien que ya está registrado, abre Clientes." : "Follow up with contacts and interested people here. Open Customers to see a registered customer’s purchases and rewards."}</p>
+
+      {realtyActive && totalUnfiltered > 0 && (() => {
+        const R = pickDict(realtyStrings, lang === "en" ? "en" : "es");
+        const params = new URLSearchParams();
+        if (q) params.set("q", q);
+        if (status !== "ALL") params.set("status", status);
+        if (!realtyOnly) params.set("realty", "1");
+        const href = `/portal/leads${params.toString() ? `?${params.toString()}` : ""}`;
+        return (
+          <div className="mb-3 flex items-center gap-2">
+            <Link href={href} aria-pressed={realtyOnly} className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${realtyOnly ? "border-brand-600 bg-brand-50 text-brand-700" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+              {R.leadSearchFilter}
+            </Link>
+            {realtyOnly && <Link href={href} className="text-xs text-slate-500 hover:text-slate-800">{R.leadSearchFilterOff}</Link>}
+          </div>
+        );
+      })()}
 
       {totalUnfiltered === 0 ? (
         <Card>

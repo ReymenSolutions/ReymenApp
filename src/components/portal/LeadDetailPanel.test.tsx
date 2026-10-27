@@ -99,4 +99,19 @@ describe("LeadDetailPanel", () => {
     await userEvent.keyboard("{Escape}");
     expect(onClose).toHaveBeenCalled();
   });
+
+  it("con Real Estate activo muestra «Lo que busca»; sin el módulo no aparece nada", async () => {
+    const view = { id: "p1", active: true, operation: "Compra", type: "Casa", budget: "≤ $4.5M", zones: ["Cumbres"], source: "Landing", sourceProperty: null, advisor: null, bestMatch: 80 };
+    getLeadPanel.mockResolvedValue({ ...panelData, realty: { views: [view], canOperate: true } });
+    const { unmount } = render(<LeadDetailPanel leadId="l1" onClose={() => {}} />);
+    expect(await screen.findByText("Lo que busca")).toBeInTheDocument();
+    expect(screen.getByText("≤ $4.5M")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Ver prospecto/ })).toHaveAttribute("href", "/portal/realty/prospects/p1");
+    unmount();
+
+    getLeadPanel.mockResolvedValue({ ...panelData, realty: null });
+    render(<LeadDetailPanel leadId="l1" onClose={() => {}} />);
+    expect(await screen.findByText("Ana Torres")).toBeInTheDocument();
+    expect(screen.queryByText("Lo que busca")).not.toBeInTheDocument();
+  });
 });
