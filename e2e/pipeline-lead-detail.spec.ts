@@ -91,9 +91,10 @@ test.describe("pipeline board and lead detail golden path", () => {
     await page.goto(`/portal/leads/${leadId}`);
 
     await expect(page.getByRole("heading", { name: "Lead Pipeline E2E" })).toBeVisible();
-    // La oportunidad aparece en su tarjeta y también en el historial
+    // La ficha tiene pestañas: la oportunidad está en «Resumen» (su tarjeta) y también en el historial de «Actividad»
     // ("Oportunidad creada: ..."), así que se verifican las dos por separado.
     await expect(page.getByRole("paragraph").filter({ hasText: "Deal Pipeline E2E" })).toBeVisible();
+    await page.getByRole("tab", { name: /actividad/i }).click();
     await expect(page.getByRole("list").getByText("Deal Pipeline E2E")).toBeVisible();
   });
 
@@ -101,6 +102,7 @@ test.describe("pipeline board and lead detail golden path", () => {
     await login(page);
     await page.goto(`/portal/leads/${leadId}`);
 
+    await page.getByRole("tab", { name: /actividad/i }).click();
     await page.locator("textarea").fill("Nota E2E del pipeline");
     await page.getByRole("button", { name: /agregar nota/i }).click();
 
@@ -116,6 +118,7 @@ test.describe("pipeline board and lead detail golden path", () => {
     await login(page);
     await page.goto(`/portal/leads/${duplicate.id}`);
 
+    await page.getByRole("tab", { name: /datos/i }).click();
     await expect(page.getByText(/posibles contactos duplicados/i)).toBeVisible();
     await expect(page.getByText("Lead Pipeline E2E")).toBeVisible();
   });
