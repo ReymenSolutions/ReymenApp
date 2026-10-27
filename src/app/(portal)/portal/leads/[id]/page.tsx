@@ -127,6 +127,8 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
         tabData: "Details",
         tabsLabel: "Contact sections",
       };
+  // Si la pestaña Datos solo tiene la tarjeta de contacto, ocupa todo el ancho en lugar de media pantalla.
+  const soloContact = customFields.length === 0 && duplicates.length === 0;
   const openOpps = opportunities.filter((o) => !o.closedAt);
   const currencies = [...new Set(openOpps.filter((o) => o.amount != null).map((o) => o.currency))];
   const openValue = openOpps.reduce((a, o) => a + (o.amount ?? 0), 0);
@@ -163,7 +165,7 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
         counts={{ activity: notes.length, data: duplicates.length }}
         panels={{
           summary: (
-            <div className={searchViews ? "grid grid-cols-1 items-start gap-5 lg:grid-cols-2" : ""}>
+            <div className={searchViews ? "grid grid-cols-1 items-stretch gap-5 lg:grid-cols-2" : ""}>
               <Section icon={GitBranch} title={L.oppTitle} hint={L.oppHint} action={canManageOpps ? <CreateOpportunityDialog stages={stageOptions} users={users} fixedLead={fixedLead} /> : undefined}>
                 {opportunities.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-slate-200 px-4 py-5 text-center text-sm text-slate-500">{L.oppEmpty}</p>
@@ -215,9 +217,9 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
             </>
           ),
           data: (
-            <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
-      <Section icon={Contact} title={L.dataTitle} hint={L.dataHint}>
-        <dl className="space-y-2.5">
+            <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-2">
+      <Section icon={Contact} title={L.dataTitle} hint={L.dataHint} className={soloContact ? "lg:col-span-2" : ""}>
+        <dl className={soloContact ? "grid gap-x-10 gap-y-2.5 sm:grid-cols-2" : "space-y-2.5"}>
           <Row label={L.email}>{lead.email ?? "—"}</Row>
           <Row label={L.phone}>{lead.phone ?? "—"}</Row>
           <Row label={L.source}>{lead.source ?? "manual"}</Row>
