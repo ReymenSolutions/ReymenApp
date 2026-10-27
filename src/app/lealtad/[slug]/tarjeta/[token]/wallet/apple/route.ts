@@ -1,6 +1,8 @@
-import { walletNotConfiguredResponse } from "@/lib/loyalty/wallet-route";
+import { appleWalletResponse } from "@/lib/loyalty/wallet-route";
 
-// Pase .pkpass de Apple Wallet. Pendiente de credenciales (ver src/lib/loyalty/wallet.ts).
+// Pase .pkpass de Apple Wallet (ver src/lib/loyalty/wallet-apple.ts).
+export const runtime = "nodejs";
+
 export async function GET(_req: Request, ctx: { params: Promise<{ slug: string; token: string }> }) {
-  return walletNotConfiguredResponse("apple", await ctx.params);
+  return appleWalletResponse(await ctx.params);
 }

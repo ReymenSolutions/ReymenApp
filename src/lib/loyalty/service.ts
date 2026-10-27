@@ -8,6 +8,7 @@
 // simplemente "no existe".
 
 import { emitDomainEvent } from "@/lib/domain-events";
+import { queueWalletRefresh } from "./wallet-sync";
 import { reconcileMemberInTx } from "./reconcile";
 import { randomBytes } from "crypto";
 import { Prisma, type LoyaltyRewardType } from "@prisma/client";
@@ -391,8 +392,10 @@ export async function registerVisit(input: RegisterVisitInput): Promise<Register
     if (original.customerId) await tx.$queryRaw`SELECT id FROM "Customer" WHERE id = ${original.customerId} AND "organizationId" = ${organizationId} FOR UPDATE`;
     const selected = original.customerId ? await tx.loyaltyMember.findFirst({ where: { organizationId, customerId: original.customerId, isSelected: true } }) : original;
     if (!selected) throw new UserError("El cliente debe elegir un programa.");
-    return registerVisitInTx(tx, { ...input, memberId: selected.id, saleAmount }, now);
+    return { ...(await registerVisitInTx(tx, { ...input, memberId: selected.id, saleAmount }, now)), memberId: selected.id };
   });
+  // El pase de Wallet del cliente refleja la visita en segundos (sin hacer esperar a la caja).
+  if (!result.replay) queueWalletRefresh(result.memberId);
 
   if (!result.replay) {
     await logAudit({
@@ -426,7 +429,7 @@ export async function redeemReward(input: { organizationId: string; userId?: str
     const branch = await prisma.branch.findFirst({ where: { id: input.branchId, organizationId: input.organizationId }, select: { id: true } });
     if (!branch) throw new UserError("Esa sucursal no existe.");
   }
-  return prisma.$transaction(async (tx) => {
+  const redeemed = await prisma.$transaction(async (tx) => {
     const existing = await tx.loyaltyReward.findFirst({ where: { id: input.rewardId, organizationId: input.organizationId } });
     if (!existing) throw new UserError("Recompensa no encontrada.");
     await tx.$queryRaw`SELECT id FROM "LoyaltyMember" WHERE id = ${existing.memberId} AND "organizationId" = ${input.organizationId} FOR UPDATE`;
@@ -451,6 +454,8 @@ export async function redeemReward(input: { organizationId: string; userId?: str
       payload: { customerId: member.customerId, rewardId: existing.id, ...(input.pos ? { posRequestId: input.pos.requestId, deviceId: input.pos.deviceId, employeeId: input.pos.employeeId } : {}) }, dedupeKey: `loyalty.reward_redeemed:${existing.id}` });
     return existing;
   });
+  queueWalletRefresh(redeemed.memberId);
+  return redeemed;
 }
 
 // ─── Caja: identificar cliente ──────────────────────────────────────────

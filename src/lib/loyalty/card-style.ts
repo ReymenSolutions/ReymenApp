@@ -59,6 +59,8 @@ function shade(hex: string, amount: number): string {
 }
 
 export interface CardStyle {
+  /** Color de la tarjeta en hex (para Wallet, que no acepta degradados). */
+  base: string;
   background: string;
   /** Texto principal: blanco o casi negro, el que contraste más con el fondo. */
   text: string;
@@ -78,6 +80,7 @@ export function cardStyle(p: { cardColor?: string | null; cardAccent?: string | 
   const accent = isHexColor(p.cardAccent) ? p.cardAccent : DEFAULT_CARD_ACCENT;
   const dark = contrast(base, "#FFFFFF") >= contrast(base, "#111827");
   return {
+    base,
     background: `linear-gradient(135deg, ${base} 0%, ${shade(base, dark ? 0.35 : 0.12)} 100%)`,
     text: dark ? "#FFFFFF" : "#111827",
     muted: dark ? "rgba(255,255,255,0.78)" : "rgba(17,24,39,0.7)",

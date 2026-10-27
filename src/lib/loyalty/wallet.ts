@@ -1,34 +1,28 @@
 // Apple Wallet / Google Wallet para la tarjeta de lealtad.
 //
-// Estado en esta branch (demo): NO hay credenciales en el proyecto, así que
-// ninguna de las dos integraciones está conectada. Lo que sí existe:
-//   - buildWalletCard(): el contenido exacto que llevaría el pase (pura, probada).
-//   - getWalletAvailability(): mantiene Wallet desactivado mientras no exista la implementación.
-//   - Las rutas /lealtad/<negocio>/tarjeta/<token>/wallet/{apple,google}
-//     responden 501: falta implementar firma y actualización de pases, además de credenciales.
+// - buildWalletCard(): el contenido del pase (puro, probado).
+// - getWalletAvailability(): cada proveedor se activa solo cuando sus
+//   credenciales están en el servidor (ver wallet-apple.ts, wallet-google.ts
+//   y docs/wallet.md). Sin ellas, los botones dicen "próximamente".
+// - Rutas: /lealtad/<negocio>/tarjeta/<token>/wallet/{apple,google} entregan
+//   el pase; /api/wallet/apple es el servicio web de actualizaciones de Apple;
+//   wallet-sync.ts empuja los cambios de progreso a los dos.
 //
 // Regla: la fuente de verdad es la base de datos de Reymen. El pase solo
 // refleja el estado; si el cliente lo borra o cambia de teléfono, su progreso
 // sigue intacto y basta con volver a agregarlo.
-//
-// Para conectar (siguiente fase):
-//   Apple  → APPLE_WALLET_PASS_TYPE_ID, APPLE_WALLET_TEAM_ID,
-//            APPLE_WALLET_CERT_P12_BASE64, APPLE_WALLET_CERT_PASSWORD
-//            (firma .pkpass + web service de actualizaciones).
-//   Google → GOOGLE_WALLET_ISSUER_ID, GOOGLE_WALLET_SERVICE_ACCOUNT_JSON
-//            (clase loyaltyClass + objetos loyaltyObject + JWT "Save to Google Wallet").
 
 import { progressOf } from "./cycle";
+import { appleWalletConfig } from "./wallet-apple";
+import { googleWalletConfig } from "./wallet-google";
 
 export interface WalletAvailability {
   apple: boolean;
   google: boolean;
 }
 
-// Credentials alone do not implement pass signing or the update service.
-// Keep both providers disabled until those integrations exist and are tested.
 export function getWalletAvailability(): WalletAvailability {
-  return { apple: false, google: false };
+  return { apple: appleWalletConfig() !== null, google: googleWalletConfig() !== null };
 }
 
 export interface WalletCardInput {
