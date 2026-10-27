@@ -33,6 +33,7 @@ export function RealtyTabs({ canManage }: { canManage: boolean }) {
     { href: `${BASE}/matches`, label: R.tabMatches },
     { href: `${BASE}/opportunities`, label: R.tabOpportunities },
     { href: `${BASE}/campaigns`, label: R.tabCampaigns },
+    { href: `${BASE}/rotation`, label: R.tabRotation },
     { href: `${BASE}/reports`, label: R.tabReports },
     ...(canManage ? [{ href: `${BASE}/settings`, label: R.tabSettings }] : []),
   ];

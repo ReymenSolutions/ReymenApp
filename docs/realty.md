@@ -177,6 +177,17 @@ ofrece **«Agregar lo que busca»** (con `realty:operate`), que abre `/portal/re
 elegido (solo si es de la organización). En **Contactos** hay el filtro **«Con perfil inmobiliario»** (`?realty=1`). Sin el módulo
 no se muestra nada: el CRM no conoce el modelo de Real Estate más allá de esta tarjeta.
 
+## Rotación (`/portal/realty/rotation`)
+
+Responde «qué casas sí se mueven, cuáles no y por qué». Código puro en `src/lib/realty/rotation.ts`, insumos en `rotation-data.ts`.
+
+- **Días en mercado**: de `availableSince` al último cambio a Vendida/Rentada en el historial de estados (si no hay historial, la fecha del cierre registrado). Solo cuentan las cerradas dentro del periodo elegido.
+- **Lectura**: rápida ≤ 30 días, lenta ≥ 90, normal en medio. Un segmento (zona, tipo, rango de precio) necesita al menos 3 cierres (`MIN_SAMPLE`) para opinar; si no, «Datos insuficientes».
+- **Sell-through**: cerradas ÷ (cerradas + inventario abierto).
+- **Rápidas vs. lentas**: compara precio contra la mediana comparable (misma operación y tipo), interés (WhatsApp, agendar, compartir) y fotos. Solo redacta un hallazgo si hay 3 rápidas y 3 lentas y la diferencia es relevante (precio ±5 puntos, interés ±30 %, fotos ±2). Son datos internos, no de mercado, y la página lo dice.
+- **Demanda sin cubrir**: zonas pedidas por ≥ 3 prospectos activos cuyo mejor match es menor a 65.
+- Sin IA: todo son conteos y medianas.
+
 ## Ubicación sin capturar coordenadas
 
 En la propiedad y en las zonas nadie escribe latitud/longitud ni tiene que
