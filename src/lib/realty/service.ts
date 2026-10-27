@@ -405,6 +405,12 @@ export interface VisitInput {
   startTime: Date;
   durationMinutes: number;
   notes: string | null;
+  /** Contacto del CRM de la visita cuando no hay perfil de búsqueda (solicitud desde la landing). */
+  leadId?: string | null;
+  /** Origen de la cita en Citas (por omisión «realty»). */
+  source?: string;
+  /** Texto de la cita si difiere de las notas (p. ej. datos de contacto cuando no hay Lead). */
+  description?: string | null;
 }
 
 /**
@@ -413,14 +419,16 @@ export interface VisitInput {
  * "una cita a la vez" de la agenda general: varios asesores muestran casas
  * al mismo tiempo. Solo evita empalmar la misma propiedad o el mismo asesor.
  */
-export async function scheduleVisit(organizationId: string, userId: string, input: VisitInput) {
+/** `userId` null = solicitud pública desde la landing. */
+export async function scheduleVisit(organizationId: string, userId: string | null, input: VisitInput) {
   const property = await assertProperty(organizationId, input.propertyId);
   if (!OPEN_STATUSES.includes(property.status)) throw new UserError("La propiedad ya no está disponible para visitas.");
   const profile = input.profileId ? await assertProfile(organizationId, input.profileId) : null;
   if (input.advisorUserId) await assertOrgUser(organizationId, input.advisorUserId);
   const start = input.startTime;
   const end = new Date(start.getTime() + input.durationMinutes * 60_000);
-  const lead = profile?.leadId ? await prisma.lead.findFirst({ where: { id: profile.leadId, organizationId }, select: { id: true, name: true } }) : null;
+  const leadRef = input.leadId ?? profile?.leadId ?? null;
+  const lead = leadRef ? await prisma.lead.findFirst({ where: { id: leadRef, organizationId }, select: { id: true, name: true } }) : null;
 
   const visitId = await prisma.$transaction(
     async (tx) => {
@@ -438,10 +446,10 @@ export async function scheduleVisit(organizationId: string, userId: string, inpu
           organizationId,
           leadId: lead?.id ?? null,
           title: `Visita: ${property.title}`.slice(0, 190),
-          description: input.notes,
+          description: input.description ?? input.notes,
           startTime: start,
           endTime: end,
-          source: "realty",
+          source: input.source ?? "realty",
           metadata: { realtyPropertyId: property.id },
         },
       });

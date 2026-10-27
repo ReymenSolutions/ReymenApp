@@ -117,6 +117,33 @@ vista por visitante y día; 60 eventos/min por IP.
 módulo NFC_QR está activo). El enlace se pega en la SmartCard existente; no se
 crea otra tarjeta ni se toca Supabase.
 
+## Landing pública rediseñada (`/p/<slug>`)
+
+Mobile-first, con la identidad de Reymen: encabezado azul noche, galería con deslizado y contador, precio y datos clave,
+y una **tarjeta de acciones** con pestañas **«Agendar visita»** y **«Pedir informes»**, WhatsApp directo y compartir (fija a
+la derecha en pantallas grandes; en el celular, justo después de los datos y con una barra fija abajo).
+
+- **Modo oscuro legible**: la landing usa tokens propios `--rl-*` (`src/app/globals.css`, clase `.rl`, claro y oscuro) en vez
+  de colores fijos. Antes los textos de color fijo (negro) quedaban sobre fondos que sí se oscurecían con el remapeo global
+  de `.dark`.
+- **Idioma y tema** (selectores en el encabezado): se guardan en las cookies `reymen-lang` / `reymen-theme` que lee el
+  servidor (y en la cuenta si hay sesión), así que se conservan al recargar. Al cambiar de idioma se vuelve a pedir la página.
+- **Placeholders, no texto por defecto**: los campos de texto salen vacíos con un ejemplo («Ej. María López», «Ej. 4,500,000»…).
+  Solo las listas (compra/renta y tipo) arrancan con lo de la propiedad.
+
+### Agendar visita → Citas
+
+`GET /api/realty/public/visit-slots?slug=&date=` y `POST /api/realty/public/visits` (`src/lib/realty/visit-request.ts`):
+
+- Horarios = reglas de la **Agenda** del negocio (`AvailabilityRule`) en su zona horaria; sin reglas, lunes a sábado de 9 a 18 h.
+  Visitas de 60 min, 2 h de anticipación mínima, hasta 30 días, y se quitan los horarios ya apartados de esa propiedad o de
+  su asesor. El servidor vuelve a validar que el horario elegido siga libre (no confía en el cliente).
+- Crea el **Lead** del CRM (mismo teléfono = mismo contacto) y la visita con `scheduleVisit`: un `Appointment` de Citas
+  (estado «Programada» = por confirmar, origen `realty-landing`) + `RealtyPropertyVisit` (aparece en Real Estate → Visitas y en
+  `/portal/appointments`, y entra a los recordatorios de citas). Si el tope de leads del plan está lleno, la cita se agenda
+  igual con el contacto en la descripción. Avisa por correo al asesor.
+- Mismo origen, 6 solicitudes/hora por IP (60 consultas de horarios/min), campo trampa; responde códigos.
+
 ## Formulario «Quiero informes» (captura de demanda)
 
 En `/p/<slug>`, arriba de los botones de WhatsApp, la persona deja **WhatsApp, compra/renta, tipo, presupuesto («hasta

@@ -63,6 +63,12 @@ export function localDateString(date: Date, tz: string): string {
   return `${l.year}-${String(l.month).padStart(2, "0")}-${String(l.day).padStart(2, "0")}`;
 }
 
+/** El instante en que son `minute` minutos después de la medianoche local del día "YYYY-MM-DD" en la zona (sin cambio de horario en medio). */
+export function zonedMinuteToUtc(day: string, minute: number, tz: string): Date {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(localMidnight(y, m, d, tz).getTime() + minute * 60_000);
+}
+
 /** Clave de día de los conteos diarios: la fecha local a las 00:00 UTC. */
 export function dayKey(date: Date, tz: string): Date {
   const l = localParts(date, tz);
