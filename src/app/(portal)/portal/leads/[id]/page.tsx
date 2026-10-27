@@ -241,7 +241,9 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
           <LeadCustomFieldsPanel
             leadId={lead.id}
             canEdit={can(session.user.role as UserRole, "leads:create")}
+            canDelete={can(session.user.role as UserRole, "settings:manage")}
             fields={customFields.map((f) => ({
+              id: f.id,
               key: f.key,
               label: f.label,
               type: f.type,

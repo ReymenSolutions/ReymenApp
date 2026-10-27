@@ -154,7 +154,7 @@ export default async function PortalLeadsPage({
       ) : (
         <LeadTableClient leads={leads} total={total} page={page} pageSize={PAGE_SIZE} query={q ?? ""} status={status}
           columns={columns}
-          customFields={customFields.map((f) => ({ key: f.key, label: f.label, type: f.type, options: f.options }))}
+          customFields={customFields.map((f) => ({ id: f.id, key: f.key, label: f.label, type: f.type, options: f.options }))}
           canCreateField={canManageSettings}
         />
       )}

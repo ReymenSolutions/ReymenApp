@@ -69,11 +69,6 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status, c
     });
   }
 
-  function openPanel(e: React.MouseEvent<HTMLElement>, id: string) {
-    openerRef.current = e.currentTarget;
-    setPanelLeadId(id);
-  }
-
   const statusOptions: { value: LeadStatus | "ALL"; label: string }[] = [
     { value: "ALL", label: t.filterAll },
     { value: "NEW", label: t.filterNew },
@@ -137,26 +132,32 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status, c
           <p className="text-sm text-slate-400">{t.noLeadsFiltered}</p>
         </div>
       ) : (
-        <div className={`hidden overflow-x-auto rounded-card md:block border border-slate-200 bg-white shadow-card motion-micro transition-opacity ${isFiltering ? "opacity-60" : ""}`} aria-busy={isFiltering}>
-          <table className="w-full text-sm">
+        <div className={`overflow-hidden rounded-card border border-slate-200 bg-white shadow-card motion-micro transition-opacity ${isFiltering ? "opacity-60" : ""}`} aria-busy={isFiltering}>
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50">
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t.colName}</th>
-                {show("contact") && <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t.colContact}</th>}
-                {show("source") && <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t.colSource}</th>}
-                {show("status") && <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t.colStatus}</th>}
-                {show("score") && <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t.colScore}</th>}
-                {show("date") && <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t.colDate}</th>}
+              <tr className="border-b border-slate-200 bg-slate-50/80">
+                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">{t.colName}</th>
+                {show("contact") && <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">{t.colContact}</th>}
+                {show("source") && <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">{t.colSource}</th>}
+                {show("status") && <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">{t.colStatus}</th>}
+                {show("score") && <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">{t.colScore}</th>}
+                {show("date") && <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">{t.colDate}</th>}
                 {shownFields.map((f) => (
-                  <th key={f.key} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{f.label}</th>
+                  <th key={f.key} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">{f.label}</th>
                 ))}
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">{C.actions}</th>
+                <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">{C.actions}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 [&_td]:align-middle">
               {leads.map((lead) => (
-                <tr key={lead.id} className="motion-micro transition-colors hover:bg-slate-50 focus-within:bg-slate-50">
-                  <td className="px-4 py-3">
+                <tr key={lead.id} className="group motion-micro transition-colors hover:bg-slate-50 focus-within:bg-slate-50">
+                  <td className="sticky left-0 z-10 bg-white px-4 py-3 group-hover:bg-slate-50">
+                    <div className="flex items-center gap-3">
+                      <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-50 text-xs font-semibold text-brand-700">
+                        {lead.name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?"}
+                      </span>
+                      <div className="min-w-0">
                     <Link
                       href={`/portal/leads/${lead.id}`}
                       onClick={(e) => {
@@ -166,13 +167,15 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status, c
                         openerRef.current = e.currentTarget;
                         setPanelLeadId(lead.id);
                       }}
-                      className="font-medium text-slate-900 hover:text-brand-600 hover:underline"
+                      className="block whitespace-nowrap font-medium text-slate-900 hover:text-brand-600 hover:underline"
                     >
                       {lead.name}
                     </Link>
                     {lead.notes && (
-                      <p className="text-xs text-slate-400 truncate max-w-[180px]">{lead.notes}</p>
+                      <p className="max-w-[180px] truncate text-xs text-slate-400">{lead.notes}</p>
                     )}
+                      </div>
+                    </div>
                   </td>
                   {show("contact") && (
                     <td className="px-4 py-3">
@@ -226,45 +229,7 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status, c
               ))}
             </tbody>
           </table>
-        </div>
-      )}
-      {leads.length > 0 && (
-        <ul className={`space-y-2 md:hidden ${isFiltering ? "opacity-60" : ""}`}>
-          {leads.map((lead) => (
-            <li key={lead.id} className="rounded-card border border-slate-200 bg-white p-3 shadow-card">
-              <button type="button" onClick={(e) => openPanel(e, lead.id)} className="block w-full text-left">
-                <div className="flex items-start justify-between gap-2">
-                  <span className="font-medium text-slate-900">{lead.name}</span>
-                  <StatusBadge status={lead.status} />
-                </div>
-                <p className="mt-1 text-xs text-slate-500">
-                  {[lead.phone, lead.email].filter(Boolean).join(" · ") || "—"}
-                </p>
-                <p className="mt-0.5 text-xs text-slate-400">
-                  {lead.source ?? "manual"} · {formatDate(lead.createdAt, lang)}
-                </p>
-              </button>
-              <div className="mt-2 flex items-center gap-2 border-t border-slate-100 pt-2">
-                {lead.phone && (
-                  <a href={`tel:${lead.phone}`} className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700">
-                    <Phone className="h-3.5 w-3.5" /> {C.call}
-                  </a>
-                )}
-                {whatsappDigits(lead.phone) && (
-                  <a href={`https://wa.me/${whatsappDigits(lead.phone)}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-emerald-700">
-                    <MessageCircle className="h-3.5 w-3.5" /> {C.whatsapp}
-                  </a>
-                )}
-                <Link href={`/portal/leads/${lead.id}`} className="ml-auto text-xs font-medium text-brand-700 hover:underline">
-                  {C.open} →
-                </Link>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-      {leads.length > 0 && (
-        <div className="mt-3 rounded-card border border-slate-200 bg-white shadow-card">
+          </div>
           <Pagination
             page={page}
             pageSize={pageSize}

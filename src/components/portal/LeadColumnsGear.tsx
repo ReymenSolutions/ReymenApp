@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Loader2, Plus, Settings2 } from "lucide-react";
+import { Loader2, Plus, Settings2, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { CustomFieldType } from "@prisma/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -10,10 +11,12 @@ import { Button } from "@/components/ui/button";
 import { usePreferences } from "@/context/preferences";
 import { updateLeadColumns } from "@/actions/lead-columns";
 import { createCustomField } from "@/actions/custom-fields";
+import { DeleteCustomFieldDialog } from "@/components/portal/DeleteCustomFieldDialog";
 import { getErrorMessage } from "@/lib/user-error";
 import { BASE_COLUMNS, type BaseColumn, type LeadColumnPrefs } from "@/lib/lead-columns";
 
 export interface ColumnField {
+  id: string;
   key: string;
   label: string;
 }
@@ -45,7 +48,9 @@ export function LeadColumnsGear({ prefs: serverPrefs, fields, canCreateField }: 
     setSeen(serverPrefs);
     setPrefs(serverPrefs);
   }
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [deleting, setDeleting] = useState<{ id: string; label: string; key: string } | null>(null);
   const [pending, startTransition] = useTransition();
   const [label, setLabel] = useState("");
   const [type, setType] = useState<CustomFieldType>("TEXT");
@@ -125,10 +130,23 @@ export function LeadColumnsGear({ prefs: serverPrefs, fields, canCreateField }: 
               <p className="px-2 text-sm text-slate-400">{es ? "Aún no tienes campos personalizados." : "You have no custom fields yet."}</p>
             ) : (
               fields.map((f) => (
-                <label key={f.key} className={row}>
-                  <input type="checkbox" checked={prefs.custom.includes(f.key)} onChange={() => toggleCustom(f.key)} />
-                  {f.label}
-                </label>
+                <div key={f.key} className="flex items-center gap-1">
+                  <label className={`${row} flex-1`}>
+                    <input type="checkbox" checked={prefs.custom.includes(f.key)} onChange={() => toggleCustom(f.key)} />
+                    {f.label}
+                  </label>
+                  {canCreateField && (
+                    <button
+                      type="button"
+                      onClick={() => setDeleting({ id: f.id, label: f.label, key: f.key })}
+                      title={es ? "Eliminar campo" : "Delete field"}
+                      aria-label={es ? `Eliminar campo ${f.label}` : `Delete field ${f.label}`}
+                      className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
               ))
             )}
           </div>
@@ -167,6 +185,14 @@ export function LeadColumnsGear({ prefs: serverPrefs, fields, canCreateField }: 
           )}
         </DialogContent>
       </Dialog>
+      <DeleteCustomFieldDialog
+        field={deleting}
+        onClose={() => setDeleting(null)}
+        onDeleted={() => {
+          if (deleting) setPrefs((p) => ({ ...p, custom: p.custom.filter((k) => k !== deleting.key) }));
+          router.refresh();
+        }}
+      />
     </>
   );
 }

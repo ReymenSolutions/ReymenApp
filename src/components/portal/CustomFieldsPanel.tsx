@@ -8,8 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { usePreferences } from "@/context/preferences";
-import { createCustomField, deleteCustomField, getCustomFieldUsage, setCustomFieldActive, updateCustomField } from "@/actions/custom-fields";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { createCustomField, setCustomFieldActive, updateCustomField } from "@/actions/custom-fields";
+import { DeleteCustomFieldDialog } from "@/components/portal/DeleteCustomFieldDialog";
 import { getErrorMessage } from "@/lib/user-error";
 
 interface FieldRow {
@@ -47,8 +47,8 @@ export function CustomFieldsPanel({ fields, canManage, max }: { fields: FieldRow
   const [type, setType] = useState<CustomFieldType>("TEXT");
   const [options, setOptions] = useState("");
   const [showArchived, setShowArchived] = useState(false);
-  // Campo que se está por eliminar y cuántos contactos tienen dato en él (null = todavía contando).
-  const [deleting, setDeleting] = useState<{ field: FieldRow; contacts: number | null } | null>(null);
+  // Campo que se está por eliminar (la confirmación cuenta cuántos contactos tienen dato en él).
+  const [deleting, setDeleting] = useState<FieldRow | null>(null);
 
   const active = fields.filter((f) => f.isActive);
   const archived = fields.filter((f) => !f.isActive);
@@ -64,26 +64,6 @@ export function CustomFieldsPanel({ fields, canManage, max }: { fields: FieldRow
         toast.error(getErrorMessage(e, errorFallback));
       }
     });
-  }
-
-  function askDelete(f: FieldRow) {
-    setDeleting({ field: f, contacts: null });
-    getCustomFieldUsage(f.id)
-      .then((u) => setDeleting((d) => (d && d.field.id === f.id ? { ...d, contacts: u.contacts } : d)))
-      .catch(() => setDeleting((d) => (d && d.field.id === f.id ? { ...d, contacts: 0 } : d)));
-  }
-
-  function confirmDelete() {
-    if (!deleting) return;
-    const f = deleting.field;
-    run(
-      async () => {
-        await deleteCustomField(f.id);
-        toast.success(es ? "Campo eliminado" : "Field deleted");
-      },
-      es ? "No se pudo eliminar" : "Couldn't delete",
-      () => setDeleting(null)
-    );
   }
 
   function add() {
@@ -149,7 +129,7 @@ export function CustomFieldsPanel({ fields, canManage, max }: { fields: FieldRow
               )}
               {canManage && (
                 <button
-                  onClick={() => askDelete(f)}
+                  onClick={() => setDeleting(f)}
                   disabled={pending}
                   className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
                   title={es ? "Eliminar campo" : "Delete field"}
@@ -244,7 +224,7 @@ export function CustomFieldsPanel({ fields, canManage, max }: { fields: FieldRow
                   )}
                   {canManage && (
                     <button
-                      onClick={() => askDelete(f)}
+                      onClick={() => setDeleting(f)}
                       disabled={pending}
                       className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
                       title={es ? "Eliminar campo" : "Delete field"}
@@ -260,33 +240,7 @@ export function CustomFieldsPanel({ fields, canManage, max }: { fields: FieldRow
         </div>
       )}
 
-      <Dialog open={deleting !== null} onOpenChange={(open) => !open && !pending && setDeleting(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{es ? `¿Eliminar el campo «${deleting?.field.label ?? ""}»?` : `Delete the “${deleting?.field.label ?? ""}” field?`}</DialogTitle>
-            <DialogDescription>
-              {deleting?.contacts === null || deleting === null
-                ? es ? "Revisando cuántos contactos tienen datos en este campo…" : "Checking how many contacts have data in this field…"
-                : deleting.contacts > 0
-                  ? es
-                    ? `Se borrarán el campo y el dato que ${deleting.contacts === 1 ? "1 contacto tiene" : `${deleting.contacts} contactos tienen`} en él. Esta acción no se puede deshacer.`
-                    : `The field and the data ${deleting.contacts === 1 ? "1 contact has" : `${deleting.contacts} contacts have`} in it will be deleted. This can't be undone.`
-                  : es
-                    ? "Se borrará el campo. Ningún contacto tiene datos en él. Esta acción no se puede deshacer."
-                    : "The field will be deleted. No contact has data in it. This can't be undone."}
-              {" "}
-              {es ? "Si solo quieres ocultarlo y conservar los datos, usa «Archivar»." : "If you only want to hide it and keep the data, use “Archive”."}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleting(null)} disabled={pending}>{es ? "Cancelar" : "Cancel"}</Button>
-            <Button variant="destructive" onClick={confirmDelete} disabled={pending || deleting?.contacts === null}>
-              {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-              {es ? "Eliminar campo" : "Delete field"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteCustomFieldDialog field={deleting} onClose={() => setDeleting(null)} archiveHint={false} />
     </div>
   );
 }
