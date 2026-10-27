@@ -58,3 +58,22 @@ export function scheduleZoneGeocode(organizationId: string, zoneId: string, a: Z
     void run();
   }
 }
+
+/**
+ * Ubica en el mapa las zonas que aún no tienen punto (zonas creadas a mano o antes de que esto fuera automático). Pocas por
+ * vuelta para no saturar al geocodificador; la siguiente visita a Mercado o Configuración continúa con las que falten.
+ */
+export async function backfillZoneGeo(organizationId: string, limit = 4): Promise<number> {
+  const zones = await prisma.realtyZone.findMany({ where: { organizationId, latitude: null }, take: limit, orderBy: { createdAt: "asc" }, select: { id: true, name: true, postalCode: true } });
+  for (const z of zones) await geocodeZoneIfMissing(organizationId, z.id, { colonia: z.name, postalCode: z.postalCode, municipality: null, state: null });
+  return zones.length;
+}
+
+export function scheduleZoneBackfill(organizationId: string): void {
+  const run = () => backfillZoneGeo(organizationId).catch((err) => console.error("[realty/zone-geo]", err instanceof Error ? err.message : err));
+  try {
+    after(run);
+  } catch {
+    void run();
+  }
+}
