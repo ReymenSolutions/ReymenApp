@@ -17,11 +17,12 @@ import { LeadTableClient } from "@/components/portal/LeadTableClient";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Users, Settings, Copy } from "lucide-react";
 import { getActiveCustomFields } from "@/lib/custom-fields-db";
+import { parsePaging } from "@/lib/paging";
 import { sanitizeLeadColumns } from "@/lib/lead-columns";
 import { countDuplicateGroups } from "@/lib/duplicate-detection";
 import type { LeadStatus, Prisma, UserRole } from "@prisma/client";
 
-const PAGE_SIZE = 50;
+const DEFAULT_PAGE_SIZE = 50;
 
 const VALID_STATUSES: LeadStatus[] = ["NEW", "CONTACTED", "QUALIFIED", "PROPOSAL", "WON", "LOST"];
 
@@ -31,7 +32,7 @@ function parseStatus(status: string | undefined): LeadStatus | "ALL" {
 
 async function getLeads(
   orgId: string,
-  { query, status, page, realty }: { query?: string; status: LeadStatus | "ALL"; page: number; realty?: boolean }
+  { query, status, page, pageSize, realty }: { query?: string; status: LeadStatus | "ALL"; page: number; pageSize: number; realty?: boolean }
 ) {
   const where: Prisma.LeadWhereInput = {
     organizationId: orgId,
@@ -54,8 +55,8 @@ async function getLeads(
     prisma.lead.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     }),
     prisma.lead.count({ where }),
     prisma.lead.count({ where: { organizationId: orgId, deletedAt: null } }),
@@ -67,14 +68,14 @@ async function getLeads(
 export default async function PortalLeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; page?: string; realty?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; page?: string; ps?: string; realty?: string }>;
 }) {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
   await requireModule(session.user.organizationId, "CRM");
 
-  const { q, status: statusParam, page: pageParam, realty: realtyParam } = await searchParams;
-  const page = Math.max(1, Number(pageParam) || 1);
+  const { q, status: statusParam, page: pageParam, ps: psParam, realty: realtyParam } = await searchParams;
+  const { page, pageSize } = parsePaging({ page: pageParam, ps: psParam }, DEFAULT_PAGE_SIZE);
   const status = parseStatus(statusParam);
 
   const realtyActive = await hasModule(session.user.organizationId, "REALTY");
@@ -83,7 +84,7 @@ export default async function PortalLeadsPage({
   const [t, lang, { leads, total, totalUnfiltered }, duplicateGroups, customFields, me] = await Promise.all([
     getServerT(),
     getServerLang(),
-    getLeads(session.user.organizationId, { query: q, status, page, realty: realtyOnly }),
+    getLeads(session.user.organizationId, { query: q, status, page, pageSize, realty: realtyOnly }),
     countDuplicateGroups(session.user.organizationId),
     getActiveCustomFields(session.user.organizationId),
     prisma.user.findUnique({ where: { id: session.user.id }, select: { leadColumns: true } }),
@@ -152,7 +153,7 @@ export default async function PortalLeadsPage({
           </CardContent>
         </Card>
       ) : (
-        <LeadTableClient leads={leads} total={total} page={page} pageSize={PAGE_SIZE} query={q ?? ""} status={status}
+        <LeadTableClient leads={leads} total={total} page={page} pageSize={pageSize} query={q ?? ""} status={status}
           columns={columns}
           customFields={customFields.map((f) => ({ id: f.id, key: f.key, label: f.label, type: f.type, options: f.options }))}
           canCreateField={canManageSettings}

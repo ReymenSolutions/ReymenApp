@@ -5,9 +5,11 @@ import { enumLabel } from "@/lib/i18n-realty";
 import { daysBetween, OPERATIONS, PROPERTY_STATUSES, PROPERTY_TYPES } from "@/lib/realty/constants";
 import { one, priceText } from "@/lib/realty/page-helpers";
 import { Empty, ScorePill, StatusBadge, Thumb } from "@/components/realty/RealtyBits";
+import { parsePaging } from "@/lib/paging";
+import { UrlPagination } from "@/components/shared/Pagination";
 import { FilterBar } from "@/components/realty/FilterBar";
 
-type SP = { q?: string; status?: string; operation?: string; zone?: string; type?: string };
+type SP = { q?: string; status?: string; operation?: string; zone?: string; type?: string; page?: string; ps?: string };
 
 export default async function PropertiesPage({ searchParams }: { searchParams: Promise<SP> }) {
   const ctx = await getRealtyContext();
@@ -17,7 +19,8 @@ export default async function PropertiesPage({ searchParams }: { searchParams: P
   const operation = one(sp.operation, OPERATIONS);
   const type = one(sp.type, PROPERTY_TYPES);
   const now = new Date();
-  const [rows, zones, snap] = await Promise.all([listProperties(ctx.orgId, { q: sp.q, status, operation, zoneId: sp.zone || undefined, type }), listZones(ctx.orgId), loadSnapshot(ctx.orgId, now)]);
+  const { page, pageSize } = parsePaging(sp, 25);
+  const [{ rows, total }, zones, snap] = await Promise.all([listProperties(ctx.orgId, { q: sp.q, status, operation, zoneId: sp.zone || undefined, type }, { page, pageSize }), listZones(ctx.orgId), loadSnapshot(ctx.orgId, now)]);
   const a = analyze(snap, { from: new Date(now.getTime() - 30 * 86_400_000), to: now });
 
   return (
@@ -69,6 +72,11 @@ export default async function PropertiesPage({ searchParams }: { searchParams: P
             );
           })}
         </ul>
+      )}
+      {rows.length > 0 && (
+        <div className="mt-4 rounded-card border border-slate-200 bg-white shadow-card">
+          <UrlPagination page={page} pageSize={pageSize} total={total} className="border-t-0" />
+        </div>
       )}
     </div>
   );

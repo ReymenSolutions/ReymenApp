@@ -5,10 +5,12 @@ import { enumLabel } from "@/lib/i18n-realty";
 import { relativeDay } from "@/lib/loyalty/format";
 import { budgetText, one } from "@/lib/realty/page-helpers";
 import { OPERATIONS } from "@/lib/realty/constants";
+import { parsePaging } from "@/lib/paging";
+import { UrlPagination } from "@/components/shared/Pagination";
 import { Empty, ScorePill } from "@/components/realty/RealtyBits";
 import { FilterBar } from "@/components/realty/FilterBar";
 
-type SP = { q?: string; operation?: string; zone?: string; status?: string };
+type SP = { q?: string; operation?: string; zone?: string; status?: string; page?: string; ps?: string };
 
 export default async function ProspectsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const ctx = await getRealtyContext();
@@ -16,7 +18,8 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
   const sp = await searchParams;
   const operation = one(sp.operation, OPERATIONS);
   const status = one(sp.status, ["active", "inactive", "all"] as const) ?? "active";
-  const [rows, zones] = await Promise.all([listProspects(ctx.orgId, { q: sp.q, operation, zoneId: sp.zone || undefined, status }), listZones(ctx.orgId)]);
+  const { page, pageSize } = parsePaging(sp, 25);
+  const [{ rows, total }, zones] = await Promise.all([listProspects(ctx.orgId, { q: sp.q, operation, zoneId: sp.zone || undefined, status }, { page, pageSize }), listZones(ctx.orgId)]);
 
   return (
     <div>
@@ -78,6 +81,9 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="mt-3 rounded-card border border-slate-200 bg-white shadow-card">
+          <UrlPagination page={page} pageSize={pageSize} total={total} className="border-t-0" />
         </div>
         </>
       )}
