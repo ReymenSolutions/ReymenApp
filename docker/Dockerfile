@@ -11,6 +11,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
+# El chequeo de tipos de Next llegó al tope de memoria por omisión de Node (~2 GB) y el build moría con «heap out of memory».
+ENV NODE_OPTIONS=--max-old-space-size=3072
 RUN npm run build
 
 FROM base AS runner
