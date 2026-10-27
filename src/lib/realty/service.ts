@@ -13,6 +13,7 @@ import { UserError } from "@/lib/user-error";
 import { OPEN_STATUSES, propertySlug, zoneKey } from "./constants";
 import { MATCH_VERSION, computeMatch, type MatchProfile, type MatchProperty } from "./match";
 import { ensureLeadForProspect, type ProspectContact } from "./lead-adapter";
+import { scheduleZoneGeocode } from "./zone-geo";
 import { MAX_PHOTOS_PER_PROPERTY, processPropertyImage } from "./media";
 
 /** Matches por debajo de esto no se guardan (no aportan y llenarían la tabla). */
@@ -101,6 +102,8 @@ export async function saveZone(organizationId: string, userId: string, input: { 
     zoneId = (await prisma.realtyZone.create({ data: { organizationId, ...data } })).id;
   }
   await logAudit({ organizationId, userId, action: input.id ? "realty.zone.update" : "realty.zone.create", resource: "RealtyZone", resourceId: zoneId, metadata: { name: data.name } });
+  // Sin punto capturado, se ubica sola por colonia y CP (en segundo plano); un punto puesto a mano no se toca.
+  if (input.latitude === null || input.longitude === null) scheduleZoneGeocode(organizationId, zoneId, { colonia: data.name, postalCode: data.postalCode, municipality: null, state: null });
   return zoneId;
 }
 

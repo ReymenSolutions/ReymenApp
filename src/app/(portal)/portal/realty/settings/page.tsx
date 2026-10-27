@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getRealtyContext } from "@/lib/realty/context";
 import { listZones } from "@/lib/realty/queries";
+import { scheduleZoneBackfill } from "@/lib/realty/zone-geo";
 import { SectionCard } from "@/components/realty/RealtyBits";
 import { SettingsForm, ZoneRow } from "@/components/realty/ManageForms";
 import { RecomputeButton } from "@/components/realty/PropertyTools";
@@ -10,6 +11,7 @@ export default async function RealtySettingsPage() {
   if (!ctx.canManage) redirect("/portal/realty");
   const { R } = ctx;
   const zones = await listZones(ctx.orgId);
+  if (zones.some((z) => z.latitude === null)) scheduleZoneBackfill(ctx.orgId);
   return (
     <div className="space-y-6">
       <SectionCard title={R.generalTitle}>

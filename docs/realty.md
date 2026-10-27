@@ -101,7 +101,7 @@ campañas deficientes, prospectos sin inventario. Máximo 3 por tipo.
 ## Landing pública y SmartCard
 
 `/p/<slug>` (sin sesión, en `src/proxy.ts`): mobile-first, fotos, precio,
-características y CTAs **WhatsApp / Agendar (por WhatsApp) / Compartir**.
+características y CTAs **WhatsApp / Agendar visita (crea una cita en Citas) / Compartir**.
 Nunca muestra dirección exacta salvo `showExactLocation`; sin datos internos.
 Solo propiedades publicadas, no inactivas, de organizaciones activas con el
 módulo activo.
@@ -179,6 +179,8 @@ no se muestra nada: el CRM no conoce el modelo de Real Estate más allá de esta
 
 ## La IA propone el perfil de búsqueda
 
+Guía para probarla con conversaciones reales: [`realty-ia-prueba.md`](./realty-ia-prueba.md).
+
 Cuando la organización tiene Real Estate, el Agente IA del pipeline (`src/lib/ai-pipeline.ts`) agrega al **mismo** análisis de la conversación un objeto `search_profile` (compra/renta, tipo, presupuesto, colonias, recámaras, extras). No hay una segunda llamada al modelo, así que respeta el presupuesto de IA, el modo del canal (Apagado = nada) y el enfriamiento entre análisis.
 
 - Solo se propone si el cliente dijo **compra/renta y presupuesto**; si falta algo, no se propone nada.
@@ -213,7 +215,10 @@ adivinar el formato de una dirección. El formulario va por partes:
 **La zona es la colonia.** La propiedad no tiene selector de zona: al guardar
 se asigna la zona de su colonia (colonia + CP) y, si no existe, se crea sola
 (`ensureColoniaZone` en `src/lib/realty/service.ts`); su punto aproximado para
-el mapa se busca después (`src/lib/realty/zone-geo.ts`). Colonias con el mismo
+el mapa se calcula **solo** en segundo plano por colonia y CP (`src/lib/realty/zone-geo.ts`).
+Las zonas que se guardan sin punto (a mano o de antes) también se ubican solas: Mercado y
+Configuración completan unas cuantas por visita (`scheduleZoneBackfill`). Un punto puesto a
+mano nunca se sobrescribe. Colonias con el mismo
 nombre en otro CP son zonas distintas ("Centro (San Pedro Garza García)"). En
 el prospecto, las colonias de interés se eligen de las existentes o se agregan
 por CP. Market Pulse solo lista colonias con demanda u oferta. Si una colonia todavía no tiene punto en el mapa (la búsqueda falló), se dibuja en el centro de sus propiedades redondeado a ~1 km. Una propiedad de
@@ -246,10 +251,18 @@ dato de prospectos.
 
 Se reducen en el navegador (≤ 1600 px) y el servidor las re-codifica con
 `sharp` a WebP sin EXIF (quita GPS) y las guarda en la base
-(`RealtyPropertyMedia.data`). Se sirven por `/api/realty/media/<id>` con caché
-larga si la propiedad es pública; si no, solo a usuarios de la organización.
-Límite: 12 fotos por propiedad. Cuando el repo tenga almacenamiento de
-objetos, solo cambia `src/lib/realty/media.ts` y esa ruta.
+(`RealtyPropertyMedia.data`). Límite: 12 fotos por propiedad (≈ 150–300 KB cada una).
+
+**¿Hace falta un CDN?** No como servicio aparte, pero la ruta ya está hecha para uno:
+`/api/realty/media/<id>` responde con `Cache-Control: public, max-age=31536000, immutable`
+y `ETag` (el id cambia si la foto cambia), así que cualquier CDN o proxy delante
+(Cloudflare, o `proxy_cache` de nginx) la guarda sola y la base solo se lee en el primer
+pedido; un navegador que revalida recibe `304` sin que se lean los bytes. Las fotos de
+propiedades no publicadas llevan `private` y nunca se cachean en un CDN.
+
+Para la v1 no se agregó almacenamiento de objetos (S3/R2): el repo no tiene ninguno y sería
+infraestructura nueva. Conviene migrar cuando las fotos pasen de unos pocos GB (cada
+respaldo de la base las incluye): solo cambian `src/lib/realty/media.ts` y esa ruta.
 
 ## Demo
 
@@ -277,7 +290,6 @@ facturación, avalúos, datos de mercado externos, exportar CSV.
 
 ## Limitaciones conocidas
 
-- Coordenadas de zona aproximadas, capturadas por el negocio.
-- Fotos en la base (sin CDN) — suficiente para v1.
-- Agendar desde la landing abre WhatsApp (no crea cita automática).
+- Coordenadas de zona aproximadas, calculadas solas por colonia y CP (a nivel colonia, no de calle).
+- Fotos en la base: cacheables por CDN (ver Fotos); sin almacenamiento de objetos todavía.
 - Campañas con conteos manuales.
