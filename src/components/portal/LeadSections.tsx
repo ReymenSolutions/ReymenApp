@@ -1,9 +1,9 @@
 import type { LucideIcon } from "lucide-react";
 
 /** Bloque de la ficha del contacto: título, una línea que explica para qué sirve y su contenido. */
-export function LeadSection({ icon: Icon, title, hint, action, children }: { icon: LucideIcon; title: string; hint: string; action?: React.ReactNode; children: React.ReactNode }) {
+export function LeadSection({ icon: Icon, title, hint, action, children, className = "" }: { icon: LucideIcon; title: string; hint: string; action?: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
-    <section aria-label={title} className="rounded-card border border-slate-200 bg-white p-4 shadow-card sm:p-5">
+    <section aria-label={title} className={`h-full rounded-card border border-slate-200 bg-white p-4 shadow-card sm:p-5 ${className}`}>
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900"><Icon className="h-4 w-4 text-slate-400" aria-hidden="true" />{title}</h2>
