@@ -5,6 +5,8 @@ import { num, shortDate } from "@/lib/loyalty/format";
 import { compactPrice } from "@/lib/realty/page-helpers";
 import { Empty, Kpi, SectionCard } from "@/components/realty/RealtyBits";
 import { CampaignEditToggle, CampaignForm, EMPTY_CAMPAIGN } from "@/components/realty/ManageForms";
+import { CopyLink } from "@/components/realty/PropertyTools";
+import { campaignTrackingUrl } from "@/lib/realty/campaign-stats";
 import { cn } from "@/lib/utils";
 
 const money = (n: number | null) => (n === null ? "—" : compactPrice(n));
@@ -42,10 +44,10 @@ export default async function CampaignsPage() {
           <Empty>{R.campaignsEmpty}</Empty>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-sm">
+            <table className="w-full min-w-[1000px] text-sm">
               <thead className="text-left text-xs uppercase tracking-wide text-slate-500">
                 <tr>
-                  {[R.campaign, R.channel, R.spend, R.leads, R.visits, R.closingsCount, R.cpl, R.costPerVisit, R.costPerClosing, R.roi, R.rating].map((h) => (
+                  {[R.campaign, R.channel, R.spend, R.leads, R.visits, R.closingsCount, R.revenue, R.cpl, R.costPerVisit, R.costPerClosing, R.roi, R.rating].map((h) => (
                     <th key={h} className="pb-2 pr-3 font-semibold">{h}</th>
                   ))}
                 </tr>
@@ -56,10 +58,20 @@ export default async function CampaignsPage() {
                     <td className="py-2.5 pr-3">
                       <p className="font-semibold text-slate-900">{c.name}</p>
                       <p className="text-xs text-slate-500">{c.property?.title ?? "—"} · {shortDate(c.startDate, lang)} · {enumLabel(R, "cst", c.status)}</p>
+                      <div className="mt-1.5 space-y-1">
+                        {c.property ? (
+                          <>
+                            <p className="text-[11px] text-slate-500">{R.trackingHint}</p>
+                            <CopyLink url={campaignTrackingUrl(c.property.slug, c.channel, c.id)} />
+                          </>
+                        ) : (
+                          <p className="text-[11px] text-amber-700">{R.trackingNeedsProperty}</p>
+                        )}
+                      </div>
                       {ctx.canManage && (
                         <CampaignEditToggle
                           properties={c.property && !propOptions.some((p) => p.id === c.property!.id) ? [...propOptions, { id: c.property.id, title: c.property.title }] : propOptions}
-                          initial={{ id: c.id, name: c.name, channel: c.channel, propertyId: c.propertyId ?? "", spend: String(c.spend), startDate: day(c.startDate), endDate: day(c.endDate), leadsCount: String(c.leadsCount), visitsCount: String(c.visitsCount), closingsCount: String(c.closingsCount), attributedRevenue: c.attributedRevenue === null ? "" : String(c.attributedRevenue), status: c.status }}
+                          initial={{ id: c.id, name: c.name, channel: c.channel, propertyId: c.propertyId ?? "", spend: String(c.spend), startDate: day(c.startDate), endDate: day(c.endDate), status: c.status }}
                         />
                       )}
                     </td>
@@ -68,6 +80,7 @@ export default async function CampaignsPage() {
                     <td className="py-2.5 pr-3 tabular-nums">{c.leadsCount}</td>
                     <td className="py-2.5 pr-3 tabular-nums">{c.visitsCount}</td>
                     <td className="py-2.5 pr-3 tabular-nums">{c.closingsCount}</td>
+                    <td className="py-2.5 pr-3 tabular-nums">{money(c.attributedRevenue)}</td>
                     <td className="py-2.5 pr-3 tabular-nums">{money(c.metrics.cpl)}</td>
                     <td className="py-2.5 pr-3 tabular-nums">{money(c.metrics.costPerVisit)}</td>
                     <td className="py-2.5 pr-3 tabular-nums">{money(c.metrics.costPerClosing)}</td>

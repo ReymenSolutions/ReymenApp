@@ -53,14 +53,10 @@ export interface CampaignValues {
   spend: string;
   startDate: string;
   endDate: string;
-  leadsCount: string;
-  visitsCount: string;
-  closingsCount: string;
-  attributedRevenue: string;
   status: string;
 }
 
-export const EMPTY_CAMPAIGN: CampaignValues = { name: "", channel: "META", propertyId: "", spend: "", startDate: new Date().toISOString().slice(0, 10), endDate: "", leadsCount: "0", visitsCount: "0", closingsCount: "0", attributedRevenue: "", status: "ACTIVE" };
+export const EMPTY_CAMPAIGN: CampaignValues = { name: "", channel: "META", propertyId: "", spend: "", startDate: new Date().toISOString().slice(0, 10), endDate: "", status: "ACTIVE" };
 
 export function CampaignForm({ initial, properties, onDone }: { initial: CampaignValues; properties: { id: string; title: string }[]; onDone?: () => void }) {
   const R = useR();
@@ -87,10 +83,6 @@ export function CampaignForm({ initial, properties, onDone }: { initial: Campaig
               spend: Number(v.spend || 0),
               startDate: new Date(`${v.startDate}T12:00:00`).toISOString(),
               endDate: v.endDate ? new Date(`${v.endDate}T12:00:00`).toISOString() : null,
-              leadsCount: Number(v.leadsCount || 0),
-              visitsCount: Number(v.visitsCount || 0),
-              closingsCount: Number(v.closingsCount || 0),
-              attributedRevenue: v.attributedRevenue === "" ? null : Number(v.attributedRevenue),
               status: v.status as "ACTIVE",
             }),
           () => {
@@ -124,10 +116,6 @@ export function CampaignForm({ initial, properties, onDone }: { initial: Campaig
       {inp("startDate", R.startDate, { type: "date", required: true })}
       {inp("endDate", R.endDate, { type: "date" })}
       {inp("spend", R.spend, { type: "number", min: 0, step: "any", required: true })}
-      {inp("leadsCount", R.leads, { type: "number", min: 0 })}
-      {inp("visitsCount", R.visits, { type: "number", min: 0 })}
-      {inp("closingsCount", R.closingsCount, { type: "number", min: 0 })}
-      {inp("attributedRevenue", R.revenue, { type: "number", min: 0, step: "any" })}
       <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-3">
         <Button type="submit" loading={busy} className="bg-[#031738] hover:bg-[#04275A]">{v.id ? R.save : R.newCampaign}</Button>
         {v.id && (

@@ -91,3 +91,21 @@ describe("rotación", () => {
     expect(unmetDemandByZone([p(10, 1), p(20, 1)], 65)).toEqual([]);
   });
 });
+
+describe("rotación por asesor y canal", () => {
+  it("agrupa por asesor con sus abiertas y por canal sin contar abiertas", () => {
+    const closedRows = [
+      closed({ days: 10, advisorKey: "a1", channelKey: "landing:smartcard" }),
+      closed({ days: 20, advisorKey: "a1", channelKey: "landing:smartcard" }),
+      closed({ days: 25, advisorKey: "a1", channelKey: "manual" }),
+      closed({ days: 120, advisorKey: null, channelKey: null }),
+    ];
+    const openRows: OpenProperty[] = [{ operation: "SALE", propertyType: "HOUSE", zoneId: "z1", price: 1, advisorKey: "a1" }];
+    const byAdvisor = segmentRotation(closedRows, openRows, (c) => c.advisorKey ?? "none", (o) => o.advisorKey ?? "none");
+    expect(byAdvisor.find((r) => r.key === "a1")).toMatchObject({ closed: 3, open: 1, medianDays: 20, status: "FAST", sellThroughPct: 75 });
+    expect(byAdvisor.find((r) => r.key === "none")).toMatchObject({ closed: 1, status: "LOW_DATA" });
+    const byChannel = segmentRotation(closedRows, openRows, (c) => c.channelKey ?? "none", () => null);
+    expect(byChannel.find((r) => r.key === "landing:smartcard")).toMatchObject({ closed: 2, open: 0 });
+    expect(byChannel.map((r) => r.key).sort()).toEqual(["landing:smartcard", "manual", "none"]);
+  });
+});

@@ -17,7 +17,8 @@ export interface SegmentLine {
   key: string;
   label: string;
   closed: number;
-  open: number;
+  /** null = no aplica en esta agrupación. */
+  open: number | null;
   medianDays: number | null;
   status: Speed | "LOW_DATA";
   statusLabel: string;
@@ -39,7 +40,7 @@ export function SegmentTable({ title, rows, heads, empty }: { title: string; row
                 <tr key={r.key}>
                   <td className="py-2 font-medium">{r.label}</td>
                   <td className="py-2 text-right tabular-nums">{r.closed}</td>
-                  <td className="py-2 text-right tabular-nums">{r.open}</td>
+                  <td className="py-2 text-right tabular-nums">{r.open ?? "—"}</td>
                   <td className="py-2 text-right tabular-nums">{r.medianDays ?? "—"}</td>
                   <td className="py-2 text-right"><SpeedBadge speed={r.status} label={r.statusLabel} /></td>
                 </tr>

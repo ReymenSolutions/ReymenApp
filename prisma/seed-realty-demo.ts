@@ -431,7 +431,7 @@ async function main() {
     });
   }
 
-  // ─── Campañas (registro manual) ──
+  // ─── Campañas (gasto a mano; leads, visitas y cierres salen solos del campaignId de cada prospecto) ──
   const campaigns: { name: string; channel: RealtyCampaignChannel; key: string | null; spend: number; leads: number; visits: number; closings: number; revenue: number | null; days: number; status: "ACTIVE" | "PAUSED" | "ENDED" }[] = [
     { name: "Meta — Casas Cumbres", channel: "META", key: "cumbres-elite", spend: 12_000, leads: 48, visits: 9, closings: 1, revenue: 115_500, days: 40, status: "ACTIVE" },
     { name: "SmartCard — Valle Poniente", channel: "SMARTCARD", key: "vp-depa", spend: 1_500, leads: 14, visits: 4, closings: 0, revenue: null, days: 20, status: "ACTIVE" },
@@ -439,10 +439,17 @@ async function main() {
     { name: "Instagram — Apodaca", channel: "INSTAGRAM", key: "apodaca-0", spend: 9_000, leads: 4, visits: 1, closings: 0, revenue: null, days: 45, status: "ACTIVE" },
     { name: "Portal — Mitras", channel: "PORTAL", key: "mitras-centro", spend: 3_000, leads: 0, visits: 0, closings: 0, revenue: null, days: 60, status: "PAUSED" },
   ];
+  const profilesForCampaigns = await prisma.realtyLeadProfile.findMany({ where: { organizationId: org.id }, orderBy: { createdAt: "asc" }, select: { id: true } });
+  let cursor = 0;
   for (const c of campaigns) {
-    await prisma.realtyCampaign.create({
-      data: { organizationId: org.id, name: c.name, channel: c.channel, propertyId: c.key ? pid(c.key) : null, spend: new Prisma.Decimal(c.spend), startDate: new Date(now - c.days * DAY), leadsCount: c.leads, visitsCount: c.visits, closingsCount: c.closings, attributedRevenue: c.revenue === null ? null : new Prisma.Decimal(c.revenue), status: c.status },
+    const created = await prisma.realtyCampaign.create({
+      data: { organizationId: org.id, name: c.name, channel: c.channel, propertyId: c.key ? pid(c.key) : null, spend: new Prisma.Decimal(c.spend), startDate: new Date(now - c.days * DAY), status: c.status },
     });
+    // Los prospectos de demostración se reparten entre las campañas en proporción a sus «leads» de muestra.
+    const take = Math.min(Math.max(c.leads > 0 ? Math.round(c.leads / 8) : 0, 0), profilesForCampaigns.length - cursor);
+    const ids = profilesForCampaigns.slice(cursor, cursor + take).map((p) => p.id);
+    cursor += take;
+    if (ids.length) await prisma.realtyLeadProfile.updateMany({ where: { id: { in: ids } }, data: { campaignId: created.id } });
   }
 
   const matches = await recomputeAllMatches(org.id);

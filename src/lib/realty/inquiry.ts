@@ -111,6 +111,8 @@ export async function submitInquiry(raw: unknown, ctx: { ip: string | null; user
   const maxBudget = Math.round(d.maxBudget);
   const mergedZones = [...new Set([...zoneIds, ...(existing?.zones.map((z) => z.zoneId) ?? [])])].slice(0, 5);
   const src = cleanSource(d.src);
+  // Campaña del enlace (?c=): solo si es de esta organización; si el prospecto ya venía de otra, se conserva la primera.
+  const campaign = d.campaign ? await prisma.realtyCampaign.findFirst({ where: { id: d.campaign, organizationId: orgId }, select: { id: true } }) : null;
   const input: ProspectInput = {
     id: existing?.id,
     contact: { leadId },
@@ -131,6 +133,7 @@ export async function submitInquiry(raw: unknown, ctx: { ip: string | null; user
     active: true,
     source: existing?.source ?? `landing${src ? `:${src}` : ""}`,
     sourcePropertyId: prop.id,
+    campaignId: existing?.campaignId ?? campaign?.id ?? null,
     consent: { version: INQUIRY_CONSENT_VERSION, at: ctx.now ?? new Date() },
   };
   const profileId = await saveProspect(orgId, null, input);

@@ -244,7 +244,7 @@ describe("landing pública", () => {
 
   it("cuenta una vista por visitante y día, los clics siempre, y valida la campaña", async () => {
     const p = await prisma.realtyProperty.findUniqueOrThrow({ where: { id: propertyId } });
-    const foreign = await saveCampaign(B.org.id, B.user.id, { name: "Ajena", channel: "META", propertyId: null, spend: 100, startDate: new Date(), endDate: null, leadsCount: 0, visitsCount: 0, closingsCount: 0, attributedRevenue: null, status: "ACTIVE" });
+    const foreign = await saveCampaign(B.org.id, B.user.id, { name: "Ajena", channel: "META", propertyId: null, spend: 100, startDate: new Date(), endDate: null, status: "ACTIVE" });
     const base = { slug: p.slug, source: "SmartCard!", campaignId: foreign, ip: "10.0.0.1", userAgent: "UA" };
     expect(await recordPublicEvent({ ...base, type: "VIEW" })).toEqual({ recorded: true });
     expect(await recordPublicEvent({ ...base, type: "VIEW" })).toMatchObject({ recorded: false, reason: "duplicate" });

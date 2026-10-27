@@ -18,6 +18,7 @@ import {
 } from "./market";
 import { EMPTY_ENGAGEMENT, isBoostCandidate, isStagnant, stagnationReason, priceInsight, propertyOpportunity, zoneOpportunity, type Engagement, type PropertyScore, type ScoredProperty } from "./scores";
 import { analyzeCampaigns, campaignTotals } from "./campaigns";
+import { campaignCounts, countsOf } from "./campaign-stats";
 import { num, toMatchProfile, toMatchProperty } from "./service";
 
 const DAY = 86_400_000;
@@ -221,13 +222,14 @@ export async function getTodayInputs(organizationId: string, now: Date) {
         propertyId: true,
       },
     }),
-    prisma.realtyCampaign.findMany({ where: { organizationId, status: "ACTIVE" }, select: { id: true, name: true, spend: true, leadsCount: true, visitsCount: true, closingsCount: true, attributedRevenue: true } }),
+    prisma.realtyCampaign.findMany({ where: { organizationId, status: "ACTIVE" }, select: { id: true, name: true, spend: true } }),
     prisma.realtyLeadProfile.findMany({
       where: { organizationId, active: true, createdAt: { gte: new Date(now.getTime() - 30 * DAY) } },
       select: { id: true, lead: { select: { name: true } }, matches: { orderBy: { totalScore: "desc" }, take: 1, select: { totalScore: true } } },
       take: 200,
     }),
   ]);
+  const counts = await campaignCounts(organizationId);
   const pairs = await prisma.realtyPropertyVisit.findMany({
     where: { organizationId, OR: highMatches.map((m) => ({ profileId: m.profileId, propertyId: m.propertyId })) },
     select: { profileId: true, propertyId: true },
@@ -242,7 +244,10 @@ export async function getTodayInputs(organizationId: string, now: Date) {
       score: m.totalScore,
       hasVisit: visited.has(`${m.profileId}|${m.propertyId}`),
     })),
-    campaigns: campaigns.map((c) => ({ ...c, spend: Number(c.spend), attributedRevenue: num(c.attributedRevenue) })),
+    campaigns: campaigns.map((c) => {
+      const k = countsOf(counts, c.id);
+      return { ...c, spend: Number(c.spend), leadsCount: k.leads, visitsCount: k.visits, closingsCount: k.closings, attributedRevenue: k.closings > 0 ? k.revenue : null };
+    }),
     unmatched: recentProfiles
       .filter((p) => (p.matches[0]?.totalScore ?? 0) < GOOD_MATCH)
       .map((p) => ({ profileId: p.id, name: p.lead?.name ?? "Prospecto", bestScore: p.matches[0]?.totalScore ?? null })),
@@ -481,9 +486,13 @@ export async function listCampaigns(organizationId: string) {
   const rows = await prisma.realtyCampaign.findMany({
     where: { organizationId },
     orderBy: [{ status: "asc" }, { startDate: "desc" }],
-    include: { property: { select: { id: true, title: true } } },
+    include: { property: { select: { id: true, title: true, slug: true } } },
   });
-  const data = rows.map((c) => ({ ...c, spend: Number(c.spend), attributedRevenue: num(c.attributedRevenue) }));
+  const counts = await campaignCounts(organizationId);
+  const data = rows.map((c) => {
+    const k = countsOf(counts, c.id);
+    return { ...c, spend: Number(c.spend), leadsCount: k.leads, visitsCount: k.visits, closingsCount: k.closings, attributedRevenue: k.closings > 0 ? k.revenue : null };
+  });
   const analysis = analyzeCampaigns(data);
   return { rows: data.map((c, i) => ({ ...c, metrics: analysis[i].metrics, rating: analysis[i].rating })), totals: campaignTotals(data) };
 }
