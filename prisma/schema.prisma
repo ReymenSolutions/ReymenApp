@@ -3119,6 +3119,8 @@ enum RealtyEventType {
   WHATSAPP_CLICK
   SCHEDULE_CLICK
   SHARE_CLICK
+  // Dejó sus datos en el formulario «Quiero informes» de la landing.
+  INQUIRY
 }
 
 enum RealtyCampaignChannel {
@@ -3193,10 +3195,16 @@ model RealtyLeadProfile {
   preferences     String[]            @default([])
   active          Boolean             @default(true)
   source          String?
+  // Propiedad desde cuya landing llegó (formulario «Quiero informes»); null si se capturó a mano.
+  sourcePropertyId String?
+  // Consentimiento que dio en el formulario público: versión del texto aceptado y cuándo.
+  consentVersion  String?
+  consentAt       DateTime?
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
   organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sourceProperty RealtyProperty?     @relation("RealtyProfileSourceProperty", fields: [sourcePropertyId], references: [id], onDelete: SetNull)
   lead         Lead?                 @relation(fields: [leadId], references: [id], onDelete: SetNull)
   branch       Branch?               @relation(fields: [branchId], references: [id], onDelete: SetNull)
   advisor      User?                 @relation("RealtyProfileAdvisor", fields: [advisorUserId], references: [id], onDelete: SetNull)
@@ -3208,6 +3216,7 @@ model RealtyLeadProfile {
   @@index([organizationId, active])
   @@index([organizationId, createdAt])
   @@index([leadId])
+  @@index([sourcePropertyId])
 }
 
 model RealtyLeadZone {
@@ -3277,6 +3286,7 @@ model RealtyProperty {
   visits        RealtyPropertyVisit[]
   closings      RealtyClosing[]
   campaigns     RealtyCampaign[]
+  inquiryProfiles RealtyLeadProfile[]         @relation("RealtyProfileSourceProperty")
 
   @@index([organizationId, status])
   @@index([organizationId, zoneId])

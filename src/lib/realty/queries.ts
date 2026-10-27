@@ -456,7 +456,7 @@ export async function getProperty(organizationId: string, id: string, now: Date 
     ...p,
     price: Number(p.price),
     statusHistory: p.statusHistory.map((h) => ({ ...h, changedByName: h.changedById ? (names.get(h.changedById) ?? null) : null })),
-    events: Object.fromEntries(byType.map((e) => [e.type, e._count._all])) as Partial<Record<"VIEW" | "WHATSAPP_CLICK" | "SCHEDULE_CLICK" | "SHARE_CLICK", number>>,
+    events: Object.fromEntries(byType.map((e) => [e.type, e._count._all])) as Partial<Record<"VIEW" | "WHATSAPP_CLICK" | "SCHEDULE_CLICK" | "SHARE_CLICK" | "INQUIRY", number>>,
     sources: bySource.map((s) => ({ source: s.source ?? "direct", count: s._count._all })).sort((a, b) => b.count - a.count),
   };
 }

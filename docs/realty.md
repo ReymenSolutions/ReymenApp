@@ -117,6 +117,30 @@ vista por visitante y día; 60 eventos/min por IP.
 módulo NFC_QR está activo). El enlace se pega en la SmartCard existente; no se
 crea otra tarjeta ni se toca Supabase.
 
+## Formulario «Quiero informes» (captura de demanda)
+
+En `/p/<slug>`, arriba de los botones de WhatsApp, la persona deja **WhatsApp, compra/renta, tipo, presupuesto («hasta
+cuánto») y colonia o CP**. Llega precargado con lo de la propiedad (operación, tipo, precio redondeado hacia arriba,
+colonia); la persona ajusta lo que busca. El formulario **no bloquea** los botones de WhatsApp.
+
+`POST /api/realty/public/inquiries` (sin sesión, `src/lib/realty/inquiry.ts`):
+
+- Solo mismo origen, 6 intentos/hora por IP, campo trampa; responde **códigos** (`phone_invalid`, `postal_not_found`,
+  `postal_ambiguous`, `place_invalid`, `unavailable`, `rate_limited`), no textos. Organización, asesor y sucursal salen de
+  la propiedad, nunca del cliente.
+- Crea/reutiliza el **Lead** del CRM (`ensureLeadForProspect`: mismo teléfono = mismo contacto; etiqueta `realty`; asignado
+  al asesor de la propiedad si no tenía) y el **perfil de búsqueda** con `saveProspect` (zonas, matches, auditoría sin
+  usuario). El tope de leads del plan no rompe el formulario: responde `saved: false` y la persona sigue a WhatsApp.
+- **Sin duplicar demanda**: quien vuelve a llenarlo con la misma operación actualiza su perfil (último presupuesto, zonas
+  sumadas, máx. 5) y conserva lo que un asesor capturó a mano (recámaras, extras…); otra operación = otro perfil.
+- **Colonia o CP**: texto = colonia (si es la de la propiedad usa su CP y cae en su misma zona); 5 dígitos = CP: usa las
+  zonas que la organización ya tiene en ese CP; si no hay, crea las colonias del CP (≤ 3); con más o inexistente pide la colonia.
+- Guarda `sourcePropertyId` (de qué landing llegó), consentimiento (`consentVersion`, `consentAt`), origen
+  `landing[:src]`, el evento `INQUIRY` (cuenta en «Interés» de la propiedad) y avisa por correo al asesor (o, sin asesor,
+  a dueño/admin/gerente). El mensaje de WhatsApp posterior lleva el título y el **folio** (slug) de la propiedad.
+
+Pruebas: `inquiry.test.ts`, `route.test.ts` y `InquiryForm.test.tsx`.
+
 ## Ubicación sin capturar coordenadas
 
 En la propiedad y en las zonas nadie escribe latitud/longitud ni tiene que
