@@ -8,7 +8,8 @@ import { enumLabel, realtyStrings } from "@/lib/i18n-realty";
 import { appUrl } from "@/lib/app-url";
 import { num } from "@/lib/loyalty/format";
 import { priceText } from "@/lib/realty/page-helpers";
-import { PublicCtas, ViewTracker } from "@/components/realty/PublicLanding";
+import { InquiryForm, PublicCtas, ViewTracker } from "@/components/realty/PublicLanding";
+import { PROPERTY_TYPES } from "@/lib/realty/constants";
 
 // Landing pública de una propiedad: /p/<slug>[?src=smartcard|qr|meta…].
 // Sin sesión (ver src/proxy.ts). Nunca muestra la dirección exacta salvo que
@@ -93,6 +94,54 @@ export default async function PublicPropertyPage({ params }: { params: Promise<{
               </ul>
             )}
           </section>
+
+          {!closed && (
+            <section className="rounded-2xl bg-white p-4 shadow-sm">
+              <InquiryForm
+                slug={p.slug}
+                whatsapp={p.whatsapp}
+                // Precarga: lo que ya sabemos de la propiedad (la persona ajusta lo que busca). El tope de presupuesto va un poco
+                // arriba del precio, redondeado, para que la propiedad quepa.
+                initial={{
+                  operation: p.operation,
+                  propertyType: p.propertyType,
+                  budget: Math.ceil(p.price / (p.operation === "RENT" ? 500 : 50_000)) * (p.operation === "RENT" ? 500 : 50_000),
+                  place: p.neighborhood ?? p.zone.name,
+                }}
+                typeOptions={PROPERTY_TYPES.map((t) => ({ value: t, label: enumLabel(R, "type", t) }))}
+                labels={{
+                  title: R.pubInqTitle,
+                  intro: R.pubInqIntro,
+                  name: R.pubInqName,
+                  phone: R.pubInqPhone,
+                  operation: R.pubInqOperation,
+                  buy: R.pubInqBuy,
+                  rent: R.pubInqRent,
+                  type: R.pubInqType,
+                  budgetSale: R.pubInqBudgetSale,
+                  budgetRent: R.pubInqBudgetRent,
+                  place: R.pubInqPlace,
+                  consent: R.pubInqConsent(p.organization.name),
+                  submit: R.pubInqSubmit,
+                  sending: R.pubInqSending,
+                  doneTitle: R.pubInqDoneTitle,
+                  doneBody: R.pubInqDoneBody,
+                  doneNotSaved: R.pubInqDoneNotSaved,
+                  whatsapp: R.pubInqWhatsapp,
+                  whatsappMsg: R.pubInqWhatsappMsg(p.title, url, p.slug),
+                  errors: {
+                    phone_invalid: R.pubInqErrPhone,
+                    postal_not_found: R.pubInqErrPostalNotFound,
+                    postal_ambiguous: R.pubInqErrPostalAmbiguous,
+                    place_invalid: R.pubInqErrPlace,
+                    unavailable: R.pubInqErrUnavailable,
+                    rate_limited: R.pubInqErrRate,
+                    generic: R.pubInqErrGeneric,
+                  },
+                }}
+              />
+            </section>
+          )}
 
           {!closed && (
             <section className="rounded-2xl bg-white p-4 shadow-sm">

@@ -56,7 +56,7 @@ export interface ColoniaAddress {
  * varios municipios, p. ej. "Centro"); una zona con ese nombre y sin CP (de
  * antes) se reusa y se le completa el CP.
  */
-export async function ensureColoniaZone(organizationId: string, userId: string, a: ColoniaAddress): Promise<{ id: string; name: string; created: boolean }> {
+export async function ensureColoniaZone(organizationId: string, userId: string | null, a: ColoniaAddress): Promise<{ id: string; name: string; created: boolean }> {
   const name = a.colonia.trim().replace(/\s+/g, " ").slice(0, 80);
   const nameKey = zoneKey(name);
   if (name.length < 2 || !nameKey) throw new UserError("Elige la colonia de la propiedad.");
@@ -270,9 +270,13 @@ export interface ProspectInput {
   advisorUserId: string | null;
   active: boolean;
   source: string | null;
+  /** Landing de la que llegó y consentimiento dado (solo formulario público). */
+  sourcePropertyId?: string | null;
+  consent?: { version: string; at: Date };
 }
 
-export async function saveProspect(organizationId: string, userId: string, input: ProspectInput): Promise<string> {
+/** `userId` null = captura pública (formulario de la landing): se audita sin usuario. */
+export async function saveProspect(organizationId: string, userId: string | null, input: ProspectInput): Promise<string> {
   if (input.minBudget !== null && input.minBudget > input.maxBudget) throw new UserError("El presupuesto mínimo no puede ser mayor que el máximo.");
   const zoneIds = [...new Set(input.zoneIds)].slice(0, 5);
   const zones = await prisma.realtyZone.count({ where: { organizationId, id: { in: zoneIds } } });
@@ -301,6 +305,9 @@ export async function saveProspect(organizationId: string, userId: string, input
     advisorUserId: input.advisorUserId,
     active: input.active,
     source: input.source,
+    // Solo cuando llega del formulario público: no se borra al editar a mano.
+    ...(input.sourcePropertyId !== undefined ? { sourcePropertyId: input.sourcePropertyId } : {}),
+    ...(input.consent ? { consentVersion: input.consent.version, consentAt: input.consent.at } : {}),
   };
   const profileId = await prisma.$transaction(async (tx) => {
     const id = before ? (await tx.realtyLeadProfile.update({ where: { id: before.id }, data })).id : (await tx.realtyLeadProfile.create({ data: { organizationId, ...data } })).id;

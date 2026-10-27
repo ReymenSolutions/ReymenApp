@@ -24,7 +24,8 @@ export interface ProspectContact {
 }
 
 /** Devuelve el id del Lead del prospecto y si se creó uno nuevo. */
-export async function ensureLeadForProspect(organizationId: string, userId: string, c: ProspectContact): Promise<{ leadId: string; created: boolean }> {
+/** `userId` null = alta pública (formulario de la landing), sin sesión. */
+export async function ensureLeadForProspect(organizationId: string, userId: string | null, c: ProspectContact): Promise<{ leadId: string; created: boolean }> {
   if (c.leadId) {
     await assertOrgLead(organizationId, c.leadId);
     return { leadId: c.leadId, created: false };

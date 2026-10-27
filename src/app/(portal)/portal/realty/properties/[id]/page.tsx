@@ -178,8 +178,8 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
           </SectionCard>
 
           <SectionCard title={R.interest30}>
-            <dl className="grid grid-cols-4 gap-2 text-center">
-              {([[R.views, ev.VIEW], [R.whatsappClicks, ev.WHATSAPP_CLICK], [R.scheduleClicks, ev.SCHEDULE_CLICK], [R.shareClicks, ev.SHARE_CLICK]] as const).map(([k, v]) => (
+            <dl className="grid grid-cols-5 gap-2 text-center">
+              {([[R.views, ev.VIEW], [R.inquiries, ev.INQUIRY], [R.whatsappClicks, ev.WHATSAPP_CLICK], [R.scheduleClicks, ev.SCHEDULE_CLICK], [R.shareClicks, ev.SHARE_CLICK]] as const).map(([k, v]) => (
                 <div key={k} className="rounded-md bg-[#F2F4F6] p-2">
                   <dd className="text-lg font-bold tabular-nums text-[#031738]">{num(v ?? 0)}</dd>
                   <dt className="text-[11px] text-slate-500">{k}</dt>
