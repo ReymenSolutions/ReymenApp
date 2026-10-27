@@ -37,7 +37,12 @@ export default async function SmartcardCompaniesPage({
     <div>
       <PageHeader
         title="Empresas"
-        description="La cuenta contratante de SmartCard y el cliente de Reymen al que está ligada. Vincular una empresa y dar acceso a sus usuarios se hace en Admin → Clientes → (cliente) → SmartCard. Dar de alta una empresa nueva sigue siendo manual."
+        description="La cuenta contratante de SmartCard y el cliente de Reymen al que está ligada. Para dar de alta una empresa, entra al cliente en Admin → Clientes → (cliente) → SmartCard y usa «Crear empresa»: queda vinculada, con el módulo SmartCard y el acceso de sus usuarios."
+        actions={
+          <Button asChild>
+            <Link href="/admin/clients">Nueva empresa desde un cliente</Link>
+          </Button>
+        }
       />
 
       <form method="get" className="mb-6 flex gap-2">

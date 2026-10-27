@@ -49,7 +49,7 @@ test("owner configures real program through native navigation", async ({ page })
   await prisma.organizationModule.create({ data: { organizationId: orgId, module: "LOYALTY" } });
   await login(page);
   await page.locator('a[href="/portal/loyalty"]').click();
-  await expect(page.getByRole("heading", { name: /REYMEN Loyalty/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Reymen (Programa de lealtad|Loyalty Program)/i })).toBeVisible();
   await page.goto("/portal/loyalty/program");
   await page.locator("#p-name").fill("Club E2E");
   await page.locator("#p-goal").fill("3");
@@ -152,7 +152,7 @@ test("mobile dark English pages render real data without horizontal overflow", a
   await userMenu.click();
   for (const path of ["", "/members", "/visits", "/map", "/analytics", "/program"]) {
     await page.goto(`/portal/loyalty${path}`);
-    await expect(page.getByRole("heading", { name: /REYMEN Loyalty/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Reymen (Programa de lealtad|Loyalty Program)/i })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await expect(page.getByRole("alert").filter({ hasText: /Unable to load|No se pudo cargar/ })).toHaveCount(0);
   }
@@ -172,7 +172,7 @@ test("mobile navigation reserves the back gesture and remains visible across rep
     await page.locator('nav a[href="/portal/loyalty/program"]').click();
     await expect(page.locator("#p-name")).toBeVisible();
     await page.goBack();
-    await expect(page.getByRole("heading", { name: /REYMEN Loyalty/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Reymen (Programa de lealtad|Loyalty Program)/i })).toBeVisible();
     await expect(page.locator("aside")).toHaveClass(/-translate-x-full/);
   }
   await page.evaluate(() => {
@@ -190,11 +190,11 @@ test("mobile navigation reserves the back gesture and remains visible across rep
   });
   for (const path of ["members", "program", "map", "analytics", "visits"]) {
     await page.locator(`nav a[href="/portal/loyalty/${path}"]`).click();
-    await expect(page.getByRole("heading", { name: /REYMEN Loyalty/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Reymen (Programa de lealtad|Loyalty Program)/i })).toBeVisible();
     await expect(page.locator("main")).not.toHaveText("");
   }
   await page.reload();
-  await expect(page.getByRole("heading", { name: /REYMEN Loyalty/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Reymen (Programa de lealtad|Loyalty Program)/i })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 

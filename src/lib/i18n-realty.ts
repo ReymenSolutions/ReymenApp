@@ -5,7 +5,7 @@ import { defineDict } from "./i18n-dict";
 
 export const realtyStrings = defineDict({
   es: {
-    moduleName: "REYMEN Ops Real Estate",
+    moduleName: "Reymen Real Estate",
     sectionName: "Real Estate",
     tagline: "Demanda, inventario y oportunidades de tu inmobiliaria.",
     demoBadge: "Datos de demostración",
@@ -380,10 +380,10 @@ export const realtyStrings = defineDict({
     pubNoPhotos: "Fotos próximamente",
     pubSoldBanner: "Esta propiedad ya no está disponible.",
     pubNoContact: "Contacto no disponible por ahora.",
-    pubPoweredBy: "Publicado con REYMEN Ops",
+    pubPoweredBy: "Publicado con Reymen",
   },
   en: {
-    moduleName: "REYMEN Ops Real Estate",
+    moduleName: "Reymen Real Estate",
     sectionName: "Real Estate",
     tagline: "Demand, inventory and opportunities for your brokerage.",
     demoBadge: "Demo data",
@@ -743,7 +743,7 @@ export const realtyStrings = defineDict({
     pubNoPhotos: "Photos coming soon",
     pubSoldBanner: "This listing is no longer available.",
     pubNoContact: "Contact not available right now.",
-    pubPoweredBy: "Published with REYMEN Ops",
+    pubPoweredBy: "Published with Reymen",
   },
 });
 

@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   addSmartcardMemberAction,
+  createSmartcardCompanyAction,
   linkSmartcardCompanyAction,
   removeSmartcardMemberAction,
   syncSmartcardMemberLimitAction,
@@ -27,8 +28,15 @@ const COPY = {
     notConfigured: "SmartCard no está configurado en este servidor (faltan SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY).",
     error: "No se pudo consultar SmartCard. Recarga la página en unos minutos.",
     unlinkedIntro:
-      "Este cliente todavía no está vinculado con una empresa de SmartCard, por eso su pantalla SmartCard muestra un aviso. Elige su empresa:",
-    noCandidates: "No hay empresas libres en SmartCard. Primero hay que crear la empresa en SmartCard.",
+      "Este cliente todavía no tiene empresa en SmartCard, por eso su pantalla SmartCard muestra un aviso.",
+    createTitle: "Crear su empresa en SmartCard",
+    createHint:
+      "Se crea con el nombre y el slug del cliente, ya vinculada, con el módulo SmartCard y el límite de usuarios de su plan. Sus usuarios activos reciben acceso (dueños y administradores primero).",
+    createButton: (name: string) => `Crear empresa «${name}»`,
+    created: (granted: number, skipped: number) =>
+      `Empresa creada. Acceso dado a ${granted} usuario${granted === 1 ? "" : "s"}${skipped ? `; ${skipped} sin acceso por el límite del plan o por error (agrégalos en Accesos)` : ""}.`,
+    orLink: "¿Ya tiene una empresa en SmartCard? Vincúlala:",
+    noCandidates: "No hay empresas libres en SmartCard para vincular.",
     stale: "vínculo roto",
     staleHint:
       "“Vínculo roto”: la empresa apunta a un cliente que no existe en Reymen (borrado o de otro entorno). Al vincularla aquí se corrige.",
@@ -71,9 +79,15 @@ const COPY = {
     title: "SmartCard",
     notConfigured: "SmartCard isn't configured on this server (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are missing).",
     error: "Couldn't reach SmartCard. Reload the page in a few minutes.",
-    unlinkedIntro:
-      "This client isn't linked to a SmartCard company yet, so their SmartCard screen shows a notice. Pick their company:",
-    noCandidates: "There are no free companies in SmartCard. Create the company in SmartCard first.",
+    unlinkedIntro: "This client doesn't have a SmartCard company yet, so their SmartCard screen shows a notice.",
+    createTitle: "Create their SmartCard company",
+    createHint:
+      "It's created with the client's name and slug, already linked, with the SmartCard module and their plan's user limit. Their active users get access (owners and admins first).",
+    createButton: (name: string) => `Create “${name}” company`,
+    created: (granted: number, skipped: number) =>
+      `Company created. Access given to ${granted} user${granted === 1 ? "" : "s"}${skipped ? `; ${skipped} left out by the plan limit or an error (add them in Access)` : ""}.`,
+    orLink: "Already has a SmartCard company? Link it:",
+    noCandidates: "There are no free SmartCard companies to link.",
     stale: "broken link",
     staleHint:
       "“Broken link”: the company points to a client that doesn't exist in Reymen (deleted or from another environment). Linking it here fixes it.",
@@ -122,11 +136,13 @@ export interface SmartcardLinkUser {
 
 export function SmartcardLinkPanel({
   orgId,
+  orgName,
   state,
   users,
   planLimit,
 }: {
   orgId: string;
+  orgName: string;
   state: SmartcardLinkState;
   users: SmartcardLinkUser[];
   /** Límite de usuarios del plan de Reymen (null = sin límite). */
@@ -161,8 +177,28 @@ export function SmartcardLinkPanel({
     body = (
       <div className="space-y-3">
         <p className="text-sm text-slate-500">{t.unlinkedIntro}</p>
+        <div className="space-y-2 rounded-lg border border-slate-200 p-4">
+          <p className="text-sm font-semibold text-slate-900">{t.createTitle}</p>
+          <p className="text-xs text-slate-500">{t.createHint}</p>
+          <Button
+            disabled={pending}
+            onClick={() =>
+              run(
+                () => createSmartcardCompanyAction({ orgId }),
+                (r) => {
+                  const { granted, skipped } = r as { granted: number; skipped: number };
+                  return t.created(granted, skipped);
+                }
+              )
+            }
+          >
+            {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+            {t.createButton(orgName)}
+          </Button>
+        </div>
+        <p className="text-sm text-slate-500">{t.orLink}</p>
         {state.candidates.length === 0 ? (
-          <p className="text-sm text-amber-700">{t.noCandidates}</p>
+          <p className="text-sm text-slate-500">{t.noCandidates}</p>
         ) : (
           <div className="flex flex-wrap items-end gap-3">
             <div className="min-w-56 flex-1 space-y-1">

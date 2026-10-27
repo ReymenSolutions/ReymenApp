@@ -8,7 +8,7 @@ export const loyaltyStrings = defineDict({
   es: {
     dateLocale: "es-MX",
     // ── Encabezado y navegación ──
-    moduleName: "REYMEN Loyalty",
+    moduleName: "Reymen Programa de lealtad",
     sectionName: "Lealtad",
     tabSummary: "Resumen",
     tabProgram: "Programas",
@@ -49,7 +49,7 @@ export const loyaltyStrings = defineDict({
     kpiRewardsAvailable: "Disponibles",
     kpiRewardsRedeemed: "Canjeadas",
     kpiRedemptionRate: "Tasa de redención",
-    kpiLoyaltyShare: "Participación Loyalty",
+    kpiLoyaltyShare: "Participación del programa",
     vsPrev: "vs. periodo anterior",
     inPeriod: "en el periodo",
     allTime: "histórico",
@@ -73,7 +73,7 @@ export const loyaltyStrings = defineDict({
     noMembersYet: "Todavía no hay clientes inscritos.",
     enrolled: (when: string) => `Se inscribió ${when}`,
     // ── Insights ──
-    insightLeader: (cp: string, share: string, ticket: string) => `El CP ${cp} concentra el ${share}% de tus ventas Loyalty, con ticket promedio de ${ticket}.`,
+    insightLeader: (cp: string, share: string, ticket: string) => `El CP ${cp} concentra el ${share}% de tus ventas del programa de lealtad, con ticket promedio de ${ticket}.`,
     insightHighValue: (cp: string, members: number, memberShare: string, factor: string) =>
       `El CP ${cp} tiene solo ${members} clientes (${memberShare}%), pero cada uno compra ${factor}× el promedio.`,
     insightLowFrequency: (cp: string, members: number, frequency: string, overall: string) =>
@@ -109,7 +109,7 @@ export const loyaltyStrings = defineDict({
     metricFrequency: "Frecuencia",
     metricMembersHint: "Clientes inscritos por código postal.",
     metricSalesHint: "Ventas identificadas en el periodo.",
-    metricShareHint: "% de las ventas Loyalty del periodo.",
+    metricShareHint: "% de las ventas del programa de lealtad en el periodo.",
     metricTicketHint: "Ticket promedio de las visitas con monto.",
     metricFrequencyHint: "Visitas del periodo ÷ clientes inscritos.",
     mapBranch: "Sucursal",
@@ -130,7 +130,7 @@ export const loyaltyStrings = defineDict({
     detailMembers: "Clientes",
     detailMemberShare: "Participación de clientes",
     detailSales: "Ventas",
-    detailSalesShare: "Participación de ventas Loyalty",
+    detailSalesShare: "Participación de ventas del programa",
     detailTicket: "Ticket promedio",
     detailVisits: "Visitas",
     detailFrequency: "Frecuencia",
@@ -147,7 +147,7 @@ export const loyaltyStrings = defineDict({
     chartSignupsQ: "¿El programa sigue sumando clientes?",
     chartVisits: "Visitas",
     chartVisitsQ: "¿Con qué ritmo regresan?",
-    chartSales: "Ventas Loyalty",
+    chartSales: "Ventas del programa",
     chartSalesQ: "¿Cuánto compran los clientes identificados?",
     chartMembersByZone: "Clientes por CP",
     chartMembersByZoneQ: "¿Dónde está tu base de clientes?",
@@ -267,7 +267,7 @@ export const loyaltyStrings = defineDict({
     changeMember: "Cambiar cliente",
     step3: "3. Captura la compra",
     saleAmount: "Monto de la compra",
-    saleAmountHint: "Recomendado: alimenta el ticket promedio, las ventas por zona y la participación Loyalty.",
+    saleAmountHint: "Recomendado: alimenta el ticket promedio, las ventas por zona y la participación del programa.",
     noAmountWarning: "Se registrará la visita sin monto.",
     branchForVisit: "Sucursal donde se registra",
     registerVisit: "Registrar visita",
@@ -392,7 +392,7 @@ export const loyaltyStrings = defineDict({
   },
   en: {
     dateLocale: "en-US",
-    moduleName: "REYMEN Loyalty",
+    moduleName: "Reymen Loyalty Program",
     sectionName: "Loyalty",
     tabSummary: "Overview",
     tabProgram: "Programs",

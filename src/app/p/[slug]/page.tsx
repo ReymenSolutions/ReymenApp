@@ -17,7 +17,7 @@ import { PublicCtas, ViewTracker } from "@/components/realty/PublicLanding";
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const p = await getPublicProperty(slug);
-  if (!p) return { title: "REYMEN Ops", robots: { index: false } };
+  if (!p) return { title: "Reymen Real Estate", robots: { index: false } };
   const desc = `${p.zone.name}${p.neighborhood ? ` · ${p.neighborhood}` : ""} · ${priceText(p.price, p.currency)}`;
   return {
     title: `${p.title} · ${p.organization.name}`,
