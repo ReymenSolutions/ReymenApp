@@ -11,6 +11,7 @@ import { getChannelMode } from "@/lib/agent-mode";
 import { buildBusinessContext } from "@/lib/rulebook";
 import { buildDraftMessages, generateText, isDraftProviderConfigured } from "@/lib/ai-draft";
 import { AiBudgetError } from "@/lib/ai/budget";
+import { recordProfileSuggestion } from "@/lib/realty/profile-suggestion";
 import { syncLeadStatusFromOpportunity } from "@/lib/lead-status-sync";
 import { AUTO_JOB_SOURCE, PIPELINE_JOB_TYPE, AUTO_JOB_LEASE_MS, AUTO_JOB_MAX_ATTEMPTS } from "./ai-auto-jobs";
 
@@ -30,7 +31,7 @@ export const ANALYSIS_COOLDOWN_MS = 10 * 60 * 1000;
 /** Si una persona deshizo una acción, el agente no la repite para esa oportunidad durante este tiempo. */
 export const UNDO_RESPECT_MS = 7 * 24 * 60 * 60 * 1000;
 
-export type Analysis = { intent: Intent; summary: string; action: "none" | "create_opportunity" | "advance_stage" | "close_won" | "close_lost"; title: string; reason: string };
+export type Analysis = { intent: Intent; summary: string; action: "none" | "create_opportunity" | "advance_stage" | "close_won" | "close_lost"; title: string; reason: string; /** Perfil de búsqueda inmobiliario que mencionó el cliente (sin validar; solo si la organización tiene Real Estate). */ searchProfile?: unknown };
 
 /** Lee el análisis del modelo (JSON). Si no se entiende, devuelve null y no se hace nada. */
 export function parseAnalysis(raw: string): Analysis | null {
@@ -43,7 +44,8 @@ export function parseAnalysis(raw: string): Analysis | null {
     const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
     const summary = str(p.summary, 400);
     if (!summary) return null;
-    return { intent, summary, action, title: str(p.title, 80), reason: str(p.reason, 300) };
+    const base = { intent, summary, action, title: str(p.title, 80), reason: str(p.reason, 300) };
+    return p.search_profile && typeof p.search_profile === "object" ? { ...base, searchProfile: p.search_profile } : base;
   } catch {
     return null;
   }
@@ -111,6 +113,11 @@ Rules:
 - close_won: the customer explicitly confirmed the purchase or booking. close_lost: the customer explicitly said they are not interested or chose someone else.
 - Greetings, support questions, complaints and anything unclear are "none". When in doubt, "none".`;
 
+// Solo se agrega cuando la organización tiene Real Estate: la misma llamada al modelo, sin costo extra de otra consulta.
+const REALTY_SYSTEM = `REAL ESTATE: if the customer says what property they are looking for, also add to the JSON a "search_profile" object:
+{"operation":"SALE|RENT","property_type":"HOUSE|APARTMENT|LAND|OFFICE|COMMERCIAL|WAREHOUSE|OTHER","max_budget":<number in MXN>,"min_budget":<number or null>,"zones":["<neighbourhood names they mentioned>"],"min_bedrooms":<number or null>,"preferences":["parking|pet_friendly|furnished|terrace|garden|amenities|pool|security|study|storage"],"move_timeline":"<short, in Spanish, or null>"}
+Only include "search_profile" when the customer stated BOTH whether they want to buy or rent AND a budget. Never guess: omit any field they did not say, and omit the whole object otherwise. A person reviews it before anything is saved.`;
+
 type RunOutcome = "analyzed" | "skipped";
 
 /** Analiza el último mensaje del cliente de una conversación y aplica o sugiere lo que corresponda. Nunca lanza. */
@@ -143,8 +150,10 @@ export async function runPipelineAgent(organizationId: string, conversationId: s
     });
 
     const { instructions, knowledgeVersion, knowledgeManaged } = await buildBusinessContext(organizationId, last.content, `pipeline:${conversationId}:${last.id}`);
+    const realty = await hasModule(organizationId, "REALTY");
     const system = [
       SYSTEM,
+      ...(realty ? [REALTY_SYSTEM] : []),
       `PIPELINE STAGES (in order)\n${stages.map((s) => `- ${s.name}${s.isWon ? " (won)" : s.isLost ? " (lost)" : ""}`).join("\n")}`,
       `CONTACT\nName: ${lead.name}\nCRM status: ${lead.status}\nOpen opportunity: ${openOpp ? `"${openOpp.title}" at stage "${stages.find((s) => s.id === openOpp.pipelineStageId)?.name ?? "?"}"` : "none"}`,
       ...(instructions.trim() ? [`BUSINESS CONTEXT\n${(knowledgeManaged ? instructions.trim() : instructions.trim().slice(0, 3000))}`] : []),
@@ -169,6 +178,9 @@ export async function runPipelineAgent(organizationId: string, conversationId: s
     } catch {
       return "skipped";
     }
+
+    // La propuesta de perfil de Real Estate es independiente del pipeline y nunca lo detiene.
+    if (realty && analysis.searchProfile) await recordProfileSuggestion(organizationId, { leadId: lead.id, messageId: last.id, reason: analysis.summary, raw: analysis.searchProfile, now }).catch(() => undefined);
 
     const [undone, pending] = await Promise.all([
       prisma.pipelineAiAction.findMany({ where: { leadId: lead.id, status: "UNDONE", resolvedAt: { gte: new Date(now.getTime() - UNDO_RESPECT_MS) } }, select: { kind: true, opportunityId: true } }),

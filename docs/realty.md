@@ -177,6 +177,15 @@ ofrece **«Agregar lo que busca»** (con `realty:operate`), que abre `/portal/re
 elegido (solo si es de la organización). En **Contactos** hay el filtro **«Con perfil inmobiliario»** (`?realty=1`). Sin el módulo
 no se muestra nada: el CRM no conoce el modelo de Real Estate más allá de esta tarjeta.
 
+## La IA propone el perfil de búsqueda
+
+Cuando la organización tiene Real Estate, el Agente IA del pipeline (`src/lib/ai-pipeline.ts`) agrega al **mismo** análisis de la conversación un objeto `search_profile` (compra/renta, tipo, presupuesto, colonias, recámaras, extras). No hay una segunda llamada al modelo, así que respeta el presupuesto de IA, el modo del canal (Apagado = nada) y el enfriamiento entre análisis.
+
+- Solo se propone si el cliente dijo **compra/renta y presupuesto**; si falta algo, no se propone nada.
+- La propuesta se guarda en `RealtyProfileSuggestion` (`src/lib/realty/profile-suggestion.ts`) y aparece en «Lo que busca» del contacto (ficha y panel) con **Aceptar** (crea el perfil, con las colonias que ya existen), **Editar** (abre el formulario de prospecto prellenado) y **Descartar**.
+- **Nunca se crea un perfil solo.** No se propone si el contacto ya tiene un perfil activo o una propuesta pendiente, y tras descartar no vuelve a proponer durante 30 días.
+- Si alguien crea el perfil a mano, la propuesta pendiente de ese contacto queda resuelta.
+
 ## Rotación (`/portal/realty/rotation`)
 
 Responde «qué casas sí se mueven, cuáles no y por qué». Código puro en `src/lib/realty/rotation.ts`, insumos en `rotation-data.ts`.

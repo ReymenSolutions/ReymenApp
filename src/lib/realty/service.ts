@@ -316,6 +316,8 @@ export async function saveProspect(organizationId: string, userId: string | null
     return id;
   });
   await logAudit({ organizationId, userId, action: before ? "realty.prospect.update" : "realty.prospect.create", resource: "RealtyLeadProfile", resourceId: profileId, metadata: { leadId, operation: input.operation } });
+  // Si la IA había propuesto un perfil para este contacto, crearlo a mano (o editando la propuesta) la deja resuelta.
+  if (!before && leadId) await prisma.realtyProfileSuggestion.updateMany({ where: { organizationId, leadId, status: "PENDING" }, data: { status: "ACCEPTED", resolvedById: userId, resolvedAt: new Date(), profileId } });
   await recomputeMatchesForProfile(organizationId, profileId);
   return profileId;
 }

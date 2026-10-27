@@ -316,7 +316,7 @@ function PanelContent({ data, openedAt, onReload }: { data: LeadPanelData; opene
           <LeadTagsEditor leadId={lead.id} initialTags={lead.tags} />
         </section>
 
-        {data.realty && <LeadSearchProfiles views={data.realty.views} leadId={lead.id} canOperate={data.realty.canOperate} lang={lang === "en" ? "en" : "es"} compact />}
+        {data.realty && <LeadSearchProfiles views={data.realty.views} suggestions={data.realty.suggestions} leadId={lead.id} canOperate={data.realty.canOperate} lang={lang === "en" ? "en" : "es"} compact />}
 
         <LeadAgentActions actions={data.aiActions} canManage={data.canManageOpps} onChanged={onReload} />
 

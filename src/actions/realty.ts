@@ -29,6 +29,7 @@ import {
   updateVisit,
 } from "@/lib/realty/service";
 import { MAX_UPLOAD_BYTES } from "@/lib/realty/media";
+import { acceptProfileSuggestion, rejectProfileSuggestion } from "@/lib/realty/profile-suggestion";
 import { geocodeAddress, geocodeStructured } from "@/lib/realty/geocode";
 import { lookupPostalCode } from "@/lib/realty/postal";
 import { schedulePropertySmartcardSync } from "@/lib/realty/smartcard-sync";
@@ -404,4 +405,22 @@ export async function geocodeRealtyStructured(data: z.input<typeof structuredSch
   const parsed = structuredSchema.safeParse(data);
   if (!parsed.success) throw new UserError("Escribe el código postal para buscar la dirección.");
   return geocodeStructured(session.user.organizationId, parsed.data);
+}
+
+// ─── Propuestas de perfil de la IA ──────────────────────────────────────
+
+/** Acepta la propuesta tal cual: se crea el perfil de búsqueda del contacto. */
+export async function acceptRealtyProfileSuggestion(id: string) {
+  const session = await requireRealtyOperator();
+  const settings = await prisma.realtySettings.findUnique({ where: { organizationId: session.user.organizationId }, select: { defaultCurrency: true } });
+  const profileId = await acceptProfileSuggestion(session.user.organizationId, id, session.user.id, settings?.defaultCurrency ?? "MXN");
+  revalidateRealty(["/portal/leads"]);
+  return { id: profileId };
+}
+
+export async function rejectRealtyProfileSuggestion(id: string) {
+  const session = await requireRealtyOperator();
+  await rejectProfileSuggestion(session.user.organizationId, id, session.user.id);
+  revalidateRealty(["/portal/leads"]);
+  return { success: true };
 }

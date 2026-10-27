@@ -27,6 +27,8 @@ describe("reglas del pipeline con IA (puras)", () => {
   it("lee el análisis del modelo y descarta lo que no se entiende", () => {
     expect(parseAnalysis('{"intent":"pricing_inquiry","summary":"Pide precio","action":"create_opportunity","title":"T","reason":"R"}')).toMatchObject({ intent: "pricing_inquiry", action: "create_opportunity" });
     expect(parseAnalysis('{"intent":"raro","summary":"x","action":"borrar_todo"}')).toMatchObject({ intent: "other", action: "none" });
+    expect(parseAnalysis('{"intent":"pricing_inquiry","summary":"x","action":"none","search_profile":{"operation":"SALE","max_budget":4000000}}')).toMatchObject({ searchProfile: { operation: "SALE" } });
+    expect(parseAnalysis('{"intent":"other","summary":"x","action":"none"}')).not.toHaveProperty("searchProfile");
     expect(parseAnalysis("hola")).toBeNull();
     expect(parseAnalysis('{"intent":"other"}')).toBeNull();
   });

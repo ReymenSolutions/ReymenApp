@@ -7,7 +7,7 @@ import { can } from "@/lib/permissions";
 import { getLeadTimeline, type LeadTimelineEvent } from "@/lib/lead-timeline";
 import { UserError } from "@/lib/user-error";
 import { getServerLang } from "@/lib/i18n-server";
-import { getLeadSearchViews, type LeadSearchView } from "@/lib/realty/lead-profile";
+import { getLeadSearchViews, getLeadSuggestionViews, type LeadSearchView, type LeadSuggestionView } from "@/lib/realty/lead-profile";
 import type { LeadStatus, UserRole } from "@prisma/client";
 
 export type LeadPanelData = {
@@ -18,7 +18,7 @@ export type LeadPanelData = {
   /** Lo que el Agente IA hizo solo (con deshacer) o sugiere en este contacto: lo que sigue pendiente de revisar. */
   aiActions: { id: string; status: "APPLIED" | "SUGGESTED"; kind: "CREATE_OPPORTUNITY" | "ADVANCE_STAGE" | "CLOSE_WON" | "CLOSE_LOST"; reason: string; opportunityTitle: string; fromStageName: string | null; toStageName: string | null; createdAt: Date }[];
   /** «Lo que busca» (Real Estate); null si la organización no tiene ese módulo. */
-  realty: { views: LeadSearchView[]; canOperate: boolean } | null;
+  realty: { views: LeadSearchView[]; suggestions: LeadSuggestionView[]; canOperate: boolean } | null;
   canManageOpps: boolean;
   canUpdateStatus: boolean;
   /** Nombre de quien tiene la sesión (autor de las notas que agrega desde el panel). */
@@ -54,7 +54,9 @@ export async function getLeadPanel(leadId: string): Promise<LeadPanelData> {
     }),
   ]);
 
-  const realtyViews = await getLeadSearchViews(orgId, lead.id, await getServerLang());
+  const serverLang = await getServerLang();
+  const realtyViews = await getLeadSearchViews(orgId, lead.id, serverLang);
+  const realtySuggestions = realtyViews ? await getLeadSuggestionViews(orgId, lead.id, serverLang) : [];
 
   return {
     lead: { id: lead.id, name: lead.name, email: lead.email, phone: lead.phone, status: lead.status, source: lead.source, tags: lead.tags, doNotContact: lead.doNotContact, createdAt: lead.createdAt, notes: lead.notes },
@@ -71,7 +73,7 @@ export async function getLeadPanel(leadId: string): Promise<LeadPanelData> {
     stages,
     timeline,
     aiActions: aiActions.map((a) => ({ ...a, status: a.status as "APPLIED" | "SUGGESTED" })),
-    realty: realtyViews ? { views: realtyViews, canOperate: can(session.user.role as UserRole, "realty:operate") } : null,
+    realty: realtyViews ? { views: realtyViews, suggestions: realtySuggestions, canOperate: can(session.user.role as UserRole, "realty:operate") } : null,
     canManageOpps: can(session.user.role as UserRole, "opportunities:manage"),
     canUpdateStatus: can(session.user.role as UserRole, "leads:update_status"),
     me: session.user.name ?? session.user.email ?? "",

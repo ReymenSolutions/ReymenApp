@@ -147,6 +147,7 @@ model Organization {
   loyaltyLocations        LoyaltyLocation[]
   realtyZones             RealtyZone[]
   realtyLeadProfiles      RealtyLeadProfile[]
+  realtyProfileSuggestions RealtyProfileSuggestion[]
   realtyProperties        RealtyProperty[]
   realtyCampaigns         RealtyCampaign[]
   realtyClosings          RealtyClosing[]
@@ -3367,6 +3368,41 @@ model RealtyMatch {
   @@unique([profileId, propertyId])
   @@index([organizationId, totalScore])
   @@index([propertyId, totalScore])
+}
+
+// Perfil de búsqueda que el Agente IA propone a partir de una conversación (la persona lo acepta, edita o descarta;
+// nunca se crea solo). zoneNames son los nombres tal como los dijo el cliente: se emparejan con las zonas al aceptar.
+enum RealtyProfileSuggestionStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model RealtyProfileSuggestion {
+  id             String                        @id @default(cuid())
+  organizationId String
+  leadId         String
+  status         RealtyProfileSuggestionStatus @default(PENDING)
+  operation      RealtyOperation
+  propertyType   RealtyPropertyType?
+  minBudget      Decimal?                      @db.Decimal(14, 2)
+  maxBudget      Decimal                       @db.Decimal(14, 2)
+  zoneNames      String[]                      @default([])
+  minBedrooms    Int?
+  preferences    String[]                      @default([])
+  moveTimeline   String?
+  /// Por qué la IA lo propone (visible para el equipo).
+  reason         String                        @db.Text
+  basedOnMessageId String?
+  profileId      String?
+  resolvedById   String?
+  resolvedAt     DateTime?
+  createdAt      DateTime                      @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, leadId, status])
+  @@index([leadId, createdAt])
 }
 
 model RealtyCampaign {

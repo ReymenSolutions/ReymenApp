@@ -11,6 +11,7 @@ vi.mock("@/actions/notes", () => ({ createNote: (...a: unknown[]) => createNote(
 vi.mock("@/actions/opportunities", () => ({ moveOpportunityStage: vi.fn() }));
 const undoAiAction = vi.fn();
 vi.mock("@/actions/ai-pipeline", () => ({ undoAiAction: (...a: unknown[]) => undoAiAction(...a), acceptAiSuggestion: vi.fn(), rejectAiSuggestion: vi.fn() }));
+vi.mock("@/actions/realty", () => ({ acceptRealtyProfileSuggestion: vi.fn(), rejectRealtyProfileSuggestion: vi.fn() }));
 vi.mock("@/actions/leads", () => ({ updateLeadStatus: vi.fn(), updateLeadTags: vi.fn() }));
 const toast = { success: vi.fn(), error: vi.fn() };
 vi.mock("sonner", () => ({ toast: { success: (...a: unknown[]) => toast.success(...a), error: (...a: unknown[]) => toast.error(...a) } }));
