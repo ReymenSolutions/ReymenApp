@@ -1,8 +1,8 @@
 "use client";
 
-// Pestañas de Real Estate en escritorio: las 5 de todos los días a la vista y
-// el resto en "Más". En el celular no se muestran: ahí está la barra inferior
-// (RealtyMobileNav), que tiene las mismas secciones.
+// Pestañas de Real Estate, como en los demás módulos. En escritorio: las 5 de
+// todos los días a la vista y el resto en "Más". En celular: todas en una sola
+// fila con desplazamiento horizontal (la pestaña activa se centra sola).
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -38,7 +38,9 @@ export function RealtyTabs({ canManage }: { canManage: boolean }) {
     ...(canManage ? [{ href: `${BASE}/settings`, label: R.tabSettings }] : []),
   ];
   const isActive = (href: string, exact?: boolean) => (exact ? pathname === href : pathname.startsWith(href));
+  const all: { href: string; label: string; exact?: boolean }[] = [...main, ...more];
   const activeMore = more.find((m) => isActive(m.href));
+  const stripRef = useRef<HTMLElement>(null);
 
   // Se cierra al cambiar de página, al dar clic fuera o con Escape.
   useEffect(() => {
@@ -59,6 +61,11 @@ export function RealtyTabs({ canManage }: { canManage: boolean }) {
     };
   }, [open]);
 
+  // En celular la pestaña activa queda a la vista dentro de la fila desplazable.
+  useEffect(() => {
+    stripRef.current?.querySelector<HTMLElement>("[aria-current=page]")?.scrollIntoView({ inline: "center", block: "nearest" });
+  }, [pathname]);
+
   const tabClass = (active: boolean) =>
     cn(
       "flex-shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors xl:px-4",
@@ -66,6 +73,17 @@ export function RealtyTabs({ canManage }: { canManage: boolean }) {
     );
 
   return (
+    <>
+    <nav ref={stripRef} aria-label={R.sectionName} className="-mx-1 mb-5 flex gap-1 overflow-x-auto border-b border-slate-200 px-1 lg:hidden">
+      {all.map((tab) => {
+        const active = isActive(tab.href, tab.exact);
+        return (
+          <Link key={tab.href} href={tab.href} aria-current={active ? "page" : undefined} className={tabClass(active)}>
+            {tab.label}
+          </Link>
+        );
+      })}
+    </nav>
     <nav className="mb-6 hidden items-end gap-1 border-b border-slate-200 lg:flex" aria-label={R.sectionName}>
       {main.map((tab) => {
         const active = isActive(tab.href, tab.exact);
@@ -97,5 +115,6 @@ export function RealtyTabs({ canManage }: { canManage: boolean }) {
         )}
       </div>
     </nav>
+    </>
   );
 }
