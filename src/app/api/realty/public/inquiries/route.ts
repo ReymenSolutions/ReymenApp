@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientIp } from "@/lib/client-ip";
 import { InquiryError, inquirySchema, submitInquiry } from "@/lib/realty/inquiry";
+import { sameSite } from "@/lib/realty/public-guard";
 
 // Formulario «Quiero informes» de la landing /p/<slug> (sin sesión, ver src/proxy.ts). Solo acepta peticiones del propio
 // sitio (mismo origen), limita por IP y descarta lo que llena el campo trampa. Contesta códigos, no textos: el
@@ -10,18 +11,6 @@ import { InquiryError, inquirySchema, submitInquiry } from "@/lib/realty/inquiry
 
 const LIMIT = 6;
 const WINDOW_MS = 60 * 60 * 1000;
-
-/** El navegador manda Origin en los POST; debe ser este mismo sitio. Sin cabecera (curl, servidores) se deja pasar: el límite por IP sigue aplicando. */
-function sameSite(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  if (!origin) return true;
-  try {
-    const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
-    return !!host && new URL(origin).host === host;
-  } catch {
-    return false;
-  }
-}
 
 export async function POST(request: Request) {
   if (!sameSite(request)) return NextResponse.json({ error: "origin" }, { status: 403 });

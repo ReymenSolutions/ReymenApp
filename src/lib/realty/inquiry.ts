@@ -42,7 +42,7 @@ export const inquirySchema = z.object({
 export type InquiryInput = z.infer<typeof inquirySchema>;
 
 /** Error con código que el formulario traduce a su idioma (la ruta pública no devuelve textos del servidor). */
-export type InquiryErrorCode = "phone_invalid" | "unavailable" | "postal_not_found" | "postal_ambiguous" | "place_invalid";
+export type InquiryErrorCode = "phone_invalid" | "unavailable" | "postal_not_found" | "postal_ambiguous" | "place_invalid" | "slot_unavailable" | "date_invalid";
 export class InquiryError extends Error {
   constructor(readonly code: InquiryErrorCode) {
     super(code);

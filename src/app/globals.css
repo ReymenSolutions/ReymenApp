@@ -549,3 +549,45 @@ summary:active {
 .dark .border-\[\#031738\] {
   border-color: #5585ff;
 }
+
+/* ── Landing pública de Real Estate (/p/<slug>) ───────────────────
+   Tokens propios, claro y oscuro. No dependen del remapeo global de
+   .dark (bg-white, text-slate-*): ahí un texto con color fijo quedaba
+   negro sobre un fondo que sí se oscurecía.
+   ──────────────────────────────────────────────────────────────── */
+.rl {
+  --rl-bg: #f3f5f9;
+  --rl-surface: #ffffff;
+  --rl-surface-2: #eef2f8;
+  --rl-ink: #0a1428;
+  --rl-muted: #53647f;
+  --rl-line: #dce3ee;
+  --rl-brand: #0b4fbf;
+  --rl-brand-ink: #ffffff;
+  --rl-input: #ffffff;
+  --rl-placeholder: #7c8ca6;
+  --rl-ring: rgba(11, 79, 191, 0.2);
+  --rl-ok: #16a34a;
+  --rl-danger: #b42318;
+  --rl-danger-bg: #feeceb;
+  --rl-shadow: 0 8px 28px rgba(3, 23, 56, 0.08);
+  color: var(--rl-ink);
+  background: var(--rl-bg);
+}
+.dark .rl {
+  --rl-bg: #070d1b;
+  --rl-surface: #0f1830;
+  --rl-surface-2: #16213d;
+  --rl-ink: #eef3fb;
+  --rl-muted: #9db0ce;
+  --rl-line: #243456;
+  --rl-brand: #4c8dff;
+  --rl-brand-ink: #04122b;
+  --rl-input: #0a1224;
+  --rl-placeholder: #6b7fa1;
+  --rl-ring: rgba(76, 141, 255, 0.3);
+  --rl-ok: #4ade80;
+  --rl-danger: #ffb4ab;
+  --rl-danger-bg: #3a1614;
+  --rl-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
