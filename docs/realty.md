@@ -28,7 +28,7 @@ Interfaces y tablas del CRM **no cambian**: la migración solo agrega el valor
 - `RealtyLeadProfile` + `RealtyLeadZone` — qué busca el prospecto (operación, tipo, presupuesto, recámaras, baños, m², extras, zonas por prioridad).
 - `RealtyProperty` (+ `Media`, `StatusHistory`, `Event`) — inventario, fotos, historial de estado y eventos de la landing.
 - `RealtyMatch` — match guardado con desglose y `calculationVersion`.
-- `RealtyCampaign` — registro manual de campañas (no es Ads Manager).
+- `RealtyCampaign` — campañas: el negocio captura solo el gasto, fechas, canal y propiedad; leads, visitas, cierres e ingreso se calculan solos (no es Ads Manager).
 - `RealtyPropertyVisit`, `RealtyClosing` — visitas y cierres para analítica (no contratos ni facturación).
 
 ### Multi-tenant
@@ -83,9 +83,21 @@ Zona (0–100): presión de demanda 40 · crecimiento 25 · interés 20 · deman
 - **Estancada**: abierta, ≥ 60 días, < 15 puntos de interés en 30 días y sin visitas en 30 días.
 - **Price Insight**: mediana de comparables propios (misma zona, operación y tipo; incluye vendidas/rentadas; precio/m² si hay área suficiente). < 3 comparables → "muestra insuficiente"; ±10 % = "en rango". Siempre con el aviso **"Insight basado en datos internos."** No es avalúo.
 
-### Campañas (`campaigns.ts`)
+### Campañas (`campaigns.ts`, `campaign-stats.ts`)
 
-CPL, costo por visita, costo por cierre, ROI = (ingreso − gasto)/gasto,
+**Métricas automáticas.** Nadie captura conteos. Cada campaña tiene un **enlace de seguimiento**
+(`/p/<slug>?src=<canal>&c=<id>`, botón «Copiar enlace» en Campañas) que se usa en el anuncio. Quien llena
+«Quiero informes» desde ese enlace queda con `RealtyLeadProfile.campaignId` (el **primer contacto manda**; solo
+si la campaña es de la misma organización). A partir de ahí:
+
+- **Leads** = perfiles con esa campaña.
+- **Visitas** = visitas no canceladas de esos prospectos (ligadas al perfil, o agendadas desde la landing con el mismo contacto del CRM).
+- **Cierres e ingreso** = cierres registrados de esos prospectos (suma del monto final).
+
+Una campaña cuyo enlace no se usa muestra ceros. Las columnas `leadsCount`, `visitsCount`, `closingsCount` y
+`attributedRevenue` de `RealtyCampaign` quedaron sin uso (no se borraron para no destruir datos).
+
+Fórmulas: CPL, costo por visita, costo por cierre, ROI = (ingreso − gasto)/gasto,
 conversión lead→visita y visita→cierre. Sin denominador → `null` ("—"), nunca
 Infinity/NaN. Lectura: sin gasto *sin datos*; gasto sin leads o CPL ≥ 1.5× la
 mediana *deficiente*; ROI ≥ 100 % o CPL ≤ 0.8× mediana *eficiente*. El ROI
@@ -193,6 +205,7 @@ Cuando la organización tiene Real Estate, el Agente IA del pipeline (`src/lib/a
 Responde «qué casas sí se mueven, cuáles no y por qué». Código puro en `src/lib/realty/rotation.ts`, insumos en `rotation-data.ts`.
 
 - **Días en mercado**: de `availableSince` al último cambio a Vendida/Rentada en el historial de estados (si no hay historial, la fecha del cierre registrado). Solo cuentan las cerradas dentro del periodo elegido.
+- **Agrupaciones**: zona, tipo, rango de precio, **asesor** (el de la propiedad; incluye su inventario abierto) y **canal** (el origen del prospecto que cerró, p. ej. `landing · smartcard`; solo se conoce al cerrar, así que no hay inventario abierto por canal).
 - **Lectura**: rápida ≤ 30 días, lenta ≥ 90, normal en medio. Un segmento (zona, tipo, rango de precio) necesita al menos 3 cierres (`MIN_SAMPLE`) para opinar; si no, «Datos insuficientes».
 - **Sell-through**: cerradas ÷ (cerradas + inventario abierto).
 - **Rápidas vs. lentas**: compara precio contra la mediana comparable (misma operación y tipo), interés (WhatsApp, agendar, compartir) y fotos. Solo redacta un hallazgo si hay 3 rápidas y 3 lentas y la diferencia es relevante (precio ±5 puntos, interés ±30 %, fotos ±2). Son datos internos, no de mercado, y la página lo dice.
@@ -292,4 +305,4 @@ facturación, avalúos, datos de mercado externos, exportar CSV.
 
 - Coordenadas de zona aproximadas, calculadas solas por colonia y CP (a nivel colonia, no de calle).
 - Fotos en la base: cacheables por CDN (ver Fotos); sin almacenamiento de objetos todavía.
-- Campañas con conteos manuales.
+- Campañas: solo cuentan el tráfico que llega por su enlace de seguimiento; lo que entra sin `?c=` (p. ej. un anuncio sin el enlace) no se atribuye.

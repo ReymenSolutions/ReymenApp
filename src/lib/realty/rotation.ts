@@ -31,6 +31,9 @@ export interface ClosedProperty {
   interest: number;
   photos: number;
   bedrooms: number | null;
+  /** Asesor de la propiedad (id) y origen del prospecto que la cerró (RealtyLeadProfile.source); null = sin dato. */
+  advisorKey?: string | null;
+  channelKey?: string | null;
 }
 
 /** Propiedad todavía en inventario (para sell-through y precio de referencia). */
@@ -39,6 +42,7 @@ export interface OpenProperty {
   propertyType: RealtyPropertyType;
   zoneId: string;
   price: number;
+  advisorKey?: string | null;
 }
 
 const DAY = 86_400_000;
@@ -98,7 +102,8 @@ export function segmentRotation(
   closed: ClosedProperty[],
   open: OpenProperty[],
   closedKey: (c: ClosedProperty) => string,
-  openKey: (o: OpenProperty) => string,
+  /** null = esa propiedad abierta no cuenta en esta agrupación (p. ej. el canal solo se conoce al cerrar). */
+  openKey: (o: OpenProperty) => string | null,
 ): SegmentRow[] {
   const map = new Map<string, { days: number[]; open: number }>();
   const slot = (k: string) => {
@@ -107,7 +112,10 @@ export function segmentRotation(
     return s;
   };
   for (const c of closed) slot(closedKey(c)).days.push(daysOnMarket(c.listedAt, c.closedAt));
-  for (const o of open) slot(openKey(o)).open++;
+  for (const o of open) {
+    const k = openKey(o);
+    if (k !== null) slot(k).open++;
+  }
   return [...map.entries()]
     .map(([key, s]) => {
       const m = median(s.days);

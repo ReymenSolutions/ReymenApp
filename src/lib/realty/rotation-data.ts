@@ -25,13 +25,14 @@ export async function loadRotationInputs(organizationId: string, range: { from: 
         _count: { select: { media: true } },
         // Fecha de cierre: la última vez que pasó a vendida/rentada; si no hay historial, el cierre registrado.
         statusHistory: { where: { toStatus: { in: CLOSED_STATUSES } }, orderBy: { changedAt: "desc" }, take: 1, select: { changedAt: true } },
-        closings: { orderBy: { closedAt: "desc" }, take: 1, select: { closedAt: true } },
+        advisorUserId: true,
+        closings: { orderBy: { closedAt: "desc" }, take: 1, select: { closedAt: true, profile: { select: { source: true } } } },
       },
       take: CAP,
     }),
     prisma.realtyProperty.findMany({
       where: { organizationId, status: { in: OPEN_STATUSES } },
-      select: { operation: true, propertyType: true, zoneId: true, price: true },
+      select: { operation: true, propertyType: true, zoneId: true, price: true, advisorUserId: true },
       take: CAP,
     }),
     prisma.realtyLeadProfile.findMany({
@@ -71,13 +72,16 @@ export async function loadRotationInputs(organizationId: string, range: { from: 
     interest: stats.get(p.id)?.interest ?? 0,
     photos: p._count.media,
     bedrooms: p.bedrooms,
+    advisorKey: p.advisorUserId,
+    channelKey: p.closings[0]?.profile?.source ?? null,
   }));
-  const open: OpenProperty[] = openRows.map((p) => ({ ...p, price: Number(p.price) }));
+  const open: OpenProperty[] = openRows.map(({ advisorUserId, ...p }) => ({ ...p, price: Number(p.price), advisorKey: advisorUserId }));
   const unmet: UnmetProfile[] = profileRows.map((p) => ({
     operation: p.operation,
     maxBudget: Number(p.maxBudget),
     zoneIds: p.zones.map((z) => z.zoneId),
     bestScore: p.matches[0]?.totalScore ?? null,
   }));
-  return { zones, closed, open, unmet };
+  const advisors = await prisma.user.findMany({ where: { organizationId, id: { in: [...new Set([...closed, ...open].map((p) => p.advisorKey).filter((x): x is string => !!x))] } }, select: { id: true, name: true, email: true } });
+  return { zones, closed, open, unmet, advisors: new Map(advisors.map((a) => [a.id, a.name ?? a.email])) };
 }

@@ -3198,6 +3198,8 @@ model RealtyLeadProfile {
   source          String?
   // Propiedad desde cuya landing llegó (formulario «Quiero informes»); null si se capturó a mano.
   sourcePropertyId String?
+  // Campaña (?c=<id> del enlace de la landing) de la que llegó por primera vez; alimenta las métricas automáticas de campañas.
+  campaignId      String?
   // Consentimiento que dio en el formulario público: versión del texto aceptado y cuándo.
   consentVersion  String?
   consentAt       DateTime?
@@ -3206,6 +3208,7 @@ model RealtyLeadProfile {
 
   organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   sourceProperty RealtyProperty?     @relation("RealtyProfileSourceProperty", fields: [sourcePropertyId], references: [id], onDelete: SetNull)
+  campaign     RealtyCampaign?       @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   lead         Lead?                 @relation(fields: [leadId], references: [id], onDelete: SetNull)
   branch       Branch?               @relation(fields: [branchId], references: [id], onDelete: SetNull)
   advisor      User?                 @relation("RealtyProfileAdvisor", fields: [advisorUserId], references: [id], onDelete: SetNull)
@@ -3218,6 +3221,7 @@ model RealtyLeadProfile {
   @@index([organizationId, createdAt])
   @@index([leadId])
   @@index([sourcePropertyId])
+  @@index([campaignId])
 }
 
 model RealtyLeadZone {
@@ -3414,6 +3418,7 @@ model RealtyCampaign {
   spend             Decimal               @db.Decimal(14, 2)
   startDate         DateTime
   endDate           DateTime?
+  // Obsoletos: las métricas se calculan solas (campaignId del perfil); estas columnas ya no se capturan ni se leen.
   leadsCount        Int                   @default(0)
   visitsCount       Int                   @default(0)
   closingsCount     Int                   @default(0)
@@ -3424,6 +3429,7 @@ model RealtyCampaign {
 
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   property     RealtyProperty? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  profiles     RealtyLeadProfile[]
 
   @@index([organizationId, startDate])
 }

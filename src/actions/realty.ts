@@ -279,10 +279,6 @@ const campaignSchema = z.object({
   spend: z.coerce.number().min(0).max(1_000_000_000),
   startDate: z.string().min(1),
   endDate: z.string().nullable().optional(),
-  leadsCount: z.coerce.number().int().min(0).max(1_000_000),
-  visitsCount: z.coerce.number().int().min(0).max(1_000_000),
-  closingsCount: z.coerce.number().int().min(0).max(1_000_000),
-  attributedRevenue: optNum(10_000_000_000),
   status: z.enum(["ACTIVE", "PAUSED", "ENDED"]),
 });
 

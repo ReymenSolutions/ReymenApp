@@ -5,6 +5,7 @@ import { enumLabel } from "@/lib/i18n-realty";
 import { num } from "@/lib/loyalty/format";
 import { compactPrice, realtyPeriod, type PeriodParams } from "@/lib/realty/page-helpers";
 import { DEFAULT_BANDS, bandFor, bandLabel } from "@/lib/realty/constants";
+import { sourceLabel } from "@/lib/realty/lead-profile";
 import { GOOD_MATCH } from "@/lib/realty/match";
 import {
   ROTATION_DISCLAIMER,
@@ -25,7 +26,7 @@ export default async function RotationPage({ searchParams }: { searchParams: Pro
   const { R } = ctx;
   const sp = await searchParams;
   const period = realtyPeriod({ p: sp.p ?? "month", from: sp.from, to: sp.to }, ctx.org.timezone);
-  const { zones, closed, open, unmet } = await loadRotationInputs(ctx.orgId, { from: period.from, to: period.to });
+  const { zones, closed, open, unmet, advisors } = await loadRotationInputs(ctx.orgId, { from: period.from, to: period.to });
 
   const zoneName = new Map(zones.map((z) => [z.id, z.name]));
   const sum = summarize(closed, open.length);
@@ -41,11 +42,14 @@ export default async function RotationPage({ searchParams }: { searchParams: Pro
   };
   const byZone = segmentRotation(closed, open, (c) => c.zoneId, (o) => o.zoneId);
   const byType = segmentRotation(closed, open, (c) => c.propertyType, (o) => o.propertyType);
+  const byAdvisor = segmentRotation(closed, open, (c) => c.advisorKey ?? "none", (o) => o.advisorKey ?? "none");
+  // El canal solo se conoce al cerrar (de dónde llegó quien compró o rentó), así que no hay inventario abierto por canal.
+  const byChannel = segmentRotation(closed, open, (c) => c.channelKey ?? "none", () => null);
   const byBudget = segmentRotation(closed, open, (c) => budgetKey(c.operation, c.price), (o) => budgetKey(o.operation, o.price));
 
   const R2 = R as unknown as Record<string, string>;
-  const lines = (data: SegmentRow[], label: (k: string) => string): SegmentLine[] =>
-    data.map((r) => ({ key: r.key, label: label(r.key), closed: r.closed, open: r.open, medianDays: r.medianDays, status: r.status, statusLabel: R2[`sp${r.status}`] }));
+  const lines = (data: SegmentRow[], label: (k: string) => string, noOpen = false): SegmentLine[] =>
+    data.map((r) => ({ key: r.key, label: label(r.key), closed: r.closed, open: noOpen ? null : r.open, medianDays: r.medianDays, status: r.status, statusLabel: R2[`sp${r.status}`] }));
 
   const idx = (v: number | null) => (v === null ? "—" : `${Math.round(v * 100)}%`);
   const fmt = (code: string, a: number, b: number) => {
@@ -75,6 +79,8 @@ export default async function RotationPage({ searchParams }: { searchParams: Pro
           { key: "zone", label: R.rotGroupZone, segmentHead: R.zone, rows: lines(byZone, (k) => zoneName.get(k) ?? "—") },
           { key: "type", label: R.rotGroupType, segmentHead: R.type, rows: lines(byType, (k) => enumLabel(R, "type", k)) },
           { key: "price", label: R.rotGroupPrice, segmentHead: R.rotColPriceRange, rows: lines(byBudget, budgetLabel) },
+          { key: "advisor", label: R.rotGroupAdvisor, segmentHead: R.advisor, rows: lines(byAdvisor, (k) => (k === "none" ? R.rotNoAdvisor : (advisors.get(k) ?? "—"))) },
+          { key: "channel", label: R.rotGroupChannel, segmentHead: R.rotColChannel, rows: lines(byChannel, (k) => (k === "none" ? R.rotNoChannel : (sourceLabel(k) ?? k)), true) },
         ]}
       />
 

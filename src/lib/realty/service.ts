@@ -275,6 +275,8 @@ export interface ProspectInput {
   source: string | null;
   /** Landing de la que llegó y consentimiento dado (solo formulario público). */
   sourcePropertyId?: string | null;
+  /** Campaña de la que llegó (solo formulario público); el primer contacto manda. */
+  campaignId?: string | null;
   consent?: { version: string; at: Date };
 }
 
@@ -310,6 +312,7 @@ export async function saveProspect(organizationId: string, userId: string | null
     source: input.source,
     // Solo cuando llega del formulario público: no se borra al editar a mano.
     ...(input.sourcePropertyId !== undefined ? { sourcePropertyId: input.sourcePropertyId } : {}),
+    ...(input.campaignId ? { campaignId: input.campaignId } : {}),
     ...(input.consent ? { consentVersion: input.consent.version, consentAt: input.consent.at } : {}),
   };
   const profileId = await prisma.$transaction(async (tx) => {
@@ -532,7 +535,7 @@ export async function recordClosing(organizationId: string, userId: string, inpu
   return closing.id;
 }
 
-// ─── Campañas (registro manual; no es un Ads Manager) ───────────────────
+// ─── Campañas (gasto y datos a mano; leads, visitas, cierres e ingreso salen solos; no es un Ads Manager) ───────────────────
 
 export interface CampaignInputData {
   id?: string;
@@ -542,10 +545,6 @@ export interface CampaignInputData {
   spend: number;
   startDate: Date;
   endDate: Date | null;
-  leadsCount: number;
-  visitsCount: number;
-  closingsCount: number;
-  attributedRevenue: number | null;
   status: RealtyCampaignStatus;
 }
 
@@ -553,7 +552,7 @@ export async function saveCampaign(organizationId: string, userId: string, input
   if (input.propertyId) await assertProperty(organizationId, input.propertyId);
   if (input.endDate && input.endDate < input.startDate) throw new UserError("La fecha de fin no puede ser anterior al inicio.");
   const { id, ...rest } = input;
-  const data = { ...rest, spend: new Prisma.Decimal(input.spend), attributedRevenue: input.attributedRevenue === null ? null : new Prisma.Decimal(input.attributedRevenue) };
+  const data = { ...rest, spend: new Prisma.Decimal(input.spend) };
   let campaignId = id;
   if (campaignId) {
     const c = await prisma.realtyCampaign.findFirst({ where: { id: campaignId, organizationId }, select: { id: true } });

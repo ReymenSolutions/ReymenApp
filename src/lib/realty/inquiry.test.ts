@@ -15,7 +15,7 @@ vi.mock("./postal", () => ({
   },
 }));
 
-import { InquiryError, submitInquiry } from "./inquiry";
+import { InquiryError, inquirySchema, submitInquiry } from "./inquiry";
 
 const ctx = { ip: "203.0.113.5", userAgent: "vitest" };
 
@@ -227,5 +227,22 @@ describe("formulario «Quiero informes» → Lead + perfil de búsqueda", () => 
     const still = await prisma.realtyLeadProfile.findUniqueOrThrow({ where: { id: manual } });
     expect(still.source).toBe("manual");
     expect(Number(still.maxBudget)).toBe(2_000_000);
+  });
+});
+
+describe("atribución a campañas", () => {
+  it("el informe con ?c=<campaña> guarda la campaña en el perfil, y el primer contacto manda", async () => {
+    const campaign = await prisma.realtyCampaign.create({ data: { organizationId: A.org.id, name: "Meta", channel: "META", spend: 100, startDate: new Date() } });
+    const other = await prisma.realtyCampaign.create({ data: { organizationId: A.org.id, name: "Google", channel: "GOOGLE", spend: 100, startDate: new Date() } });
+    const first = await submitInquiry(inquirySchema.parse(body(slugA, { name: "Camila Campaña", phone: "81 5555 0001", campaign: campaign.id, src: "meta" })), ctx);
+    expect(first.saved && (await prisma.realtyLeadProfile.findUniqueOrThrow({ where: { id: first.profileId } })).campaignId).toBe(campaign.id);
+    const again = await submitInquiry(inquirySchema.parse(body(slugA2, { name: "Camila Campaña", phone: "81 5555 0001", campaign: other.id })), ctx);
+    expect(again.saved && (await prisma.realtyLeadProfile.findUniqueOrThrow({ where: { id: again.profileId } })).campaignId).toBe(campaign.id);
+  });
+
+  it("una campaña de otra organización se ignora", async () => {
+    const foreign = await prisma.realtyCampaign.create({ data: { organizationId: NoModule.org.id, name: "Ajena", channel: "META", spend: 1, startDate: new Date() } });
+    const r = await submitInquiry(inquirySchema.parse(body(slugA, { name: "Nadia Nueva", phone: "81 5555 0002", campaign: foreign.id })), ctx);
+    expect(r.saved && (await prisma.realtyLeadProfile.findUniqueOrThrow({ where: { id: r.profileId } })).campaignId).toBeNull();
   });
 });
