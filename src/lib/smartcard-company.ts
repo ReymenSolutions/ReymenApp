@@ -235,6 +235,8 @@ export interface CardStatsEntry {
   totalEvents: number;
   byType: Record<string, number>;
   lastActivityAt: string | null;
+  /** Usuario de SmartCard (auth.users) al que está asignada la tarjeta; null = de la empresa, sin asignar. */
+  assignedUserId: string | null;
 }
 
 /**
@@ -327,7 +329,20 @@ const EMPTY_STATS: CompanyCardStats = { totalCards: 0, totalEvents: 0, byType: {
  * is_bot rows are excluded — that flag exists in the schema specifically
  * to keep non-human traffic out of stats like these.
  */
-export async function getCompanyCardStats(companyId: string, { throwOnError = false }: { throwOnError?: boolean } = {}): Promise<CompanyCardStats> {
+export async function getCompanyCardStats(
+  companyId: string,
+  {
+    throwOnError = false,
+    assignedTo,
+    withAssignment = false,
+  }: {
+    throwOnError?: boolean;
+    /** Solo las tarjetas asignadas a este usuario (lo que ve un asesor). */
+    assignedTo?: string;
+    /** Si la columna cards.assigned_user_id existe (ver supportsCardAssignment). */
+    withAssignment?: boolean;
+  } = {}
+): Promise<CompanyCardStats> {
   const supabase = getSmartcardAdminClient();
   if (!supabase) {
     if (throwOnError) throw new Error("SmartCard is not configured");
@@ -348,11 +363,29 @@ export async function getCompanyCardStats(companyId: string, { throwOnError = fa
   const clientIds = clients.map((c) => c.id);
   const clientNameById = new Map(clients.map((c) => [c.id, c.business_name || c.name]));
 
-  const { data: cards, error: cardsError } = await supabase
+  // Un asesor sin la columna de asignación no tiene tarjetas propias que ver.
+  if (assignedTo && !withAssignment) return EMPTY_STATS;
+  let cardsQuery = supabase
     .from("cards")
-    .select("id, card_code, status, destination_type, destination_url, profile_id, client_id")
+    .select(
+      withAssignment
+        ? "id, card_code, status, destination_type, destination_url, profile_id, client_id, assigned_user_id"
+        : "id, card_code, status, destination_type, destination_url, profile_id, client_id"
+    )
     .in("client_id", clientIds)
     .is("deleted_at", null);
+  if (assignedTo) cardsQuery = cardsQuery.eq("assigned_user_id", assignedTo);
+  const { data: rawCards, error: cardsError } = await cardsQuery;
+  const cards = (rawCards ?? []) as unknown as {
+    id: string;
+    card_code: string;
+    status: string;
+    destination_type: string;
+    destination_url: string | null;
+    profile_id: string | null;
+    client_id: string;
+    assigned_user_id?: string | null;
+  }[];
   if (cardsError) {
     console.error("[smartcard-company] Error listando cards:", cardsError.message);
     if (throwOnError) throw new Error("Unable to load SmartCard statistics");
@@ -404,6 +437,7 @@ export async function getCompanyCardStats(companyId: string, { throwOnError = fa
       totalEvents: stats.total,
       byType: stats.byType,
       lastActivityAt: stats.lastActivityAt,
+      assignedUserId: c.assigned_user_id ?? null,
     };
   });
   cardStats.sort((a, b) => b.totalEvents - a.totalEvents);
@@ -702,3 +736,18 @@ export async function setProfileTheme(profileId: string, companyId: string, them
   }
   return true;
 }
+
+/**
+ * Si SmartCard ya tiene la columna cards.assigned_user_id (migración
+ * 20261027120001_card_assigned_user.sql). Mientras no se aplique, las
+ * tarjetas siguen siendo de la empresa y no se pueden asignar a personas.
+ */
+export async function supportsCardAssignment(): Promise<boolean> {
+  const supabase = getSmartcardAdminClient();
+  if (!supabase) return false;
+  const { error } = await supabase.from("cards").select("assigned_user_id").limit(1);
+  if (!error) return true;
+  if (!/assigned_user_id/.test(error.message)) console.error("[smartcard-company] Error revisando assigned_user_id:", error.message);
+  return false;
+}
+

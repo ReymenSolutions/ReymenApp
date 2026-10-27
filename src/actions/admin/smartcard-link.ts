@@ -9,6 +9,7 @@ import { UserError } from "@/lib/user-error";
 import { SMARTCARD_LINK_ROLES } from "@/lib/smartcard-link-shared";
 import {
   addSmartcardMember,
+  createSmartcardCompanyForOrg,
   linkSmartcardCompany,
   removeSmartcardMember,
   planMemberLimit,
@@ -43,6 +44,23 @@ export async function linkSmartcardCompanyAction(data: z.infer<typeof linkSchema
     metadata: { companyName: company.name, slug: company.slug, replacedOrgId: company.staleOrgId ?? null, memberLimit },
   });
   refresh(orgId);
+}
+
+/** Botón "Crear empresa en SmartCard": alta de la empresa ya vinculada, con módulo y accesos. */
+export async function createSmartcardCompanyAction(data: { orgId: string }) {
+  const session = await requireAdmin();
+  const orgId = z.string().min(1).parse(data.orgId);
+  const result = await createSmartcardCompanyForOrg(orgId);
+  await logAudit({
+    userId: session.user.id,
+    organizationId: orgId,
+    action: "client.smartcard_company_create",
+    resource: "SmartcardCompany",
+    resourceId: result.company.id,
+    metadata: { companyName: result.company.name, slug: result.company.slug, granted: result.granted, skipped: result.skipped },
+  });
+  refresh(orgId);
+  return { granted: result.granted.length, skipped: result.skipped.length };
 }
 
 export async function unlinkSmartcardCompanyAction(data: { orgId: string }) {

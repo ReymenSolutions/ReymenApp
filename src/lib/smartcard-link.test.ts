@@ -38,12 +38,13 @@ function query(table: string) {
     return Promise.resolve({ error: null, ...respond(call) });
   };
   builder.maybeSingle = finish;
+  builder.single = finish;
   builder.then = (ok: (v: unknown) => unknown, ko: (e: unknown) => unknown) => finish().then(ok, ko);
   return builder;
 }
 
 // Clientes que existen en Reymen (para distinguir vínculos válidos de rotos).
-let reymenOrgs: { id: string; name: string }[] = [];
+let reymenOrgs: { id: string; name: string; [k: string]: unknown }[] = [];
 vi.mock("./prisma", () => ({
   prisma: {
     organization: {
@@ -58,7 +59,7 @@ vi.mock("./smartcard-supabase", () => ({
   getSmartcardAdminClient: () => (configured ? { from: query, auth } : null),
 }));
 
-const { getSmartcardLinkState, linkSmartcardCompany, listSmartcardCompanies, syncSmartcardMemberLimit, planMemberLimit, unlinkSmartcardCompany, addSmartcardMember, removeSmartcardMember } =
+const { getSmartcardLinkState, linkSmartcardCompany, listSmartcardCompanies, syncSmartcardMemberLimit, planMemberLimit, unlinkSmartcardCompany, addSmartcardMember, removeSmartcardMember, createSmartcardCompanyForOrg, smartcardRoleForUserRole } =
   await import("./smartcard-link");
 
 const has = (c: Call, f: [string, string, unknown]) => c.filters.some((x) => x[0] === f[0] && x[1] === f[1] && x[2] === f[2]);
@@ -284,5 +285,92 @@ describe("syncSmartcardMemberLimit", () => {
     expect(await planMemberLimit("professional")).toBe(10);
     expect(await planMemberLimit("business")).toBeNull();
     expect(await planMemberLimit("unknown")).toBe(2);
+  });
+});
+
+describe("createSmartcardCompanyForOrg", () => {
+  const day = (n: number) => new Date(2026, 0, n);
+  const wolf = {
+    id: "org-wolf",
+    name: "Taller Automotriz Wolf",
+    slug: "taller-wolf",
+    industry: "workshop",
+    plan: "starter", // límite de 2 integrantes en el mock de planes
+    users: [
+      { email: "agente@wolf.mx", role: "AGENT", createdAt: day(1) },
+      { email: "cliente@wolf.mx", role: "CLIENT", createdAt: day(1) },
+      { email: "dueno@wolf.mx", role: "OWNER", createdAt: day(3) },
+      { email: "admin@wolf.mx", role: "ADMIN", createdAt: day(2) },
+    ],
+  };
+
+  // Simula SmartCard: la empresa existe solo después de insertarla.
+  function smartcard(opts: { takenSlugs?: string[]; moduleFails?: boolean; alreadyLinked?: boolean } = {}) {
+    let created: { id: string; name: string; slug: string } | null = null;
+    let nextUser = 0;
+    auth.admin.createUser.mockImplementation(async () => ({ data: { user: { id: `u${++nextUser}` } }, error: null }));
+    respond = (c) => {
+      if (c.table === "companies" && c.op === "insert") {
+        const p = c.payload as { slug: string; name: string };
+        if (opts.takenSlugs?.includes(p.slug)) return { data: null, error: { message: "dup", code: "23505" } as { message: string } };
+        created = { id: "co-new", name: p.name, slug: p.slug };
+        return { data: created };
+      }
+      if (c.table === "companies" && c.op === "select") {
+        if (opts.alreadyLinked) return { data: { id: "co-old" } };
+        return { data: created ? { id: created.id } : null };
+      }
+      if (c.table === "modules") return { data: { id: "mod-sc" } };
+      if (c.table === "company_modules" && c.op === "insert") return opts.moduleFails ? { error: { message: "boom" } } : { data: null };
+      if (c.table === "roles") return { data: { id: `role-${String(c.filters[0][2])}` } };
+      return { data: null };
+    };
+  }
+
+  it("creates the linked company with the module and gives access to owners and admins first, up to the plan limit", async () => {
+    reymenOrgs = [wolf];
+    smartcard();
+    const r = await createSmartcardCompanyForOrg("org-wolf");
+
+    expect(r.company).toMatchObject({ id: "co-new", name: "Taller Automotriz Wolf", slug: "taller-wolf" });
+    const insert = calls.find((c) => c.table === "companies" && c.op === "insert")!;
+    expect(insert.payload).toMatchObject({ external_org_id: "org-wolf", status: "active", industry: "workshop" });
+    const mod = calls.find((c) => c.table === "company_modules" && c.op === "insert")!;
+    expect(mod.payload).toMatchObject({ company_id: "co-new", module_id: "mod-sc", enabled: true, limits: { max_team_members: 2 } });
+    expect(r.granted).toEqual(["dueno@wolf.mx", "admin@wolf.mx"]);
+    expect(r.skipped).toEqual(["agente@wolf.mx"]); // fuera por el límite; CLIENT ni se considera
+    const memberships = calls.filter((c) => c.table === "company_users" && c.op === "insert");
+    expect(memberships.map((m) => (m.payload as { role_id: string }).role_id)).toEqual(["role-owner", "role-admin"]);
+  });
+
+  it("adds a suffix when the client's slug is already used in SmartCard", async () => {
+    reymenOrgs = [wolf];
+    smartcard({ takenSlugs: ["taller-wolf"] });
+    const r = await createSmartcardCompanyForOrg("org-wolf");
+    expect(r.company.slug).toBe("taller-wolf-reymen");
+  });
+
+  it("refuses a second company for an already linked client", async () => {
+    reymenOrgs = [wolf];
+    smartcard({ alreadyLinked: true });
+    await expect(createSmartcardCompanyForOrg("org-wolf")).rejects.toThrow(/ya está vinculado/);
+    expect(calls.some((c) => c.op === "insert")).toBe(false);
+  });
+
+  it("deletes the company again when the module can't be enabled", async () => {
+    reymenOrgs = [wolf];
+    smartcard({ moduleFails: true });
+    await expect(createSmartcardCompanyForOrg("org-wolf")).rejects.toThrow(/habilitar SmartCard/);
+    const del = calls.find((c) => c.table === "companies" && c.op === "delete")!;
+    expect(has(del, ["eq", "id", "co-new"])).toBe(true);
+    expect(calls.some((c) => c.table === "company_users")).toBe(false);
+  });
+
+  it("maps Reymen roles to SmartCard roles", () => {
+    expect(smartcardRoleForUserRole("OWNER")).toBe("owner");
+    expect(smartcardRoleForUserRole("AGENT")).toBe("agent");
+    expect(smartcardRoleForUserRole("VIEWER")).toBe("staff");
+    expect(smartcardRoleForUserRole("CLIENT")).toBeNull();
+    expect(smartcardRoleForUserRole("SUPER_ADMIN")).toBeNull();
   });
 });

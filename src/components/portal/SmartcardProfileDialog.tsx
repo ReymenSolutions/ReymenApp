@@ -186,6 +186,8 @@ export function SmartcardProfileDialog({
   const [busyLinkId, setBusyLinkId] = useState<string | null>(null);
   const [newLinkIcon, setNewLinkIcon] = useState("");
   const [tab, setTab] = useState<"perfil" | "apariencia" | "contacto" | "links" | "productos">("perfil");
+  // false para un asesor editando su propia tarjeta: diseño y logo los fija la empresa.
+  const [canEditDesign, setCanEditDesign] = useState(true);
   const [products, setProducts] = useState<ProfileProduct[]>([]);
   const [theme, setTheme] = useState<ProfileThemeInfo | null>(null);
   const [themeId, setThemeId] = useState<string | null>(null);
@@ -222,6 +224,7 @@ export function SmartcardProfileDialog({
       setIsCustom(Boolean(result.profile.primaryColor || result.profile.accentColor || result.profile.backgroundColor));
       setLinks(result.links);
       setTheme(result.theme);
+      setCanEditDesign(result.canEditDesign);
       setThemeId(result.theme?.currentId ?? null);
       setSavedThemeId(result.theme?.currentId ?? null);
       setLoading(false);
@@ -244,7 +247,7 @@ export function SmartcardProfileDialog({
       toast.error(result.error);
       return;
     }
-    if (themeId && themeId !== savedThemeId) {
+    if (canEditDesign && themeId && themeId !== savedThemeId) {
       const themeResult = await updateSmartcardProfileTheme(profileId, themeId);
       if (!themeResult.success) {
         toast.error(themeResult.error);
@@ -305,7 +308,7 @@ export function SmartcardProfileDialog({
             <TabBar
               tabs={[
                 { key: "perfil", label: t("Perfil", "Profile") },
-                { key: "apariencia", label: t("Apariencia", "Appearance") },
+                ...(canEditDesign ? [{ key: "apariencia", label: t("Apariencia", "Appearance") }] : []),
                 { key: "contacto", label: t("Contacto y redes", "Contact & social") },
                 { key: "links", label: "Links", count: links.length },
                 { key: "productos", label: t("Productos", "Products"), count: products.length },
@@ -337,7 +340,9 @@ export function SmartcardProfileDialog({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Field id="profile-photo-url" label={t("URL de foto", "Photo URL")} value={form.photoUrl ?? ""} onChange={(v) => set("photoUrl", v)} placeholder="https://..." />
-              <Field id="profile-logo-url" label={t("URL de logo", "Logo URL")} value={form.logoUrl ?? ""} onChange={(v) => set("logoUrl", v)} placeholder="https://..." />
+              {canEditDesign && (
+                <Field id="profile-logo-url" label={t("URL de logo", "Logo URL")} value={form.logoUrl ?? ""} onChange={(v) => set("logoUrl", v)} placeholder="https://..." />
+              )}
             </div>
             <p className="-mt-4 text-xs text-slate-500">
               {t(

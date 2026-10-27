@@ -5,7 +5,7 @@
 import type { RealtyOperation, RealtyPropertyStatus, RealtyPropertyType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { OPEN_STATUSES } from "./constants";
-import { GOOD_MATCH, HIGH_MATCH } from "./match";
+import { GOOD_MATCH, HIGH_MATCH, computeMatch, matchMissReasons, type MatchMissReason } from "./match";
 import {
   budgetBands,
   emergingZones,
@@ -18,7 +18,7 @@ import {
 } from "./market";
 import { EMPTY_ENGAGEMENT, isBoostCandidate, isStagnant, stagnationReason, priceInsight, propertyOpportunity, zoneOpportunity, type Engagement, type PropertyScore, type ScoredProperty } from "./scores";
 import { analyzeCampaigns, campaignTotals } from "./campaigns";
-import { num } from "./service";
+import { num, toMatchProfile, toMatchProperty } from "./service";
 
 const DAY = 86_400_000;
 const SNAPSHOT_CAP = 5000;
@@ -331,6 +331,56 @@ export async function getProspect(organizationId: string, id: string) {
   return { ...p, minBudget: num(p.minBudget), maxBudget: Number(p.maxBudget) };
 }
 
+export interface MatchDiagnosis {
+  property: { id: string; title: string; price: number; currency: string; zoneName: string };
+  visited: boolean;
+  total: number;
+  reasons: MatchMissReason[];
+}
+
+/**
+ * Las propiedades abiertas más cercanas a lo que busca el prospecto que NO
+ * son match, con el porqué. Primero las que ya visitó. Para que el asesor
+ * entienda por qué el tablero no le muestra nada (p. ej. busca renta y la
+ * propiedad es de venta) en lugar de pensar que el match falló.
+ */
+export async function getMatchDiagnosis(organizationId: string, profileId: string, limit = 3): Promise<MatchDiagnosis[]> {
+  const profile = await prisma.realtyLeadProfile.findFirst({
+    where: { id: profileId, organizationId },
+    include: {
+      zones: { select: { zoneId: true, priority: true } },
+      matches: { select: { propertyId: true } },
+      visits: { select: { propertyId: true } },
+    },
+  });
+  if (!profile) return [];
+  const matched = new Set(profile.matches.map((m) => m.propertyId));
+  const visited = new Set(profile.visits.map((v) => v.propertyId));
+  const properties = await prisma.realtyProperty.findMany({
+    where: { organizationId, status: { in: OPEN_STATUSES }, id: { notIn: [...matched] } },
+    select: {
+      id: true, title: true, currency: true, operation: true, propertyType: true, price: true, zoneId: true,
+      bedrooms: true, bathrooms: true, constructionArea: true, landArea: true, features: true,
+      zone: { select: { name: true } },
+    },
+    take: 300,
+  });
+  const mp = toMatchProfile(profile);
+  return properties
+    .map((p) => {
+      const prop = toMatchProperty(p);
+      const m = computeMatch(mp, prop);
+      return {
+        property: { id: p.id, title: p.title, price: Number(p.price), currency: p.currency, zoneName: p.zone.name },
+        visited: visited.has(p.id),
+        total: m.total,
+        reasons: matchMissReasons(mp, prop, m),
+      };
+    })
+    .sort((a, b) => Number(b.visited) - Number(a.visited) || b.total - a.total)
+    .slice(0, limit);
+}
+
 export interface PropertyFilters {
   q?: string;
   status?: RealtyPropertyStatus | "open";
@@ -439,11 +489,11 @@ export async function listCampaigns(organizationId: string) {
 }
 
 export async function listOpenPropertiesForSelect(organizationId: string) {
-  return prisma.realtyProperty.findMany({ where: { organizationId, status: { in: OPEN_STATUSES } }, orderBy: { title: "asc" }, select: { id: true, title: true, operation: true, price: true } });
+  return prisma.realtyProperty.findMany({ where: { organizationId, status: { in: OPEN_STATUSES } }, orderBy: { title: "asc" }, select: { id: true, title: true, operation: true, price: true, zone: { select: { name: true } } } });
 }
 
 export async function listActiveProspectsForSelect(organizationId: string) {
-  return prisma.realtyLeadProfile.findMany({ where: { organizationId, active: true }, orderBy: { createdAt: "desc" }, take: 300, select: { id: true, operation: true, lead: { select: { name: true } } } });
+  return prisma.realtyLeadProfile.findMany({ where: { organizationId, active: true }, orderBy: { createdAt: "desc" }, take: 300, select: { id: true, operation: true, lead: { select: { name: true, phone: true } } } });
 }
 
 // ─── Reportes ───────────────────────────────────────────────────────────

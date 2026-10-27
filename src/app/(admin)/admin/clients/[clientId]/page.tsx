@@ -290,6 +290,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
       {active === "smartcard" && hasModule("NFC_QR") && (
         <SmartcardLinkPanel
           orgId={client.id}
+          orgName={client.name}
           state={await getSmartcardLinkState(client.id)}
           users={client.users.filter((u) => u.isActive).map(({ id, name, email }) => ({ id, name, email }))}
           planLimit={planMemberCap}

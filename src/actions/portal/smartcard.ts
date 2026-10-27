@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getSmartcardAdminClient } from "@/lib/smartcard-supabase";
 import {
+  supportsCardAssignment,
   resolveSmartcardMembership,
   buildSmartcardPublicUrl,
   getSmartcardProfile,
@@ -17,6 +18,7 @@ import {
   type ProfileLink,
 } from "@/lib/smartcard-company";
 import { findOrCreateSmartcardAuthUser } from "@/lib/smartcard-link";
+import { getRosterPeople } from "@/lib/smartcard-roster";
 import { HEX_COLOR } from "@/lib/smartcard-theme";
 import { isValidLinkIcon } from "@/lib/smartcard-link-icons";
 import { characteristicsToSubtitle } from "@/lib/smartcard-product-input";
@@ -53,6 +55,51 @@ async function requireCardManagementMembership() {
     throw new Error("No tienes permiso para hacer eso.");
   }
   return result.membership;
+}
+
+/** Cualquier integrante activo de la empresa vinculada, sin importar su rol. */
+async function requireMembership() {
+  const session = await auth();
+  if (!session?.user.organizationId || !session.user.email) {
+    throw new Error("Sesión inválida.");
+  }
+  const result = await resolveSmartcardMembership(session.user.organizationId, session.user.email);
+  if (!result.ok) {
+    throw new Error("No se pudo confirmar tu membresía en SmartCard. Recarga la página e intenta de nuevo.");
+  }
+  return result.membership;
+}
+
+/** ¿La tarjeta (por id o por su perfil) está asignada a este usuario? */
+async function isAssignedTo(column: "id" | "profile_id", value: string, userId: string): Promise<boolean> {
+  const supabase = getSmartcardAdminClient();
+  if (!supabase) return false;
+  const { data, error } = await supabase
+    .from("cards")
+    .select("id")
+    .eq(column, value)
+    .eq("assigned_user_id", userId)
+    .is("deleted_at", null)
+    .limit(1);
+  if (error) return false; // sin la columna de asignación, nadie tiene tarjeta propia
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Quién puede editar un perfil: dueño, administrador o gerente, cualquiera
+ * de la empresa; un asesor o personal, solo el de la tarjeta que tiene
+ * asignada. isManager decide si además puede tocar el diseño y el logo,
+ * que fija la empresa para que todas las tarjetas se vean iguales.
+ */
+async function requireProfileEditor(profileId: string) {
+  const membership = await requireMembership();
+  const existing = await getSmartcardProfile(profileId, membership.companyId);
+  if (!existing) throw new Error("Ese perfil no pertenece a tu empresa.");
+  if (CARD_MANAGEMENT_ROLES.includes(membership.roleCode)) return { membership, existing, isManager: true };
+  if (!(await isAssignedTo("profile_id", profileId, membership.userId))) {
+    throw new Error("Solo puedes editar el perfil de tu propia tarjeta.");
+  }
+  return { membership, existing, isManager: false };
 }
 
 // Roles that can be assigned from this form — mirrors reymen-smartcard's
@@ -535,7 +582,10 @@ export async function getSmartcardCardQrCode(cardId: string): Promise<SmartcardC
     if (!result.ok) {
       throw new UserError("No se pudo confirmar tu membresía en SmartCard. Recarga la página e intenta de nuevo.");
     }
-    if (!CARD_MANAGEMENT_ROLES.includes(result.membership.roleCode)) {
+    if (
+      !CARD_MANAGEMENT_ROLES.includes(result.membership.roleCode) &&
+      !(await isAssignedTo("id", cardId, result.membership.userId))
+    ) {
       throw new UserError("No tienes permiso para descargar el QR de esta tarjeta.");
     }
 
@@ -576,17 +626,22 @@ export async function getSmartcardCardQrCode(cardId: string): Promise<SmartcardC
 type SmartcardActionResult = { success: true } | { success: false; error: string };
 
 export type SmartcardProfileResult =
-  | { success: true; profile: SmartcardProfile; links: ProfileLink[]; theme: ProfileThemeInfo | null }
+  | {
+      success: true;
+      profile: SmartcardProfile;
+      links: ProfileLink[];
+      theme: ProfileThemeInfo | null;
+      /** false para un asesor: el diseño y el logo los fija la empresa. */
+      canEditDesign: boolean;
+    }
   | { success: false; error: string };
 
 /** Loads a card's linked profile (destination_type PROFILE) for editing. */
 export async function getSmartcardProfileForEdit(profileId: string): Promise<SmartcardProfileResult> {
   try {
-    const membership = await requireCardManagementMembership();
-    const result = await getSmartcardProfile(profileId, membership.companyId);
-    if (!result) throw new Error("Ese perfil no pertenece a tu empresa.");
+    const { membership, existing: result, isManager } = await requireProfileEditor(profileId);
     const theme = await getProfileThemeInfo(profileId, membership.companyId);
-    return { success: true, profile: result.profile, links: result.links, theme };
+    return { success: true, profile: result.profile, links: result.links, theme, canEditDesign: isManager };
   } catch (err) {
     const message = err instanceof Error ? err.message : "No se pudo cargar el perfil. Intenta de nuevo.";
     if (!(err instanceof Error)) {
@@ -661,9 +716,7 @@ export async function updateSmartcardProfile(
   input: SmartcardProfileInput
 ): Promise<SmartcardActionResult> {
   try {
-    const membership = await requireCardManagementMembership();
-    const existing = await getSmartcardProfile(profileId, membership.companyId);
-    if (!existing) throw new Error("Ese perfil no pertenece a tu empresa.");
+    const { membership, isManager } = await requireProfileEditor(profileId);
 
     const displayName = input.displayName.trim();
     if (!displayName) throw new Error("El nombre a mostrar es obligatorio.");
@@ -681,6 +734,8 @@ export async function updateSmartcardProfile(
       }
       update[column] = value || null;
     }
+    // El logo es de la empresa: un asesor no lo cambia desde su perfil.
+    if (!isManager) delete update.logo_url;
 
     const primaryColor = (input.primaryColor ?? "").trim();
     const accentColor = (input.accentColor ?? "").trim();
@@ -709,12 +764,14 @@ export async function updateSmartcardProfile(
       throw new Error("No se pudo guardar el perfil. Intenta de nuevo.");
     }
 
-    const themeResult = await updateProfileThemeColors(profileId, membership.companyId, {
-      primaryColor: primaryColor || null,
-      accentColor: accentColor || null,
-      backgroundColor: backgroundColor || null,
-    });
-    if (!themeResult.ok) throw new Error(themeResult.error);
+    if (isManager) {
+      const themeResult = await updateProfileThemeColors(profileId, membership.companyId, {
+        primaryColor: primaryColor || null,
+        accentColor: accentColor || null,
+        backgroundColor: backgroundColor || null,
+      });
+      if (!themeResult.ok) throw new Error(themeResult.error);
+    }
 
     revalidatePath("/portal/smartcard");
     return { success: true };
@@ -741,9 +798,7 @@ export async function saveProfileLink(
   link: { id?: string; title: string; url: string; icon?: string | null }
 ): Promise<SaveProfileLinkResult> {
   try {
-    const membership = await requireCardManagementMembership();
-    const existing = await getSmartcardProfile(profileId, membership.companyId);
-    if (!existing) throw new Error("Ese perfil no pertenece a tu empresa.");
+    const { existing } = await requireProfileEditor(profileId);
 
     const title = link.title.trim();
     const url = link.url.trim();
@@ -804,9 +859,7 @@ export async function saveProfileLink(
  */
 export async function deleteProfileLink(linkId: string, profileId: string): Promise<SmartcardActionResult> {
   try {
-    const membership = await requireCardManagementMembership();
-    const existing = await getSmartcardProfile(profileId, membership.companyId);
-    if (!existing) throw new Error("Ese perfil no pertenece a tu empresa.");
+    await requireProfileEditor(profileId);
 
     const supabase = getSmartcardAdminClient();
     if (!supabase) throw new Error("SmartCard aún no está configurado en este entorno.");
@@ -856,9 +909,7 @@ export type ProfileProductsResult =
 async function requireProductEditor(profileId: string) {
   const session = await auth();
   if (!session?.user.organizationId) throw new UserError("Sesión inválida.");
-  const membership = await requireCardManagementMembership();
-  const existing = await getSmartcardProfile(profileId, membership.companyId);
-  if (!existing) throw new UserError("Ese perfil no pertenece a tu empresa.");
+  await requireProfileEditor(profileId);
   return { organizationId: session.user.organizationId };
 }
 
@@ -877,7 +928,7 @@ export async function getProfileProducts(profileId: string): Promise<ProfileProd
 export async function listSmartcardCatalog(query: string, lang: "es" | "en" = "es"): Promise<CatalogPickerGroup[]> {
   const session = await auth();
   if (!session?.user.organizationId) throw new UserError("Sesión inválida.");
-  await requireCardManagementMembership();
+  await requireMembership();
   const groups = await listCatalog(session.user.organizationId, query.slice(0, 80));
   return groups.map((g) => ({
     key: g.key,
@@ -998,5 +1049,171 @@ export async function updateSmartcardProfileTheme(profileId: string, themeId: st
     return { success: true };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "No se pudo cambiar el tema de esta tarjeta." };
+  }
+}
+
+// ─── Tarjetas por persona ─────────────────────────────────────────────
+
+export type CreateMemberCardResult =
+  | { success: true; cardCode: string | null; profileId: string }
+  | { success: false; error: string };
+
+const NEEDS_MIGRATION = "Para tarjetas por persona falta un ajuste en SmartCard. Avisa a soporte de Reymen.";
+
+/** Integrante activo de la empresa (por su user_id de SmartCard), o error. */
+async function requireActiveMember(companyId: string, memberUserId: string) {
+  const supabase = getSmartcardAdminClient();
+  if (!supabase) throw new UserError("SmartCard aún no está configurado en este entorno.");
+  const { data: member } = await supabase
+    .from("company_users")
+    .select("id")
+    .eq("company_id", companyId)
+    .eq("user_id", memberUserId)
+    .eq("status", "active")
+    .maybeSingle();
+  if (!member) throw new UserError("Esa persona no es integrante activo de tu empresa en SmartCard.");
+  return supabase;
+}
+
+/**
+ * Crea la tarjeta de un integrante (dueño, administrador o gerente): su
+ * perfil digital con su nombre y correo, con el diseño y el logo que ya usa
+ * la empresa, y la tarjeta asignada a esa persona. Una tarjeta por persona.
+ * La tarjeta queda colgada del titular de la empresa en SmartCard (se crea
+ * si la empresa todavía no tiene uno).
+ */
+export async function createSmartcardCardForMember(memberUserId: string): Promise<CreateMemberCardResult> {
+  try {
+    const membership = await requireCardManagementMembership();
+    const session = await auth();
+    if (!session?.user.organizationId) throw new UserError("Sesión inválida.");
+    if (!(await supportsCardAssignment())) throw new UserError(NEEDS_MIGRATION);
+    const supabase = await requireActiveMember(membership.companyId, memberUserId);
+
+    const { data: clients, error: clientsError } = await supabase
+      .from("clients")
+      .select("id")
+      .eq("company_id", membership.companyId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true });
+    if (clientsError) throw new UserError("No se pudo cargar tu empresa en SmartCard. Intenta de nuevo.");
+    const clientIds = (clients ?? []).map((c) => c.id as string);
+
+    if (clientIds.length) {
+      const { data: taken } = await supabase
+        .from("cards")
+        .select("id")
+        .in("client_id", clientIds)
+        .eq("assigned_user_id", memberUserId)
+        .is("deleted_at", null)
+        .limit(1);
+      if (taken?.length) throw new UserError("Esa persona ya tiene su tarjeta.");
+    }
+
+    let clientId = clientIds[0];
+    if (!clientId) {
+      const { data: created, error } = await supabase
+        .from("clients")
+        .insert({ name: membership.companyName, business_name: membership.companyName, status: "ACTIVE", company_id: membership.companyId })
+        .select("id")
+        .single();
+      if (!created) {
+        console.error("[smartcard/actions] Error creando titular de la empresa:", error?.message);
+        throw new UserError("No se pudo preparar tu empresa en SmartCard. Intenta de nuevo.");
+      }
+      clientId = created.id as string;
+    }
+
+    // El diseño y el logo de la empresa: los del perfil más reciente que ya tenga.
+    const { data: look } = await supabase
+      .from("profiles")
+      .select("theme_id, theme_overrides, logo_url")
+      .in("client_id", clientIds.length ? clientIds : [clientId])
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const person = (await getRosterPeople(session.user.organizationId, [memberUserId]))[memberUserId];
+    const displayName = (person?.name || person?.email?.split("@")[0] || "Integrante").trim();
+    const baseSlug = slugify(displayName);
+
+    let profileId: string | null = null;
+    for (let attempt = 0; attempt < 3 && !profileId; attempt++) {
+      const suffix = attempt === 0 ? memberUserId.replace(/-/g, "").slice(0, 6) : Math.random().toString(36).slice(2, 8);
+      const { data: created, error } = await supabase
+        .from("profiles")
+        .insert({
+          client_id: clientId,
+          slug: `${baseSlug}-${suffix}`.slice(0, 60).replace(/-+$/g, ""),
+          display_name: displayName,
+          email: person?.email ?? null,
+          company: membership.companyName,
+          logo_url: look?.logo_url ?? null,
+          theme_id: look?.theme_id ?? null,
+          theme_overrides: look?.theme_overrides ?? {},
+          status: "ACTIVE",
+          is_noindex: false,
+        })
+        .select("id")
+        .single();
+      if (created) profileId = created.id as string;
+      else if (error?.code !== "23505" && error?.code !== "23514" && error?.code !== "P0001") {
+        console.error("[smartcard/actions] Error creando perfil del integrante:", error?.message);
+        break;
+      }
+    }
+    if (!profileId) throw new UserError("No se pudo crear el perfil digital. Intenta de nuevo.");
+
+    const { data: card, error: cardError } = await supabase
+      .from("cards")
+      .insert({ client_id: clientId, profile_id: profileId, destination_type: "PROFILE", status: "ACTIVE", assigned_user_id: memberUserId })
+      .select("id, card_code")
+      .single();
+    if (!card) {
+      console.error("[smartcard/actions] Error creando la tarjeta del integrante:", cardError?.message);
+      await supabase.from("profiles").update({ deleted_at: new Date().toISOString() }).eq("id", profileId);
+      throw new UserError("No se pudo crear la tarjeta. Intenta de nuevo.");
+    }
+
+    revalidatePath("/portal/smartcard");
+    return { success: true, cardCode: (card.card_code as string | null) ?? null, profileId };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "No se pudo crear la tarjeta. Intenta de nuevo." };
+  }
+}
+
+/**
+ * Asigna una tarjeta de la empresa a un integrante, o la deja sin asignar
+ * (memberUserId null). Solo dueño, administrador o gerente.
+ */
+export async function assignSmartcardCard(cardId: string, memberUserId: string | null): Promise<SmartcardActionResult> {
+  try {
+    const membership = await requireCardManagementMembership();
+    if (!(await supportsCardAssignment())) throw new UserError(NEEDS_MIGRATION);
+    const supabase = getSmartcardAdminClient();
+    if (!supabase) throw new UserError("SmartCard aún no está configurado en este entorno.");
+
+    const { data: card } = await supabase
+      .from("cards")
+      .select("id, clients!inner(company_id)")
+      .eq("id", cardId)
+      .is("deleted_at", null)
+      .maybeSingle<{ id: string; clients: { company_id: string } }>();
+    if (!card || card.clients.company_id !== membership.companyId) throw new UserError("Esa tarjeta no pertenece a tu empresa.");
+    if (memberUserId) await requireActiveMember(membership.companyId, memberUserId);
+
+    const { error } = await supabase
+      .from("cards")
+      .update({ assigned_user_id: memberUserId, updated_at: new Date().toISOString() })
+      .eq("id", cardId);
+    if (error) {
+      console.error("[smartcard/actions] Error asignando tarjeta:", error.message);
+      throw new UserError("No se pudo asignar la tarjeta. Intenta de nuevo.");
+    }
+    revalidatePath("/portal/smartcard");
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "No se pudo asignar la tarjeta. Intenta de nuevo." };
   }
 }

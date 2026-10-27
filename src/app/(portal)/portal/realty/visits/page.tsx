@@ -29,7 +29,7 @@ export default async function VisitsPage({ searchParams }: { searchParams: Promi
     <div className="space-y-6">
       {ctx.canOperate && properties.length > 0 && (
         <SectionCard title={R.newVisit} subtitle={R.visitAgendaNote}>
-          <VisitForm properties={properties.map((p) => ({ id: p.id, title: p.title }))} prospects={prospects.map((p) => ({ id: p.id, name: p.lead?.name ?? R.prospect }))} advisors={advisors} defaultAdvisorId={ctx.userId} />
+          <VisitForm properties={properties.map((p) => ({ id: p.id, title: p.title, hint: [p.zone?.name, enumLabel(R, "op", p.operation)].filter(Boolean).join(" · ") }))} prospects={prospects.map((p) => ({ id: p.id, name: p.lead?.name ?? R.prospect, hint: [p.lead?.phone, enumLabel(R, "opBuy", p.operation)].filter(Boolean).join(" · ") }))} advisors={advisors} defaultAdvisorId={ctx.userId} />
         </SectionCard>
       )}
       <SectionCard title={R.visits}>

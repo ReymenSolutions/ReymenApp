@@ -390,3 +390,116 @@ export async function syncSmartcardMemberLimitForPlan(organizationId: string, pl
     return "failed";
   }
 }
+
+/** Rol de SmartCard que corresponde al rol del usuario en Reymen (null = no se le da acceso). */
+export function smartcardRoleForUserRole(role: string): SmartcardLinkRole | null {
+  switch (role) {
+    case "OWNER":
+      return "owner";
+    case "ADMIN":
+      return "admin";
+    case "MANAGER":
+      return "manager";
+    case "AGENT":
+      return "agent";
+    case "VIEWER":
+      return "staff";
+    default:
+      return null; // SUPER_ADMIN (staff de Reymen) y CLIENT no entran a SmartCard por aquí.
+  }
+}
+
+const ROLE_ORDER: Record<string, number> = { OWNER: 0, ADMIN: 1, MANAGER: 2, AGENT: 3, VIEWER: 4 };
+
+export interface CreatedSmartcardCompany {
+  company: SmartcardCompanyOption;
+  granted: string[];
+  skipped: string[];
+}
+
+/**
+ * Da de alta la empresa de SmartCard de un cliente de Reymen en un paso:
+ * la empresa (con el nombre y slug del cliente y ya vinculada), su módulo
+ * SmartCard con el límite de integrantes del plan y el acceso de los
+ * usuarios activos del cliente (dueños y administradores primero) hasta ese
+ * límite. Antes había que crear la empresa a mano en el SQL Editor.
+ */
+export async function createSmartcardCompanyForOrg(organizationId: string): Promise<CreatedSmartcardCompany> {
+  const supabase = requireClient();
+
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      industry: true,
+      plan: true,
+      users: { where: { isActive: true }, select: { email: true, role: true, createdAt: true } },
+    },
+  });
+  if (!org) throw new UserError("Ese cliente no existe.");
+
+  const { data: current } = await supabase.from("companies").select("id").eq("external_org_id", organizationId).maybeSingle();
+  if (current) throw new UserError("Este cliente ya está vinculado con una empresa de SmartCard.");
+
+  const { data: smartcardModule } = await supabase.from("modules").select("id").eq("code", "smartcard").maybeSingle();
+  if (!smartcardModule) throw new UserError("SmartCard no tiene el módulo «smartcard» configurado. Avisa a soporte técnico.");
+
+  // El slug de la empresa es único en SmartCard: si el del cliente ya lo usa otra, se le agrega un sufijo.
+  const base = org.slug.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || "empresa";
+  let company: SmartcardCompanyOption | null = null;
+  for (const slug of [base, `${base}-reymen`, `${base}-2`, `${base}-3`]) {
+    const { data, error } = await supabase
+      .from("companies")
+      .insert({ name: org.name, slug, industry: org.industry ?? null, status: "active", external_org_id: organizationId })
+      .select("id, name, slug")
+      .single();
+    if (data) {
+      company = { id: data.id as string, name: data.name as string, slug: data.slug as string, staleOrgId: null };
+      break;
+    }
+    if (error?.code !== "23505") {
+      console.error("[smartcard-link] Error creando company:", error?.message);
+      throw new UserError("No se pudo crear la empresa en SmartCard. Intenta de nuevo.");
+    }
+  }
+  if (!company) throw new UserError("Ya existen empresas en SmartCard con el slug de este cliente. Cambia el slug del cliente e intenta de nuevo.");
+
+  const limit = await planMemberLimit(org.plan);
+  const { error: moduleError } = await supabase.from("company_modules").insert({
+    company_id: company.id,
+    module_id: smartcardModule.id,
+    enabled: true,
+    source: "override",
+    limits: limit === null ? {} : { max_team_members: limit },
+  });
+  if (moduleError) {
+    console.error("[smartcard-link] Error habilitando el módulo SmartCard:", moduleError.message);
+    // Sin módulo la empresa no sirve: se borra para poder reintentar limpio.
+    await supabase.from("companies").delete().eq("id", company.id);
+    throw new UserError("No se pudo habilitar SmartCard para la empresa. Intenta de nuevo.");
+  }
+
+  const candidates = org.users
+    .map((u) => ({ email: u.email, role: smartcardRoleForUserRole(u.role), order: ROLE_ORDER[u.role] ?? 9, createdAt: u.createdAt }))
+    .filter((u): u is { email: string; role: SmartcardLinkRole; order: number; createdAt: Date } => u.role !== null)
+    .sort((a, b) => a.order - b.order || a.createdAt.getTime() - b.createdAt.getTime());
+
+  const granted: string[] = [];
+  const skipped: string[] = [];
+  for (const u of candidates) {
+    if (limit !== null && granted.length >= limit) {
+      skipped.push(u.email);
+      continue;
+    }
+    try {
+      await addSmartcardMember(organizationId, u.email, u.role);
+      granted.push(u.email);
+    } catch (e) {
+      console.error("[smartcard-link] No se pudo dar acceso al crear la empresa:", e);
+      skipped.push(u.email);
+    }
+  }
+  return { company, granted, skipped };
+}

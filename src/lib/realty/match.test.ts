@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { areaScore, budgetScore, computeMatch, extrasScore, fitsBudget, roomsScore, typeScore, zoneScore, type MatchProfile, type MatchProperty } from "./match";
+import { areaScore, budgetScore, computeMatch, extrasScore, fitsBudget, matchMissReasons, roomsScore, typeScore, zoneScore, type MatchProfile, type MatchProperty } from "./match";
 
 const profile: MatchProfile = {
   operation: "SALE",
@@ -90,5 +90,23 @@ describe("match prospecto ↔ propiedad", () => {
     expect(fitsBudget(4_000_000, 3_000_000, 4_500_000)).toBe(true);
     expect(fitsBudget(4_600_000, 3_000_000, 4_500_000)).toBe(false);
     expect(fitsBudget(2_000_000, 3_000_000, 4_500_000)).toBe(false);
+  });
+});
+
+describe("matchMissReasons", () => {
+  const profile = { operation: "RENT", propertyType: "APARTMENT", minBudget: 150000, maxBudget: 300000, zoneIds: [], minBedrooms: 2, minBathrooms: 2, minArea: null, preferences: [] } as const;
+  const house = { operation: "SALE", propertyType: "HOUSE", price: 500000, zoneId: "z1", bedrooms: 3, bathrooms: 2, constructionArea: 120, landArea: 160, features: [] } as const;
+
+  it("explains an operation mismatch before anything else", () => {
+    const p = { ...profile, zoneIds: [...profile.zoneIds], preferences: [...profile.preferences] };
+    const h = { ...house, features: [...house.features] };
+    expect(matchMissReasons(p, h, computeMatch(p, h))).toEqual([{ code: "operation", has: "SALE", wanted: "RENT" }]);
+  });
+
+  it("lists price, type and missing neighborhoods when the operation matches", () => {
+    const p = { ...profile, zoneIds: [] as string[], preferences: [] as string[] };
+    const h = { ...house, operation: "RENT" as const, features: [] as string[] };
+    const codes = matchMissReasons(p, h, computeMatch(p, h)).map((r) => r.code);
+    expect(codes).toEqual(["budget", "typeNear", "noZones"]);
   });
 });

@@ -27,7 +27,10 @@ import {
   updateSmartcardCardDestination,
   createSmartcardCardProfile,
   getSmartcardCardQrCode,
+  createSmartcardCardForMember,
+  assignSmartcardCard,
 } from "@/actions/portal/smartcard";
+import type { RosterPerson } from "@/lib/smartcard-roster";
 import {
   EVENT_TYPE_LABELS_ES,
   type SmartcardMembership,
@@ -123,28 +126,19 @@ function EventBreakdown({ counts, labels, lang }: { counts: Record<string, numbe
  * OrganizationModulesPanel.tsx) rather than the original's full-page
  * redirect-with-query-string-error pattern.
  *
- * The "Equipo" card intentionally does NOT list members one by one anymore
- * (see the removed per-row markup in git history). Two reasons, not one:
- *   1. Privacy, ported on purpose from the original product — company_users
- *      never exposed other members' emails, RLS scoped `user_profiles` to
- *      your own row only. getCompanyRoster() still only returns role/status,
- *      no name/email, so a real per-row list here could only ever show a
- *      placeholder like "Integrante" for everyone but yourself — theater,
- *      not information.
- *   2. This portal already has a real, working team list with actual names
- *      (Configuración → Equipo, backed by this app's own User table) —
- *      inviteSmartcardTeamMember() below already provisions an account
- *      there for every SmartCard invite. Duplicating a (worse) roster view
- *      here just to have one on this page isn't worth it; the seat count
- *      in the header plus a link to Settings covers what this page needs
- *      to say about who's on the team, without the SmartCard invite path's
- *      own company_users provisioning (the part unique to this page) going
- *      away.
+ * Tarjetas por persona (2026-10-27): cada tarjeta puede estar asignada a
+ * un integrante. Dueño, administrador y gerente ven todas, ven al equipo con
+ * nombre (el mismo que ya ven en Configuración → Equipo; getRosterPeople lo
+ * toma de las cuentas de Reymen) y crean o asignan la tarjeta de cada quien.
+ * Un asesor o personal solo recibe su propia tarjeta y edita su perfil, sin
+ * el diseño ni el logo, que fija la empresa.
  */
 export function SmartcardPanel({
   membership,
   roster,
   cardStats,
+  people = {},
+  assignmentReady = false,
   destinationTypes,
   publicBaseUrl = "https://link.reymen.mx",
   timeZone = "America/Mexico_City",
@@ -152,6 +146,10 @@ export function SmartcardPanel({
   membership: SmartcardMembership;
   roster: CompanyRosterEntry[];
   cardStats: CompanyCardStats;
+  /** Nombre y correo de cada integrante (solo llega para dueño, administrador o gerente). */
+  people?: Record<string, RosterPerson>;
+  /** Si SmartCard ya permite asignar tarjetas a personas (migración aplicada). */
+  assignmentReady?: boolean;
   destinationTypes: DestinationTypeOption[];
   /** Dominio público de las tarjetas (para "Ver tarjeta"). */
   publicBaseUrl?: string;
@@ -171,11 +169,41 @@ export function SmartcardPanel({
   const [isPending, startTransition] = useTransition();
 
   const canManageTeam = ["owner", "admin"].includes(membership.roleCode);
-  // Wider than team invites on purpose (2026-09-29): a manager shouldn't
-  // have to wait on the owner or Reymen for something this routine — cards
-  // represent spots like "Recepción" or "Mesa 1", not individual logins,
-  // so there's no per-person ownership to restrict this to either.
+  // Dueño, administrador y gerente ven y editan todas las tarjetas, y crean o
+  // asignan las de cada integrante. Un asesor o personal solo ve la suya
+  // (la página ya le manda solo esa) y edita su perfil, sin el diseño.
   const canEditCards = ["owner", "admin", "manager"].includes(membership.roleCode);
+  const isMine = (c: CardStatsEntry) => !!c.assignedUserId && c.assignedUserId === membership.userId;
+  const personLabel = (userId: string) =>
+    people[userId]?.name || people[userId]?.email || (lang === "es" ? "Integrante" : "Member");
+  const activeMembers = roster.filter((m) => m.status === "active");
+  const cardByUser = new Map(cardStats.cards.filter((c) => c.assignedUserId).map((c) => [c.assignedUserId as string, c]));
+  const [busyMemberId, setBusyMemberId] = useState<string | null>(null);
+  const [assigningCardId, setAssigningCardId] = useState<string | null>(null);
+
+  async function handleCreateMemberCard(userId: string) {
+    setBusyMemberId(userId);
+    const result = await createSmartcardCardForMember(userId);
+    setBusyMemberId(null);
+    if (!result.success) {
+      toast.error(translateMessage(result.error));
+      return;
+    }
+    toast.success(
+      lang === "es"
+        ? `Tarjeta ${result.cardCode ?? ""} creada para ${personLabel(userId)}. Completa su perfil.`
+        : `Card ${result.cardCode ?? ""} created for ${personLabel(userId)}. Fill in their profile.`
+    );
+    setEditingProfileId(result.profileId);
+  }
+
+  async function handleAssign(cardId: string, value: string) {
+    setAssigningCardId(cardId);
+    const result = await assignSmartcardCard(cardId, value === "__none" ? null : value);
+    setAssigningCardId(null);
+    if (!result.success) toast.error(translateMessage(result.error));
+    else toast.success(lang === "es" ? "Tarjeta asignada." : "Card assigned.");
+  }
   const [editingCard, setEditingCard] = useState<CardStatsEntry | null>(null);
   const [editType, setEditType] = useState("");
   const [editUrl, setEditUrl] = useState("");
@@ -192,9 +220,18 @@ export function SmartcardPanel({
   const [tab, setTab] = useState<"resumen" | "tarjetas" | "equipo">("resumen");
   const tabs = [
     { key: "resumen", label: lang === "es" ? "Resumen" : "Overview" },
-    { key: "tarjetas", label: lang === "es" ? "Tarjetas" : "Cards", count: cardStats.totalCards },
-    { key: "equipo", label: lang === "es" ? "Equipo" : "Team" },
+    canEditCards
+      ? { key: "tarjetas", label: lang === "es" ? "Tarjetas" : "Cards", count: cardStats.totalCards }
+      : { key: "tarjetas", label: lang === "es" ? "Mi tarjeta" : "My card" },
+    ...(canEditCards ? [{ key: "equipo", label: lang === "es" ? "Equipo" : "Team" }] : []),
   ];
+  const noCardsText = canEditCards
+    ? lang === "es"
+      ? "Todavía no hay tarjetas emitidas para esta empresa."
+      : "No cards have been issued for this company yet."
+    : lang === "es"
+      ? "Todavía no tienes una tarjeta asignada. Pídele al dueño o al gerente que te la cree."
+      : "You don't have a card assigned yet. Ask the owner or manager to create one for you.";
 
   function openEditCard(c: CardStatsEntry) {
     setEditingCard(c);
@@ -346,15 +383,15 @@ export function SmartcardPanel({
       <Card>
         <CardHeader className="p-3 sm:p-4 flex-row items-center gap-2">
           <Activity className="h-4 w-4 text-slate-400" />
-          <CardTitle>{lang === "es" ? "Estadísticas de tarjetas" : "Card statistics"}</CardTitle>
+          <CardTitle>
+            {canEditCards
+              ? lang === "es" ? "Estadísticas de tarjetas" : "Card statistics"
+              : lang === "es" ? "Estadísticas de tu tarjeta" : "Your card's statistics"}
+          </CardTitle>
         </CardHeader>
         <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
           {cardStats.totalCards === 0 ? (
-            <p className="rounded-md bg-slate-50 px-3 py-3 text-sm text-slate-500">
-              {lang === "es"
-                ? "Todavía no hay tarjetas emitidas para esta empresa."
-                : "No cards have been issued for this company yet."}
-            </p>
+            <p className="rounded-md bg-slate-50 px-3 py-3 text-sm text-slate-500">{noCardsText}</p>
           ) : (
             <div className="space-y-6">
               <MetricGrid>
@@ -384,13 +421,11 @@ export function SmartcardPanel({
       <Card>
         <CardHeader className="p-3 sm:p-4 flex-row items-center gap-2">
           <CreditCard className="h-4 w-4 text-slate-400" />
-          <CardTitle>{lang === "es" ? "Tarjetas" : "Cards"}</CardTitle>
+          <CardTitle>{canEditCards ? (lang === "es" ? "Tarjetas" : "Cards") : lang === "es" ? "Mi tarjeta" : "My card"}</CardTitle>
         </CardHeader>
         <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
           {cardStats.totalCards === 0 ? (
-            <p className="rounded-md bg-slate-50 px-3 py-3 text-sm text-slate-500">
-              {lang === "es" ? "Todavía no hay tarjetas emitidas para esta empresa." : "No cards have been issued for this company yet."}
-            </p>
+            <p className="rounded-md bg-slate-50 px-3 py-3 text-sm text-slate-500">{noCardsText}</p>
           ) : (
               <div>
                 <MetricGrid columns={2} density="comfortable">
@@ -403,7 +438,9 @@ export function SmartcardPanel({
                     return <article key={c.cardId} className="rounded-xl border border-slate-200 p-3 sm:p-4">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <h4 className="font-semibold text-slate-900">{c.clientName}</h4>
+                          <h4 className="font-semibold text-slate-900">
+                            {c.assignedUserId ? (isMine(c) && !canEditCards ? (lang === "es" ? "Tu tarjeta" : "Your card") : personLabel(c.assignedUserId)) : c.clientName}
+                          </h4>
                           <p className="mt-1 break-all font-mono text-xs text-slate-500">{c.cardCode}</p>
                         </div>
                         <Badge variant="secondary">{statusLabels[c.status.toLowerCase()] ?? c.status}</Badge>
@@ -412,6 +449,22 @@ export function SmartcardPanel({
                         <div className="flex flex-wrap justify-between gap-x-3"><dt className="text-slate-500">{lang === "es" ? "Eventos" : "Events"}</dt><dd className="font-semibold tabular-nums">{c.totalEvents.toLocaleString(lang === "es" ? "es-MX" : "en-US")}</dd></div>
                         <div className="flex flex-wrap justify-between gap-x-3"><dt className="text-slate-500">{lang === "es" ? "Última actividad" : "Last activity"}</dt><dd>{c.lastActivityAt ? new Date(c.lastActivityAt).toLocaleDateString(lang === "es" ? "es-MX" : "en-US", { year: "numeric", month: "short", day: "numeric", timeZone }) : lang === "es" ? "Sin actividad" : "No activity"}</dd></div>
                       </dl>
+                      {canEditCards && assignmentReady && (
+                        <div className="mb-3 flex flex-col gap-1">
+                          <Label htmlFor={`assign-${c.cardId}`} className="text-xs text-slate-500">{lang === "es" ? "Asignada a" : "Assigned to"}</Label>
+                          <Select value={c.assignedUserId ?? "__none"} onValueChange={(v) => handleAssign(c.cardId, v)} disabled={assigningCardId === c.cardId}>
+                            <SelectTrigger id={`assign-${c.cardId}`} className="h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none">{lang === "es" ? "De la empresa (sin asignar)" : "Company card (unassigned)"}</SelectItem>
+                              {activeMembers.map((m) => (
+                                <SelectItem key={m.userId} value={m.userId}>{personLabel(m.userId)}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                       <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-2">
                         {c.cardCode && c.status.toLowerCase() === "active" && (
                           <Button asChild variant="outline" size="sm" className="min-h-11">
@@ -423,6 +476,16 @@ export function SmartcardPanel({
                         <Button variant="outline" size="sm" className="min-h-11" aria-expanded={isExpanded} aria-controls={`card-events-${c.cardId}`} onClick={() => setExpandedCardId(isExpanded ? null : c.cardId)}>
                           {isExpanded ? lang === "es" ? "Ocultar actividad" : "Hide activity" : lang === "es" ? "Ver actividad" : "View activity"}
                         </Button>
+                        {!canEditCards && isMine(c) && <>
+                          {isProfileCard && (
+                            <Button variant="ghost" size="sm" className="min-h-11" onClick={() => setEditingProfileId(c.profileId)}>
+                              <Pencil className="h-4 w-4 shrink-0" />{lang === "es" ? "Editar mi perfil" : "Edit my profile"}
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="sm" className="min-h-11" disabled={downloadingQrCardId === c.cardId} onClick={() => handleDownloadQr(c)} aria-label={lang === "es" ? `Descargar QR de ${c.cardCode}` : `Download QR for ${c.cardCode}`}>
+                            {downloadingQrCardId === c.cardId ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : <QrCode className="h-4 w-4" />}QR
+                          </Button>
+                        </>}
                         {canEditCards && <>
                           <Button variant="ghost" size="sm" className="min-h-11" onClick={() => isProfileCard ? setEditingProfileId(c.profileId) : openEditCard(c)}>
                             <Pencil className="h-4 w-4 shrink-0" />{isProfileCard ? lang === "es" ? "Editar perfil" : "Edit profile" : lang === "es" ? "Editar" : "Edit"}
@@ -456,16 +519,46 @@ export function SmartcardPanel({
           </span>
         </CardHeader>
         <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+          <h3 className="mb-2 text-sm font-semibold text-slate-900">{lang === "es" ? "Tarjetas del equipo" : "Team cards"}</h3>
+          {!assignmentReady ? (
+            <p className="mb-4 rounded-md bg-amber-50 px-3 py-3 text-sm text-amber-800">
+              {lang === "es"
+                ? "Las tarjetas por persona todavía no están habilitadas en SmartCard. Contacta a soporte de Reymen."
+                : "Per-person cards aren't enabled in SmartCard yet. Please contact Reymen support."}
+            </p>
+          ) : (
+            <ul className="mb-4 divide-y divide-slate-100 rounded-lg border border-slate-200">
+              {activeMembers.map((m) => {
+                const card = cardByUser.get(m.userId);
+                return (
+                  <li key={m.userId} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-900">
+                        {personLabel(m.userId)}
+                        {m.isCurrentUser && <span className="ml-1 text-xs font-normal text-slate-500">({lang === "es" ? "tú" : "you"})</span>}
+                      </p>
+                      <p className="text-xs text-slate-500">{ROLE_LABELS[m.roleCode] ?? m.roleCode}</p>
+                    </div>
+                    {card ? (
+                      <Badge variant="secondary" className="font-mono">{card.cardCode}</Badge>
+                    ) : (
+                      <Button size="sm" variant="outline" disabled={busyMemberId === m.userId} onClick={() => handleCreateMemberCard(m.userId)}>
+                        {busyMemberId === m.userId && <Loader2 className="h-4 w-4 animate-spin" />}
+                        {lang === "es" ? "Crear su tarjeta" : "Create their card"}
+                      </Button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
           <p className="mb-4 text-sm text-slate-500">
-            {lang === "es"
-              ? "Por privacidad no se listan nombres aquí. "
-              : "Names aren't listed here for privacy. "}
             <Link href="/portal/settings" className="font-medium text-brand-600 hover:underline">
               {lang === "es" ? "Ve a Configuración" : "Go to Settings"}
             </Link>
             {lang === "es"
-              ? " para ver quién es cada integrante, cambiar su rol o darlo de baja del portal."
-              : " to see who each member is, change their role, or remove them from the portal."}
+              ? " para cambiar el rol de un integrante o darlo de baja del portal."
+              : " to change a member's role or remove them from the portal."}
           </p>
 
           {canManageTeam ? (
