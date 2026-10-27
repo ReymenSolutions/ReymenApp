@@ -9,19 +9,19 @@ import { ProfileSuggestionCard } from "./ProfileSuggestionCard";
  * «Lo que busca» en la ficha de un contacto del CRM: compra/renta, tipo, presupuesto y colonias de su perfil de Real Estate
  * (o un botón para agregarlo). Solo presenta datos ya formateados: sirve igual en la ficha (servidor) y en el panel lateral.
  */
-export function LeadSearchProfiles({ views, suggestions = [], leadId, canOperate, lang, compact = false }: { views: LeadSearchView[]; suggestions?: LeadSuggestionView[]; leadId: string; canOperate: boolean; lang: "es" | "en"; compact?: boolean }) {
+export function LeadSearchProfiles({ views, suggestions = [], leadId, canOperate, lang, compact = false, hideTitle = false }: { views: LeadSearchView[]; suggestions?: LeadSuggestionView[]; leadId: string; canOperate: boolean; lang: "es" | "en"; compact?: boolean; hideTitle?: boolean }) {
   const R = pickDict(realtyStrings, lang);
   const addHref = `/portal/realty/prospects/new?leadId=${encodeURIComponent(leadId)}`;
   return (
     <section aria-label={R.leadSearchTitle} className="space-y-2">
-      <h3 className={`flex items-center gap-1.5 font-semibold text-slate-900 ${compact ? "text-xs uppercase tracking-wide text-slate-500" : "text-sm"}`}>
+      <h3 className={`${hideTitle ? "sr-only " : ""}flex items-center gap-1.5 font-semibold text-slate-900 ${compact ? "text-xs uppercase tracking-wide text-slate-500" : "text-sm"}`}>
         <Home className="h-3.5 w-3.5" aria-hidden="true" />
         {R.leadSearchTitle}
       </h3>
       {canOperate && suggestions.map((sg) => <ProfileSuggestionCard key={sg.id} s={sg} leadId={leadId} lang={lang} compact={compact} />)}
       {views.length === 0 ? (
         <div className="space-y-2">
-          <p className="text-xs text-slate-500">{R.leadSearchNone}</p>
+          {!(canOperate && suggestions.length > 0) && <p className="text-xs text-slate-500">{R.leadSearchNone}</p>}
           {canOperate && (
             <Link href={addHref} className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
               <Plus className="h-3.5 w-3.5" aria-hidden="true" />
