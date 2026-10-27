@@ -1,8 +1,11 @@
 // @vitest-environment node
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { createTestOrg, createTestUser, cleanupOrg } from "@/test/helpers";
 import { saveProspect } from "./service";
+
+const sent: { to: string; subject: string }[] = [];
+vi.mock("@/lib/email", () => ({ sendEmail: vi.fn(async (m: { to: string; subject: string }) => (sent.push({ to: m.to, subject: m.subject }), { sent: true })) }));
 import { acceptProfileSuggestion, listPendingSuggestions, matchZones, parseSuggestion, recordProfileSuggestion, rejectProfileSuggestion, REJECT_COOLDOWN_MS } from "./profile-suggestion";
 
 const full = { operation: "SALE", property_type: "HOUSE", max_budget: "4,500,000", min_budget: 3_500_000, zones: ["Cumbres", " cumbres ", "Narnia"], min_bedrooms: 3, preferences: ["parking", "jacuzzi"], move_timeline: "en 3 meses" };
@@ -50,6 +53,21 @@ describe("propuestas de perfil (BD)", () => {
   afterAll(async () => {
     await cleanupOrg(orgId);
     await cleanupOrg(noModuleId);
+  });
+
+  beforeEach(() => {
+    sent.length = 0;
+  });
+
+  it("avisa por correo al asesor del contacto (o a quien administra si no tiene)", async () => {
+    const owner = await prisma.user.findFirstOrThrow({ where: { id: userId }, select: { email: true } });
+    const withAdvisor = await prisma.lead.create({ data: { organizationId: orgId, name: "Con asesor", assignedTo: userId } });
+    leads.push(withAdvisor.id);
+    await recordProfileSuggestion(orgId, { leadId: withAdvisor.id, messageId: "m", reason: "r", raw: full });
+    expect(sent).toEqual([{ to: owner.email, subject: "La IA propone un perfil para Con asesor" }]);
+    sent.length = 0;
+    await recordProfileSuggestion(orgId, { leadId: withAdvisor.id, messageId: "m2", reason: "r", raw: full });
+    expect(sent).toEqual([]); // ya había una pendiente: no se repite el aviso
   });
 
   it("propone una vez, sin duplicar mientras haya una pendiente", async () => {

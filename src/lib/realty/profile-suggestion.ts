@@ -7,6 +7,9 @@ import { prisma } from "@/lib/prisma";
 import { hasModule } from "@/lib/modules";
 import { logAudit } from "@/lib/audit";
 import { UserError } from "@/lib/user-error";
+import { sendEmail } from "@/lib/email";
+import { renderBrandedEmail } from "@/lib/email-template";
+import { appUrl } from "@/lib/app-url";
 import { FEATURES, OPERATIONS, PROPERTY_TYPES, zoneKey } from "./constants";
 import { saveProspect } from "./service";
 
@@ -96,7 +99,30 @@ export async function recordProfileSuggestion(organizationId: string, input: { l
     },
   });
   await logAudit({ organizationId, action: "realty.profile_suggestion.create", resource: "Lead", resourceId: input.leadId, metadata: { operation: parsed.operation } });
+  await notifySuggestion(organizationId, input.leadId, parsed).catch(() => undefined);
   return true;
+}
+
+/** Correo al asesor del contacto (o, sin asesor, a quien administra el negocio): la IA propone un perfil y hay que revisarlo. Un fallo nunca rompe el análisis. */
+async function notifySuggestion(organizationId: string, leadId: string, p: ParsedSuggestion) {
+  const lead = await prisma.lead.findFirst({ where: { id: leadId, organizationId }, select: { name: true, assignedTo: true } });
+  if (!lead) return;
+  const advisor = lead.assignedTo ? await prisma.user.findFirst({ where: { id: lead.assignedTo, organizationId, isActive: true }, select: { email: true } }) : null;
+  const recipients = advisor ? [advisor.email] : (await prisma.user.findMany({ where: { organizationId, role: { in: ["OWNER", "ADMIN", "MANAGER"] }, isActive: true }, select: { email: true } })).map((u) => u.email);
+  if (!recipients.length) return;
+  const money = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 }).format(p.maxBudget);
+  const { html, text } = renderBrandedEmail({
+    preheader: `${lead.name} · la IA propone su perfil de búsqueda`,
+    title: "La IA detectó lo que busca un contacto",
+    intro: `Por la conversación con ${lead.name}, la IA propone este perfil de búsqueda. No se guarda nada hasta que lo aceptes, lo edites o lo descartes.`,
+    rows: [
+      { label: "Busca", value: `${p.operation === "RENT" ? "Rentar" : "Comprar"}${p.propertyType ? ` · ${p.propertyType}` : ""}` },
+      { label: "Presupuesto", value: `Hasta ${money}` },
+      ...(p.zoneNames.length ? [{ label: "Colonias", value: p.zoneNames.join(", ") }] : []),
+    ],
+    actions: [{ label: "Revisar propuesta", url: appUrl(`/portal/leads/${leadId}`) }],
+  });
+  await Promise.all(recipients.map((to) => sendEmail({ to, subject: `La IA propone un perfil para ${lead.name}`, html, text }).catch(() => undefined)));
 }
 
 export interface SuggestionView {

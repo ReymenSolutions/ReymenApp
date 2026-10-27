@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getRealtyBellItems } from "@/lib/realty/bell";
 
 export async function GET() {
   const session = await auth();
@@ -11,7 +12,7 @@ export async function GET() {
   const isPortal = !!session.user.organizationId;
   const orgFilter = isPortal ? { organizationId: session.user.organizationId! } : {};
 
-  const [escalated, openRequests, seenAt, aiActions, alerts, lowFeedback] = await Promise.all([
+  const [escalated, openRequests, seenAt, aiActions, alerts, lowFeedback, realtyItems] = await Promise.all([
     prisma.conversation.findMany({
       where: { ...orgFilter, status: "ESCALATED" },
       take: 5,
@@ -48,6 +49,8 @@ export async function GET() {
     isPortal
       ? prisma.customerFeedback.findMany({ where: { organizationId: session.user.organizationId!, status: "OPEN" }, take: 5, orderBy: { respondedAt: "desc" }, select: { score: true, comment: true, respondedAt: true, createdAt: true } })
       : Promise.resolve([]),
+    // Real Estate: nuevos interesados de la landing, perfiles que propone la IA y demanda sin inventario.
+    isPortal ? getRealtyBellItems(session.user.organizationId!, session.user.id, session.user.role) : Promise.resolve([]),
   ]);
 
   const items = [
@@ -58,6 +61,8 @@ export async function GET() {
       href: isPortal ? "/portal/conversations" : "/admin/escalations",
       at: c.updatedAt,
     })),
+    // Lo de Real Estate es accionable y sensible al tiempo (el primer mensaje al interesado es el que cuenta): va antes que lo demás.
+    ...realtyItems.map(({ type, label, detail, href, at }) => ({ type, label, detail, href, at })),
     ...aiActions.map((a) => ({
       type: a.status === "SUGGESTED" ? "ai_suggestion" : "ai_action",
       label: a.status === "SUGGESTED" ? "El Agente IA sugiere" : "El Agente IA actualizó el pipeline",
