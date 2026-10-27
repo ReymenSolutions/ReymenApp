@@ -94,62 +94,69 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         <button className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white">{es ? "Buscar" : "Search"}</button>
       </form>
 
-      <Card>
-        <CardContent className="p-0">
-          {customers.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={Contact}
-                title={query ? (es ? "Ningún cliente coincide" : "No customer matches") : es ? "Aún no hay clientes" : "No customers yet"}
-                description={es ? "Aparecen al registrar su teléfono en el POS o al inscribirse en Lealtad." : "They appear when registered by phone in the POS or enrolled in Loyalty."}
-              />
-            </div>
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {customers.map((c) => {
-                const lead = c.lead && !c.lead.deletedAt ? c.lead : null;
-                return (
-                  <li key={c.id} className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6">
-                    <div className="min-w-[12rem] flex-1">
-                      <Link href={`/portal/customers/${c.id}`} className="text-base font-semibold text-brand-700 hover:underline">{c.name ?? (es ? "Sin nombre" : "No name")}</Link>
-                      <p className="text-xs text-slate-500">{c.phone}</p>
-                      <CustomerBirthday customerId={c.id} month={c.birthMonth} day={c.birthDay} consent={c.consentAccepted} canEdit={canEdit} />
-                    </div>
-                    <div className="text-right text-sm">
-                      <p className="text-xs text-slate-500">{es ? "Compras en POS" : "POS purchases"}</p>
-                      <p className="font-semibold text-slate-900">{formatMoney(Number(c.totalSpent))}</p>
-                      <p className="text-xs text-slate-500">
-                        {c.visitCount} {c.visitCount === 1 ? (es ? "visita" : "visit") : es ? "visitas" : "visits"}
-                        {c.lastVisitAt && ` · ${es ? "última" : "last"} ${formatDate(c.lastVisitAt, es ? "es" : "en")}`}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {c.consentAccepted ? (
-                        <Badge variant="success" className="text-[10px]">{es ? "Aceptó contacto" : "Accepted contact"}</Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-[10px]">{es ? "Sin consentimiento" : "No consent"}</Badge>
-                      )}
-                    </div>
-                    <Link href={`/portal/customers/${c.id}`} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white">{es ? "Ver compras y recompensas" : "View purchases and rewards"}</Link>
-                    {loyalty && c.loyaltyMembers[0] && <Link href={`/portal/loyalty/members/${c.loyaltyMembers[0].id}`} className="text-sm font-medium text-brand-700 hover:underline">{es ? "Ver lealtad →" : "View loyalty →"}</Link>}
-                    {crm && (
-                      <div className="w-full sm:w-auto">
-                        {lead ? (
-                          <Link href={`/portal/leads/${lead.id}`} className="text-sm font-medium text-brand-700 hover:underline">
-                            {es ? "Ver contacto →" : "View contact →"}
-                          </Link>
-                        ) : canCreateLead ? (
-                          <CreateLeadFromCustomerButton customerId={c.id} />
-                        ) : null}
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      {customers.length === 0 ? (
+        <Card>
+          <CardContent className="p-6">
+            <EmptyState
+              icon={Contact}
+              title={query ? (es ? "Ningún cliente coincide" : "No customer matches") : es ? "Aún no hay clientes" : "No customers yet"}
+              description={es ? "Aparecen al registrar su teléfono en el POS o al inscribirse en Lealtad." : "They appear when registered by phone in the POS or enrolled in Loyalty."}
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {customers.map((c) => {
+            const lead = c.lead && !c.lead.deletedAt ? c.lead : null;
+            const name = c.name ?? (es ? "Sin nombre" : "No name");
+            const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?";
+            return (
+              <li key={c.id} className="flex flex-col rounded-card border border-slate-200 bg-white p-4 shadow-card">
+                <div className="flex items-start gap-3">
+                  <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-50 text-sm font-semibold text-brand-700">{initials}</span>
+                  <div className="min-w-0 flex-1">
+                    <Link href={`/portal/customers/${c.id}`} className="block truncate text-base font-semibold text-slate-900 hover:text-brand-700 hover:underline">{name}</Link>
+                    <p className="text-xs text-slate-500">{c.phone}</p>
+                  </div>
+                  {c.consentAccepted ? (
+                    <Badge variant="success" className="shrink-0 text-[10px]">{es ? "Aceptó contacto" : "Accepted contact"}</Badge>
+                  ) : (
+                    <Badge variant="secondary" className="shrink-0 text-[10px]">{es ? "Sin consentimiento" : "No consent"}</Badge>
+                  )}
+                </div>
+                <CustomerBirthday customerId={c.id} month={c.birthMonth} day={c.birthDay} consent={c.consentAccepted} canEdit={canEdit} />
+
+                <dl className="mt-3 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 text-sm">
+                  <div>
+                    <dt className="text-xs text-slate-500">{es ? "Compras en POS" : "POS purchases"}</dt>
+                    <dd className="font-semibold tabular-nums text-slate-900">{formatMoney(Number(c.totalSpent))}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-slate-500">{es ? "Visitas" : "Visits"}</dt>
+                    <dd className="font-semibold tabular-nums text-slate-900">{c.visitCount}</dd>
+                  </div>
+                  <div className="col-span-2 text-xs text-slate-500">
+                    {c.lastVisitAt ? `${es ? "Última visita" : "Last visit"}: ${formatDate(c.lastVisitAt, es ? "es" : "en")}` : es ? "Sin visitas todavía" : "No visits yet"}
+                  </div>
+                </dl>
+
+                <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 pt-4">
+                  <Link href={`/portal/customers/${c.id}`} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white">{es ? "Ver compras y recompensas" : "View purchases and rewards"}</Link>
+                  {loyalty && c.loyaltyMembers[0] && <Link href={`/portal/loyalty/members/${c.loyaltyMembers[0].id}`} className="text-sm font-medium text-brand-700 hover:underline">{es ? "Ver lealtad →" : "View loyalty →"}</Link>}
+                  {crm &&
+                    (lead ? (
+                      <Link href={`/portal/leads/${lead.id}`} className="text-sm font-medium text-brand-700 hover:underline">
+                        {es ? "Ver contacto →" : "View contact →"}
+                      </Link>
+                    ) : canCreateLead ? (
+                      <CreateLeadFromCustomerButton customerId={c.id} />
+                    ) : null)}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
       {pages > 1 && (
         <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
