@@ -61,7 +61,7 @@ export async function getLeadSearchViews(organizationId: string, leadId: string,
   return rows.map((r) => ({
     id: r.id,
     active: r.active,
-    operation: enumLabel(R, "op", r.operation),
+    operation: enumLabel(R, "opBuy", r.operation),
     type: r.propertyType ? enumLabel(R, "type", r.propertyType) : null,
     budget: budgetText(r.minBudget === null ? null : Number(r.minBudget), Number(r.maxBudget)),
     zones: r.zones.map((z) => z.zone.name),
@@ -90,7 +90,7 @@ export async function getLeadSuggestionViews(organizationId: string, leadId: str
   const rows = await listPendingSuggestions(organizationId, leadId);
   return rows.map((r) => ({
     id: r.id,
-    operation: enumLabel(R, "op", r.operation),
+    operation: enumLabel(R, "opBuy", r.operation),
     type: r.propertyType ? enumLabel(R, "type", r.propertyType) : null,
     budget: budgetText(r.minBudget, r.maxBudget),
     zones: r.zoneNames,

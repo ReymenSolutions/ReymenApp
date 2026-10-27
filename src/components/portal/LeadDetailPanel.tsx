@@ -287,7 +287,8 @@ function PanelContent({ data, openedAt, onReload }: { data: LeadPanelData; opene
         </Link>
       </header>
 
-      <div className="flex-1 space-y-6 overflow-y-auto p-5">
+      {/* Cada sección va separada por una línea para distinguir dónde termina una y empieza la otra. */}
+      <div className="flex-1 divide-y divide-slate-200 overflow-y-auto px-5 [&>*]:py-5">
         <section aria-label={t.contact} className="space-y-2.5 text-sm">
           <div className="flex items-center justify-between gap-3">
             <span className="text-slate-500">{t.stageLabel}</span>
