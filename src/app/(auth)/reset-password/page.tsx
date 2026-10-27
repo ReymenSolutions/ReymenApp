@@ -1,5 +1,6 @@
 "use client";
 
+import { PasswordInput } from "@/components/ui/password-input";
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -65,12 +66,12 @@ function ResetPasswordForm() {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="password">Nueva contraseña</Label>
-        <Input id="password" type="password" placeholder="••••••••" {...register("password")} autoFocus />
+        <PasswordInput id="password" placeholder="••••••••" {...register("password")} autoFocus />
         {errors.password && <p className="text-xs text-red-500">{translateMessage(errors.password.message)}</p>}
       </div>
       <div className="space-y-2">
         <Label htmlFor="confirm">Confirmar contraseña</Label>
-        <Input id="confirm" type="password" placeholder="••••••••" {...register("confirm")} />
+        <PasswordInput id="confirm" placeholder="••••••••" {...register("confirm")} />
         {errors.confirm && <p className="text-xs text-red-500">{translateMessage(errors.confirm.message)}</p>}
       </div>
       <Button type="submit" className="w-full" disabled={loading}>

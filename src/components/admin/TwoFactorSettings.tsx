@@ -1,5 +1,6 @@
 "use client";
 
+import { PasswordInput } from "@/components/ui/password-input";
 import { useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
@@ -180,9 +181,8 @@ export function TwoFactorSettings({ initialEnabled }: { initialEnabled: boolean 
           </DialogHeader>
           <div className="space-y-2 py-2">
             <Label htmlFor="disable-password">{lang === "es" ? "Confirma tu contraseña" : "Confirm your password"}</Label>
-            <Input
+            <PasswordInput
               id="disable-password"
-              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoFocus

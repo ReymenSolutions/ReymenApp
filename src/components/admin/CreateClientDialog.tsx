@@ -1,5 +1,6 @@
 "use client";
 
+import { PasswordInput } from "@/components/ui/password-input";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -127,7 +128,7 @@ export function CreateClientDialog() {
 
           <div className="space-y-2">
             <Label htmlFor="createclientdialog-f4">{lang === "es" ? "Contraseña inicial" : "Initial password"}</Label>
-            <Input id="createclientdialog-f4" type="password" placeholder={lang === "es" ? "Mínimo 8 caracteres" : "At least 8 characters"} {...register("password")} />
+            <PasswordInput id="createclientdialog-f4" placeholder={lang === "es" ? "Mínimo 8 caracteres" : "At least 8 characters"} {...register("password")} />
             {errors.password && <p className="text-xs text-red-500">{translateMessage(errors.password.message)}</p>}
           </div>
 

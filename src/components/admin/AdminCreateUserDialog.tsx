@@ -1,5 +1,6 @@
 "use client";
 
+import { PasswordInput } from "@/components/ui/password-input";
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { Loader2, Plus } from "lucide-react";
@@ -102,7 +103,7 @@ export function AdminCreateUserDialog({ orgs }: { orgs: { id: string; name: stri
           </div>
           <div className="space-y-2">
             <Label htmlFor="cu-pass">{es ? "Contraseña temporal *" : "Temporary password *"}</Label>
-            <Input id="cu-pass" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={es ? "Mínimo 8 caracteres" : "At least 8 characters"} />
+            <PasswordInput id="cu-pass" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={es ? "Mínimo 8 caracteres" : "At least 8 characters"} />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>{es ? "Cancelar" : "Cancel"}</Button>

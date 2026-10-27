@@ -1,4 +1,5 @@
 import { setPassword } from './actions'
+import { PasswordField } from '../../components/PasswordField'
 
 export default async function SetPasswordPage({
   searchParams,
@@ -45,30 +46,14 @@ export default async function SetPasswordPage({
           <label htmlFor="password" className="text-sm font-medium">
             Nueva contraseña
           </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            minLength={8}
-            autoComplete="new-password"
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
-          />
+          <PasswordField id="password" name="password" required minLength={8} autoComplete="new-password" />
         </div>
 
         <div className="flex flex-col gap-1">
           <label htmlFor="confirmPassword" className="text-sm font-medium">
             Confirma la contraseña
           </label>
-          <input
-            id="confirmPassword"
-            name="confirmPassword"
-            type="password"
-            required
-            minLength={8}
-            autoComplete="new-password"
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
-          />
+          <PasswordField id="confirmPassword" name="confirmPassword" required minLength={8} autoComplete="new-password" />
         </div>
 
         <button

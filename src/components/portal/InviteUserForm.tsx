@@ -1,5 +1,6 @@
 "use client";
 
+import { PasswordInput } from "@/components/ui/password-input";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -99,7 +100,7 @@ export function InviteUserForm() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="inviteuserform-f3">{lang === "es" ? "Contraseña temporal *" : "Temporary password *"}</Label>
-            <Input id="inviteuserform-f3" type="password" placeholder={lang === "es" ? "Mínimo 8 caracteres" : "At least 8 characters"} {...register("password")} />
+            <PasswordInput id="inviteuserform-f3" placeholder={lang === "es" ? "Mínimo 8 caracteres" : "At least 8 characters"} {...register("password")} />
             {errors.password && <p className="text-xs text-red-500">{translateMessage(errors.password.message)}</p>}
           </div>
 

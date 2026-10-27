@@ -1,5 +1,6 @@
 "use client";
 
+import { PasswordInput } from "@/components/ui/password-input";
 import { useState, useEffect, useRef, useTransition } from "react";
 import {
   Bell, LogOut, MessageSquare, FileText, Sun, Moon, Globe,
@@ -694,9 +695,8 @@ export function TopBar({ title, onMenuClick }: TopBarProps) {
           <div className="space-y-3 py-2">
             <div className="space-y-1.5">
               <Label htmlFor="pwd-current">{t.currentPassword}</Label>
-              <Input
+              <PasswordInput
                 id="pwd-current"
-                type="password"
                 value={pwdForm.current}
                 onChange={(e) => setPwdForm((p) => ({ ...p, current: e.target.value }))}
                 autoComplete="current-password"
@@ -704,9 +704,8 @@ export function TopBar({ title, onMenuClick }: TopBarProps) {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="pwd-new">{t.newPassword}</Label>
-              <Input
+              <PasswordInput
                 id="pwd-new"
-                type="password"
                 value={pwdForm.next}
                 onChange={(e) => setPwdForm((p) => ({ ...p, next: e.target.value }))}
                 autoComplete="new-password"
@@ -714,9 +713,8 @@ export function TopBar({ title, onMenuClick }: TopBarProps) {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="pwd-confirm">{t.confirmPassword}</Label>
-              <Input
+              <PasswordInput
                 id="pwd-confirm"
-                type="password"
                 value={pwdForm.confirm}
                 onChange={(e) => setPwdForm((p) => ({ ...p, confirm: e.target.value }))}
                 autoComplete="new-password"

@@ -1,5 +1,6 @@
 "use client";
 
+import { PasswordInput } from "@/components/ui/password-input";
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { Loader2, Pencil } from "lucide-react";
@@ -139,7 +140,7 @@ export function AdminEditUserDialog({ user, orgs = [], fixedOrgId, onSaved }: { 
             )}
             <div className="space-y-2">
               <Label htmlFor={`eu-pass-${user.id}`}>{es ? "Nueva contraseña (opcional)" : "New password (optional)"}</Label>
-              <Input id={`eu-pass-${user.id}`} type="password" autoComplete="new-password" placeholder={es ? "Déjala vacía para no cambiarla" : "Leave empty to keep it"} value={password} onChange={(e) => setPassword(e.target.value)} />
+              <PasswordInput id={`eu-pass-${user.id}`} autoComplete="new-password" placeholder={es ? "Déjala vacía para no cambiarla" : "Leave empty to keep it"} value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
             <p className="text-xs text-slate-500">
               {es ? "Si cambias el rol, la organización, el email o la contraseña, esa persona tendrá que volver a iniciar sesión." : "If you change the role, organization, email or password, that person will need to sign in again."}
