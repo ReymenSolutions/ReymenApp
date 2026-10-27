@@ -17,7 +17,8 @@ import {
 } from "@/lib/realty/rotation";
 import { LoyaltyFilters } from "@/components/loyalty/LoyaltyFilters";
 import { Empty, Kpi, SectionCard } from "@/components/realty/RealtyBits";
-import { SegmentTable, SpeedBadge, type SegmentLine } from "@/components/realty/RotationBits";
+import { SpeedBadge, type SegmentLine } from "@/components/realty/RotationBits";
+import { SegmentExplorer } from "@/components/realty/SegmentExplorer";
 
 export default async function RotationPage({ searchParams }: { searchParams: Promise<PeriodParams> }) {
   const ctx = await getRealtyContext();
@@ -43,7 +44,6 @@ export default async function RotationPage({ searchParams }: { searchParams: Pro
   const byBudget = segmentRotation(closed, open, (c) => budgetKey(c.operation, c.price), (o) => budgetKey(o.operation, o.price));
 
   const R2 = R as unknown as Record<string, string>;
-  const heads = { segment: R.rotColSegment, closed: R.rotColClosed, open: R.rotColOpen, median: R.rotColMedian, status: R.rotColStatus };
   const lines = (data: SegmentRow[], label: (k: string) => string): SegmentLine[] =>
     data.map((r) => ({ key: r.key, label: label(r.key), closed: r.closed, open: r.open, medianDays: r.medianDays, status: r.status, statusLabel: R2[`sp${r.status}`] }));
 
@@ -67,11 +67,16 @@ export default async function RotationPage({ searchParams }: { searchParams: Pro
         <Kpi label={R.rotSellThrough} value={sum.sellThroughPct === null ? "—" : `${sum.sellThroughPct}%`} hint={R.rotSellThroughHint} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <SegmentTable title={R.rotByZone} rows={lines(byZone, (k) => zoneName.get(k) ?? "—")} heads={heads} empty={R.emptyList} />
-        <SegmentTable title={R.rotByType} rows={lines(byType, (k) => enumLabel(R, "type", k))} heads={heads} empty={R.emptyList} />
-      </div>
-      <SegmentTable title={R.rotByBudget} rows={lines(byBudget, budgetLabel)} heads={heads} empty={R.emptyList} />
+      <SegmentExplorer
+        title={R.rotTitle}
+        heads={{ closed: R.rotColClosed, open: R.rotColOpen, median: R.rotColMedian, status: R.rotColStatus }}
+        empty={R.emptyList}
+        groups={[
+          { key: "zone", label: R.rotGroupZone, segmentHead: R.zone, rows: lines(byZone, (k) => zoneName.get(k) ?? "—") },
+          { key: "type", label: R.rotGroupType, segmentHead: R.type, rows: lines(byType, (k) => enumLabel(R, "type", k)) },
+          { key: "price", label: R.rotGroupPrice, segmentHead: R.rotColPriceRange, rows: lines(byBudget, budgetLabel) },
+        ]}
+      />
 
       <SectionCard title={R.rotFastSlowTitle}>
         {!cmp.enough ? (
