@@ -152,7 +152,7 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status, c
             <tbody className="divide-y divide-slate-100 [&_td]:align-middle">
               {leads.map((lead) => (
                 <tr key={lead.id} className="group motion-micro transition-colors hover:bg-slate-50 focus-within:bg-slate-50">
-                  <td className="sticky left-0 z-10 bg-white px-4 py-3 group-hover:bg-slate-50">
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-50 text-xs font-semibold text-brand-700">
                         {lead.name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?"}
