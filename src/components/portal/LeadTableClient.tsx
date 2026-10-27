@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { Search, X } from "lucide-react";
+import { MessageCircle, Phone, Search, X } from "lucide-react";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { LeadScoreBadge } from "@/components/shared/LeadScoreBadge";
 import { Badge } from "@/components/ui/badge";
-import { LeadActions } from "@/components/portal/LeadActions";
+import { whatsappDigits } from "@/components/portal/LeadHeaderCard";
 import { Pagination } from "@/components/shared/Pagination";
 import { formatDate } from "@/lib/utils";
 import { LeadColumnsGear, type ColumnField } from "@/components/portal/LeadColumnsGear";
@@ -34,6 +34,10 @@ interface LeadTableClientProps {
 // whatever page happens to be loaded client-side.
 export function LeadTableClient({ leads, total, page, pageSize, query, status, columns, customFields, canCreateField }: LeadTableClientProps) {
   const { t, lang } = usePreferences();
+  const es = lang !== "en";
+  const C = es
+    ? { stage: "Etapa:", showing: (a: number, b: number) => `Mostrando ${a} de ${b} contactos`, open: "Ver", openHint: "Haz clic en un contacto para ver su resumen.", call: "Llamar", whatsapp: "WhatsApp", actions: "Acciones" }
+    : { stage: "Stage:", showing: (a: number, b: number) => `Showing ${a} of ${b} contacts`, open: "View", openHint: "Click a contact to see its summary.", call: "Call", whatsapp: "WhatsApp", actions: "Actions" };
   const show = (c: LeadColumnPrefs["hidden"][number]) => !columns.hidden.includes(c);
   const shownFields = columns.custom.map((k) => customFields.find((f) => f.key === k)).filter((f): f is (typeof customFields)[number] => !!f);
   const router = useRouter();
@@ -63,6 +67,11 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status, c
     startTransition(() => {
       router.push(`${pathname}${params.toString() ? `?${params.toString()}` : ""}`);
     });
+  }
+
+  function openPanel(e: React.MouseEvent<HTMLElement>, id: string) {
+    openerRef.current = e.currentTarget;
+    setPanelLeadId(id);
   }
 
   const statusOptions: { value: LeadStatus | "ALL"; label: string }[] = [
@@ -98,6 +107,7 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status, c
           )}
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-medium text-slate-500">{C.stage}</span>
           {statusOptions.map((opt) => (
             <button
               key={opt.value}
@@ -118,12 +128,16 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status, c
         </div>
       </div>
 
+      <p className="mb-3 text-xs text-slate-500">
+        {C.showing(leads.length, total)} · {C.openHint}
+      </p>
+
       {leads.length === 0 ? (
         <div className="rounded-lg border border-dashed border-slate-200 py-10 text-center">
           <p className="text-sm text-slate-400">{t.noLeadsFiltered}</p>
         </div>
       ) : (
-        <div className={`overflow-x-auto rounded-card border border-slate-200 bg-white shadow-card motion-micro transition-opacity ${isFiltering ? "opacity-60" : ""}`} aria-busy={isFiltering}>
+        <div className={`hidden overflow-x-auto rounded-card md:block border border-slate-200 bg-white shadow-card motion-micro transition-opacity ${isFiltering ? "opacity-60" : ""}`} aria-busy={isFiltering}>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
@@ -136,7 +150,7 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status, c
                 {shownFields.map((f) => (
                   <th key={f.key} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{f.label}</th>
                 ))}
-                <th className="px-4 py-3" />
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">{C.actions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -192,12 +206,65 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status, c
                     </td>
                   ))}
                   <td className="px-4 py-3">
-                    <LeadActions leadId={lead.id} currentStatus={lead.status} />
+                    <div className="flex items-center justify-end gap-1.5">
+                      {lead.phone && (
+                        <a href={`tel:${lead.phone}`} title={`${C.call} ${lead.phone}`} aria-label={`${C.call} ${lead.name}`} className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50 hover:text-slate-800">
+                          <Phone className="h-3.5 w-3.5" />
+                        </a>
+                      )}
+                      {whatsappDigits(lead.phone) && (
+                        <a href={`https://wa.me/${whatsappDigits(lead.phone)}`} target="_blank" rel="noopener noreferrer" title={C.whatsapp} aria-label={`${C.whatsapp} ${lead.name}`} className="rounded-md border border-slate-200 p-1.5 text-emerald-600 hover:bg-emerald-50">
+                          <MessageCircle className="h-3.5 w-3.5" />
+                        </a>
+                      )}
+                      <Link href={`/portal/leads/${lead.id}`} className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">
+                        {C.open}
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {leads.length > 0 && (
+        <ul className={`space-y-2 md:hidden ${isFiltering ? "opacity-60" : ""}`}>
+          {leads.map((lead) => (
+            <li key={lead.id} className="rounded-card border border-slate-200 bg-white p-3 shadow-card">
+              <button type="button" onClick={(e) => openPanel(e, lead.id)} className="block w-full text-left">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-medium text-slate-900">{lead.name}</span>
+                  <StatusBadge status={lead.status} />
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  {[lead.phone, lead.email].filter(Boolean).join(" · ") || "—"}
+                </p>
+                <p className="mt-0.5 text-xs text-slate-400">
+                  {lead.source ?? "manual"} · {formatDate(lead.createdAt, lang)}
+                </p>
+              </button>
+              <div className="mt-2 flex items-center gap-2 border-t border-slate-100 pt-2">
+                {lead.phone && (
+                  <a href={`tel:${lead.phone}`} className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700">
+                    <Phone className="h-3.5 w-3.5" /> {C.call}
+                  </a>
+                )}
+                {whatsappDigits(lead.phone) && (
+                  <a href={`https://wa.me/${whatsappDigits(lead.phone)}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-emerald-700">
+                    <MessageCircle className="h-3.5 w-3.5" /> {C.whatsapp}
+                  </a>
+                )}
+                <Link href={`/portal/leads/${lead.id}`} className="ml-auto text-xs font-medium text-brand-700 hover:underline">
+                  {C.open} →
+                </Link>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {leads.length > 0 && (
+        <div className="mt-3 rounded-card border border-slate-200 bg-white shadow-card">
           <Pagination
             page={page}
             pageSize={pageSize}

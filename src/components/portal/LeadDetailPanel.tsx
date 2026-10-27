@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { ArrowUpRight, Loader2, Mail, Phone, RefreshCw } from "lucide-react";
+import { ArrowUpRight, Loader2, Mail, MessageCircle, Phone, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { LeadTagsEditor } from "@/components/portal/LeadTagsEditor";
 import { LeadTimeline } from "@/components/portal/LeadTimeline";
 import { LeadAgentActions } from "@/components/portal/LeadAgentActions";
 import { LeadSearchProfiles } from "@/components/realty/LeadSearchProfiles";
+import { whatsappDigits } from "@/components/portal/LeadHeaderCard";
 import { usePreferences } from "@/context/preferences";
 import { getLeadPanel, type LeadPanelData } from "@/actions/lead-panel";
 import { createNote } from "@/actions/notes";
@@ -31,7 +32,7 @@ const COPY = {
     retry: "Reintentar",
     contact: "Contacto",
     status: "Estado",
-    source: "Fuente",
+    source: "Origen",
     since: "Desde",
     tags: "Etiquetas",
     opportunities: "Oportunidades",
@@ -48,7 +49,15 @@ const COPY = {
     statusSaved: "Estado actualizado",
     close: "Cerrar",
     stage: "Etapa",
-    doNotContact: "No contactar",
+    doNotContact: "No contactar: no recibirá mensajes ni seguimientos automáticos.",
+    stageLabel: "Etapa del contacto",
+    whatsapp: "Escribir por WhatsApp",
+    oppHint: "Ventas o servicios en curso con esta persona.",
+    tagsHint: "Palabras para encontrarlo y agruparlo después.",
+    noteTitle: "Agregar una nota",
+    noteHint: "Solo tu equipo la ve.",
+    historyTitle: "Historial",
+    historyHint: "Lo que ha pasado con este contacto, lo más reciente primero.",
   },
   en: {
     description: "Contact details",
@@ -74,7 +83,15 @@ const COPY = {
     statusSaved: "Status updated",
     close: "Close",
     stage: "Stage",
-    doNotContact: "Do not contact",
+    doNotContact: "Do not contact: they won't receive automatic messages or follow-ups.",
+    stageLabel: "Contact stage",
+    whatsapp: "Message on WhatsApp",
+    oppHint: "Sales or services in progress with this person.",
+    tagsHint: "Words to find and group them later.",
+    noteTitle: "Add a note",
+    noteHint: "Only your team can see it.",
+    historyTitle: "History",
+    historyHint: "What has happened with this contact, newest first.",
   },
 };
 
@@ -265,7 +282,7 @@ function PanelContent({ data, openedAt, onReload }: { data: LeadPanelData; opene
             <SheetDescription className="mt-0.5">{t.description}</SheetDescription>
           </div>
         </div>
-        <Link href={`/portal/leads/${lead.id}`} className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline">
+        <Link href={`/portal/leads/${lead.id}`} className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-slate-50">
           {t.open} <ArrowUpRight className="h-3 w-3" />
         </Link>
       </header>
@@ -273,10 +290,10 @@ function PanelContent({ data, openedAt, onReload }: { data: LeadPanelData; opene
       <div className="flex-1 space-y-6 overflow-y-auto p-5">
         <section aria-label={t.contact} className="space-y-2.5 text-sm">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-slate-500">{t.status}</span>
+            <span className="text-slate-500">{t.stageLabel}</span>
             {data.canUpdateStatus ? (
               <Select value={status} onValueChange={(v) => changeStatus(v as LeadStatus)}>
-                <SelectTrigger className="h-8 w-40 text-xs" aria-label={t.status}>
+                <SelectTrigger className="h-8 w-40 text-xs" aria-label={t.stageLabel}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -301,6 +318,11 @@ function PanelContent({ data, openedAt, onReload }: { data: LeadPanelData; opene
               <Phone className="h-4 w-4 text-slate-400" /> {lead.phone}
             </a>
           )}
+          {whatsappDigits(lead.phone) && (
+            <a href={`https://wa.me/${whatsappDigits(lead.phone)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-slate-700 hover:text-brand-700">
+              <MessageCircle className="h-4 w-4 text-emerald-600" /> {t.whatsapp}
+            </a>
+          )}
           <div className="flex items-center justify-between text-xs text-slate-500">
             <span>
               {t.source}: <span className="font-medium text-slate-700">{lead.source ?? "manual"}</span>
@@ -312,16 +334,11 @@ function PanelContent({ data, openedAt, onReload }: { data: LeadPanelData; opene
           {lead.doNotContact && <p className="rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">{t.doNotContact}</p>}
         </section>
 
-        <section aria-label={t.tags}>
-          <LeadTagsEditor leadId={lead.id} initialTags={lead.tags} />
-        </section>
-
-        {data.realty && <LeadSearchProfiles views={data.realty.views} suggestions={data.realty.suggestions} leadId={lead.id} canOperate={data.realty.canOperate} lang={lang === "en" ? "en" : "es"} compact />}
-
         <LeadAgentActions actions={data.aiActions} canManage={data.canManageOpps} onChanged={onReload} />
 
         <section aria-label={t.opportunities} className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t.opportunities}</h3>
+          <p className="text-xs text-slate-500">{t.oppHint}</p>
           {opps.length === 0 ? (
             <p className="text-xs text-slate-400">{t.noOpps}</p>
           ) : (
@@ -358,8 +375,17 @@ function PanelContent({ data, openedAt, onReload }: { data: LeadPanelData; opene
           )}
         </section>
 
+        {data.realty && <LeadSearchProfiles views={data.realty.views} suggestions={data.realty.suggestions} leadId={lead.id} canOperate={data.realty.canOperate} lang={lang === "en" ? "en" : "es"} compact />}
+
+        <section aria-label={t.tags} className="space-y-1.5">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t.tags}</h3>
+          <p className="text-xs text-slate-500">{t.tagsHint}</p>
+          <LeadTagsEditor leadId={lead.id} initialTags={lead.tags} />
+        </section>
+
         <section aria-label={t.activity} className="space-y-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t.activity}</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t.noteTitle}</h3>
+          <p className="text-xs text-slate-500">{t.noteHint}</p>
           <div className="space-y-2">
             <Textarea
               ref={noteRef}
@@ -380,6 +406,8 @@ function PanelContent({ data, openedAt, onReload }: { data: LeadPanelData; opene
               </Button>
             </div>
           </div>
+          <h3 className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{t.historyTitle}</h3>
+          <p className="text-xs text-slate-500">{t.historyHint}</p>
           <LeadTimeline events={events} hasMore={data.timeline.hasMore} moreHref={`/portal/leads/${lead.id}`} lang={lang === "en" ? "en" : "es"} animateAfter={openedAt} />
         </section>
       </div>

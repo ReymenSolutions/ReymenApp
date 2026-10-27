@@ -64,7 +64,8 @@ export function LandingPrefs({ labels }: { labels: { lang: string; toDark: strin
     <div className="flex items-center gap-2">
       <div role="group" aria-label={labels.lang} className="flex overflow-hidden rounded-full border border-white/25 text-xs font-semibold">
         {(["es", "en"] as const).map((l) => (
-          <button key={l} type="button" onClick={() => pick(l)} aria-pressed={lang === l} className={`px-3 py-1.5 uppercase transition-colors ${lang === l ? "bg-white text-[#031738]" : "text-white/80 hover:bg-white/10"}`}>
+          <button key={l} type="button" onClick={() => pick(l)} aria-pressed={lang === l} // Colores en línea: el modo oscuro global reasigna las clases text-*/bg-white y dejaba la opción sin seleccionar ilegible.
+            style={lang === l ? { backgroundColor: "#ffffff", color: "#031738" } : { color: "rgba(255,255,255,0.88)" }} className={`px-3 py-1.5 uppercase transition-colors ${lang === l ? "" : "hover:bg-white/10"}`}>
             {l}
           </button>
         ))}
