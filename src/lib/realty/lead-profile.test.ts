@@ -59,7 +59,8 @@ describe("getLeadSearchViews", () => {
 
   it("respeta el idioma de las etiquetas", async () => {
     const [active] = (await getLeadSearchViews(withModule.id, leadId, "en"))!;
-    expect(active.operation).toMatch(/sale|buy/i);
+    // Es lo que BUSCA la persona: «Buy», no «Sale» (la operación de una propiedad).
+    expect(active.operation).toBe("Buy");
     expect(active.type).toMatch(/house/i);
   });
 
