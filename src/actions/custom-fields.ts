@@ -110,6 +110,38 @@ export async function setCustomFieldActive(fieldId: string, isActive: boolean) {
  * Guarda los valores de los campos personalizados de un contacto. Todo o nada:
  * si algún valor no corresponde al tipo del campo no se guarda nada y se dice cuál.
  */
+/** Cuántos contactos tienen un dato guardado en el campo (para avisarlo antes de eliminarlo). */
+export async function getCustomFieldUsage(fieldId: string) {
+  const session = await requireManager();
+  const orgId = session.user.organizationId!;
+  const field = await prisma.customField.findFirst({ where: { id: fieldId, organizationId: orgId }, select: { key: true } });
+  if (!field) throw new UserError("Campo no encontrado");
+  const [row] = await prisma.$queryRaw<{ n: bigint }[]>`SELECT count(*)::bigint AS n FROM "Lead" WHERE "organizationId" = ${orgId} AND "deletedAt" IS NULL AND jsonb_exists("customFields"::jsonb, ${field.key})`;
+  return { contacts: Number(row?.n ?? 0) };
+}
+
+/**
+ * Elimina el campo para siempre: borra su definición y el dato que cada contacto tenía en él. No se puede deshacer
+ * (para solo ocultarlo existe «Archivar», que conserva los datos). La pantalla pide confirmación antes de llamar aquí.
+ */
+export async function deleteCustomField(fieldId: string) {
+  const session = await requireManager();
+  const orgId = session.user.organizationId!;
+  const field = await prisma.customField.findFirst({ where: { id: fieldId, organizationId: orgId } });
+  if (!field) throw new UserError("Campo no encontrado");
+
+  const cleared = await prisma.$transaction(async (tx) => {
+    const n = await tx.$executeRaw`UPDATE "Lead" SET "customFields" = "customFields"::jsonb - ${field.key} WHERE "organizationId" = ${orgId} AND jsonb_exists("customFields"::jsonb, ${field.key})`;
+    await tx.customField.delete({ where: { id: field.id } });
+    return n;
+  });
+
+  await logAudit({ organizationId: orgId, userId: session.user.id, action: "custom_field.delete", resource: "CustomField", resourceId: field.id, metadata: { label: field.label, type: field.type, contactsCleared: cleared } });
+  revalidatePath("/portal/settings");
+  revalidatePath("/portal/leads");
+  return { success: true, contactsCleared: cleared };
+}
+
 export async function updateLeadCustomFields(leadId: string, values: Record<string, unknown>) {
   const session = await auth();
   if (!session?.user.organizationId) throw new UserError("No autorizado");

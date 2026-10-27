@@ -84,15 +84,18 @@ export async function changePassword(data: { currentPassword: string; newPasswor
 export async function updatePreferences(data: { theme?: string; language?: string }) {
   const session = await auth();
   if (!session?.user.id) throw new UserError("No autorizado");
+  // Suplantando a un cliente, session.user es el cliente: la preferencia es de quien navega (el admin), no se escribe
+  // en la cuenta de la persona suplantada.
+  const ownerId = session.user.impersonating?.adminId ?? session.user.id;
 
   await prisma.user.update({
-    where: { id: session.user.id },
+    where: { id: ownerId },
     data: {
       ...(data.theme !== undefined && { theme: data.theme }),
       ...(data.language !== undefined && { language: data.language }),
     },
   });
-  invalidateSessionCache(session.user.id);
+  invalidateSessionCache(ownerId);
 
   return { success: true };
 }
