@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { login } from './actions'
 import { InviteFragmentHandler } from './InviteFragmentHandler'
+import { PasswordField } from '../../components/PasswordField'
 
 const ERROR_MESSAGES: Record<string, string> = {
   invalid_credentials: 'Correo o contraseña incorrectos.',
@@ -55,14 +56,7 @@ export default async function LoginPage({
           <label htmlFor="password" className="text-sm font-medium">
             Contraseña
           </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            autoComplete="current-password"
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
-          />
+          <PasswordField id="password" name="password" required autoComplete="current-password" />
         </div>
 
         <button

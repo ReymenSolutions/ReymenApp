@@ -1,5 +1,6 @@
 "use client";
 
+import { PasswordInput } from "@/components/ui/password-input";
 import Image from "next/image";
 import { useState } from "react";
 import Link from "next/link";
@@ -166,9 +167,8 @@ export default function LoginPage() {
                 ¿Olvidaste tu contraseña?
               </Link>
             </div>
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
               placeholder="••••••••"
               {...register("password")}
             />

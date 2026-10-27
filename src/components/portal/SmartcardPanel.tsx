@@ -1,5 +1,6 @@
 "use client";
 
+import { PasswordInput } from "@/components/ui/password-input";
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Loader2, CreditCard, Users, Activity, Pencil, QrCode, ExternalLink } from "lucide-react";
@@ -626,9 +627,8 @@ export function SmartcardPanel({
                     <label htmlFor="smartcard-invite-password" className="text-xs font-medium text-slate-600">
                       {lang === "es" ? "Contraseña temporal" : "Temporary password"}
                     </label>
-                    <input
+                    <PasswordInput
                       id="smartcard-invite-password"
-                      type="password"
                       required
                       minLength={8}
                       value={password}
