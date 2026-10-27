@@ -2,7 +2,7 @@
 // organización de la sesión. Los números salen de conteos en SQL y de las
 // reglas puras (match.ts, market.ts, scores.ts, campaigns.ts); nada de IA.
 
-import type { RealtyOperation, RealtyPropertyStatus, RealtyPropertyType } from "@prisma/client";
+import type { Prisma, RealtyOperation, RealtyPropertyStatus, RealtyPropertyType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { OPEN_STATUSES } from "./constants";
 import { GOOD_MATCH, HIGH_MATCH, computeMatch, matchMissReasons, type MatchMissReason } from "./match";
@@ -279,18 +279,20 @@ export interface ProspectFilters {
   status?: "active" | "inactive" | "all";
 }
 
-export async function listProspects(organizationId: string, f: ProspectFilters, take = 100) {
+export async function listProspects(organizationId: string, f: ProspectFilters, paging: { page: number; pageSize: number } = { page: 1, pageSize: 100 }) {
   const q = f.q?.trim();
-  const rows = await prisma.realtyLeadProfile.findMany({
-    where: {
+  const where: Prisma.RealtyLeadProfileWhereInput = {
       organizationId,
       ...(f.status === "all" ? {} : { active: f.status !== "inactive" }),
       ...(f.operation ? { operation: f.operation } : {}),
       ...(f.zoneId ? { zones: { some: { zoneId: f.zoneId } } } : {}),
       ...(q ? { lead: { OR: [{ name: { contains: q, mode: "insensitive" } }, { phone: { contains: q } }, { email: { contains: q, mode: "insensitive" } }] } } : {}),
-    },
-    orderBy: { createdAt: "desc" },
-    take,
+  };
+  const [total, rows] = await Promise.all([prisma.realtyLeadProfile.count({ where }), prisma.realtyLeadProfile.findMany({
+    where,
+    orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+    skip: (paging.page - 1) * paging.pageSize,
+    take: paging.pageSize,
     select: {
       id: true,
       operation: true,
@@ -308,8 +310,8 @@ export async function listProspects(organizationId: string, f: ProspectFilters, 
       matches: { orderBy: { totalScore: "desc" }, take: 1, select: { totalScore: true } },
       _count: { select: { visits: true } },
     },
-  });
-  return rows.map((r) => ({ ...r, minBudget: num(r.minBudget), maxBudget: Number(r.maxBudget), bestMatch: r.matches[0]?.totalScore ?? null }));
+  })]);
+  return { total, rows: rows.map((r) => ({ ...r, minBudget: num(r.minBudget), maxBudget: Number(r.maxBudget), bestMatch: r.matches[0]?.totalScore ?? null })) };
 }
 
 export async function getProspect(organizationId: string, id: string) {
@@ -394,19 +396,21 @@ export interface PropertyFilters {
   type?: RealtyPropertyType;
 }
 
-export async function listProperties(organizationId: string, f: PropertyFilters, take = 120) {
+export async function listProperties(organizationId: string, f: PropertyFilters, paging: { page: number; pageSize: number } = { page: 1, pageSize: 120 }) {
   const q = f.q?.trim();
-  const rows = await prisma.realtyProperty.findMany({
-    where: {
+  const where: Prisma.RealtyPropertyWhereInput = {
       organizationId,
       ...(f.status === "open" ? { status: { in: OPEN_STATUSES } } : f.status ? { status: f.status } : {}),
       ...(f.operation ? { operation: f.operation } : {}),
       ...(f.zoneId ? { zoneId: f.zoneId } : {}),
       ...(f.type ? { propertyType: f.type } : {}),
       ...(q ? { OR: [{ title: { contains: q, mode: "insensitive" } }, { neighborhood: { contains: q, mode: "insensitive" } }] } : {}),
-    },
-    orderBy: [{ status: "asc" }, { availableSince: "desc" }],
-    take,
+  };
+  const [total, rows] = await Promise.all([prisma.realtyProperty.count({ where }), prisma.realtyProperty.findMany({
+    where,
+    orderBy: [{ status: "asc" }, { availableSince: "desc" }, { id: "asc" }],
+    skip: (paging.page - 1) * paging.pageSize,
+    take: paging.pageSize,
     select: {
       id: true,
       slug: true,
@@ -429,8 +433,8 @@ export async function listProperties(organizationId: string, f: PropertyFilters,
       media: { orderBy: { sortOrder: "asc" }, take: 1, select: { id: true } },
       _count: { select: { matches: { where: { totalScore: { gte: GOOD_MATCH } } }, visits: true } },
     },
-  });
-  return rows.map((r) => ({ ...r, price: Number(r.price), coverId: r.media[0]?.id ?? null }));
+  })]);
+  return { total, rows: rows.map((r) => ({ ...r, price: Number(r.price), coverId: r.media[0]?.id ?? null })) };
 }
 
 export async function getProperty(organizationId: string, id: string, now: Date = new Date()) {

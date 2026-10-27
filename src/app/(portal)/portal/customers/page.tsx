@@ -6,6 +6,8 @@ import { auth } from "@/lib/auth";
 import { hasModule, requireModule } from "@/lib/modules";
 import { prisma } from "@/lib/prisma";
 import { can } from "@/lib/permissions";
+import { parsePaging } from "@/lib/paging";
+import { UrlPagination } from "@/components/shared/Pagination";
 import { getServerLang } from "@/lib/i18n-server";
 import { phoneKey } from "@/lib/phone";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -19,17 +21,16 @@ import { formatDate, formatMoney } from "@/lib/utils";
 import { Contact, DollarSign, Repeat, ShieldCheck } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 
-const PAGE_SIZE = 50;
 
 /** Clientes del POS o Lealtad, enlazados al CRM por teléfono. */
-export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
+export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string; ps?: string }> }) {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
   const orgId = session.user.organizationId;
   await requireModule(orgId, "FOOD_OPS");
 
-  const { q, page: pageParam } = await searchParams;
-  const page = Math.max(1, Number(pageParam) || 1);
+  const { q, page: pageParam, ps: psParam } = await searchParams;
+  const { page, pageSize } = parsePaging({ page: pageParam, ps: psParam }, 25);
   const query = q?.trim() ?? "";
   const es = (await getServerLang()) === "es";
   const crm = await hasModule(orgId, "CRM");
@@ -49,8 +50,8 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
     prisma.customer.findMany({
       where,
       orderBy: [{ lastVisitAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
       include: { lead: { select: { id: true, name: true, deletedAt: true } }, loyaltyMembers: {
         where: { organizationId: orgId, ...(loyalty ? {} : { id: { in: [] } }) },
         orderBy: [{ isSelected: "desc" }, { createdAt: "asc" }],
@@ -62,8 +63,6 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
     prisma.customer.count({ where: { organizationId: orgId, consentAccepted: true } }),
     prisma.customer.count({ where: { organizationId: orgId, visitCount: { gte: 2 } } }),
   ]);
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const href = (p: number) => `/portal/customers?${new URLSearchParams({ ...(query ? { q: query } : {}), ...(p > 1 ? { page: String(p) } : {}) }).toString()}`;
 
   return (
     <div>
@@ -158,15 +157,9 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         </ul>
       )}
 
-      {pages > 1 && (
-        <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
-          <span>{es ? `Página ${page} de ${pages}` : `Page ${page} of ${pages}`}</span>
-          <span className="flex gap-3">
-            {page > 1 && <Link href={href(page - 1)} className="font-medium text-brand-700 hover:underline">{es ? "← Anterior" : "← Previous"}</Link>}
-            {page < pages && <Link href={href(page + 1)} className="font-medium text-brand-700 hover:underline">{es ? "Siguiente →" : "Next →"}</Link>}
-          </span>
-        </div>
-      )}
+      <div className="mt-4 rounded-card border border-slate-200 bg-white shadow-card">
+        <UrlPagination page={page} pageSize={pageSize} total={total} defaultPageSize={25} className="border-t-0" />
+      </div>
     </div>
   );
 }

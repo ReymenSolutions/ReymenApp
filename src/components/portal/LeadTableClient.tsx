@@ -235,6 +235,7 @@ export function LeadTableClient({ leads, total, page, pageSize, query, status, c
             pageSize={pageSize}
             total={total}
             onPageChange={(p) => updateParams({ page: p > 1 ? String(p) : undefined })}
+            onPageSizeChange={(size) => updateParams({ ps: size === 50 ? undefined : String(size), page: undefined })}
           />
         </div>
       )}

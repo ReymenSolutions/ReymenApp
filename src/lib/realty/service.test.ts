@@ -191,8 +191,8 @@ describe("aislamiento entre organizaciones", () => {
   it("las lecturas de B no ven nada de A", async () => {
     expect(await getProperty(B.org.id, propertyId)).toBeNull();
     expect(await getProspect(B.org.id, profileId)).toBeNull();
-    expect((await listProspects(B.org.id, { status: "all" })).some((p) => p.id === profileId)).toBe(false);
-    expect((await listProperties(B.org.id, {})).some((p) => p.id === propertyId)).toBe(false);
+    expect((await listProspects(B.org.id, { status: "all" })).rows.some((p) => p.id === profileId)).toBe(false);
+    expect((await listProperties(B.org.id, {})).rows.some((p) => p.id === propertyId)).toBe(false);
     const snap = await loadSnapshot(B.org.id);
     expect(snap.properties.some((p) => p.id === propertyId)).toBe(false);
     expect(snap.profiles.some((p) => p.id === profileId)).toBe(false);
