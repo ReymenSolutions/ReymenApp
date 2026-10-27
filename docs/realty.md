@@ -200,6 +200,21 @@ Cuando la organización tiene Real Estate, el Agente IA del pipeline (`src/lib/a
 - **Nunca se crea un perfil solo.** No se propone si el contacto ya tiene un perfil activo o una propuesta pendiente, y tras descartar no vuelve a proponer durante 30 días.
 - Si alguien crea el perfil a mano, la propuesta pendiente de ese contacto queda resuelta.
 
+## Avisos (campana del portal y correo)
+
+Sin tablas nuevas: la campana lee los datos mismos (`src/lib/realty/bell.ts`) y el aviso desaparece cuando se atiende.
+Solo lo ven quienes pueden operar Real Estate y solo si la organización tiene el módulo.
+
+| Aviso | Cuándo aparece | A quién |
+| --- | --- | --- |
+| **Nuevo interesado desde la landing** | Pidió informes en los últimos 3 días | Al asesor de la propiedad; sin asesor, a todos |
+| **La IA propone lo que busca un contacto** | Hay una propuesta de perfil pendiente | Al asesor del contacto; sin asesor, a todos |
+| **Demanda sin inventario** | Una zona con ≥ 3 prospectos activos y ninguna propiedad que les encaje (match < 65) | A todos los que operan Real Estate; se quita sola al cubrirse |
+
+Además hay **correo**: al asesor de la propiedad (o a dueño/admin/gerente si no tiene) cuando llega un informe de la landing, y
+al asesor del contacto (o a dueño/admin/gerente) cuando la IA propone un perfil. Un fallo del correo nunca rompe el alta ni
+el análisis. En la campana, lo de Real Estate va antes que lo demás porque es sensible al tiempo.
+
 ## Rotación (`/portal/realty/rotation`)
 
 Responde «qué casas sí se mueven, cuáles no y por qué». Código puro en `src/lib/realty/rotation.ts`, insumos en `rotation-data.ts`.

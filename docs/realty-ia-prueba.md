@@ -41,7 +41,8 @@ Los casos 4, 5 y 8 son tan importantes como los demás: confirman que **calla cu
 1. Abre el contacto (CRM → Contactos) → «Lo que busca» (pestaña **Resumen** de la ficha, o el panel lateral).
    Debe aparecer la tarjeta morada **«La IA detectó lo que busca»** con las etiquetas, presupuesto, colonias y la frase de la conversación.
 2. Pulsa **Editar** para ver cómo quedaría en el formulario; **Aceptar** crea el perfil; **Descartar** lo guarda como descartado.
-3. Si no aparece nada en 15 minutos, revisa el punto 5.
+3. También te llega un **aviso en la campana** y un **correo** al asesor del contacto (o a dueño/admin/gerente si no tiene asesor).
+4. Si no aparece nada en 15 minutos, revisa el punto 5.
 
 ## 4. Qué revisar (y qué hacer si falla)
 
