@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ExternalLink, Pencil } from "lucide-react";
 import { getRealtyContext } from "@/lib/realty/context";
-import { getProspect, listAdvisors, listOpenPropertiesForSelect } from "@/lib/realty/queries";
+import { getMatchDiagnosis, getProspect, listAdvisors, listOpenPropertiesForSelect } from "@/lib/realty/queries";
+import type { MatchMissReason } from "@/lib/realty/match";
 import { enumLabel } from "@/lib/i18n-realty";
 import { dateTime, relativeDay, shortDate } from "@/lib/loyalty/format";
 import { budgetText, priceText } from "@/lib/realty/page-helpers";
@@ -17,6 +18,29 @@ export default async function ProspectDetailPage({ params }: { params: Promise<{
   const p = await getProspect(ctx.orgId, id);
   if (!p) notFound();
   const [properties, advisors] = ctx.canOperate ? await Promise.all([listOpenPropertiesForSelect(ctx.orgId), listAdvisors(ctx.orgId)]) : [[], []];
+  const diagnosis = p.matches.length === 0 ? await getMatchDiagnosis(ctx.orgId, p.id) : [];
+  const reasonText = (r: MatchMissReason): string => {
+    switch (r.code) {
+      case "operation":
+        return R.missOperation(enumLabel(R, "op", r.has), enumLabel(R, "opBuy", r.wanted));
+      case "budget":
+        return R.missBudget(priceText(r.price, p.currency), priceText(r.maxBudget, p.currency));
+      case "type":
+        return R.missType(enumLabel(R, "type", r.has), enumLabel(R, "type", r.wanted));
+      case "typeNear":
+        return R.missTypeNear(enumLabel(R, "type", r.has), enumLabel(R, "type", r.wanted));
+      case "zone":
+        return R.missZone;
+      case "noZones":
+        return R.missNoZones;
+      case "rooms":
+        return R.missRooms;
+      case "area":
+        return R.missArea;
+      default:
+        return R.missLow;
+    }
+  };
   const name = p.lead?.name ?? R.prospect;
   const facts: [string, string][] = [
     [R.lookingFor, `${enumLabel(R, "type", p.propertyType)} · ${enumLabel(R, "opBuy", p.operation)}`],
@@ -26,7 +50,7 @@ export default async function ProspectDetailPage({ params }: { params: Promise<{
     [R.minBathrooms, p.minBathrooms?.toString() ?? "—"],
     [R.minArea, p.minArea ? `${p.minArea} m²` : "—"],
     [R.preferences, p.preferences.map((f) => enumLabel(R, "feat", f)).join(", ") || "—"],
-    [R.moveTimeline, p.moveTimeline ?? "—"],
+    [R.moveTimeline, !p.moveTimeline ? "—" : /^\d{4}-\d{2}-\d{2}$/.test(p.moveTimeline) ? shortDate(new Date(`${p.moveTimeline}T12:00:00`), lang) : p.moveTimeline],
     [R.financing, p.financingNeeded === null ? "—" : p.financingNeeded ? R.yes : R.no],
     [R.advisor, p.advisor?.name ?? "—"],
     [R.source, p.source ?? "—"],
@@ -72,7 +96,35 @@ export default async function ProspectDetailPage({ params }: { params: Promise<{
 
         <SectionCard title={R.matchesTitle} subtitle={R.matchesSubtitle} className="lg:col-span-2">
           {p.matches.length === 0 ? (
-            <Empty>{R.matchesEmpty}</Empty>
+            diagnosis.length === 0 ? (
+              <Empty>{R.matchesEmpty}</Empty>
+            ) : (
+              <div>
+                <p className="text-sm font-semibold text-slate-900">{R.whyNoMatchTitle}</p>
+                <p className="mb-3 text-xs text-slate-500">{R.whyNoMatchSubtitle}</p>
+                <ul className="space-y-3">
+                  {diagnosis.map((d) => (
+                    <li key={d.property.id} className="rounded-lg border border-slate-200 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <Link href={`/portal/realty/properties/${d.property.id}`} className="block truncate text-sm font-semibold text-slate-900 hover:underline">{d.property.title}</Link>
+                          <p className="text-xs text-slate-500">
+                            {d.property.zoneName} · {priceText(d.property.price, d.property.currency)}
+                            {d.visited && <span className="ml-2 rounded bg-[#F2F4F6] px-1.5 py-0.5 font-medium text-[#031738]">{R.visited}</span>}
+                          </p>
+                        </div>
+                        <ScorePill value={d.total} title={R.matchScore} />
+                      </div>
+                      <ul className="mt-2 list-disc space-y-0.5 pl-5 text-xs text-slate-600">
+                        {d.reasons.map((r, i) => (
+                          <li key={i}>{reasonText(r)}</li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
           ) : (
             <ul className="space-y-3">
               {p.matches.slice(0, 8).map((m) => (

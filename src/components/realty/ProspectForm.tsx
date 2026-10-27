@@ -45,6 +45,8 @@ export interface ProspectFormValues {
 }
 
 const n = (s: string) => (s.trim() === "" ? null : Number(s));
+/** "¿Cuándo se mudaría?" se guarda como fecha AAAA-MM-DD (antes era texto libre). */
+export const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function ProspectForm({
   initial,
@@ -108,6 +110,12 @@ export function ProspectForm({
     e.preventDefault();
     setSaving(true);
     try {
+      // Si eligió una colonia por CP pero no le dio "Agregar colonia", se agrega al guardar.
+      let zoneIds = v.zoneIds;
+      if (addr.colonia.trim().length >= 2 && zoneIds.length < 5) {
+        const z = await ensureRealtyColoniaZone({ colonia: addr.colonia, postalCode: addr.cp || null, municipality: addr.municipio || null, state: addr.estado || null });
+        if (!zoneIds.includes(z.id)) zoneIds = [...zoneIds, z.id];
+      }
       const res = await saveRealtyProspect({
         id: v.id,
         leadId: v.leadId,
@@ -125,7 +133,7 @@ export function ProspectForm({
         moveTimeline: v.moveTimeline || null,
         financingNeeded: v.financingNeeded === "" ? null : v.financingNeeded === "yes",
         preferences: v.preferences as never,
-        zoneIds: v.zoneIds,
+        zoneIds,
         branchId: v.branchId || null,
         advisorUserId: v.advisorUserId || null,
         active: v.active,
@@ -255,6 +263,7 @@ export function ProspectForm({
         <div className="mt-5">
           <Label>{R.zones}</Label>
           <p className="mb-2 text-xs text-slate-500">{R.zonesHint}</p>
+          {v.zoneIds.length === 0 && <p className="mb-2 rounded-md bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800">{R.zonesNone}</p>}
           <ol className="mb-2 space-y-1.5">
             {v.zoneIds.map((id, i) => (
               <li key={id} className="flex items-center gap-2 rounded-md border border-slate-200 bg-[#F2F4F6] px-2 py-1.5 text-sm">
@@ -266,6 +275,7 @@ export function ProspectForm({
               </li>
             ))}
           </ol>
+          {zones.some((z) => !v.zoneIds.includes(z.id)) && <p className="mb-1.5 text-xs text-slate-500">{R.zonesSuggested}</p>}
           <div className="flex flex-wrap gap-1.5">
             {zones
               .filter((z) => !v.zoneIds.includes(z.id))
@@ -312,7 +322,13 @@ export function ProspectForm({
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-1.5">
             <Label htmlFor="p-time">{R.moveTimeline}</Label>
-            <Input id="p-time" value={v.moveTimeline} onChange={(e) => set("moveTimeline", e.target.value)} maxLength={80} />
+            <Input
+              id="p-time"
+              type="date"
+              value={ISO_DATE.test(v.moveTimeline) ? v.moveTimeline : ""}
+              onChange={(e) => set("moveTimeline", e.target.value)}
+            />
+            {v.moveTimeline && !ISO_DATE.test(v.moveTimeline) && <p className="text-xs text-slate-500">{R.moveTimelineBefore(v.moveTimeline)}</p>}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="p-fin">{R.financing}</Label>

@@ -158,3 +158,29 @@ export const GOOD_MATCH = 65;
 export function fitsBudget(price: number, minBudget: number | null, maxBudget: number): boolean {
   return price <= maxBudget && (!minBudget || price >= minBudget * 0.7);
 }
+
+/** Por qué una propiedad no es buen match para el prospecto (lo que se le explica al asesor). */
+export type MatchMissReason =
+  | { code: "operation"; has: RealtyOperation; wanted: RealtyOperation }
+  | { code: "budget"; price: number; maxBudget: number }
+  | { code: "type"; has: RealtyPropertyType; wanted: RealtyPropertyType }
+  | { code: "typeNear"; has: RealtyPropertyType; wanted: RealtyPropertyType }
+  | { code: "zone" }
+  | { code: "noZones" }
+  | { code: "rooms" }
+  | { code: "area" }
+  | { code: "low" };
+
+export function matchMissReasons(profile: MatchProfile, property: MatchProperty, m: MatchBreakdown): MatchMissReason[] {
+  if (!m.eligible) return [{ code: "operation", has: property.operation, wanted: profile.operation }];
+  const out: MatchMissReason[] = [];
+  if (property.price > profile.maxBudget) out.push({ code: "budget", price: property.price, maxBudget: profile.maxBudget });
+  if (profile.propertyType && m.type === 0) out.push({ code: "type", has: property.propertyType, wanted: profile.propertyType });
+  else if (profile.propertyType && m.type < 100) out.push({ code: "typeNear", has: property.propertyType, wanted: profile.propertyType });
+  if (profile.zoneIds.length === 0) out.push({ code: "noZones" });
+  else if (m.zone === 0) out.push({ code: "zone" });
+  if (m.rooms < 100) out.push({ code: "rooms" });
+  if (m.area < 100) out.push({ code: "area" });
+  if (out.length === 0) out.push({ code: "low" });
+  return out;
+}

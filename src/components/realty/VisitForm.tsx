@@ -12,6 +12,7 @@ import { usePreferences } from "@/context/preferences";
 import { pickDict } from "@/lib/i18n-dict";
 import { enumLabel, realtyStrings } from "@/lib/i18n-realty";
 import { SELECT } from "./ProspectForm";
+import { SearchSelect } from "./SearchSelect";
 
 /** Agenda una visita: crea la cita del CRM y la liga a la propiedad. */
 export function VisitForm({
@@ -22,8 +23,8 @@ export function VisitForm({
   defaultProfileId,
   defaultAdvisorId,
 }: {
-  properties: { id: string; title: string }[];
-  prospects: { id: string; name: string }[];
+  properties: { id: string; title: string; hint?: string | null }[];
+  prospects: { id: string; name: string; hint?: string | null }[];
   advisors: { id: string; name: string | null; email: string }[];
   defaultPropertyId?: string;
   defaultProfileId?: string;
@@ -62,22 +63,29 @@ export function VisitForm({
       {!defaultPropertyId && (
         <div className="space-y-1.5">
           <Label htmlFor="v-prop">{R.property}</Label>
-          <select id="v-prop" className={SELECT} value={propertyId} onChange={(e) => setPropertyId(e.target.value)} required>
-            {properties.map((p) => (
-              <option key={p.id} value={p.id}>{p.title}</option>
-            ))}
-          </select>
+          <SearchSelect
+            id="v-prop"
+            value={propertyId}
+            onChange={setPropertyId}
+            options={properties.map((p) => ({ id: p.id, label: p.title, hint: p.hint }))}
+            placeholder={R.searchProperty}
+            emptyText={R.noResults}
+            required
+          />
         </div>
       )}
       {!defaultProfileId && (
         <div className="space-y-1.5">
           <Label htmlFor="v-prof">{R.prospect}</Label>
-          <select id="v-prof" className={SELECT} value={profileId} onChange={(e) => setProfileId(e.target.value)}>
-            <option value="">—</option>
-            {prospects.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
+          <SearchSelect
+            id="v-prof"
+            value={profileId}
+            onChange={setProfileId}
+            options={prospects.map((p) => ({ id: p.id, label: p.name, hint: p.hint }))}
+            placeholder={R.searchProspect}
+            emptyText={R.noResults}
+            allowEmpty
+          />
         </div>
       )}
       <div className="space-y-1.5">
