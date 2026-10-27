@@ -10,7 +10,7 @@ vi.mock("@/lib/email", () => ({ sendEmail: vi.fn().mockResolvedValue({ sent: tru
 const authMock = vi.fn();
 vi.mock("@/lib/auth", () => ({ auth: () => authMock() }));
 
-const { createCustomField, updateCustomField, setCustomFieldActive, updateLeadCustomFields } = await import("./custom-fields");
+const { createCustomField, updateCustomField, setCustomFieldActive, updateLeadCustomFields, deleteCustomField, getCustomFieldUsage } = await import("./custom-fields");
 const { mergeLeads } = await import("./leads");
 const { processLeadEvent } = await import("@/lib/webhook-processors");
 const { GET: exportLeads } = await import("@/app/api/portal/leads/export/route");
@@ -199,5 +199,46 @@ describe("custom fields", () => {
       await prisma.customField.deleteMany({ where: { organizationId: eOrg.id } });
       await cleanupOrg(eOrg.id);
     }
+  });
+
+  describe("eliminar campo", () => {
+    it("borra el campo y el dato en cada contacto (solo ese; otras claves y otras organizaciones quedan)", async () => {
+      as(owner, "OWNER");
+      const { fieldId, key } = await createCustomField({ label: "Campo para borrar", type: "TEXT" });
+      const { key: keepKey } = await createCustomField({ label: "Campo que se queda", type: "TEXT" });
+      const a = await prisma.lead.create({ data: { organizationId: org.id, name: "Con dato", customFields: { [key]: "x", [keepKey]: "y" } } });
+      const b = await prisma.lead.create({ data: { organizationId: org.id, name: "Sin dato", customFields: { [keepKey]: "z" } } });
+      const c = await prisma.lead.create({ data: { organizationId: other.id, name: "Otra org", customFields: { [key]: "ajeno" } } });
+
+      expect(await getCustomFieldUsage(fieldId)).toEqual({ contacts: 1 });
+      const res = await deleteCustomField(fieldId);
+      expect(res).toMatchObject({ success: true, contactsCleared: 1 });
+
+      expect(await prisma.customField.findUnique({ where: { id: fieldId } })).toBeNull();
+      expect((await prisma.lead.findUniqueOrThrow({ where: { id: a.id } })).customFields).toEqual({ [keepKey]: "y" });
+      expect((await prisma.lead.findUniqueOrThrow({ where: { id: b.id } })).customFields).toEqual({ [keepKey]: "z" });
+      expect((await prisma.lead.findUniqueOrThrow({ where: { id: c.id } })).customFields).toEqual({ [key]: "ajeno" });
+      const audit = await prisma.auditLog.findFirst({ where: { organizationId: org.id, action: "custom_field.delete", resourceId: fieldId } });
+      expect(audit?.metadata).toMatchObject({ label: "Campo para borrar", contactsCleared: 1 });
+    });
+
+    it("también elimina un campo archivado y permite reusar su nombre", async () => {
+      as(owner, "OWNER");
+      const { fieldId } = await createCustomField({ label: "Archivado y borrado", type: "BOOLEAN" });
+      await setCustomFieldActive(fieldId, false);
+      await deleteCustomField(fieldId);
+      await expect(createCustomField({ label: "Archivado y borrado", type: "TEXT" })).resolves.toMatchObject({ success: true });
+    });
+
+    it("solo quien administra la configuración, y solo campos de su organización", async () => {
+      as(owner, "OWNER");
+      const { fieldId } = await createCustomField({ label: "Solo del dueño", type: "TEXT" });
+      as(agent, "AGENT");
+      await expect(deleteCustomField(fieldId)).rejects.toThrow(/autorizado/i);
+      await expect(getCustomFieldUsage(fieldId)).rejects.toThrow(/autorizado/i);
+      as(otherOwner, "OWNER", other.id);
+      await expect(deleteCustomField(fieldId)).rejects.toThrow(/no encontrado/i);
+      expect(await prisma.customField.findUnique({ where: { id: fieldId } })).not.toBeNull();
+    });
   });
 });

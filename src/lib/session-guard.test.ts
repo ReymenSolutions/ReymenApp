@@ -52,4 +52,21 @@ describe("validateSession", () => {
   it("un usuario que ya no existe no entra", async () => {
     expect(await validateSession(sessionFor("no-existe", "OWNER", org.id))).toBeNull();
   });
+
+  // Preferencias al suplantar: son del admin que navega, no de la persona suplantada.
+  describe("suplantación", () => {
+    it("toma tema e idioma del admin real, no del token ni del cliente", async () => {
+      const admin = await createTestUser(null, "SUPER_ADMIN", "imp-admin");
+      await prisma.user.update({ where: { id: admin.id }, data: { theme: "dark", language: "en" } });
+      await prisma.user.update({ where: { id: user.id }, data: { theme: "light", language: "es" } });
+      const s = sessionFor(user.id, "OWNER", org.id);
+      s.user.theme = "light";
+      s.user.language = "es";
+      (s.user as unknown as { impersonating: unknown }).impersonating = { adminId: admin.id, adminName: null, adminEmail: admin.email };
+      const out = await validateSession(s);
+      expect(out?.user.theme).toBe("dark");
+      expect(out?.user.language).toBe("en");
+      await prisma.user.delete({ where: { id: admin.id } });
+    });
+  });
 });

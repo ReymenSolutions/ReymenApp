@@ -37,7 +37,12 @@ export async function validateSession(session: Session | null): Promise<Session 
   const imp = session.user.impersonating;
   if (imp) {
     const admin = await snapshot(imp.adminId);
-    return admin.ok && (admin.role === "SUPER_ADMIN" || admin.role === "ADMIN") ? session : null;
+    if (!(admin.ok && (admin.role === "SUPER_ADMIN" || admin.role === "ADMIN"))) return null;
+    // Tema e idioma son del admin que está navegando (no del cliente suplantado): así lo que elige en pantalla
+    // se queda al recargar, y no se toca la configuración de la persona suplantada.
+    session.user.theme = admin.theme;
+    session.user.language = admin.language;
+    return session;
   }
   const snap = await snapshot(session.user.id);
   if (!snap.ok) return null;
