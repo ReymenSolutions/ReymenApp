@@ -22,6 +22,8 @@ import { inputValue } from "@/lib/custom-fields";
 import { LeadNotesPanel } from "@/components/portal/LeadNotesPanel";
 import { LeadDuplicatesPanel } from "@/components/portal/LeadDuplicatesPanel";
 import { CreateOpportunityDialog } from "@/components/portal/CreateOpportunityDialog";
+import { LeadSearchProfiles } from "@/components/realty/LeadSearchProfiles";
+import { getLeadSearchViews } from "@/lib/realty/lead-profile";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { UserRole } from "@prisma/client";
 
@@ -58,6 +60,7 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
     getActiveCustomFields(orgId),
   ]);
 
+  const searchViews = await getLeadSearchViews(orgId, lead.id, lang === "en" ? "en" : "es");
   const canManageOpps = can(session.user.role as UserRole, "opportunities:manage");
   const stageOptions = stages.map((s) => ({ id: s.id, name: s.name }));
   const fixedLead = { id: lead.id, name: lead.name, email: lead.email, phone: lead.phone };
@@ -113,6 +116,14 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
               </div>
             </CardContent>
           </Card>
+
+          {searchViews && (
+            <Card>
+              <CardContent className="pt-5">
+                <LeadSearchProfiles views={searchViews} leadId={lead.id} canOperate={can(session.user.role as UserRole, "realty:operate")} lang={lang === "en" ? "en" : "es"} />
+              </CardContent>
+            </Card>
+          )}
 
           {customFields.length > 0 && (
             <Card>

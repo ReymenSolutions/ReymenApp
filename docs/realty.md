@@ -168,6 +168,15 @@ colonia); la persona ajusta lo que busca. El formulario **no bloquea** los boton
 
 Pruebas: `inquiry.test.ts`, `route.test.ts` y `InquiryForm.test.tsx`.
 
+## «Lo que busca» en el CRM
+
+En la ficha del contacto (`/portal/leads/<id>`) y en su panel lateral, si la organización tiene el módulo REALTY, aparece la
+tarjeta **«Lo que busca»** (`src/lib/realty/lead-profile.ts` + `LeadSearchProfiles`): compra/renta, tipo, presupuesto, colonias,
+mejor match, propiedad de la que llegó y enlace al prospecto (máx. 3 perfiles, el activo primero). Sin perfil, explica qué falta y
+ofrece **«Agregar lo que busca»** (con `realty:operate`), que abre `/portal/realty/prospects/new?leadId=…` con el contacto ya
+elegido (solo si es de la organización). En **Contactos** hay el filtro **«Con perfil inmobiliario»** (`?realty=1`). Sin el módulo
+no se muestra nada: el CRM no conoce el modelo de Real Estate más allá de esta tarjeta.
+
 ## Ubicación sin capturar coordenadas
 
 En la propiedad y en las zonas nadie escribe latitud/longitud ni tiene que
