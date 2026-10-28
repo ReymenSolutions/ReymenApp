@@ -1,0 +1,17 @@
+
+> reymenapp@0.1.0 test
+> vitest run --maxWorkers=3 --testTimeout=30000
+
+The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.
+
+ RUN  v5.0.0 /workspace/ReymenApp
+
+
+ Test Files  252 passed (252)
+      Tests  1777 passed (1777)
+   Start at  22:35:57
+   Duration  227.86s (tests 63%, environment 15%, setup 8%, import 8%, transform 4%, worker 1%)
+
+    Isolate  252 workers spawned · ~595ms startup each (spawn + environment, per file)
+             at least ~49.39s faster with isolate: false — reuses workers across files instead of one per file
+

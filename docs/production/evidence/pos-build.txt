@@ -1,0 +1,39 @@
+
+> reymen-pos@0.1.0 build
+> next build
+
+▲ Next.js 16.3.6 (Turbopack)
+✓ Running next.config.ts took 182ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 2.7s
+  Running TypeScript ...
+  Finished TypeScript in 5.5s ...
+  Collecting page data using 4 workers ...
+  Generating static pages using 4 workers (0/5) ...
+  Generating static pages using 4 workers (1/5) 
+  Generating static pages using 4 workers (2/5) 
+  Generating static pages using 4 workers (3/5) 
+✓ Generating static pages using 4 workers (5/5) in 448ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/devices
+├ ƒ /api/devices/enroll
+├ ƒ /api/devices/revoke
+├ ƒ /api/devices/status
+├ ƒ /api/health
+├ ƒ /api/menu
+├ ƒ /api/ops/snapshot
+├ ƒ /api/orders
+├ ƒ /api/reymen/events
+├ ƒ /api/reymen/loyalty
+├ ƒ /api/staff
+└ ○ /manifest.webmanifest
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

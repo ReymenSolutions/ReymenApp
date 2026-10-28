@@ -1,0 +1,569 @@
+
+> reymenapp@0.1.0 build
+> next build
+
+▲ Next.js 16.3.5 (Turbopack)
+✓ Running next.config.ts took 429ms
+- Experiments (use with caution):
+  · clientTraceMetadata
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 66s
+  Running next.config.js provided runAfterProductionCompile ...
+✓ Completed runAfterProductionCompile in 360ms
+  Running TypeScript ...
+  Finished TypeScript in 82s ...
+  Collecting page data using 4 workers ...
+  Generating static pages using 4 workers (0/135) ...
+  Generating static pages using 4 workers (33/135) 
+prisma:error 
+Invalid `prisma.automation.findMany()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.organization.findMany()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.automation.findMany()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.automationTemplate.findMany()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.organization.findMany()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+  Generating static pages using 4 workers (67/135) 
+prisma:error 
+Invalid `prisma.organization.count()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.automation.count()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.automation.count()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.request.count()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.automationEvent.findMany()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.organization.findMany()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.conversation.findMany()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.lead.count()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.automation.count()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.organization.count()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.conversation.count()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.automationEvent.groupBy()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.lead.groupBy()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.organization.groupBy()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.lead.findMany()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.templateInstallation.count()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.request.findMany()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.organization.count()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.user.count()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.lead.count()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.automation.count()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.automationTemplate.count()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.templateInstallation.count()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+  Generating static pages using 4 workers (101/135) 
+prisma:error 
+Invalid `prisma.templatePackage.findMany()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.automationTemplate.findMany()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.automationTemplate.findMany()` invocation:
+
+
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+   | 
+ 6 |   provider = "postgresql"
+ 7 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+✓ Generating static pages using 4 workers (135/135) in 3.1s
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ƒ /_not-found
+├ ƒ /admin/ai
+├ ƒ /admin/ai-pilot
+├ ƒ /admin/api-docs
+├ ƒ /admin/audit
+├ ƒ /admin/automations
+├ ƒ /admin/clients
+├ ƒ /admin/clients/[clientId]
+├ ƒ /admin/clients/[clientId]/automations
+├ ƒ /admin/dashboard
+├ ƒ /admin/escalations
+├ ƒ /admin/home
+├ ƒ /admin/metrics
+├ ƒ /admin/plans
+├ ƒ /admin/requests
+├ ƒ /admin/settings
+├ ƒ /admin/smartcard
+├ ƒ /admin/smartcard/analytics
+├ ƒ /admin/smartcard/cards
+├ ƒ /admin/smartcard/cards/[cardId]
+├ ƒ /admin/smartcard/cards/new
+├ ƒ /admin/smartcard/clients
+├ ƒ /admin/smartcard/clients/[clientId]
+├ ƒ /admin/smartcard/clients/new
+├ ƒ /admin/smartcard/companies
+├ ƒ /admin/smartcard/companies/[companyId]
+├ ƒ /admin/smartcard/feedback
+├ ƒ /admin/smartcard/profiles
+├ ƒ /admin/smartcard/profiles/[profileId]
+├ ƒ /admin/smartcard/profiles/new
+├ ƒ /admin/smartcard/settings
+├ ƒ /admin/smartcard/settings/themes/[themeId]
+├ ƒ /admin/smartcard/settings/themes/new
+├ ƒ /admin/smartcard/users
+├ ƒ /admin/smartcard/users/[userId]
+├ ƒ /admin/smartcard/users/new
+├ ƒ /admin/template-packages
+├ ƒ /admin/template-packages/[packageId]
+├ ƒ /admin/templates
+├ ƒ /admin/templates/[templateId]
+├ ƒ /admin/users
+├ ƒ /admin/webhooks
+├ ƒ /api/auth/[...nextauth]
+├ ƒ /api/cron/automations/tick
+├ ƒ /api/cron/billing
+├ ƒ /api/cron/mark-chat
+├ ƒ /api/cron/retry-webhooks
+├ ƒ /api/health
+├ ƒ /api/mark-chat
+├ ƒ /api/notifications
+├ ƒ /api/portal/leads/export
+├ ƒ /api/public/chat
+├ ƒ /api/public/leads
+├ ƒ /api/public/plans
+├ ƒ /api/realty/media/[id]
+├ ƒ /api/realty/public/events
+├ ƒ /api/realty/public/inquiries
+├ ƒ /api/realty/public/visit-slots
+├ ƒ /api/realty/public/visits
+├ ƒ /api/v1/appointments/due-reminders
+├ ƒ /api/v1/conversations/status
+├ ƒ /api/v1/food/menu
+├ ƒ /api/v1/knowledge-base
+├ ƒ /api/v1/leads/due-followups
+├ ƒ /api/wallet/apple/v1/[...path]
+├ ƒ /api/wallet/logo/[programId]
+├ ƒ /api/webhooks/delivery/orders
+├ ƒ /api/webhooks/n8n/ai
+├ ƒ /api/webhooks/n8n/appointment-reminder-sent
+├ ƒ /api/webhooks/n8n/automation-config
+├ ƒ /api/webhooks/n8n/automation-executions
+├ ƒ /api/webhooks/n8n/automations
+├ ƒ /api/webhooks/n8n/channels
+├ ƒ /api/webhooks/n8n/conversations
+├ ƒ /api/webhooks/n8n/followup-sent
+├ ƒ /api/webhooks/n8n/leads
+├ ƒ /api/webhooks/n8n/message-status
+├ ƒ /api/webhooks/n8n/scoring
+├ ƒ /api/webhooks/pos/kitchen
+├ ƒ /api/webhooks/pos/loyalty
+├ ƒ /api/webhooks/pos/orders
+├ ƒ /api/webhooks/pos/shifts
+├ ƒ /api/webhooks/smartcard/leads
+├ ƒ /api/webhooks/stripe
+├ ○ /apple-icon.png
+├ ƒ /feedback/[token]
+├ ƒ /forgot-password
+├ ○ /icon.png
+├ ƒ /lealtad/[slug]
+├ ƒ /lealtad/[slug]/tarjeta/[token]
+├ ƒ /lealtad/[slug]/tarjeta/[token]/wallet/apple
+├ ƒ /lealtad/[slug]/tarjeta/[token]/wallet/google
+├ ƒ /login
+├ ○ /manifest.webmanifest
+├ ƒ /mark-chat
+├ ƒ /p/[slug]
+├ ƒ /portal/ai-agents
+├ ƒ /portal/ai-agents/assistant
+├ ƒ /portal/ai-channels
+├ ƒ /portal/ai-lab
+├ ƒ /portal/ai-usage
+├ ƒ /portal/appointments
+├ ƒ /portal/appointments/settings
+├ ƒ /portal/automations
+├ ƒ /portal/automations/[id]
+├ ƒ /portal/conversations
+├ ƒ /portal/conversations/[id]
+├ ƒ /portal/customers
+├ ƒ /portal/customers/[customerId]
+├ ƒ /portal/dashboard
+├ ƒ /portal/food
+├ ƒ /portal/food/analytics
+├ ƒ /portal/food/branch-menu
+├ ƒ /portal/food/delivery
+├ ƒ /portal/food/inventory
+├ ƒ /portal/food/operations
+├ ƒ /portal/food/profitability
+├ ƒ /portal/food/purchases
+├ ƒ /portal/food/recipes
+├ ƒ /portal/food/sales
+├ ƒ /portal/food/suppliers
+├ ƒ /portal/home
+├ ƒ /portal/inbox
+├ ƒ /portal/knowledge-base
+├ ƒ /portal/leads
+├ ƒ /portal/leads/[id]
+├ ƒ /portal/leads/duplicates
+├ ƒ /portal/leads/settings
+├ ƒ /portal/loyalty
+├ ƒ /portal/loyalty/analytics
+├ ƒ /portal/loyalty/map
+├ ƒ /portal/loyalty/members
+├ ƒ /portal/loyalty/members/[memberId]
+├ ƒ /portal/loyalty/program
+├ ƒ /portal/loyalty/visits
+├ ƒ /portal/mark-chat-pilot
+├ ƒ /portal/mark-pilot
+├ ƒ /portal/onboarding
+├ ƒ /portal/pipeline
+├ ƒ /portal/prompts
+├ ƒ /portal/realty
+├ ƒ /portal/realty/campaigns
+├ ƒ /portal/realty/market
+├ ƒ /portal/realty/matches
+├ ƒ /portal/realty/opportunities
+├ ƒ /portal/realty/properties
+├ ƒ /portal/realty/properties/[id]
+├ ƒ /portal/realty/properties/[id]/edit
+├ ƒ /portal/realty/properties/new
+├ ƒ /portal/realty/prospects
+├ ƒ /portal/realty/prospects/[id]
+├ ƒ /portal/realty/prospects/[id]/edit
+├ ƒ /portal/realty/prospects/new
+├ ƒ /portal/realty/reports
+├ ƒ /portal/realty/rotation
+├ ƒ /portal/realty/settings
+├ ƒ /portal/realty/visits
+├ ƒ /portal/reports
+├ ƒ /portal/requests
+├ ƒ /portal/settings
+├ ƒ /portal/smartcard
+├ ƒ /portal/templates
+├ ƒ /portal/today
+├ ƒ /portal/whatsapp
+└ ƒ /reset-password
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
