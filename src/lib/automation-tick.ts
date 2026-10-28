@@ -1,5 +1,6 @@
 import { consumeCustomerContactEvent, syncCustomerContacts } from "@/lib/customer-contacts";
 import { consumeLoyaltyEvent } from "@/lib/loyalty/events";
+import { consumeWalletEvent } from "@/lib/loyalty/wallet-sync";
 import { prisma } from "@/lib/prisma";
 import { dispatchPendingExecutions, type DispatchResult } from "@/lib/automation/dispatcher";
 import { runAutomationsForEvent } from "@/lib/automation/engine";
@@ -24,7 +25,7 @@ export async function runAutomationTick(now: Date = new Date(), opts: { organiza
       if (!locked) return { ran: false as const, reason: "locked" as const };
       // Lo que lo dispara la hora (no un hecho) se convierte en eventos antes de procesar la bandeja.
       await runClockDetectors(now, { organizationId: opts.organizationId });
-      const outbox = await processDomainEvents({ now, organizationId: opts.organizationId, consumers: [consumeCustomerContactEvent, consumeLoyaltyEvent, (event) => runAutomationsForEvent(event, now), attributeEvent] });
+      const outbox = await processDomainEvents({ now, organizationId: opts.organizationId, consumers: [consumeCustomerContactEvent, consumeLoyaltyEvent, (event) => runAutomationsForEvent(event, now), attributeEvent, consumeWalletEvent] });
       const orgs = await prisma.organizationModule.findMany({ where: { module: "CRM", status: "ACTIVE", ...(opts.organizationId ? { organizationId: opts.organizationId } : {}) }, select: { organizationId: true } });
       for (const org of orgs) {
         try { await syncCustomerContacts(org.organizationId); }
