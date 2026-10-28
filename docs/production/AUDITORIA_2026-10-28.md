@@ -43,3 +43,6 @@ APP-QA-02: dos selectores de Playwright fallaban por textos duplicados en el DOM
 Bloqueo de escaneo: se pudo leer codex-security:security-scan/SKILL.md, pero sus referencias scan-prologue.md no estuvieron disponibles y no había herramientas de scan/preflight registradas. No se inició ni completó un escaneo formal. No se presenta un informe de seguridad generado ni se declara ausencia de vulnerabilidades. La revisión manual del proxy Loyalty confirma autenticación del dispositivo, verificación de revocación y PIN server-side para política/canje; esa inspección puntual no cubre todo el producto.
 
 Las pruebas POS existentes incluyen cancelación de venta sin enviar, cancelación durante envío, reintentos ante 5xx, bloqueo de dispositivo revocado, cobro offline y PIN de canje. Son evidencia automatizada del servicio, no una prueba física de dos terminales ni de impresoras.
+
+## Actualización de dictamen tras revisión de seguridad
+NO APROBAR PRODUCCIÓN: ver SEGURIDAD_2026-10-28.md. Se confirmó escalamiento de permisos mediante sincronización de personal POS y se detectaron avisos de dependencias pendientes de remediar. Las pruebas funcionales siguen aprobadas; no neutralizan estos hallazgos. Guía de release: PASE_A_PRODUCCION.md.
