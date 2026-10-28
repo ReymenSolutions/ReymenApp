@@ -7,6 +7,7 @@ import { getPublicCard } from "@/lib/loyalty/service";
 import { progressOf } from "@/lib/loyalty/cycle";
 import { firstName, memberCardPath, TOKEN_PATTERN } from "@/lib/loyalty/token";
 import { getWalletAvailability } from "@/lib/loyalty/wallet";
+import { WALLET_ERROR_CODES, type WalletErrorCode } from "@/lib/loyalty/wallet-route";
 import { getAppUrl } from "@/lib/app-url";
 import { getServerLang } from "@/lib/i18n-server";
 import { pickDict } from "@/lib/i18n-dict";
@@ -18,8 +19,15 @@ import { PublicMessage, PublicShell } from "@/components/loyalty/PublicShell";
 // La tarjeta es personal: no se indexa y no manda el token como Referer a otros sitios.
 export const metadata: Metadata = { title: "Mi tarjeta de lealtad", robots: { index: false, follow: false }, referrer: "no-referrer" };
 
-export default async function LoyaltyCardPage({ params }: { params: Promise<{ slug: string; token: string }> }) {
-  const [{ slug, token }, lang] = await Promise.all([params, getServerLang()]);
+export default async function LoyaltyCardPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string; token: string }>;
+  searchParams: Promise<{ wallet?: string | string[] }>;
+}) {
+  const [{ slug, token }, query, lang] = await Promise.all([params, searchParams, getServerLang()]);
+  const walletError = WALLET_ERROR_CODES.find((c) => c === query.wallet) as WalletErrorCode | undefined;
   const L = pickDict(loyaltyStrings, lang);
   const card = TOKEN_PATTERN.test(token) ? await getPublicCard(slug, token) : null;
   if (!card) return <PublicMessage text={L.cardNotFound} />;
@@ -79,6 +87,11 @@ export default async function LoyaltyCardPage({ params }: { params: Promise<{ sl
 
         {/* Wallet: botones reales solo si hay credenciales; si no, se dice claramente. */}
         <div className="mt-5 space-y-2">
+          {walletError && (
+            <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              {walletError === "limited" ? L.walletErrorLimited : walletError === "not_configured" ? L.walletErrorNotConfigured : L.walletErrorUnavailable}
+            </p>
+          )}
           {wallet.apple ? (
             <a href={`${memberCardPath(org.slug, token)}/wallet/apple`} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-black text-sm font-semibold text-white">
               <Wallet className="h-4 w-4" aria-hidden="true" /> {L.walletApple}
