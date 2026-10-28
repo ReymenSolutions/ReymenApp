@@ -57,9 +57,14 @@ describe("Apple Wallet: servicio web y descarga del pase", () => {
     await cleanupOrg(orgId);
   });
 
-  it("without credentials the card routes answer 'not configured' and the service is hidden", async () => {
-    expect((await cardPass(new Request("https://app.test"), { params: Promise.resolve({ slug, token }) })).status).toBe(501);
-    expect((await cardGoogle(new Request("https://app.test"), { params: Promise.resolve({ slug, token }) })).status).toBe(501);
+  it("without credentials the card routes send the customer back to the card and the service is hidden", async () => {
+    for (const res of [
+      await cardPass(new Request("https://app.test"), { params: Promise.resolve({ slug, token }) }),
+      await cardGoogle(new Request("https://app.test"), { params: Promise.resolve({ slug, token }) }),
+    ]) {
+      expect(res.status).toBe(303);
+      expect(res.headers.get("location")).toMatch(new RegExp(`/lealtad/${slug}/tarjeta/${token}\\?wallet=not_configured$`));
+    }
     expect((await GET(req(`passes/${PASS}/${memberId}`), params(["passes", PASS, memberId]))).status).toBe(404);
   });
 

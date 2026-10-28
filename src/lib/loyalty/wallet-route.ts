@@ -1,17 +1,24 @@
 import { NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { TOKEN_PATTERN } from "./token";
+import { getAppUrl } from "@/lib/app-url";
+import { memberCardPath, TOKEN_PATTERN } from "./token";
 import { getWalletPassDataByToken } from "./wallet-data";
 import { appleWalletConfig, buildPkpass } from "./wallet-apple";
 import { googleSaveUrl, googleWalletConfig, upsertGoogleObjects } from "./wallet-google";
 
 const noStore = { "Cache-Control": "no-store" };
 
-function notConfigured(provider: "apple" | "google") {
-  return NextResponse.json(
-    { error: "wallet_not_configured", provider, message: "Wallet todavía no está conectado en este servidor. La tarjeta web sigue funcionando igual." },
-    { status: 501, headers: noStore }
-  );
+export type WalletErrorCode = "unavailable" | "not_configured" | "limited";
+export const WALLET_ERROR_CODES: readonly WalletErrorCode[] = ["unavailable", "not_configured", "limited"];
+
+/**
+ * El cliente llega aquí tocando un botón en su tarjeta: si algo falla, se le
+ * regresa a la tarjeta con un aviso (?wallet=<código>) en vez de mostrarle
+ * un JSON o descargarle un archivo.
+ */
+function backToCard(params: { slug: string; token: string }, code: WalletErrorCode) {
+  const url = `${getAppUrl()}${memberCardPath(params.slug, params.token)}?wallet=${code}`;
+  return NextResponse.redirect(url, { status: 303, headers: noStore });
 }
 
 async function resolve(params: { slug: string; token: string }) {
@@ -24,11 +31,17 @@ async function resolve(params: { slug: string; token: string }) {
 /** /lealtad/<negocio>/tarjeta/<token>/wallet/apple → el .pkpass firmado. */
 export async function appleWalletResponse(params: { slug: string; token: string }) {
   const cfg = appleWalletConfig();
-  if (!cfg) return notConfigured("apple");
+  if (!cfg) return backToCard(params, "not_configured");
   const data = await resolve(params);
-  if (data === "limited") return NextResponse.json({ error: "rate_limited" }, { status: 429, headers: noStore });
+  if (data === "limited") return backToCard(params, "limited");
   if (!data) return NextResponse.json({ error: "not_found" }, { status: 404, headers: noStore });
-  const pkpass = await buildPkpass(data, cfg);
+  let pkpass: Buffer;
+  try {
+    pkpass = await buildPkpass(data, cfg);
+  } catch (err) {
+    console.error("[wallet-apple] No se pudo armar el pase:", err instanceof Error ? err.message : err);
+    return backToCard(params, "unavailable");
+  }
   return new NextResponse(new Uint8Array(pkpass), {
     headers: {
       ...noStore,
@@ -42,15 +55,15 @@ export async function appleWalletResponse(params: { slug: string; token: string 
 /** /lealtad/<negocio>/tarjeta/<token>/wallet/google → crea/actualiza el pase y manda a "Guardar en Google Wallet". */
 export async function googleWalletResponse(params: { slug: string; token: string }) {
   const cfg = googleWalletConfig();
-  if (!cfg) return notConfigured("google");
+  if (!cfg) return backToCard(params, "not_configured");
   const data = await resolve(params);
-  if (data === "limited") return NextResponse.json({ error: "rate_limited" }, { status: 429, headers: noStore });
+  if (data === "limited") return backToCard(params, "limited");
   if (!data) return NextResponse.json({ error: "not_found" }, { status: 404, headers: noStore });
   try {
     await upsertGoogleObjects(data, cfg);
   } catch (err) {
     console.error("[wallet-google] No se pudo crear el pase:", err instanceof Error ? err.message : err);
-    return NextResponse.json({ error: "wallet_unavailable", message: "Google Wallet no respondió. Intenta de nuevo en unos minutos." }, { status: 502, headers: noStore });
+    return backToCard(params, "unavailable");
   }
   return NextResponse.redirect(googleSaveUrl(data, cfg), { status: 303, headers: noStore });
 }
