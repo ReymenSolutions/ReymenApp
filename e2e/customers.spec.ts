@@ -44,7 +44,7 @@ test.describe("clientes del negocio", () => {
     await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 15_000 });
 
     await page.goto("/portal/customers");
-    await expect(page.getByText("Marta Compradora")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Marta Compradora", exact: true })).toBeVisible();
     // Cada cliente es una tarjeta: nombre, compras y visitas.
     await expect(page.getByRole("listitem").filter({ hasText: "Marta Compradora" })).toContainText(/Visitas\s*3/);
 
