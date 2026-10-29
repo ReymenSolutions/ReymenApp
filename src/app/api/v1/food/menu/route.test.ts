@@ -114,6 +114,8 @@ describe("GET /api/v1/food/menu", () => {
       expect(etag).toBeTruthy();
       const body = await res.json();
       expect(etag).toBe(`"${body.meta.version}"`);
+      expect(res.headers.get("cache-control")).toBe("private, no-cache");
+      expect(res.headers.get("vary")).toBe("Cookie, X-Api-Key");
     });
 
     it("returns 304 with no body when If-None-Match matches the current ETag", async () => {

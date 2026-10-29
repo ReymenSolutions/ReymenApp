@@ -100,7 +100,7 @@ test("admin browses historical programs without changing the customer's selected
   await page.getByLabel("Consultar clientes y visitas de").selectOption(selected.programId);
   await expect(page.getByRole("status").filter({ hasText: "Estás viendo" })).toContainText("Segundo Club");
   await page.goto(`/portal/loyalty/members/${old.id}`);
-  await expect(page.getByText("Café de regalo", { exact: true })).toBeVisible();
+  await expect(page.getByRole("main").getByText("Café de regalo", { exact: true })).toBeVisible();
   const choices = page.getByRole("region", { name: "Programas de este cliente" });
   await expect(choices.getByRole("link")).toHaveCount(2);
   await choices.getByRole("link", { name: /Segundo Club/ }).click();

@@ -51,11 +51,11 @@ export async function GET(req: NextRequest) {
   const etag = `"${version}"`;
 
   if (req.headers.get("if-none-match") === etag) {
-    return new NextResponse(null, { status: 304, headers: { ETag: etag } });
+    return new NextResponse(null, { status: 304, headers: { ETag: etag, "Cache-Control": "private, no-cache", Vary: "Cookie, X-Api-Key" } });
   }
 
   return NextResponse.json(
     { data: content.data, categories: content.categories, inventory: content.inventory, branches: content.branches, meta: { total: content.total, version } },
-    { headers: { ETag: etag } }
+    { headers: { ETag: etag, "Cache-Control": "private, no-cache", Vary: "Cookie, X-Api-Key" } }
   );
 }

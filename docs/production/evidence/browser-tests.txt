@@ -1,0 +1,20 @@
+
+Running 13 tests using 1 worker
+
+(node:60267) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › e2e/customers.spec.ts:39:7 › clientes del negocio › lista clientes y los convierte en contacto del CRM (3.1s)
+  ✓   2 [chromium] › e2e/customers.spec.ts:63:7 › clientes del negocio › shows manual Loyalty amounts separately from POS spending and respects module suspension (2.3s)
+  ✓   3 [chromium] › e2e/customers.spec.ts:103:7 › clientes del negocio › customer profile shows only this customer’s purchases and works on mobile (2.2s)
+  ✓   4 [chromium] › e2e/food-recipes-categories.spec.ts:40:7 › recetas: platillos por categoría › agrupa por categoría, y un clic en cualquier parte del platillo abre su edición (2.2s)
+  ✓   5 [chromium] › e2e/loyalty.spec.ts:42:5 › entitlement gates navigation and direct route (1.3s)
+  ✓   6 [chromium] › e2e/loyalty.spec.ts:48:5 › owner configures real program through native navigation (1.7s)
+  ✓   7 [chromium] › e2e/loyalty.spec.ts:61:5 › public signup creates a Customer-linked opaque card with no marketing consent (960ms)
+  ✓   8 [chromium] › e2e/loyalty.spec.ts:74:5 › business creates another program and a member chooses it from their card (1.4s)
+  ✓   9 [chromium] › e2e/loyalty.spec.ts:92:5 › admin browses historical programs without changing the customer's selected program (2.4s)
+  ✓  10 [chromium] › e2e/loyalty.spec.ts:119:5 › owner recovers two legacy skipped POS purchases from a member profile only once (1.4s)
+  ✓  11 [chromium] › e2e/loyalty.spec.ts:141:5 › mobile dark English pages render real data without horizontal overflow (13.4s)
+  ✓  12 [chromium] › e2e/loyalty.spec.ts:163:5 › mobile navigation reserves the back gesture and remains visible across repeated tab changes (4.3s)
+  ✓  13 [chromium] › e2e/loyalty.spec.ts:201:5 › suspension hides navigation, blocks routes and public cards, preserves members (1.1s)
+
+  13 passed (40.7s)
