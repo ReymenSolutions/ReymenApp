@@ -324,7 +324,7 @@ export async function createFoodDish(data: DishInput) {
   const session = await requireFoodManager();
 
   const parsed = dishSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos de platillo inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos de platillo inválidos");
 
   const existing = await prisma.foodDish.findUnique({
     where: { organizationId_name: { organizationId: session.user.organizationId, name: parsed.data.name } },
@@ -371,7 +371,7 @@ export async function updateFoodDish(dishId: string, data: DishInput) {
   const session = await requireFoodManager();
 
   const parsed = dishSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos de platillo inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos de platillo inválidos");
 
   const dish = await prisma.foodDish.findFirst({ where: { id: dishId, organizationId: session.user.organizationId } });
   if (!dish) throw new UserError("Platillo no encontrado");
@@ -485,7 +485,7 @@ export async function createFoodDishCategory(data: { name: string; sortOrder?: n
   const session = await requireFoodManager();
 
   const parsed = dishCategorySchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos de categoría inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos de categoría inválidos");
 
   const existing = await prisma.foodDishCategory.findUnique({
     where: { organizationId_name: { organizationId: session.user.organizationId, name: parsed.data.name } },
@@ -513,7 +513,7 @@ export async function updateFoodDishCategory(categoryId: string, data: { name: s
   const session = await requireFoodManager();
 
   const parsed = dishCategorySchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos de categoría inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos de categoría inválidos");
 
   const category = await prisma.foodDishCategory.findFirst({ where: { id: categoryId, organizationId: session.user.organizationId } });
   if (!category) throw new UserError("Categoría no encontrada");
@@ -599,7 +599,7 @@ export async function createFoodModifierGroup(data: ModifierGroupInput) {
   const session = await requireFoodManager();
 
   const parsed = modifierGroupSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos de modificador inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos de modificador inválidos");
   if (parsed.data.minSelect > parsed.data.maxSelect) throw new UserError("El mínimo no puede ser mayor al máximo");
 
   const existing = await prisma.foodModifierGroup.findUnique({
@@ -642,7 +642,7 @@ export async function updateFoodModifierGroup(groupId: string, data: ModifierGro
   const session = await requireFoodManager();
 
   const parsed = modifierGroupSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos de modificador inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos de modificador inválidos");
   if (parsed.data.minSelect > parsed.data.maxSelect) throw new UserError("El mínimo no puede ser mayor al máximo");
 
   const group = await prisma.foodModifierGroup.findFirst({ where: { id: groupId, organizationId: session.user.organizationId, isActive: true } });
@@ -756,7 +756,7 @@ export async function createFoodOperatingCost(data: { name: string; amountMonthl
   const session = await requireFoodManager();
 
   const parsed = operatingCostSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos de gasto inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos de gasto inválidos");
 
   const cost = await prisma.foodOperatingCost.create({
     data: { organizationId: session.user.organizationId, name: parsed.data.name, amountMonthly: parsed.data.amountMonthly },
@@ -779,7 +779,7 @@ export async function updateFoodOperatingCost(costId: string, data: { name: stri
   const session = await requireFoodManager();
 
   const parsed = operatingCostSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos de gasto inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos de gasto inválidos");
 
   const cost = await prisma.foodOperatingCost.findFirst({ where: { id: costId, organizationId: session.user.organizationId } });
   if (!cost) throw new UserError("Gasto no encontrado");

@@ -29,3 +29,6 @@ Next, Sentry (App), node-forge (App), sharp, source-map-js, deepmerge-ts, fast-u
 
 ## Cobertura no realizada
 Auditoría de todas las rutas, dependencias explotables una por una, infraestructura/proxy real, pruebas de intrusión, secretos del VPS, Wallet con credenciales reales, Safari y hardware. No declarar estos puntos aprobados ni confundir las pruebas funcionales con seguridad completa.
+
+## Seguimiento 29 octubre
+SEC-01 corregido en POS #50 (autorización de propietario para publicar personal); SEC-02 remediado en la rama App codex/security-remediation-20261029 y POS #50. Ver REMEDIACION_2026-10-29.md para evidencia y limitaciones. La cobertura exhaustiva e infraestructura siguen pendientes; estos cierres no equivalen a certificación global.

@@ -43,14 +43,14 @@ const DEFAULT_VARIANT_LABEL = "Único";
 
 const ingredientSchema = z.object({
   inventoryItemId: z.string().min(1, "Selecciona un insumo"),
-  quantity: z.coerce.number().positive("Cantidad debe ser mayor a 0"),
+  quantity: z.coerce.number<number>().positive("Cantidad debe ser mayor a 0"),
 });
 
 const variantSchema = z.object({
   // Id de la variante existente: el servidor la actualiza en su lugar.
   variantId: z.string().optional(),
   label: z.string().min(1, "Nombre de variante requerido"),
-  price: z.coerce.number().positive("El precio debe ser mayor a 0"),
+  price: z.coerce.number<number>().positive("El precio debe ser mayor a 0"),
   ingredients: z.array(ingredientSchema).min(1, "Agrega al menos un insumo"),
 });
 

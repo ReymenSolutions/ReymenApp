@@ -68,9 +68,7 @@ export type ConfigFieldView = {
 function unwrap(schema: ZodTypeAny): ZodTypeAny {
   let s = schema;
   for (let i = 0; i < 6; i++) {
-    const t = s._def.typeName as string;
-    if (t === "ZodDefault" || t === "ZodOptional" || t === "ZodNullable") s = s._def.innerType;
-    else if (t === "ZodEffects") s = s._def.schema;
+    if (s instanceof z.ZodDefault || s instanceof z.ZodOptional || s instanceof z.ZodNullable) s = s.unwrap() as ZodTypeAny;
     else break;
   }
   return s;
@@ -78,9 +76,8 @@ function unwrap(schema: ZodTypeAny): ZodTypeAny {
 
 function numberBounds(schema: ZodTypeAny): { min?: number; max?: number; int: boolean } {
   const base = unwrap(schema);
-  if (base._def.typeName !== "ZodNumber") return { int: false };
-  const checks = base._def.checks as { kind: string; value?: number }[];
-  return { min: checks.find((c) => c.kind === "min")?.value, max: checks.find((c) => c.kind === "max")?.value, int: checks.some((c) => c.kind === "int") };
+  if (!(base instanceof z.ZodNumber)) return { int: false };
+  return { min: base.minValue ?? undefined, max: base.maxValue ?? undefined, int: base.isInt };
 }
 
 /** Los parámetros de un blueprint, en el orden de sus secciones, con límites y valores por defecto tomados de su esquema. */
@@ -94,7 +91,7 @@ export function describeConfig(blueprint: Pick<Blueprint, "configSchema" | "defa
     if (!meta) continue;
     const base = unwrap(shape[key]);
     const { min, max, int } = numberBounds(shape[key]);
-    const enumValues = base._def.typeName === "ZodEnum" ? (base._def.values as string[]) : undefined;
+    const enumValues = base instanceof z.ZodEnum ? (base.options as string[]) : undefined;
     const kind = meta.kind;
     fields.push({
       key,

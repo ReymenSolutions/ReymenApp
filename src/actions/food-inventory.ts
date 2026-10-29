@@ -37,7 +37,7 @@ export async function updateFoodInventoryItem(itemId: string, data: z.input<type
   const session = await requireFoodManager();
   const organizationId = session.user.organizationId;
   const parsed = inventoryItemSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos de insumo inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos de insumo inválidos");
 
   const item = await prisma.foodInventoryItem.findFirst({ where: { id: itemId, organizationId } });
   if (!item) throw new UserError("Insumo no encontrado");
@@ -139,7 +139,7 @@ export async function adjustFoodInventoryStock(itemId: string, data: z.input<typ
   const session = await requireFoodManager();
   const organizationId = session.user.organizationId;
   const parsed = adjustSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos inválidos");
 
   const branchId = await effectiveStockBranch(organizationId, parsed.data.branchId);
   await prisma.$transaction(async (tx) => {
@@ -191,7 +191,7 @@ export async function recordInventoryAdjustment(data: QuickAdjustInput): Promise
   const session = await requireFoodManager();
   const organizationId = session.user.organizationId;
   const parsed = quickAdjustSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos inválidos");
   const { kind, output } = parsed.data;
   const note = parsed.data.note || undefined;
   // Líneas sin cantidad (o en 0, salvo en conteo) no cuentan.
@@ -270,7 +270,7 @@ export async function updateFoodSupplier(supplierId: string, data: z.input<typeo
   const session = await requireFoodManager();
   const organizationId = session.user.organizationId;
   const parsed = supplierSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos de proveedor inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos de proveedor inválidos");
 
   const supplier = await prisma.foodSupplier.findFirst({ where: { id: supplierId, organizationId }, select: { id: true } });
   if (!supplier) throw new UserError("Proveedor no encontrado");
@@ -372,7 +372,7 @@ export async function createFoodPurchase(data: z.input<typeof purchaseSchema>) {
   const session = await requireFoodManager();
   const organizationId = session.user.organizationId;
   const parsed = purchaseSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos de compra inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos de compra inválidos");
 
   const purchasedAt = new Date(parsed.data.purchasedAt);
   if (Number.isNaN(purchasedAt.getTime())) throw new UserError("Fecha inválida");
@@ -544,7 +544,7 @@ export async function transferInventoryBetweenBranches(data: z.input<typeof tran
   const session = await requireFoodManager();
   const organizationId = session.user.organizationId;
   const parsed = transferSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos inválidos");
   const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { inventoryPerBranch: true } });
   if (!org?.inventoryPerBranch) throw new UserError("Activa el inventario por sucursal para hacer traspasos");
   const { fromBranchId, toBranchId } = parsed.data;

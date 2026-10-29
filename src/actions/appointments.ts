@@ -140,7 +140,7 @@ export async function createAppointment(data: z.infer<typeof createSchema>) {
   if (!session?.user.organizationId) throw new UserError("No autorizado");
 
   const parsed = createSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos inválidos");
 
   const organizationId = session.user.organizationId;
   if (parsed.data.leadId) await assertOrgLead(organizationId, parsed.data.leadId);

@@ -29,7 +29,7 @@ export async function inviteTeamMember(data: {
   if (!can(session.user.role as UserRole, "team:manage")) throw new UserError("Sin permisos para gestionar el equipo");
 
   const parsed = inviteSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos inválidos");
 
   await createOrgUserRecord({
     organizationId: session.user.organizationId,
@@ -88,7 +88,7 @@ export async function updateTeamMember(userId: string, data: { name: string; rol
   if (!can(session.user.role as UserRole, "team:manage")) throw new UserError("Sin permisos para gestionar el equipo");
 
   const parsed = updateSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos inválidos");
 
   const user = await prisma.user.findFirst({
     where: { id: userId, organizationId: session.user.organizationId },

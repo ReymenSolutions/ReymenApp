@@ -28,7 +28,7 @@ export async function createOrgUser(orgId: string, data: { name: string; email: 
   const session = await requireAdmin();
 
   const parsed = createOrgUserSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos inválidos");
 
   const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { id: true } });
   if (!org) throw new UserError("Cliente no encontrado");
@@ -56,7 +56,7 @@ export async function updateOrgUser(userId: string, data: { name: string; role: 
   const session = await requireAdmin();
 
   const parsed = updateOrgUserSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos inválidos");
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user || !user.organizationId) throw new UserError("Usuario no encontrado");
@@ -100,7 +100,7 @@ export async function updateUserAsAdmin(
   const session = await requireAdmin();
 
   const parsed = editUserSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos inválidos");
   const next = parsed.data;
 
   const target = await prisma.user.findUnique({ where: { id: userId } });
@@ -200,7 +200,7 @@ export async function createStandaloneUser(data: { name: string; email: string; 
   if (!session || session.user.role !== "SUPER_ADMIN") throw new UserError("No autorizado");
 
   const parsed = createStandaloneUserSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos inválidos");
 
   const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } });
   if (existing) throw new UserError("Ya existe un usuario con ese email");
@@ -250,7 +250,7 @@ const createUserSchema = z.object({
 export async function createUserAsAdmin(data: { name: string; email: string; role: string; organizationId: string | null; password: string }) {
   const session = await requireAdmin();
   const parsed = createUserSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos inválidos");
   const input = parsed.data;
 
   const blocked = checkUserCreate({ actorRole: session.user.role, role: input.role, organizationId: input.organizationId });

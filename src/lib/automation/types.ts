@@ -1,5 +1,5 @@
 import type { Customer, PlatformModule } from "@prisma/client";
-import type { ZodType, ZodTypeDef } from "zod";
+import type { ZodType } from "zod";
 import type { StoredDomainEvent } from "@/lib/domain-events";
 import type { DailyReport } from "./report";
 import type { ConfigUi } from "./config-ui";
@@ -47,7 +47,7 @@ export type Blueprint<C = Record<string, unknown>> = {
   /** Categorías de plantillas n8n (`AutomationTemplate.category`) que hacen un trabajo parecido: avisan al activar ambas. */
   overlapCategories?: string[];
   status: "active" | "deprecated";
-  configSchema: ZodType<C, ZodTypeDef, unknown>;
+  configSchema: ZodType<C, unknown>;
   defaultConfig: C;
   /** Coherencia entre parámetros (p. ej. "desde" < "hasta"): devuelve la llave con el problema, o null si está bien. */
   crossCheck?: (config: C) => { key: string; code: "must_be_less"; other: string } | { key: string; code: "required" } | null;

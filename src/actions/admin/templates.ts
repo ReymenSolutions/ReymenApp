@@ -22,9 +22,9 @@ const templateSchema = z.object({
 const versionSchema = z.object({
   version: z.string().regex(/^\d+\.\d+\.\d+$/, "Usa formato semver: 1.0.0"),
   changelog: z.string().optional(),
-  n8nWorkflowJson: z.record(z.unknown()),
+  n8nWorkflowJson: z.record(z.string(), z.unknown()),
   /** Parámetros configurables por cliente (formato de src/lib/automation/config-spec.ts). */
-  configSpec: z.record(z.unknown()).optional(),
+  configSpec: z.record(z.string(), z.unknown()).optional(),
 });
 
 export async function createTemplate(data: z.infer<typeof templateSchema>) {
