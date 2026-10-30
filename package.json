@@ -34,7 +34,7 @@
     "@radix-ui/react-switch": "^1.1.11",
     "@radix-ui/react-tabs": "^1.1.12",
     "@radix-ui/react-tooltip": "^1.2.7",
-    "@sentry/nextjs": "^10.74.0",
+    "@sentry/nextjs": "^10.78.0",
     "@supabase/supabase-js": "^2.116.0",
     "@webrek/mx-cp": "0.2.0",
     "bcryptjs": "^3.0.2",
@@ -42,9 +42,9 @@
     "clsx": "^2.1.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.511.0",
-    "next": "^16.3.5",
+    "next": "^16.4.3",
     "next-auth": "^5.0.0-beta.32",
-    "node-forge": "^1.4.0",
+    "node-forge": "^1.4.2",
     "otpauth": "^9.5.2",
     "prisma": "^6.8.2",
     "qrcode": "^1.5.4",
@@ -53,11 +53,11 @@
     "react-hook-form": "^7.56.4",
     "recharts": "^2.15.3",
     "resend": "^6.28.0",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "sonner": "^2.0.5",
     "stripe": "^22.6.2",
     "tailwind-merge": "^3.3.0",
-    "zod": "^3.25.32"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
@@ -81,5 +81,8 @@
     "typescript": "^5.8.3",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^5.0.0"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.0"
   }
 }

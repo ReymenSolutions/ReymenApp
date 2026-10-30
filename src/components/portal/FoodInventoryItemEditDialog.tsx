@@ -19,7 +19,7 @@ const schema = z.object({
   name: z.string().trim().min(1, "Nombre requerido"),
   unit: z.string().trim().min(1, "Unidad requerida"),
   category: z.enum(["EDIBLE", "NON_EDIBLE"]),
-  minStock: z.coerce.number().min(0, "No puede ser negativo"),
+  minStock: z.coerce.number<number>().min(0, "No puede ser negativo"),
   unitCost: z.string().optional(),
 });
 

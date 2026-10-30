@@ -57,7 +57,7 @@ export type DeliveryItem = z.infer<typeof itemSchema>;
 export async function processDeliveryOrder(body: unknown, organizationId: string, opts: { isTest?: boolean } = {}) {
   const parsed = deliveryOrderSchema.safeParse(body);
   if (!parsed.success) {
-    const issue = parsed.error.errors[0];
+    const issue = parsed.error.issues[0];
     throw new UserError(`Pedido inválido: ${issue?.path.join(".") || "cuerpo"} ${issue?.message ?? ""}`.trim());
   }
   const data = parsed.data;

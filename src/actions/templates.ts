@@ -65,7 +65,7 @@ async function installTemplateCore(
 
 const installSchema = z.object({
   templateId: z.string(),
-  config: z.record(z.unknown()).optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
 });
 
 export async function installTemplate(data: z.infer<typeof installSchema>) {

@@ -18,7 +18,7 @@ import { getErrorMessage, translateMessage } from "@/lib/user-error";
 
 const schema = z.object({
   name: z.string().min(1, "Nombre requerido"),
-  amountMonthly: z.coerce.number().positive("El monto debe ser mayor a 0"),
+  amountMonthly: z.coerce.number<number>().positive("El monto debe ser mayor a 0"),
 });
 
 type FormData = z.infer<typeof schema>;

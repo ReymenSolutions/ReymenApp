@@ -54,7 +54,7 @@ export async function changePassword(data: { currentPassword: string; newPasswor
   if (!session?.user.id) throw new UserError("No autorizado");
 
   const parsed = passwordSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos inválidos");
 
   const user = await prisma.user.findUnique({ where: { id: session.user.id } });
   if (!user || !user.passwordHash) throw new UserError("Usuario no encontrado");

@@ -33,7 +33,7 @@ export async function createAutomation(data: {
 }) {
   await requireAdmin();
   const parsed = automationSchema.safeParse(data);
-  if (!parsed.success) throw new UserError("Datos inválidos: " + parsed.error.errors[0].message);
+  if (!parsed.success) throw new UserError("Datos inválidos: " + parsed.error.issues[0].message);
 
   const automation = await prisma.automation.create({
     data: {

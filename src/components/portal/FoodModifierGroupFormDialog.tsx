@@ -19,21 +19,21 @@ import type { FoodInventoryOption } from "./FoodDishFormDialog";
 
 const optionIngredientSchema = z.object({
   inventoryItemId: z.string().min(1, "Selecciona un insumo"),
-  quantity: z.coerce.number().refine((n) => Number.isFinite(n) && n !== 0, "La cantidad no puede ser 0"),
+  quantity: z.coerce.number<number>().refine((n) => Number.isFinite(n) && n !== 0, "La cantidad no puede ser 0"),
 });
 
 const optionSchema = z.object({
   optionId: z.string().optional(),
   name: z.string().min(1, "Nombre de opción requerido"),
-  priceDelta: z.coerce.number().min(0, "No puede ser negativo"),
+  priceDelta: z.coerce.number<number>().min(0, "No puede ser negativo"),
   ingredients: z.array(optionIngredientSchema),
 });
 
 const schema = z
   .object({
     name: z.string().min(1, "Nombre requerido"),
-    minSelect: z.coerce.number().int().min(0),
-    maxSelect: z.coerce.number().int().min(1),
+    minSelect: z.coerce.number<number>().int().min(0),
+    maxSelect: z.coerce.number<number>().int().min(1),
     options: z.array(optionSchema).min(1, "Agrega al menos una opción"),
   })
   .refine((data) => data.minSelect <= data.maxSelect, {

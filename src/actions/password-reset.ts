@@ -76,7 +76,7 @@ export async function resetPassword(data: {
   password: string;
 }): Promise<{ success: true }> {
   const parsed = resetSchema.safeParse(data);
-  if (!parsed.success) throw new UserError(parsed.error.errors[0]?.message ?? "Datos inválidos");
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos inválidos");
 
   const tokenHash = hashToken(parsed.data.token);
   const verification = await prisma.verificationToken.findUnique({

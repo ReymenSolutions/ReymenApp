@@ -46,3 +46,5 @@ Las pruebas POS existentes incluyen cancelación de venta sin enviar, cancelaci�
 
 ## Actualización de dictamen tras revisión de seguridad
 NO APROBAR PRODUCCIÓN: ver SEGURIDAD_2026-10-28.md. Se confirmó escalamiento de permisos mediante sincronización de personal POS y se detectaron avisos de dependencias pendientes de remediar. Las pruebas funcionales siguen aprobadas; no neutralizan estos hallazgos. Guía de release: PASE_A_PRODUCCION.md.
+
+Seguimiento: consultar REMEDIACION_2026-10-29.md; las dependencias se actualizaron y se verificó el arreglo POS en PR #50. La aceptación operativa y auditoría exhaustiva siguen siendo pendientes distintos.
