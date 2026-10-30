@@ -42,7 +42,10 @@ export default async function LoyaltyCardPage({
 
   return (
     <PublicShell businessName={org.name} logoUrl={org.logoUrl} theme={program}>
-      <MemberProgramChoice slug={slug} token={token} current={program.id} selected={member.isSelected} programs={programs} lang={lang} />
+      {/* Elegir programa solo tiene sentido con más de uno, o si la tarjeta muestra uno anterior o en pausa. */}
+      {(programs.length > 1 || !member.isSelected || !programs.some((p) => p.id === program.id)) && (
+        <MemberProgramChoice slug={slug} token={token} current={program.id} selected={member.isSelected} programs={programs} lang={lang} />
+      )}
       {/* Tarjeta */}
       <LoyaltyCardFace
         size="lg"
@@ -85,32 +88,23 @@ export default async function LoyaltyCardPage({
           </span>
         </div>
 
-        {/* Wallet: botones reales solo si hay credenciales; si no, se dice claramente. */}
+        {/* Wallet: solo se ofrece la que tiene credenciales. Sin ninguna, el cliente ve únicamente el consejo de guardar la página. */}
         <div className="mt-5 space-y-2">
           {walletError && (
             <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               {walletError === "limited" ? L.walletErrorLimited : walletError === "not_configured" ? L.walletErrorNotConfigured : L.walletErrorUnavailable}
             </p>
           )}
-          {wallet.apple ? (
+          {wallet.apple && (
             <a href={`${memberCardPath(org.slug, token)}/wallet/apple`} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-black text-sm font-semibold text-white">
               <Wallet className="h-4 w-4" aria-hidden="true" /> {L.walletApple}
             </a>
-          ) : (
-            <button type="button" disabled className="flex h-12 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-black/80 text-sm font-semibold text-white opacity-60">
-              <Wallet className="h-4 w-4" aria-hidden="true" /> {L.walletApple}
-            </button>
           )}
-          {wallet.google ? (
+          {wallet.google && (
             <a href={`${memberCardPath(org.slug, token)}/wallet/google`} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-900">
               <Wallet className="h-4 w-4" aria-hidden="true" /> {L.walletGoogle}
             </a>
-          ) : (
-            <button type="button" disabled className="flex h-12 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-900 opacity-60">
-              <Wallet className="h-4 w-4" aria-hidden="true" /> {L.walletGoogle}
-            </button>
           )}
-          {(!wallet.apple || !wallet.google) && <p className="text-xs text-slate-400">{L.walletPending}</p>}
           <p className="flex items-start justify-center gap-1.5 pt-1 text-xs text-slate-500">
             <Smartphone className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             {L.walletSaveTip}

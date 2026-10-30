@@ -30,9 +30,11 @@ export default async function LoyaltyEnrollPage({ params, searchParams }: { para
 
   return (
     <PublicShell businessName={org.name} logoUrl={org.logoUrl} theme={program}>
-      <nav className="flex flex-wrap gap-2 px-6 pt-4" aria-label={lang === "es" ? "Elegir programa" : "Choose program"}>
-        {programs.map((p) => <Link key={p.id} className="rounded border px-3 py-2 text-sm" aria-current={p.id === program.id ? "page" : undefined} href={`/lealtad/${org.slug}?${new URLSearchParams({ program: p.id, ...(suc ? { suc } : {}) })}`}>{p.name}</Link>)}
-      </nav>
+      {programs.length > 1 && (
+        <nav className="flex flex-wrap gap-2 px-6 pt-4" aria-label={lang === "es" ? "Elegir programa" : "Choose program"}>
+          {programs.map((p) => <Link key={p.id} className="rounded border px-3 py-2 text-sm" aria-current={p.id === program.id ? "page" : undefined} href={`/lealtad/${org.slug}?${new URLSearchParams({ program: p.id, ...(suc ? { suc } : {}) })}`}>{p.name}</Link>)}
+        </nav>
+      )}
       <div className="px-6 pb-2 pt-6 text-center">
         <h1 className="text-2xl font-bold text-slate-900">{L.joinTitle(program.name)}</h1>
         <p className="mt-1 text-sm text-slate-500">{program.description || L.joinSubtitle}</p>

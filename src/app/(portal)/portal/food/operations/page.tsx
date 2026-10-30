@@ -4,6 +4,7 @@ import {
   AlertTriangle, Bike, ChefHat, Clock, Flame, MonitorSmartphone, Printer, Receipt, Store, Users, Workflow, Ban, Package, Timer, Wallet,
 } from "lucide-react";
 import { auth } from "@/lib/auth";
+import { isAdmin } from "@/lib/roles";
 import { requireModule } from "@/lib/modules";
 import { prisma } from "@/lib/prisma";
 import { getServerLang, getServerT } from "@/lib/i18n-server";
@@ -202,7 +203,12 @@ export default async function FoodOperationsPage({ searchParams }: { searchParam
       </div>
 
       {pos.kind === "disabled" && <Notice tone="info">{f.opNoPosModule}</Notice>}
-      {pos.kind === "unauthorized" && <Notice tone="warning">{f.opPosUnauthorized}</Notice>}
+      {pos.kind === "unauthorized" && (
+        <Notice tone="warning">
+          {f.opPosUnauthorized}
+          {isAdmin(session.user.role) && <span className="mt-1 block text-xs opacity-80">{f.opPosUnauthorizedTech}</span>}
+        </Notice>
+      )}
       {pos.kind === "unreachable" && <Notice tone="warning">{f.opPosUnreachable}</Notice>}
 
       {/* ── KPIs ── */}
