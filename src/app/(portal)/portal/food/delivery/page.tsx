@@ -171,22 +171,28 @@ export default async function FoodDeliveryPage() {
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-slate-600">
           <p>{t.howIntro}</p>
-          <div>
-            <p className="font-medium text-slate-900">{t.endpoint}</p>
-            <div className="mt-1 flex items-center gap-2">
-              <code className="min-w-0 flex-1 truncate rounded bg-slate-100 px-2 py-1 text-xs">POST {appUrl("/api/webhooks/delivery/orders")}</code>
-              <CopyButton text={appUrl("/api/webhooks/delivery/orders")} />
+          {/* Lo técnico (endpoint, firma, formato) es para quien integra; el dueño lo abre solo si lo necesita. */}
+          <details className="group rounded-lg border border-slate-200 px-3 py-2">
+            <summary className="cursor-pointer select-none font-medium text-slate-900">{t.techSummary}</summary>
+            <div className="mt-3 space-y-3">
+              <div>
+                <p className="font-medium text-slate-900">{t.endpoint}</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <code className="min-w-0 flex-1 truncate rounded bg-slate-100 px-2 py-1 text-xs">POST {appUrl("/api/webhooks/delivery/orders")}</code>
+                  <CopyButton text={appUrl("/api/webhooks/delivery/orders")} />
+                </div>
+              </div>
+              <div>
+                <p className="font-medium text-slate-900">{t.headers}</p>
+                <p>{t.headersDesc}</p>
+              </div>
+              <div>
+                <p className="font-medium text-slate-900">{t.example}</p>
+                <pre className="mt-1 overflow-x-auto rounded bg-slate-900 p-3 text-xs text-slate-100">{JSON.stringify(EXAMPLE, null, 2)}</pre>
+                <p className="mt-1 text-xs">platform: UBER_EATS · RAPPI · DIDI_FOOD — status: NEW · ACCEPTED · PREPARING · READY · PICKED_UP · DELIVERED · CANCELLED</p>
+              </div>
             </div>
-          </div>
-          <div>
-            <p className="font-medium text-slate-900">{t.headers}</p>
-            <p>{t.headersDesc}</p>
-          </div>
-          <div>
-            <p className="font-medium text-slate-900">{t.example}</p>
-            <pre className="mt-1 overflow-x-auto rounded bg-slate-900 p-3 text-xs text-slate-100">{JSON.stringify(EXAMPLE, null, 2)}</pre>
-            <p className="mt-1 text-xs">platform: UBER_EATS · RAPPI · DIDI_FOOD — status: NEW · ACCEPTED · PREPARING · READY · PICKED_UP · DELIVERED · CANCELLED</p>
-          </div>
+          </details>
           <p className="text-xs text-slate-500">{t.note}</p>
         </CardContent>
       </Card>

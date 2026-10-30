@@ -63,31 +63,31 @@ export default async function SmartcardPage() {
   const result = await resolveSmartcardMembership(session.user.organizationId, session.user.email);
 
   if (!result.ok) {
-    if (result.reason === "query_failed") throw new Error("Unable to load SmartCard membership");
-    const lang = await getServerLang();
-    return (
-      <section className="mx-auto w-full max-w-6xl">
-        <h1 className="text-2xl font-semibold">SmartCard</h1>
-        <p className="mt-4 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          {FAILURE_MESSAGES[lang][result.reason]}
-        </p>
-      </section>
-    );
+    // query_failed también se muestra como aviso: SmartCard vive en otro proyecto y una caída suya no debe tumbar el portal.
+    if (result.reason === "query_failed") console.error("[smartcard] no se pudo consultar la membresía");
+    return <SmartcardNotice reason={result.reason} />;
   }
 
   // Dueño, administrador y gerente ven todas las tarjetas y al equipo con
   // nombre; un asesor o personal solo ve la tarjeta que tiene asignada.
   const isManager = ["owner", "admin", "manager"].includes(result.membership.roleCode);
   const assignmentReady = await supportsCardAssignment();
-  const [roster, cardStats, destinationTypes] = await Promise.all([
-    getCompanyRoster(result.membership.companyId, result.membership.userId),
-    getCompanyCardStats(result.membership.companyId, {
-      throwOnError: true,
-      withAssignment: assignmentReady,
-      assignedTo: isManager ? undefined : result.membership.userId,
-    }),
-    getActiveDestinationTypes({ throwOnError: true }),
-  ]);
+  let data;
+  try {
+    data = await Promise.all([
+      getCompanyRoster(result.membership.companyId, result.membership.userId),
+      getCompanyCardStats(result.membership.companyId, {
+        throwOnError: true,
+        withAssignment: assignmentReady,
+        assignedTo: isManager ? undefined : result.membership.userId,
+      }),
+      getActiveDestinationTypes({ throwOnError: true }),
+    ]);
+  } catch (e) {
+    console.error("[smartcard] no se pudieron cargar las tarjetas", e);
+    return <SmartcardNotice reason="query_failed" />;
+  }
+  const [roster, cardStats, destinationTypes] = data;
   const people = isManager
     ? await getRosterPeople(
         session.user.organizationId,
@@ -106,5 +106,15 @@ export default async function SmartcardPage() {
       publicBaseUrl={smartcardPublicBaseUrl()}
       timeZone={org?.timezone ?? "America/Mexico_City"}
     />
+  );
+}
+
+async function SmartcardNotice({ reason }: { reason: string }) {
+  const lang = await getServerLang();
+  return (
+    <section className="mx-auto w-full max-w-6xl">
+      <h1 className="text-2xl font-semibold">SmartCard</h1>
+      <p className="mt-4 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800">{FAILURE_MESSAGES[lang][reason]}</p>
+    </section>
   );
 }

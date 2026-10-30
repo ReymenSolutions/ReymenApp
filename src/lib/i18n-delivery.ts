@@ -42,6 +42,7 @@ export const deliveryStrings = defineDict({
     howTitle: "Cómo se conectan los pedidos",
     howIntro:
       "Uber Eats, Rappi y DiDi Food solo envían pedidos a integradores aprobados en sus programas de socios. El integrador (o un flujo de n8n que reciba su webhook) manda cada pedido a Reymen en este formato; repetir el mismo externalId actualiza el estado.",
+    techSummary: "Datos técnicos para tu integrador",
     endpoint: "Endpoint",
     headers: "Headers",
     headersDesc: "x-reymen-orgid, x-reymen-timestamp y x-reymen-signature (HMAC-SHA256 de \"<timestamp>.<cuerpo>\" con la llave de conexión), igual que los demás webhooks de la organización.",
@@ -88,6 +89,7 @@ export const deliveryStrings = defineDict({
     howTitle: "How orders are connected",
     howIntro:
       "Uber Eats, Rappi and DiDi Food only send orders to integrators approved in their partner programs. The integrator (or an n8n flow receiving its webhook) sends each order to Reymen in this format; sending the same externalId again updates its status.",
+    techSummary: "Technical details for your integrator",
     endpoint: "Endpoint",
     headers: "Headers",
     headersDesc: "x-reymen-orgid, x-reymen-timestamp and x-reymen-signature (HMAC-SHA256 of \"<timestamp>.<body>\" with the connection key), like the organization's other webhooks.",
