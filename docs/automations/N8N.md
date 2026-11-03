@@ -65,3 +65,14 @@ Un workflow genérico **no lleva datos de ningún cliente dentro** (horarios, pl
 - **Por evento:** cuando Reymen le avisa a n8n de algo para una automatización, el cuerpo firmado (mismas firmas de Reymen → n8n) trae `organizationId`, `event`, `data` y `automation` (el contenido de arriba).
 - **Por consulta** (flujos que empiezan en un canal, p. ej. un WhatsApp entrante): `POST /api/webhooks/n8n/automation-config`, con la misma firma de plataforma (`X-Reymen-Timestamp`, `X-Reymen-Signature` = `sha256=` + HMAC-SHA256 hex de `"<timestamp>.<cuerpo>"` con `N8N_WEBHOOK_SECRET`) y el cuerpo `{ "organizationId": "…", "automationId": "…" }` o `{ "organizationId": "…", "templateId": "…" }`.
   - **Siempre se valida la organización**: si la automatización no existe, es de otro cliente o está pausada, responde `404` igual (no revela qué ids existen). Otros códigos: `400` cuerpo inválido, `401` firma/hora inválidas, `429`, `503` sin `N8N_WEBHOOK_SECRET`.
+
+## Seguimiento de clientes por WhatsApp — `reymen-followups-whatsapp`
+Workflow por cliente: `n8n/workflows/reymen-followups-whatsapp.json` (importar, editar el nodo **Configuración**, probar y activar).
+
+1. **Reglas en Reymen**: el cliente las define en CRM → Contactos → **Configurar seguimientos** (estado del contacto, espera, intentos, plantilla con `{{contactName}}`). Reymen decide a quién toca: estado, tiempo, intentos máximos y «no contactar».
+2. **Cada 30 min** n8n consulta `GET /api/v1/leads/due-followups?orgId=…` con `X-Api-Key` = llave de conexión del cliente (`n8nWebhookSecret`, Admin → Clientes → botón de webhook).
+3. Arma un WhatsApp por persona (solo canal `whatsapp`, teléfono MX a `+52…`, solo en horario del negocio, máximo por corrida) y lo envía con **Twilio** (credencial «Twilio» de n8n; el Account SID y el número van en Configuración).
+   - Fuera de la ventana de 24 h WhatsApp exige **plantilla aprobada**: poner su `contentSid` en Configuración (variable `{{1}}` = nombre). Sin `contentSid` se manda el texto de la regla, que solo entrega dentro de las 24 h.
+4. Por cada mensaje que Twilio aceptó, avisa `POST /api/webhooks/n8n/followup-sent` `{ leadId, ruleId }` firmado (`x-reymen-orgid`, `x-reymen-timestamp`, `x-reymen-signature` = `sha256=` + HMAC-SHA256 hex de `"<timestamp>.<cuerpo>"` con la llave del cliente) y `x-reymen-event-id` = `followup:<lead>:<regla>:<intento>` para que un reintento no cuente doble. Los fallidos no se avisan: Reymen los ofrece de nuevo en la siguiente corrida.
+- **`modoPrueba: true`** (predeterminado): solo arma y muestra los mensajes, sin enviar ni avisar. Cambiarlo a `false` para operar.
+- Requiere `NODE_FUNCTION_ALLOW_BUILTIN=crypto` (igual que los demás). No usa la base de datos de n8n ni accede a la de Reymen: todo pasa por la API.
