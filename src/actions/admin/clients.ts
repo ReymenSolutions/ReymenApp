@@ -102,7 +102,8 @@ export async function changePlan(orgId: string, plan: string, customMonthlyPrice
 
   const org = await prisma.organization.update({
     where: { id: orgId },
-    data: { plan, customMonthlyPriceMxn: customPrice },
+    // Elegir un plan del catálogo saca al cliente del plan «A la medida» (sus límites propios dejan de aplicar).
+    data: { plan, customMonthlyPriceMxn: customPrice, customPlan: false, customMaxLeads: null, customMaxUsers: null, customMaxAutomations: null, customMaxAiAgents: null },
   });
 
   // SmartCard guarda su propio límite de integrantes; se iguala al del plan.

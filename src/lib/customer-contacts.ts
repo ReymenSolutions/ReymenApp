@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { getPlan } from "./plans";
+import { getOrgLimits } from "./plans";
 import { hasModule } from "./modules";
 import { UserError } from "./user-error";
 import { monthPeriod, METRIC_KEYS } from "./metrics";
@@ -8,8 +8,7 @@ import type { StoredDomainEvent } from "./domain-events";
 /** Same identity and capacity lock for automatic and manual customer conversion. */
 export async function ensureCustomerContact(organizationId: string, customerId: string, opts: { manual?: boolean; userId?: string } = {}) {
   if (!(await hasModule(organizationId, "CRM"))) return null;
-  const org = await prisma.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { plan: true } });
-  const limit = (await getPlan(org.plan)).limits.leads;
+  const limit = (await getOrgLimits(organizationId)).leads;
   return prisma.$transaction(async (tx) => {
     // Share the plan lock with every normal contact creation, including unlimited plans.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`plancap:${organizationId}:leads`}))`;

@@ -384,7 +384,10 @@ export async function planMemberLimit(plan: string): Promise<number | null> {
  */
 export async function syncSmartcardMemberLimitForPlan(organizationId: string, plan: string): Promise<MemberLimitSync | "failed"> {
   try {
-    return await syncSmartcardMemberLimit(organizationId, await planMemberLimit(plan));
+    // Con plan «A la medida» manda el límite de usuarios pactado con el cliente, no el de su plan base.
+    const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { customPlan: true, customMaxUsers: true } });
+    const limit = org?.customPlan ? org.customMaxUsers : await planMemberLimit(plan);
+    return await syncSmartcardMemberLimit(organizationId, limit);
   } catch (e) {
     console.error("[smartcard-link] No se pudo igualar el límite de SmartCard al plan:", e);
     return "failed";

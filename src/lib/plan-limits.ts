@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
-import { getPlan } from "./plans";
+import { getOrgLimits } from "./plans";
 import { UserError } from "./user-error";
 
 type PlanResource = "leads" | "users" | "automations";
@@ -28,11 +28,7 @@ function capacityError(resource: PlanResource, limit: number) {
 
 /** Throws a clear, upgrade-prompting error once the org is at or over its plan's cap for that resource. */
 export async function assertPlanCapacity(organizationId: string, resource: PlanResource): Promise<void> {
-  const org = await prisma.organization.findUniqueOrThrow({
-    where: { id: organizationId },
-    select: { plan: true },
-  });
-  const limit = (await getPlan(org.plan)).limits[resource];
+  const limit = (await getOrgLimits(organizationId))[resource];
   // Sin tope (ilimitado): nunca se bloquea.
   if (limit === null) return;
   const currentCount = await countResource(organizationId, resource);
@@ -55,8 +51,7 @@ export async function withPlanCapacity<T>(
   create: (tx: Prisma.TransactionClient) => Promise<T>
 ): Promise<T> {
   // El tope se resuelve ANTES de abrir la transacción (usa el caché del catálogo y otra conexión).
-  const org = await prisma.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { plan: true } });
-  const limit = (await getPlan(org.plan)).limits[resource];
+  const limit = (await getOrgLimits(organizationId))[resource];
 
   return prisma.$transaction(
     async (tx) => {
