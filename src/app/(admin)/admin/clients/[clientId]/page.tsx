@@ -3,10 +3,10 @@ import Link from "next/link";
 import { ArrowLeft, Users, FileText, Layers, AlertTriangle, Bot, MessageSquare, SlidersHorizontal, BookOpen, BarChart3 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getRulebook, rulebookProgress } from "@/lib/rulebook";
-import { getServerT } from "@/lib/i18n-server";
+import { getServerLang, getServerT } from "@/lib/i18n-server";
 import { getEnabledModules } from "@/lib/modules";
 import { METRIC_KEYS, monthPeriod } from "@/lib/metrics";
-import { getPlan, getPlans, monthlyPriceMxn } from "@/lib/plans";
+import { customPlanName, getOrgLimits, getPlan, getPlans, monthlyPriceMxn } from "@/lib/plans";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { ClientTabs, type ClientTab } from "@/components/admin/ClientTabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +20,7 @@ import { getOrganizationBlueprints } from "@/actions/admin/blueprints";
 import { OrganizationModulesPanel } from "@/components/admin/OrganizationModulesPanel";
 import { PurgePosSalesPanel } from "@/components/admin/PurgePosSalesPanel";
 import { SmartcardLinkPanel } from "@/components/admin/SmartcardLinkPanel";
-import { getSmartcardLinkState, planMemberLimit } from "@/lib/smartcard-link";
+import { getSmartcardLinkState } from "@/lib/smartcard-link";
 import { AdminClientUsersPanel } from "@/components/admin/AdminClientUsersPanel";
 import { ConsumptionChart } from "@/components/charts/ConsumptionChart";
 import { getOrganizationModules } from "@/actions/admin/modules";
@@ -109,8 +109,10 @@ export default async function ClientDetailPage({ params, searchParams }: { param
   ]);
   if (!client) notFound();
   const hasModule = (m: PlatformModule) => enabledModules.includes(m);
-  const [planInfo, catalog, planMemberCap] = await Promise.all([getPlan(client.plan), getPlans(), planMemberLimit(client.plan)]);
-  const leadsLimit = planInfo.limits.leads;
+  const [planInfo, catalog, orgLimits, lang] = await Promise.all([getPlan(client.plan), getPlans(), getOrgLimits(client.id), getServerLang()]);
+  // Límites que de verdad aplican: los del plan, o los propios si el cliente es «A la medida».
+  const leadsLimit = orgLimits.leads;
+  const planMemberCap = orgLimits.users;
   const planModules = planInfo.modules;
   const automationErrors = client.automations.filter((a) => a.status === "ERROR").length;
 
@@ -145,7 +147,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
 
       <PageHeader
         title={client.name}
-        description={`${client.slug} · ${client.industry ?? t.adminNoIndustry} · ${planInfo.name} $${monthlyPriceMxn(planInfo, client.customMonthlyPriceMxn !== null ? Number(client.customMonthlyPriceMxn) : null).toLocaleString("en-US")} MXN`}
+        description={`${client.slug} · ${client.industry ?? t.adminNoIndustry} · ${orgLimits.custom ? customPlanName(lang) : planInfo.name} $${monthlyPriceMxn(planInfo, client.customMonthlyPriceMxn !== null ? Number(client.customMonthlyPriceMxn) : null).toLocaleString("en-US")} MXN`}
         actions={
           <div className="flex items-center gap-2">
             <OrgWebhookInfoDialog
@@ -159,6 +161,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
               currentPlan={client.plan}
               plans={catalog}
               currentCustomPrice={client.customMonthlyPriceMxn !== null ? Number(client.customMonthlyPriceMxn) : null}
+              isCustomPlan={orgLimits.custom}
             />
             <ToggleClientStatusButton orgId={client.id} isActive={client.isActive} />
             <Badge variant={client.isActive ? "success" : "destructive"}>

@@ -76,7 +76,7 @@ export function AiBudgetPanel({ orgId, view, providers }: { orgId: string; view:
         <div>
           <h4 className="mb-2 text-sm font-semibold text-slate-900">{es ? "Agentes" : "Agents"}</h4>
           <p className={`mb-2 text-xs ${ac.overBy > 0 ? "font-medium text-amber-700" : "text-slate-500"}`}>
-            {es ? "Agentes IA activos" : "Active AI agents"}: {ac.active} / {ac.cap === null ? (es ? "sin tope" : "no cap") : ac.cap} ({ac.source === "override" ? (es ? "tope pactado con el cliente" : "cap agreed with the client") : es ? "tope de su plan" : "its plan's cap"})
+            {es ? "Agentes IA activos" : "Active AI agents"}: {ac.active} / {ac.cap === null ? (es ? "sin tope" : "no cap") : ac.cap} ({ac.source === "custom" ? (es ? "plan A la medida" : "Custom Service plan") : ac.source === "override" ? (es ? "tope pactado con el cliente" : "cap agreed with the client") : es ? "tope de su plan" : "its plan's cap"})
             {ac.overBy > 0 && ` · ${es ? `por encima del tope (+${ac.overBy}); conserva lo que tiene pero no puede activar más` : `over the cap (+${ac.overBy}); keeps what it has but cannot turn more on`}`}
           </p>
           <ul className="divide-y divide-slate-100 rounded-lg border border-slate-100">
@@ -91,6 +91,11 @@ export function AiBudgetPanel({ orgId, view, providers }: { orgId: string; view:
           </ul>
         </div>
 
+        {ac.source === "custom" ? (
+          <p className="rounded-lg border border-violet-100 bg-violet-50/60 p-3 text-xs text-violet-900">
+            {es ? "Este cliente tiene plan A la medida: su tope de agentes IA se ajusta en Admin → Planes → A la medida → Configurar." : "This client has a Custom Service plan: its AI agents cap is set in Admin → Plans → Custom Service → Configure."}
+          </p>
+        ) : (
         <div className="space-y-2 rounded-lg border border-slate-100 p-3">
           <h4 className="text-sm font-semibold text-slate-900">{es ? "Tope de agentes IA (excepción para este cliente)" : "AI agents cap (exception for this client)"}</h4>
           <div className="flex flex-wrap gap-2">
@@ -100,6 +105,7 @@ export function AiBudgetPanel({ orgId, view, providers }: { orgId: string; view:
           </div>
           <p className="text-xs text-slate-500">{es ? "Reemplaza el tope del plan solo para este cliente. Nunca apaga agentes: si queda por debajo de los activos, conserva lo que tiene pero no puede activar más." : "Replaces the plan's cap for this client only. It never turns agents off: if it ends below the active ones, the client keeps what it has but cannot turn more on."}</p>
         </div>
+        )}
 
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="space-y-2 rounded-lg border border-slate-100 p-3">

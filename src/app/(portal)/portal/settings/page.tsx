@@ -14,7 +14,8 @@ import { BillingActions } from "@/components/portal/BillingActions";
 import { PipelineStagesPanel } from "@/components/portal/PipelineStagesPanel";
 import { formatDate } from "@/lib/utils";
 import { can } from "@/lib/permissions";
-import { getPlan, monthlyPriceMxn, planDescription, planName } from "@/lib/plans";
+import { customPlanName, getOrgLimits, getPlan, monthlyPriceMxn, planDescription, planName } from "@/lib/plans";
+import { getEnabledModules } from "@/lib/modules";
 import { accentTone } from "@/lib/plan-accent";
 import { getModuleLabel } from "@/lib/modules";
 import { isStripeConfigured } from "@/lib/stripe";
@@ -61,7 +62,9 @@ export default async function PortalSettingsPage() {
   const canManagePipeline = can(session.user.role as UserRole, "pipeline:manage");
   const plan = await getPlan(org.plan);
   const billing = await getBillingView(org.id);
-  const planModules = plan.modules;
+  // Con plan «A la medida» el cliente ve sus propios límites y módulos, no los de su plan base.
+  const limits = await getOrgLimits(org.id);
+  const planModules = limits.custom ? await getEnabledModules(org.id) : plan.modules;
   const stripeEnabled = isStripeConfigured();
   const hasActiveSubscription =
     org.stripeSubscriptionStatus === "active" || org.stripeSubscriptionStatus === "trialing";
@@ -95,7 +98,7 @@ export default async function PortalSettingsPage() {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-500">{t.plan}</span>
-              <Badge variant="outline" className={`border-transparent text-sm px-3 ${accentTone(plan.accent).badge}`}>{planName(plan, lang)}</Badge>
+              <Badge variant="outline" className={`border-transparent text-sm px-3 ${accentTone(limits.custom ? "violet" : plan.accent).badge}`}>{limits.custom ? customPlanName(lang) : planName(plan, lang)}</Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-500">{lang === "es" ? "Mensualidad" : "Monthly price"}</span>
@@ -105,9 +108,10 @@ export default async function PortalSettingsPage() {
             </div>
             <div className="space-y-2">
               {[
-                { label: t.includedLeads, value: plan.limits.leads === null ? t.unlimited : plan.limits.leads.toLocaleString("en-US") },
-                { label: t.users, value: plan.limits.users === null ? t.unlimited : plan.limits.users },
-                { label: t.automations, value: plan.limits.automations === null ? t.unlimitedF : plan.limits.automations },
+                { label: t.includedLeads, value: limits.leads === null ? t.unlimited : limits.leads.toLocaleString("en-US") },
+                { label: t.users, value: limits.users === null ? t.unlimited : limits.users },
+                { label: t.automations, value: limits.automations === null ? t.unlimitedF : limits.automations },
+                ...(limits.custom ? [{ label: lang === "es" ? "Agentes IA" : "AI agents", value: limits.aiAgents === null ? t.unlimited : limits.aiAgents }] : []),
               ].map(({ label, value }) => (
                 <div key={label} className="flex justify-between text-sm">
                   <span className="text-slate-500">{label}</span>
@@ -115,8 +119,8 @@ export default async function PortalSettingsPage() {
                 </div>
               ))}
             </div>
-            {planDescription(plan, lang) && <p className="text-xs text-slate-500">{planDescription(plan, lang)}</p>}
-            {plan.features.length > 0 && (
+            {!limits.custom && planDescription(plan, lang) && <p className="text-xs text-slate-500">{planDescription(plan, lang)}</p>}
+            {!limits.custom && plan.features.length > 0 && (
               <ul className="space-y-1 text-xs text-slate-600">
                 {plan.features.map((f) => (
                   <li key={f.es} className="flex gap-1.5"><span aria-hidden="true" className="text-emerald-600">✓</span>{lang === "en" ? f.en : f.es}</li>

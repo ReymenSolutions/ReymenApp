@@ -95,3 +95,55 @@ export function monthlyPriceMxn(plan: Pick<PlanDef, "priceMxn">, customMonthlyPr
 export async function planLabels(lang: string): Promise<Record<string, string>> {
   return Object.fromEntries((await getPlans({ includeInactive: true })).map((p) => [p.key, planName(p, lang)]));
 }
+
+// ── Plan «A la medida» (Custom Service) ──────────────────────────────────────────────────────────────────────────
+// No es una fila del catálogo: es un cliente con customPlan = true, sus propios límites (Organization.customMax*, null =
+// ilimitado) y los módulos que el admin le encendió. Conserva un plan base (Organization.plan) como referencia de
+// facturación. Toda validación de capacidad pasa por limitsFor / getOrgLimits para respetar ambos casos.
+
+export const CUSTOM_PLAN_NAME = { es: "A la medida", en: "Custom Service" } as const;
+export const customPlanName = (lang: string) => (lang === "en" ? CUSTOM_PLAN_NAME.en : CUSTOM_PLAN_NAME.es);
+
+export const ORG_PLAN_SELECT = {
+  plan: true,
+  customPlan: true,
+  customMaxLeads: true,
+  customMaxUsers: true,
+  customMaxAutomations: true,
+  customMaxAiAgents: true,
+  aiAgentsCapOverride: true,
+} as const;
+
+export type OrgPlanFields = {
+  plan: string;
+  customPlan: boolean;
+  customMaxLeads: number | null;
+  customMaxUsers: number | null;
+  customMaxAutomations: number | null;
+  customMaxAiAgents: number | null;
+  aiAgentsCapOverride: number | null;
+};
+
+export type OrgLimits = PlanDef["limits"] & {
+  custom: boolean;
+  /** Tope de agentes IA activos; null = sin tope. */
+  aiAgents: number | null;
+  aiAgentsSource: "custom" | "override" | "plan";
+};
+
+/** Límites que de verdad aplican a una organización: los suyos si es «A la medida», si no los de su plan (más el tope de agentes pactado). */
+export function limitsFor(org: OrgPlanFields, plan: PlanDef): OrgLimits {
+  if (org.customPlan) {
+    return { custom: true, leads: org.customMaxLeads, users: org.customMaxUsers, automations: org.customMaxAutomations, aiAgents: org.customMaxAiAgents, aiAgentsSource: "custom" };
+  }
+  const override = org.aiAgentsCapOverride;
+  return { custom: false, ...plan.limits, aiAgents: override !== null ? override : plan.maxAiAgents, aiAgentsSource: override !== null ? "override" : "plan" };
+}
+
+export async function getOrgLimits(organizationId: string): Promise<OrgLimits> {
+  const org = await prisma.organization.findUniqueOrThrow({ where: { id: organizationId }, select: ORG_PLAN_SELECT });
+  return limitsFor(org, await getPlan(org.plan));
+}
+
+/** Nombre del plan de una organización para mostrar: «A la medida» o el del catálogo. */
+export const orgPlanName = (org: { customPlan: boolean }, plan: Pick<PlanDef, "name" | "nameEn">, lang: string) => (org.customPlan ? customPlanName(lang) : planName(plan, lang));

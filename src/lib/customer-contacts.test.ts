@@ -42,8 +42,9 @@ describe("automatic customer contacts", () => {
   });
   it("respects capacity without rejecting a sale identity, and retries when capacity is restored", async () => {
     const c = await customer("5512340007");
-    const plan = await plans.getPlan((await prisma.organization.findUniqueOrThrow({ where: { id: org.id } })).plan);
-    const mock = vi.spyOn(plans, "getPlan").mockResolvedValue({ ...plan, limits: { ...plan.limits, leads: 0 } });
+    // El tope efectivo sale de getOrgLimits (plan o «A la medida»); aquí se simula un tope de 0 leads.
+    const limits = await plans.getOrgLimits(org.id);
+    const mock = vi.spyOn(plans, "getOrgLimits").mockResolvedValue({ ...limits, leads: 0 });
     try {
       expect(await ensureCustomerContact(org.id, c.id)).toBeNull();
       expect((await prisma.customer.findUniqueOrThrow({ where: { id: c.id } })).leadId).toBeNull();
