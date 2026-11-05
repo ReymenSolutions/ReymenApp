@@ -33,6 +33,20 @@ Mismo flujo de Meta (paso 2): con `leadgen` suscrito, cada formulario enviado cr
 ## 4. Mensajes de automatizaciones — `n8n/workflows/reymen-action-message.json`
 Reemplaza al flujo anterior (que solo simulaba). En **Verificar y preparar**: `twilioAccountSid`, por cliente su número (`clientes`) y el `contentSid` de cada plantilla aprobada. Lo que no tenga plantilla se registra como «omitido» en Reymen, sin enviar.
 
+**Plantillas generales y propias de un negocio**
+- `plantillas` (abajo) son las **generales**: las usan todos los negocios. Con `businessName` en una variable, un mismo texto sirve para todos («Hola {{1}}, gracias por visitar {{2}}»).
+- Si un negocio quiere sus propios textos, se agrega `plantillas` **dentro de su renglón**, solo con las que cambian. Para ese negocio se usa la suya; las demás siguen siendo las generales:
+  ```js
+  clientes: {
+    'ID_LONIER': { whatsapp: '+5281…1' },
+    'ID_VILLA':  { whatsapp: '+5281…2', plantillas: {
+      birthday_campaign_v1: { contentSid: 'HX…', variables: ['name'] },
+    } },
+  },
+  ```
+- `variables` dice qué dato va en `{{1}}`, `{{2}}`…: `name` (cliente), `businessName`, `daysSince` (días sin venir), `rewardName` (recompensa), `feedbackUrl` (enlace para opinar).
+- Si cada número de WhatsApp está en una cuenta de WhatsApp Business distinta, cada negocio necesita sus plantillas aprobadas en su propia cuenta aunque el texto sea igual: en ese caso, pon las de cada uno en su renglón.
+
 ## Si algo no llega
 - **Mensaje entrante no aparece**: en n8n → Executions, revisa el error. «no está en Configuración» = falta el número/página de ese cliente. `401` de Reymen = `orgId` o `llave` mal copiados.
 - **La respuesta sale «no enviado»**: el flujo de salida falló (Executions). Fuera de 24 h WhatsApp la rechaza (error 63016).
