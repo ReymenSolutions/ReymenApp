@@ -32,7 +32,7 @@ El cuerpo trae organización, automatización, ejecución (`id`, `attempt`), dis
 - Respuestas: `200`, `400` cuerpo inválido, `401` firma/hora/token inválidos, `404` ejecución desconocida, `429`, `503` sin `N8N_WEBHOOK_SECRET`.
 
 ## Workflows
-`n8n/workflows/reymen-action-message.json` (importar en n8n y activar). Envía por **WhatsApp con Twilio** usando **plantillas aprobadas** (`contentSid` por `templateKey` en el nodo «Verificar y preparar»; `variables` dice qué dato va en `{{1}}`, `{{2}}`…). Callback: `sent` si Twilio aceptó (con su `sid`), `failed` con el error de Twilio, `skipped` si el canal no es WhatsApp, el cliente no tiene número o la plantilla no está configurada (nunca manda texto suelto). La credencial «Twilio» vive en n8n.
+`n8n/workflows/reymen-action-message.json` (importar en n8n y activar). Envía por **WhatsApp con Twilio** usando **plantillas aprobadas** (`contentSid` por `templateKey` en el nodo «Verificar y preparar»; `variables` dice qué dato va en `{{1}}`, `{{2}}`…). Plantillas generales para todos los negocios y, opcionalmente, propias por negocio dentro de su renglón de `clientes` (tienen prioridad). Callback: `sent` si Twilio aceptó (con su `sid`), `failed` con el error de Twilio, `skipped` si el canal no es WhatsApp, el cliente no tiene número o la plantilla no está configurada (nunca manda texto suelto). La credencial «Twilio» vive en n8n.
 
 ## Avisos internos (alertas y reportes) — `reymen-action-notify`
 Mismo despachador, otro workflow genérico: `POST {N8N_BASE_URL}/webhook/reymen-action-notify` (tipo `action.notify.send`), con las **mismas firmas, headers, idempotencia (`<executionId>:<intento>`) y callback** que el de mensajes. Sirve a **todos** los clientes: no lleva nombres, teléfonos, plantillas ni horarios dentro.
