@@ -12,7 +12,7 @@
           ]
         }
       },
-      "id": "da944d30-6618-469a-8767-b661cc209287",
+      "id": "dc0ef0d6-721c-55b9-8d85-ac26199dd068",
       "name": "Cada 30 minutos",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
@@ -23,61 +23,14 @@
     },
     {
       "parameters": {
-        "jsCode": "// CONFIGURACIÓN de este cliente. Es lo único que se edita en este flujo.\n// - orgId y llave: Admin de Reymen → Clientes → (cliente) → botón de webhook (\"ID de organización\" y \"llave de conexión\").\n//   La llave es secreta: este flujo queda guardado en tu n8n; no lo exportes ni lo compartas con la llave puesta.\n// - Twilio: el Account SID está en la consola de Twilio; el token va en la credencial \"Twilio\" de n8n (no aquí).\n// - contentSid: plantilla de WhatsApp APROBADA en Twilio (Content Template Builder). WhatsApp exige plantilla para escribirle\n//   a alguien que no te ha escrito en las últimas 24 h, que es el caso normal de un seguimiento. Si se deja vacío, se manda el\n//   texto de la regla de Reymen, que solo entrega dentro de esas 24 h.\n// - modoPrueba: true = solo arma los mensajes y los muestra, sin enviar ni avisar a Reymen. Ponlo en false cuando todo esté bien.\nreturn [{ json: {\n  reymenUrl: 'https://app.reymen.mx',\n  orgId: 'PEGA_AQUI_EL_ID_DE_LA_ORGANIZACION',\n  llave: 'PEGA_AQUI_LA_LLAVE_DE_CONEXION',\n  twilioAccountSid: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',\n  whatsappFrom: '+528100000000', // tu número de WhatsApp en Twilio, con +52\n  contentSid: '',\n  horaInicio: 9,\n  horaFin: 20,\n  zonaHoraria: 'America/Monterrey',\n  maxPorCorrida: 40,\n  modoPrueba: true,\n} }];"
+        "jsCode": "\n// Teléfono a formato internacional (+52 + 10 dígitos para México; otros países ya con su lada).\nfunction e164(raw) {\n  const s = String(raw || '').replace(/^whatsapp:/, '');\n  const d = s.replace(/\\D/g, '');\n  if (d.length === 10) return '+52' + d;\n  if (d.length === 13 && d.startsWith('521')) return '+52' + d.slice(3);\n  if (s.trim().startsWith('+') && d.length >= 11) return '+' + d;\n  if (d.length === 12 && d.startsWith('52')) return '+' + d;\n  return null;\n}\n// Cuerpo application/x-www-form-urlencoded para Twilio. (El código de n8n 2.x no trae URLSearchParams.)\nconst formulario = (campos) => Object.entries(campos).filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(String(v))).join('&');\nconst twilioUrl = (cfg, c) => 'https://api.twilio.com/2010-04-01/Accounts/' + (c.twilioAccountSid || cfg.twilioAccountSid) + '/Messages.json';\n\n// CONFIGURACIÓN (lo único que se edita). Sirve a uno o a varios negocios: un renglón por negocio en «clientes».\n// - Las REGLAS (a quién, cuándo, cuántos intentos y el texto) las define cada negocio en Reymen:\n//   CRM → Contactos → Configurar seguimientos. Reymen decide a quién le toca; este flujo solo lo envía.\n// - orgId y llave: Admin de Reymen → Clientes → (cliente) → botón de webhook. La llave es secreta: no exportes ni\n//   compartas este flujo con ella puesta. El token de Twilio va en la credencial «Twilio» de n8n (no aquí).\n// - PLANTILLAS: WhatsApp exige plantilla APROBADA para escribirle a alguien que no te ha escrito en las últimas 24 h\n//   (el caso normal de un seguimiento). Se busca en este orden y se usa la primera que tenga contentSid:\n//     1) la del negocio para esa regla (por su nombre en Reymen), 2) la del negocio «default»,\n//     3) la general para esa regla, 4) la general «default».\n//   Sin ninguna, se manda el texto de la regla de Reymen, que WhatsApp solo entrega dentro de las 24 h.\n//   variables = qué dato va en {{1}}, {{2}}…: contactName (primer nombre), fullName, businessName, ruleName, attemptNumber.\n//   Si cada número está en una cuenta de WhatsApp Business distinta, cada negocio necesita sus plantillas aprobadas\n//   en su cuenta (aunque el texto sea igual): ponlas en su renglón.\n// - modoPrueba: true = solo arma y muestra los mensajes, sin enviar ni avisar a Reymen. Se puede poner por negocio\n//   (por ejemplo, un negocio nuevo en prueba mientras los demás ya envían).\nconst cfg = {\n  reymenUrl: 'https://app.reymen.mx',\n  twilioAccountSid: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',\n  horaInicio: 9,\n  horaFin: 20,\n  zonaHoraria: 'America/Monterrey',\n  maxPorCorrida: 40,       // por negocio\n  modoPrueba: true,\n  plantillas: {\n    default: { contentSid: '', variables: ['contactName'] },\n    // 'Recontacto semanal': { contentSid: 'HX...', variables: ['contactName', 'businessName'] },\n  },\n  clientes: [\n    { nombre: 'Villa Gardenia', orgId: 'PEGA_AQUI_EL_ID_DE_LA_ORGANIZACION', llave: 'PEGA_AQUI_LA_LLAVE_DE_CONEXION', whatsapp: '+528100000000' },\n    // Ejemplo de otro negocio con horario, prueba y plantillas propias (borra o copia este renglón):\n    // { nombre: 'Otro negocio', orgId: '...', llave: '...', whatsapp: '+528100000001', horaInicio: 10, horaFin: 19, modoPrueba: true,\n    //   plantillas: { default: { contentSid: 'HX...', variables: ['contactName', 'businessName'] } } },\n  ],\n};\n\nconst primerNombre = (n) => String(n || '').trim().split(/\\s+/)[0] || '';\nconst conSid = (p) => (p && p.contentSid ? p : null);\nconst out = [];\nconst problemas = [];\nfor (const c of cfg.clientes) {\n  if (!c.orgId || c.orgId.startsWith('PEGA_AQUI')) continue;\n  const tz = c.zonaHoraria || cfg.zonaHoraria;\n  const hora = Number(new Intl.DateTimeFormat('es-MX', { hour: 'numeric', hour12: false, timeZone: tz }).format(new Date()));\n  if (hora < (c.horaInicio ?? cfg.horaInicio) || hora >= (c.horaFin ?? cfg.horaFin)) continue; // fuera de su horario\n  let rows;\n  try {\n    const res = await this.helpers.httpRequest({ method: 'GET', url: cfg.reymenUrl + '/api/v1/leads/due-followups', qs: { orgId: c.orgId }, headers: { 'X-Api-Key': c.llave }, json: true, timeout: 20000 });\n    rows = res.data || [];\n  } catch (e) {\n    problemas.push(c.nombre + ': ' + (e.message || 'error al consultar Reymen')); // un negocio con error no detiene a los demás\n    continue;\n  }\n  const propias = c.plantillas || {};\n  let n = 0;\n  for (const r of rows) {\n    if (r.channel !== 'whatsapp') continue;\n    const to = e164(r.contactPhone);\n    if (!to) continue;\n    const datos = { contactName: primerNombre(r.contactName) || 'hola', fullName: r.contactName || '', businessName: c.nombre || '', ruleName: r.ruleName || '', attemptNumber: String(r.attemptNumber || '') };\n    const plantilla = conSid(propias[r.ruleName]) || conSid(propias.default) || conSid((cfg.plantillas || {})[r.ruleName]) || conSid((cfg.plantillas || {}).default);\n    const text = String(r.template || '').replace(/\\{\\{\\s*contactName\\s*\\}\\}/g, primerNombre(r.contactName)).trim();\n    const campos = { From: 'whatsapp:' + e164(c.whatsapp), To: 'whatsapp:' + to };\n    if (plantilla) {\n      const vars = {};\n      (plantilla.variables || ['contactName']).forEach((k, i) => { vars[String(i + 1)] = String(datos[k] || '').trim() || '-'; });\n      campos.ContentSid = plantilla.contentSid;\n      campos.ContentVariables = JSON.stringify(vars);\n    } else {\n      campos.Body = text;\n    }\n    out.push({ json: {\n      negocio: c.nombre, orgId: c.orgId, llave: c.llave, reymenUrl: cfg.reymenUrl,\n      leadId: r.leadId, ruleId: r.ruleId, regla: r.ruleName, attemptNumber: r.attemptNumber,\n      contacto: r.contactName, to, plantilla: plantilla ? plantilla.contentSid : '(texto de la regla)', text,\n      form: formulario(campos), twilioUrl: twilioUrl(cfg, c),\n      modoPrueba: (c.modoPrueba ?? cfg.modoPrueba) === true,\n    } });\n    if (++n >= (c.maxPorCorrida || cfg.maxPorCorrida)) break;\n  }\n}\nif (problemas.length) console.log('Seguimientos: ' + problemas.join(' | '));\nreturn out;\n"
       },
-      "id": "f9630bf4-6e2a-4ff7-886b-16c47ce54de4",
-      "name": "Configuración",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        220,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "url": "={{ $json.reymenUrl }}/api/v1/leads/due-followups",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "orgId",
-              "value": "={{ $json.orgId }}"
-            }
-          ]
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "X-Api-Key",
-              "value": "={{ $json.llave }}"
-            }
-          ]
-        },
-        "options": {
-          "timeout": 20000
-        }
-      },
-      "id": "0822526f-83a9-4e1a-89b6-c37ee76b380a",
-      "name": "Reymen: seguimientos pendientes",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        440,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Toma los seguimientos que Reymen dice que ya tocan y arma un mensaje de WhatsApp por persona.\n// Reymen ya filtró: estado del contacto, tiempo de espera, intentos máximos y \"no contactar\".\nconst cfg = $('Configuración').first().json;\nconst rows = ($input.first().json.data || []);\n\n// Solo en horario del negocio, para no escribir de madrugada.\nconst hora = Number(new Intl.DateTimeFormat('es-MX', { hour: 'numeric', hour12: false, timeZone: cfg.zonaHoraria }).format(new Date()));\nif (hora < cfg.horaInicio || hora >= cfg.horaFin) return [];\n\n// Teléfono a formato internacional de México (+52 + 10 dígitos). Si no se puede, se omite (se reintenta en la próxima corrida).\nfunction e164(raw) {\n  const d = String(raw || '').replace(/\\D/g, '');\n  if (d.length === 10) return '+52' + d;\n  if (d.length === 12 && d.startsWith('52')) return '+' + d;\n  if (d.length === 13 && d.startsWith('521')) return '+52' + d.slice(3);\n  return null;\n}\nconst nombre = (n) => String(n || '').trim().split(/\\s+/)[0] || '';\n\nconst out = [];\nfor (const r of rows) {\n  if (r.channel !== 'whatsapp') continue;\n  const to = e164(r.contactPhone);\n  if (!to) continue;\n  const text = String(r.template || '').replace(/\\{\\{\\s*contactName\\s*\\}\\}/g, nombre(r.contactName)).trim();\n  const form = new URLSearchParams({ From: 'whatsapp:' + cfg.whatsappFrom, To: 'whatsapp:' + to });\n  if (cfg.contentSid) {\n    form.set('ContentSid', cfg.contentSid);\n    form.set('ContentVariables', JSON.stringify({ 1: nombre(r.contactName) || 'hola' }));\n  } else {\n    form.set('Body', text);\n  }\n  out.push({ json: {\n    leadId: r.leadId, ruleId: r.ruleId, attemptNumber: r.attemptNumber,\n    contacto: r.contactName, to, text, form: form.toString(),\n    twilioUrl: 'https://api.twilio.com/2010-04-01/Accounts/' + cfg.twilioAccountSid + '/Messages.json',\n    modoPrueba: cfg.modoPrueba === true,\n  } });\n  if (out.length >= cfg.maxPorCorrida) break;\n}\nreturn out;"
-      },
-      "id": "b609422b-aca9-402f-8b76-05c1bfa1b593",
+      "id": "7ca6e3fb-643a-566d-923f-594e7b8b8533",
       "name": "Preparar mensajes",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        660,
+        260,
         300
       ]
     },
@@ -87,12 +40,10 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "loose",
-            "version": 2
+            "typeValidation": "loose"
           },
           "conditions": [
             {
-              "id": "62842aed-28e9-426c-ae7c-448cdacfc313",
               "leftValue": "={{ $json.modoPrueba }}",
               "rightValue": true,
               "operator": {
@@ -106,24 +57,24 @@
         },
         "options": {}
       },
-      "id": "484a3b7f-abf6-44f4-bc58-4c6346e6a1df",
+      "id": "5feb9f0a-ed70-56fd-8544-6399c75232ef",
       "name": "¿Modo prueba?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
-        880,
+        500,
         300
       ]
     },
     {
       "parameters": {},
-      "id": "e8a530ec-b267-4b90-b944-b5ca61cedb94",
+      "id": "09de37ed-ec87-5378-add0-35a15b6e1390",
       "name": "Solo vista previa (no envía)",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        1100,
-        180
+        760,
+        160
       ]
     },
     {
@@ -138,6 +89,11 @@
         "body": "={{ $json.form }}",
         "options": {
           "timeout": 20000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
           "batching": {
             "batch": {
               "batchSize": 1,
@@ -146,26 +102,25 @@
           }
         }
       },
-      "id": "97096fb8-778b-4be8-a041-c529c45b4072",
+      "id": "ec541d1d-e320-5c1f-aed9-5526962b297c",
       "name": "Twilio: enviar WhatsApp",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1100,
+        760,
         420
-      ],
-      "onError": "continueRegularOutput"
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Para cada mensaje que Twilio aceptó (trae \"sid\"), arma el aviso firmado para que Reymen cuente el intento.\n// Los que fallaron no se avisan: Reymen los vuelve a ofrecer en la próxima corrida.\n// Requiere NODE_FUNCTION_ALLOW_BUILTIN=crypto en el entorno de n8n (el mismo que ya usan los demás flujos de Reymen).\nconst crypto = require('crypto');\nconst cfg = $('Configuración').first().json;\nconst enviados = $('Preparar mensajes').all();\nconst out = [];\n$input.all().forEach((res, i) => {\n  const sent = enviados[i] && enviados[i].json;\n  if (!sent || !res.json.sid) return;\n  const body = JSON.stringify({ leadId: sent.leadId, ruleId: sent.ruleId });\n  const ts = String(Date.now());\n  const sig = 'sha256=' + crypto.createHmac('sha256', cfg.llave).update(ts + '.' + body).digest('hex');\n  out.push({ json: {\n    url: cfg.reymenUrl + '/api/webhooks/n8n/followup-sent',\n    orgId: cfg.orgId, body, ts, sig,\n    // Id estable por intento: si este aviso se repite, Reymen lo cuenta una sola vez.\n    eventId: 'followup:' + sent.leadId + ':' + sent.ruleId + ':' + sent.attemptNumber,\n    contacto: sent.contacto, twilioSid: res.json.sid,\n  } });\n});\nreturn out;"
+        "jsCode": "\n// Por cada mensaje que Twilio aceptó (trae «sid»), avisa a Reymen —firmado con la llave de ESE negocio— para que\n// cuente el intento. Los que fallaron no se avisan: Reymen los vuelve a ofrecer en la próxima corrida.\n// Requiere NODE_FUNCTION_ALLOW_BUILTIN=crypto en el entorno de n8n.\nconst crypto = require('crypto');\nconst out = [];\n$input.all().forEach((res, i) => {\n  const sent = $('Preparar mensajes').itemMatching(i).json;\n  if (!sent || !res.json.sid) return;\n  const body = JSON.stringify({ leadId: sent.leadId, ruleId: sent.ruleId });\n  const ts = String(Date.now());\n  const sig = 'sha256=' + crypto.createHmac('sha256', sent.llave).update(ts + '.' + body).digest('hex');\n  out.push({ json: {\n    url: sent.reymenUrl + '/api/webhooks/n8n/followup-sent',\n    orgId: sent.orgId, body, ts, sig,\n    // Id estable por intento: si este aviso se repite, Reymen lo cuenta una sola vez.\n    eventId: 'followup:' + sent.leadId + ':' + sent.ruleId + ':' + sent.attemptNumber,\n    negocio: sent.negocio, contacto: sent.contacto, twilioSid: res.json.sid,\n  } });\n});\nreturn out;\n"
       },
-      "id": "1fe9ea9d-1045-40ec-89b7-e8f646620d0a",
+      "id": "3b7d3d79-22b6-5564-ab7e-3992d7f3cf2d",
       "name": "Firmar aviso a Reymen",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1320,
+        1000,
         420
       ]
     },
@@ -202,41 +157,18 @@
           "timeout": 20000
         }
       },
-      "id": "9bde9e60-6117-404b-aac0-d2437ac2404a",
+      "id": "4410ef8b-5f7a-58ff-84d0-645420419211",
       "name": "Reymen: seguimiento enviado",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1540,
+        1240,
         420
-      ],
-      "onError": "continueRegularOutput"
+      ]
     }
   ],
   "connections": {
     "Cada 30 minutos": {
-      "main": [
-        [
-          {
-            "node": "Configuración",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Configuración": {
-      "main": [
-        [
-          {
-            "node": "Reymen: seguimientos pendientes",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Reymen: seguimientos pendientes": {
       "main": [
         [
           {

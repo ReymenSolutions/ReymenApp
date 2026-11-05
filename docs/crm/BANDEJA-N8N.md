@@ -5,6 +5,7 @@ Todo pasa por n8n: Reymen no guarda tokens de Twilio ni de Meta. Cada mensaje qu
 ## Antes de empezar (una sola vez)
 1. En el servidor de Reymen: `N8N_BASE_URL` (la dirección de n8n que ve Reymen) y `N8N_WEBHOOK_SECRET` (el mismo valor también en n8n).
 2. En n8n: `NODE_FUNCTION_ALLOW_BUILTIN=crypto` y `N8N_WEBHOOK_SECRET` (ya los tienes si funcionan los seguimientos).
+   - **n8n 2.x** no deja que los flujos lean variables de entorno. En cada flujo, pon el mismo valor de `N8N_WEBHOOK_SECRET` en `secretoReymen` (nodo Configuración / Verificar y preparar), o agrega `N8N_BLOCK_ENV_ACCESS_IN_NODE=false` al entorno de n8n.
 3. Por cliente: en Reymen, **Admin → Clientes → (cliente) → botón de webhook**: copia el **ID de organización** y la **llave de conexión**. La llave es secreta.
 
 ## 1. WhatsApp con Twilio — `n8n/workflows/reymen-inbox-whatsapp-twilio.json`
@@ -47,7 +48,11 @@ Reemplaza al flujo anterior (que solo simulaba). En **Verificar y preparar**: `t
 - `variables` dice qué dato va en `{{1}}`, `{{2}}`…: `name` (cliente), `businessName`, `daysSince` (días sin venir), `rewardName` (recompensa), `feedbackUrl` (enlace para opinar).
 - Si cada número de WhatsApp está en una cuenta de WhatsApp Business distinta, cada negocio necesita sus plantillas aprobadas en su propia cuenta aunque el texto sea igual: en ese caso, pon las de cada uno en su renglón.
 
+## 5. Seguimientos de clientes — `n8n/workflows/reymen-followups-whatsapp.json`
+Un solo flujo para todos los negocios: un renglón por negocio en `clientes` del nodo **Preparar mensajes** (su `orgId`, `llave`, número de WhatsApp y, si quiere, su horario, `modoPrueba` y plantillas propias). Las reglas se definen en Reymen (CRM → Contactos → Configurar seguimientos). Plantillas: la del negocio para esa regla → la `default` del negocio → la general para esa regla → la `default` general. Detalle en `docs/automations/N8N.md`.
+
 ## Si algo no llega
 - **Mensaje entrante no aparece**: en n8n → Executions, revisa el error. «no está en Configuración» = falta el número/página de ese cliente. `401` de Reymen = `orgId` o `llave` mal copiados.
+- **«Falta el secreto de Reymen» o «access to env vars denied»**: n8n 2.x; llena `secretoReymen` (ver «Antes de empezar»).
 - **La respuesta sale «no enviado»**: el flujo de salida falló (Executions). Fuera de 24 h WhatsApp la rechaza (error 63016).
 - **Meta no valida el webhook**: el `verifyToken` no coincide o el flujo no está activo.

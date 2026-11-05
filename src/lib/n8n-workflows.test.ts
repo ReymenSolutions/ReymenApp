@@ -26,6 +26,19 @@ describe("flujos de n8n del repositorio", () => {
     }
   });
 
+  it("funcionan en n8n 2.x: sin URLSearchParams y sin leer variables de entorno fuera de un try", () => {
+    // En n8n 2.x el código corre aislado: no existe URLSearchParams y $env está bloqueado por defecto
+    // (N8N_BLOCK_ENV_ACCESS_IN_NODE). Ambos se descubrieron al probar los flujos en un n8n real.
+    for (const file of files) {
+      const wf = JSON.parse(readFileSync(join(DIR, file), "utf8")) as Workflow;
+      for (const node of wf.nodes.filter((n) => n.type === "n8n-nodes-base.code")) {
+        const js = String(node.parameters.jsCode ?? "");
+        expect(js, `${file} › ${node.name}`).not.toMatch(/new URLSearchParams|URLSearchParams\(/);
+        for (const line of js.split("\n").filter((l) => l.includes("$env"))) expect(line, `${file} › ${node.name}`).toMatch(/try\s*\{/);
+      }
+    }
+  });
+
   it("no traen secretos reales: solo los textos para pegar", () => {
     for (const file of files) {
       const raw = readFileSync(join(DIR, file), "utf8");
