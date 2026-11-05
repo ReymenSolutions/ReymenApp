@@ -32,6 +32,13 @@ model Organization {
   customMonthlyPriceMxn    Decimal?  @db.Decimal(10, 2)
   // Tope de agentes IA activos pactado con este cliente (plan Custom). Null = el de su plan (Plan.maxAiAgents).
   aiAgentsCapOverride      Int?
+  // Plan «A la medida» (Custom Service): módulos y límites pactados con este cliente. Con customPlan, los custom* mandan
+  // sobre los del plan base (null = ilimitado / sin tope) y los módulos son los que el admin encendió; sin customPlan se ignoran.
+  customPlan               Boolean   @default(false)
+  customMaxLeads           Int?
+  customMaxUsers           Int?
+  customMaxAutomations     Int?
+  customMaxAiAgents        Int?
   // Hasta cuándo está pagada la suscripción (próximo vencimiento). Null = este cliente aún no se factura por la plataforma:
   // no hay avisos ni estado de pago. Lo fija un pago registrado (manual o de Stripe) o un admin.
   billingPeriodEnd         DateTime?

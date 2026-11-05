@@ -68,6 +68,11 @@ export default async function LoyaltyProgramPage({ searchParams }: { searchParam
     };
   }
 
+  // Ventas del POS que no se pudieron convertir en visitas: el botón para reintentarlas solo aparece si hay alguna.
+  const failedEvents = ctx.canManage
+    ? await prisma.domainEvent.count({ where: { organizationId: ctx.orgId, status: "FAILED", type: { in: ["sale.completed", "sale.cancelled"] } } })
+    : 0;
+
   return (
     <div className="space-y-6">
       <Card><CardContent className="space-y-3 p-4">
@@ -80,7 +85,7 @@ export default async function LoyaltyProgramPage({ searchParams }: { searchParam
         </div>)}
         {ctx.canManage && <Link className="inline-block text-brand-600 underline" href="/portal/loyalty/program?new=1">{ctx.lang === "es" ? "Crear otro programa" : "Create another program"}</Link>}
       </CardContent></Card>
-      {ctx.canManage && <LoyaltyMaintenance lang={ctx.lang} />}
+      {ctx.canManage && failedEvents > 0 && <LoyaltyMaintenance lang={ctx.lang} failedEvents={failedEvents} />}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">{L.programTitle}</CardTitle>

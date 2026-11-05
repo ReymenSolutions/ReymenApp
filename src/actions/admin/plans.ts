@@ -7,7 +7,10 @@ import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
 import { requireAdmin } from "@/lib/guards";
 import { UserError } from "@/lib/user-error";
-import { getPlans, invalidatePlanCache, toPlanDef, type PlanDef } from "@/lib/plans";
+import { getPlan, getPlans, invalidatePlanCache, ORG_PLAN_SELECT, limitsFor, toPlanDef, type PlanDef } from "@/lib/plans";
+import { ALL_MODULES } from "@/lib/modules";
+import { setMonthlyBudget } from "@/lib/ai/budget";
+import { syncSmartcardMemberLimitForPlan } from "@/lib/smartcard-link";
 import { listOrgsOverAgentCap, type OverCapRow } from "@/lib/agent-cap";
 import { PLAN_ACCENTS } from "@/lib/plan-accent";
 
@@ -131,19 +134,167 @@ export async function createPlan(data: PlanInput & { key: string }) {
   return { success: true, key: data.key };
 }
 
-export type CustomPlanClient = { id: string; name: string; plan: string; planName: string; priceMxn: number; listPriceMxn: number };
+export type CustomPlanClient = {
+  id: string;
+  name: string;
+  plan: string;
+  planName: string;
+  /** true = plan «A la medida» completo (módulos y límites propios); false = solo precio pactado sobre su plan. */
+  customPlan: boolean;
+  priceMxn: number;
+  listPriceMxn: number;
+  modules: PlatformModule[];
+  limits: { leads: number | null; users: number | null; automations: number | null; aiAgents: number | null };
+};
 
-/** Clientes con un precio pactado (plan personalizado): su plan base, el precio de lista y lo que realmente pagan. */
+/** Clientes «A la medida» y los que solo tienen precio pactado sobre un plan: lo que pagan, su plan base, módulos y límites. */
 export async function listCustomPlanClients(): Promise<CustomPlanClient[]> {
   await requireAdmin();
   const [orgs, plans] = await Promise.all([
-    prisma.organization.findMany({ where: { customMonthlyPriceMxn: { not: null }, isActive: true }, select: { id: true, name: true, plan: true, customMonthlyPriceMxn: true }, orderBy: { name: "asc" } }),
+    prisma.organization.findMany({
+      where: { isActive: true, OR: [{ customPlan: true }, { customMonthlyPriceMxn: { not: null } }] },
+      select: { id: true, name: true, customMonthlyPriceMxn: true, ...ORG_PLAN_SELECT, modules: { where: { status: "ACTIVE" }, select: { module: true } } },
+      orderBy: { name: "asc" },
+    }),
     getPlans({ includeInactive: true }),
   ]);
-  return orgs.map((o) => {
-    const plan = plans.find((p) => p.key === o.plan);
-    return { id: o.id, name: o.name, plan: o.plan, planName: plan?.name ?? o.plan, priceMxn: Number(o.customMonthlyPriceMxn), listPriceMxn: plan?.priceMxn ?? 0 };
+  return Promise.all(orgs.map(async (o) => {
+    const plan = plans.find((p) => p.key === o.plan) ?? (await getPlan(o.plan));
+    const l = limitsFor(o, plan);
+    return {
+      id: o.id, name: o.name, plan: o.plan, planName: plan.name, customPlan: o.customPlan,
+      priceMxn: o.customMonthlyPriceMxn !== null ? Number(o.customMonthlyPriceMxn) : plan.priceMxn, listPriceMxn: plan.priceMxn,
+      modules: o.modules.map((m) => m.module), limits: { leads: l.leads, users: l.users, automations: l.automations, aiAgents: l.aiAgents },
+    };
+  }));
+}
+
+/** Clientes activos para elegir a quién darle un plan «A la medida». */
+export async function listClientsForCustomPlan(): Promise<{ id: string; name: string; customPlan: boolean }[]> {
+  await requireAdmin();
+  return prisma.organization.findMany({ where: { isActive: true }, select: { id: true, name: true, customPlan: true }, orderBy: { name: "asc" } });
+}
+
+export type CustomPlanState = {
+  orgId: string;
+  name: string;
+  customPlan: boolean;
+  basePlan: string;
+  priceMxn: number | null;
+  aiBudgetMxn: number;
+  modules: PlatformModule[];
+  limits: { leads: number | null; users: number | null; automations: number | null; aiAgents: number | null };
+};
+
+/** Cómo está hoy un cliente, para abrir el editor «A la medida» con sus valores (o los de su plan, si aún no es a la medida). */
+export async function getCustomPlanState(orgId: string): Promise<CustomPlanState> {
+  await requireAdmin();
+  const org = await prisma.organization.findUnique({
+    where: { id: z.string().min(1).parse(orgId) },
+    select: { id: true, name: true, customMonthlyPriceMxn: true, ...ORG_PLAN_SELECT, aiBudgetSetting: { select: { monthlyBudgetMxn: true } }, modules: { where: { status: "ACTIVE" }, select: { module: true } } },
   });
+  if (!org) throw new UserError("Cliente no encontrado");
+  const plan = await getPlan(org.plan);
+  const l = limitsFor(org, plan);
+  return {
+    orgId: org.id, name: org.name, customPlan: org.customPlan, basePlan: org.plan,
+    priceMxn: org.customMonthlyPriceMxn !== null ? Number(org.customMonthlyPriceMxn) : null,
+    aiBudgetMxn: org.aiBudgetSetting?.monthlyBudgetMxn != null ? Number(org.aiBudgetSetting.monthlyBudgetMxn) : plan.aiBudgetMxn,
+    modules: org.modules.map((m) => m.module),
+    limits: { leads: l.leads, users: l.users, automations: l.automations, aiAgents: l.aiAgents },
+  };
+}
+
+const count = (max: number) => z.number().int().min(0).max(max).nullable();
+const customPlanSchema = z.object({
+  orgId: z.string().min(1),
+  basePlan: z.string().min(1),
+  priceMxn: z.number().positive().max(1_000_000),
+  aiBudgetMxn: z.number().min(0).max(1_000_000),
+  modules: z.array(z.enum(ALL_MODULES as [PlatformModule, ...PlatformModule[]])).max(ALL_MODULES.length),
+  limits: z.object({ leads: count(10_000_000), users: count(10_000), automations: count(10_000), aiAgents: count(100) }),
+});
+export type CustomPlanInput = z.input<typeof customPlanSchema>;
+
+/**
+ * Guarda el plan «A la medida» de un cliente: precio pactado, plan base (referencia de facturación), presupuesto de IA,
+ * límites propios (null = ilimitado) y módulos. Encender un módulo lo activa; apagar uno activo lo cancela (se conserva su
+ * historial y se puede volver a encender). Nunca borra datos ni apaga agentes ya activos: si un límite queda por debajo de lo
+ * que el cliente ya usa, conserva lo que tiene pero no puede crear más.
+ */
+export async function saveCustomPlan(input: CustomPlanInput) {
+  const session = await requireAdmin();
+  const parsed = customPlanSchema.safeParse(input);
+  if (!parsed.success) throw new UserError("Revisa el precio, el presupuesto y las cantidades");
+  const d = parsed.data;
+  const modules = new Set(d.modules);
+  if (modules.has("REYMEN_POS") && !modules.has("FOOD_OPS")) throw new UserError("Reymen POS necesita Reymen Foods encendido");
+
+  const catalog = await getPlans({ includeInactive: true });
+  const org = await prisma.organization.findUnique({ where: { id: d.orgId }, select: { id: true, plan: true, customPlan: true, customMonthlyPriceMxn: true } });
+  if (!org) throw new UserError("Cliente no encontrado");
+  const base = catalog.find((p) => p.key === d.basePlan);
+  if (!base || (!base.isActive && org.plan !== d.basePlan)) throw new UserError("Plan base inválido");
+  const before = await getCustomPlanState(d.orgId);
+
+  const changedModules = await prisma.$transaction(async (tx) => {
+    await tx.organization.update({
+      where: { id: d.orgId },
+      data: {
+        plan: d.basePlan, customPlan: true, customMonthlyPriceMxn: d.priceMxn,
+        customMaxLeads: d.limits.leads, customMaxUsers: d.limits.users, customMaxAutomations: d.limits.automations, customMaxAiAgents: d.limits.aiAgents,
+      },
+    });
+    const rows = await tx.organizationModule.findMany({ where: { organizationId: d.orgId } });
+    const changes: { module: PlatformModule; status: "ACTIVE" | "CANCELLED" }[] = [];
+    for (const m of ALL_MODULES) {
+      const row = rows.find((r) => r.module === m);
+      if (modules.has(m) && row?.status !== "ACTIVE") {
+        await tx.organizationModule.upsert({
+          where: { organizationId_module: { organizationId: d.orgId, module: m } },
+          create: { organizationId: d.orgId, module: m, status: "ACTIVE", source: "ADMIN_GRANTED", notes: "Plan A la medida" },
+          update: { status: "ACTIVE", suspendedAt: null, cancelledAt: null },
+        });
+        changes.push({ module: m, status: "ACTIVE" });
+      } else if (!modules.has(m) && row?.status === "ACTIVE") {
+        await tx.organizationModule.update({ where: { id: row.id }, data: { status: "CANCELLED", cancelledAt: new Date() } });
+        changes.push({ module: m, status: "CANCELLED" });
+      }
+    }
+    return changes;
+  });
+  await setMonthlyBudget(d.orgId, d.aiBudgetMxn, session.user.id);
+  const smartcardMemberLimit = await syncSmartcardMemberLimitForPlan(d.orgId, d.basePlan);
+
+  await logAudit({
+    userId: session.user.id, organizationId: d.orgId, action: "client.custom_plan", resource: "Organization", resourceId: d.orgId,
+    metadata: { before: { customPlan: before.customPlan, basePlan: before.basePlan, priceMxn: before.priceMxn, aiBudgetMxn: before.aiBudgetMxn, limits: before.limits }, after: { basePlan: d.basePlan, priceMxn: d.priceMxn, aiBudgetMxn: d.aiBudgetMxn, limits: d.limits }, modules: changedModules, smartcardMemberLimit },
+  });
+  propagate();
+  revalidatePath(`/admin/clients/${d.orgId}`);
+  return { success: true, modulesChanged: changedModules.length };
+}
+
+/**
+ * Quita el plan «A la medida»: el cliente vuelve a su plan base con su precio de lista y los límites de ese plan. Sus módulos
+ * se quedan como están (se ajustan en Cliente → Módulos); el presupuesto de IA vuelve al predeterminado del plan.
+ */
+export async function removeCustomPlan(orgId: string) {
+  const session = await requireAdmin();
+  const id = z.string().min(1).parse(orgId);
+  const org = await prisma.organization.findUnique({ where: { id }, select: { plan: true, customPlan: true } });
+  if (!org) throw new UserError("Cliente no encontrado");
+  if (!org.customPlan) return { success: true };
+  await prisma.organization.update({
+    where: { id },
+    data: { customPlan: false, customMonthlyPriceMxn: null, customMaxLeads: null, customMaxUsers: null, customMaxAutomations: null, customMaxAiAgents: null },
+  });
+  await setMonthlyBudget(id, null, session.user.id);
+  const smartcardMemberLimit = await syncSmartcardMemberLimitForPlan(id, org.plan);
+  await logAudit({ userId: session.user.id, organizationId: id, action: "client.custom_plan_removed", resource: "Organization", resourceId: id, metadata: { basePlan: org.plan, smartcardMemberLimit } });
+  propagate();
+  revalidatePath(`/admin/clients/${id}`);
+  return { success: true };
 }
 
 /** Clientes con más agentes IA activos que su tope (conservan lo que tienen pero no pueden activar más). */

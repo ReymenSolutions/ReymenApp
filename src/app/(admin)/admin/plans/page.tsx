@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { getServerLang } from "@/lib/i18n-server";
-import { listClientsOverAgentCap, listCustomPlanClients, listPlansForAdmin } from "@/actions/admin/plans";
+import { listClientsForCustomPlan, listClientsOverAgentCap, listCustomPlanClients, listPlansForAdmin } from "@/actions/admin/plans";
 import { accentTone } from "@/lib/plan-accent";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PlanEditorDialog } from "@/components/admin/PlanEditorDialog";
+import { CustomPlanDialog } from "@/components/admin/CustomPlanDialog";
 import { getModuleLabel } from "@/lib/modules";
-import { planDescription, planName } from "@/lib/plans";
+import { customPlanName, planDescription, planName } from "@/lib/plans";
 import { formatDateTime } from "@/lib/utils";
 
 /**
@@ -28,7 +29,7 @@ function spanClass(index: number, total: number): string {
 export default async function AdminPlansPage() {
   const es = (await getServerLang()) === "es";
   const lang = es ? "es" : "en";
-  const [plans, customClients, overCap] = await Promise.all([listPlansForAdmin(), listCustomPlanClients(), listClientsOverAgentCap()]);
+  const [plans, customClients, overCap, allClients] = await Promise.all([listPlansForAdmin(), listCustomPlanClients(), listClientsOverAgentCap(), listClientsForCustomPlan()]);
   const moduleLabel = getModuleLabel(lang);
   const wideCustom = spanClass(plans.length, plans.length + 1).includes("lg:col-span-6");
   const limit = (n: number | null, one: string, many: string, unlimited: string) => (n === null ? unlimited : `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`);
@@ -52,7 +53,7 @@ export default async function AdminPlansPage() {
               {overCap.map((c) => (
                 <li key={c.orgId} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
                   <Link href={`/admin/clients/${c.orgId}#ia-presupuesto`} className="min-w-0 truncate font-medium text-slate-900 hover:underline">{c.name}</Link>
-                  <span className="flex-shrink-0 text-xs text-slate-600">{c.active} / {c.cap} · {c.source === "override" ? (es ? "tope pactado" : "agreed cap") : c.plan}</span>
+                  <span className="flex-shrink-0 text-xs text-slate-600">{c.active} / {c.cap} · {c.source === "custom" ? customPlanName(lang) : c.source === "override" ? (es ? "tope pactado" : "agreed cap") : c.plan}</span>
                 </li>
               ))}
             </ul>
@@ -103,36 +104,57 @@ export default async function AdminPlansPage() {
           </div>
         ))}
 
-        {/* Plan personalizado: no es una fila del catálogo; es un precio pactado con un cliente concreto sobre alguno de los planes. */}
+        {/* «A la medida» (Custom Service): no es una fila del catálogo. Cada cliente tiene sus propios módulos (interruptores),
+            cantidades (contadores) y precio pactado; se configuran aquí, cliente por cliente. */}
         <div className={spanClass(plans.length, plans.length + 1)}>
         <Card className={`h-full ${accentTone("violet").card}`}>
-          <CardHeader className="space-y-1">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <span className="h-2.5 w-2.5 rounded-full bg-violet-500" aria-hidden="true" /> Custom
-              <Sparkles className="h-4 w-4 text-violet-400" />
-            </CardTitle>
-            <p className="text-xs text-slate-500">{es ? "Precio pactado por cliente" : "Price agreed per client"} · {customClients.length} {es ? (customClients.length === 1 ? "cliente" : "clientes") : customClients.length === 1 ? "client" : "clients"}</p>
+          <CardHeader className="flex-row items-start justify-between gap-2 space-y-0">
+            <div className="min-w-0 space-y-1">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <span className="h-2.5 w-2.5 rounded-full bg-violet-500" aria-hidden="true" /> {customPlanName(lang)}
+                <Sparkles className="h-4 w-4 text-violet-400" />
+              </CardTitle>
+              <p className="text-xs text-slate-500">{es ? "Módulos y cantidades por cliente" : "Modules and quantities per client"} · {customClients.length} {es ? (customClients.length === 1 ? "cliente" : "clientes") : customClients.length === 1 ? "client" : "clients"}</p>
+            </div>
+            <CustomPlanDialog clients={allClients} plans={plans} lang={lang} />
           </CardHeader>
           {/* A todo el ancho (cuando va sola en su fila) el texto queda a la izquierda y los clientes a la derecha. */}
           <CardContent className={wideCustom ? "space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0" : "space-y-4"}>
             <div className="space-y-4">
-              <p className="text-3xl font-bold text-slate-900">{es ? "A la medida" : "Tailor-made"}</p>
+              <p className="text-3xl font-bold text-slate-900">{es ? "Precio pactado" : "Agreed price"}</p>
               <p className="text-sm text-slate-600">
-                {es ? "Para negocios con condiciones propias (p. ej. Villa Gardenia). El cliente conserva uno de los planes de arriba —con sus límites y módulos— y paga un precio pactado que no cambia al editar el precio de lista. Se fija en Cliente → Cambiar plan → «Precio mensual pactado»." : "For businesses with their own terms (e.g. Villa Gardenia). The client keeps one of the plans above —with its limits and modules— and pays an agreed price that does not change when the list price is edited. Set it in Client → Change plan → “Agreed monthly price”."}
+                {es
+                  ? "Para negocios con condiciones propias. Enciendes con interruptores los módulos que contrata cada cliente y fijas con contadores cuántos usuarios, leads, automatizaciones y agentes IA incluye, además de su presupuesto de IA y su precio mensual. No cambia al editar los planes de arriba."
+                  : "For businesses with their own terms. Turn on each client's modules with switches and set with counters how many users, leads, automations and AI agents it includes, plus its AI budget and monthly price. Editing the plans above doesn't change it."}
               </p>
             </div>
             <div>
               {customClients.length === 0 ? (
-                <p className="text-sm text-slate-400">{es ? "Aún no hay clientes con precio pactado." : "No clients with an agreed price yet."}</p>
+                <p className="text-sm text-slate-400">{es ? "Aún no hay clientes A la medida." : "No Custom Service clients yet."}</p>
               ) : (
                 <ul className="divide-y divide-violet-100 rounded-lg border border-violet-100 bg-white/60">
                   {customClients.map((c) => (
-                    <li key={c.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                      <Link href={`/admin/clients/${c.id}`} className="min-w-0 truncate font-medium text-slate-900 hover:underline">{c.name}</Link>
-                      <span className="flex-shrink-0 text-right">
-                        <span className="block font-semibold text-slate-900">${c.priceMxn.toLocaleString("en-US")} MXN</span>
-                        <span className="block text-xs text-slate-500">{c.planName} · {es ? "lista" : "list"} ${c.listPriceMxn.toLocaleString("en-US")}</span>
-                      </span>
+                    <li key={c.id} className="space-y-1.5 px-3 py-2.5 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <Link href={`/admin/clients/${c.id}`} className="min-w-0 truncate font-medium text-slate-900 hover:underline">{c.name}</Link>
+                        <span className="flex flex-shrink-0 items-center gap-2">
+                          <span className="font-semibold text-slate-900">${c.priceMxn.toLocaleString("en-US")} MXN</span>
+                          <CustomPlanDialog orgId={c.id} plans={plans} lang={lang} />
+                        </span>
+                      </div>
+                      {c.customPlan ? (
+                        <p className="text-xs text-slate-500">
+                          {[
+                            limit(c.limits.users, es ? "usuario" : "user", es ? "usuarios" : "users", es ? "usuarios ilimitados" : "unlimited users"),
+                            limit(c.limits.leads, "lead", "leads", es ? "leads ilimitados" : "unlimited leads"),
+                            c.modules.includes("AUTOMATIONS") ? limit(c.limits.automations, es ? "automatización" : "automation", es ? "automatizaciones" : "automations", es ? "automatizaciones ilimitadas" : "unlimited automations") : null,
+                            c.modules.includes("AI_WHATSAPP") ? limit(c.limits.aiAgents, es ? "agente IA" : "AI agent", es ? "agentes IA" : "AI agents", es ? "agentes IA sin tope" : "no AI agent cap") : null,
+                          ].filter(Boolean).join(" · ")}
+                          {" · "}{c.modules.map((m) => moduleLabel[m]).join(", ") || (es ? "sin módulos" : "no modules")}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-amber-700">{es ? `Solo precio pactado sobre ${c.planName} (lista $${c.listPriceMxn.toLocaleString("en-US")}). Configúralo para darle módulos y cantidades propios.` : `Agreed price only on ${c.planName} (list $${c.listPriceMxn.toLocaleString("en-US")}). Configure it to give it its own modules and quantities.`}</p>
+                      )}
                     </li>
                   ))}
                 </ul>

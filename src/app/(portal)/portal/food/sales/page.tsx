@@ -108,7 +108,7 @@ export default async function FoodSalesPage({ searchParams }: { searchParams: Pr
                 const pct = totalChannelGross > 0 ? Math.round((c.gross / totalChannelGross) * 100) : 0;
                 return (
                   <li key={c.channel ?? ""} className="px-6 py-3">
-                    <div className="flex items-center justify-between text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-sm">
                       <span className="font-medium text-slate-900">{c.channel ?? f.noChannel}</span>
                       <span className="text-slate-500">{formatMoney(c.gross)} · {f.salesCount(c.count)} · {pct}%</span>
                     </div>

@@ -133,6 +133,7 @@ export async function setOrgAgentsCap(data: { orgId: string; cap: number | null;
   if (!reason.success || (cap && !cap.success)) throw new UserError("Revisa el monto y el motivo");
   await assertOrg(orgId);
   const before = await getAgentCap(orgId);
+  if (before.source === "custom") throw new UserError("Este cliente tiene plan A la medida: ajusta su tope de agentes en Admin → Planes");
   const value = cap ? cap.data : null;
   await prisma.organization.update({ where: { id: orgId }, data: { aiAgentsCapOverride: value } });
   await logAudit({ organizationId: orgId, userId: session.user.id, action: "ai.agents_cap", resource: "Organization", resourceId: orgId, metadata: { fromCap: before.cap, fromSource: before.source, toOverride: value, reason: reason.data } });

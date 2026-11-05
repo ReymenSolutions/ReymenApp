@@ -23,9 +23,11 @@ interface ChangePlanDialogProps {
   plans: PlanDef[];
   /** Precio pactado actual (MXN/mes), o null si paga el precio de lista del plan. */
   currentCustomPrice: number | null;
+  /** El cliente tiene plan «A la medida»: elegir aquí un plan del catálogo lo saca de él. */
+  isCustomPlan?: boolean;
 }
 
-export function ChangePlanDialog({ orgId, currentPlan, currentCustomPrice, plans }: ChangePlanDialogProps) {
+export function ChangePlanDialog({ orgId, currentPlan, currentCustomPrice, plans, isCustomPlan = false }: ChangePlanDialogProps) {
   const { lang } = usePreferences();
   const MODULE_LABEL = getModuleLabel(lang);
   const [open, setOpen] = useState(false);
@@ -33,7 +35,7 @@ export function ChangePlanDialog({ orgId, currentPlan, currentCustomPrice, plans
   const [customPrice, setCustomPrice] = useState(currentCustomPrice !== null ? String(currentCustomPrice) : "");
   const parsedCustomPrice = customPrice.trim() === "" ? null : Number(customPrice);
   const customPriceInvalid = parsedCustomPrice !== null && !(Number.isFinite(parsedCustomPrice) && parsedCustomPrice > 0);
-  const unchanged = selected === currentPlan && parsedCustomPrice === currentCustomPrice;
+  const unchanged = !isCustomPlan && selected === currentPlan && parsedCustomPrice === currentCustomPrice;
   const [loading, setLoading] = useState(false);
 
   async function handleSave() {
@@ -63,6 +65,13 @@ export function ChangePlanDialog({ orgId, currentPlan, currentCustomPrice, plans
           <DialogTitle>{lang === "es" ? "Cambiar plan del cliente" : "Change client's plan"}</DialogTitle>
         </DialogHeader>
 
+        {isCustomPlan && (
+          <p className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900">
+            {lang === "es"
+              ? "Este cliente tiene plan A la medida (módulos y cantidades propios, se configura en Admin → Planes). Si eliges aquí un plan del catálogo, deja A la medida y toma los límites de ese plan."
+              : "This client has a Custom Service plan (its own modules and quantities, set in Admin → Plans). Choosing a catalog plan here takes it off Custom Service and applies that plan's limits."}
+          </p>
+        )}
         <div className="space-y-3 py-2">
           {plans.map((plan) => {
             const tone = accentTone(plan.accent);
@@ -99,7 +108,8 @@ export function ChangePlanDialog({ orgId, currentPlan, currentCustomPrice, plans
             );
           })}
 
-          {/* Custom: no es otro plan del catálogo, es un precio pactado sobre el plan elegido (se escribe abajo). */}
+          {/* Precio pactado: no es otro plan del catálogo, es un precio propio sobre el plan elegido (se escribe abajo). El plan
+              con módulos y cantidades propios es «A la medida», en Admin → Planes. */}
           <button
             type="button"
             onClick={() => document.getElementById("customPrice")?.focus()}
@@ -107,7 +117,7 @@ export function ChangePlanDialog({ orgId, currentPlan, currentCustomPrice, plans
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${accentTone("violet").badge}`}>Custom</span>
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${accentTone("violet").badge}`}>{lang === "es" ? "Precio pactado" : "Agreed price"}</span>
                 <span className="text-sm font-medium text-slate-900">{customPrice.trim() !== "" ? `$${Number(customPrice).toLocaleString("en-US")} MXN/${lang === "es" ? "mes" : "mo"}` : lang === "es" ? "Precio pactado" : "Agreed price"}</span>
               </div>
               {customPrice.trim() !== "" && <Check className="h-4 w-4 text-violet-600" />}

@@ -107,9 +107,10 @@ export async function changePlan(orgId: string, plan: string, customMonthlyPrice
   }
 
   const org = await prisma.$transaction(async tx => {
-    const updated = await tx.organization.update({ where: { id: orgId }, data: { plan, customMonthlyPriceMxn: customPrice } });
+    const updated = await tx.organization.update({ where: { id: orgId }, data: { plan, customMonthlyPriceMxn: customPrice, customPlan: false, customMaxLeads: null, customMaxUsers: null, customMaxAutomations: null, customMaxAiAgents: null } });
     await reconcilePlanEntitlements(tx, orgId, chosen.modules);
     return updated;
+
   });
 
   // SmartCard guarda su propio límite de integrantes; se iguala al del plan.
