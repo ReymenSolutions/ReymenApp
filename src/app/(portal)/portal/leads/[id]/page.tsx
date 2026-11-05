@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, GitBranch, StickyNote, ArrowRightLeft, Home, Contact } from "lucide-react";
+import { ArrowLeft, GitBranch, StickyNote, ArrowRightLeft, Home, Contact, ListTodo } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { getServerT, getServerLang } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
@@ -22,6 +22,9 @@ import { inputValue } from "@/lib/custom-fields";
 import { LeadNotesPanel } from "@/components/portal/LeadNotesPanel";
 import { LeadDuplicatesPanel } from "@/components/portal/LeadDuplicatesPanel";
 import { CreateOpportunityDialog } from "@/components/portal/CreateOpportunityDialog";
+import { NewTaskButton } from "@/components/portal/tasks/NewTaskButton";
+import { TaskList } from "@/components/portal/tasks/TaskList";
+import { getLeadTasks, toTaskItem } from "@/lib/tasks";
 import { LeadSearchProfiles } from "@/components/realty/LeadSearchProfiles";
 import { getLeadSearchViews, getLeadSuggestionViews } from "@/lib/realty/lead-profile";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -42,7 +45,7 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
   const lead = await prisma.lead.findFirst({ where: { id, organizationId: orgId, deletedAt: null } });
   if (!lead) return notFound();
 
-  const [t, lang, opportunities, notes, stages, users, duplicates, timeline, customFields, aiActions] = await Promise.all([
+  const [t, lang, opportunities, notes, stages, users, duplicates, timeline, customFields, aiActions, tasks, org] = await Promise.all([
     getServerT(),
     getServerLang(),
     prisma.opportunity.findMany({
@@ -61,11 +64,17 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
     getLeadTimeline(lead, timelineLimit),
     getActiveCustomFields(orgId),
     getLeadAiActions(orgId, lead.id),
+    getLeadTasks(orgId, lead.id),
+    prisma.organization.findUnique({ where: { id: orgId }, select: { timezone: true } }),
   ]);
 
   const searchViews = await getLeadSearchViews(orgId, lead.id, lang === "en" ? "en" : "es");
   const searchSuggestions = searchViews ? await getLeadSuggestionViews(orgId, lead.id, lang === "en" ? "en" : "es") : [];
   const canManageOpps = can(session.user.role as UserRole, "opportunities:manage");
+  const canManageTasks = can(session.user.role as UserRole, "tasks:manage");
+  const currentUser = { id: session.user.id, role: session.user.role as UserRole };
+  const tz = org?.timezone ?? "America/Mexico_City";
+  const nowIso = new Date().toISOString();
   const stageOptions = stages.map((s) => ({ id: s.id, name: s.name }));
   const es = lang === "es";
   const L = es
@@ -165,6 +174,27 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
         counts={{ activity: notes.length, data: duplicates.length }}
         panels={{
           summary: (
+            <div className="space-y-5">
+            <Section
+              icon={ListTodo}
+              title={es ? "Tareas" : "Tasks"}
+              hint={es ? "Lo que sigue con este contacto: llamadas, mensajes, reuniones." : "Next steps with this contact: calls, messages, meetings."}
+              action={canManageTasks ? <NewTaskButton users={users} currentUser={currentUser} fixedLead={fixedLead} opportunities={opportunities.filter((o) => !o.closedAt).map((o) => ({ id: o.id, title: o.title }))} variant="outline" /> : undefined}
+            >
+              <div className="-mx-4 sm:-mx-5" data-testid="lead-tasks">
+                <TaskList
+                  tasks={tasks.map(toTaskItem)}
+                  users={users}
+                  currentUser={currentUser}
+                  timeZone={tz}
+                  now={nowIso}
+                  showLead={false}
+                  opportunities={opportunities.filter((o) => !o.closedAt).map((o) => ({ id: o.id, title: o.title }))}
+                  readOnly={!canManageTasks}
+                  emptyText={es ? "Sin tareas para este contacto." : "No tasks for this contact."}
+                />
+              </div>
+            </Section>
             <div className={searchViews ? "grid grid-cols-1 items-stretch gap-5 lg:grid-cols-2" : ""}>
               <Section icon={GitBranch} title={L.oppTitle} hint={L.oppHint} action={canManageOpps ? <CreateOpportunityDialog stages={stageOptions} users={users} fixedLead={fixedLead} /> : undefined}>
                 {opportunities.length === 0 ? (
@@ -194,6 +224,7 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
                 </Section>
               )}
 
+            </div>
             </div>
           ),
           activity: (

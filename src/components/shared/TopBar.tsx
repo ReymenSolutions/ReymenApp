@@ -3,7 +3,7 @@
 import { PasswordInput } from "@/components/ui/password-input";
 import { useState, useEffect, useRef, useTransition } from "react";
 import {
-  Bell, LogOut, MessageSquare, FileText, Sun, Moon, Globe,
+  Bell, LogOut, MessageSquare, FileText, ListTodo, Sun, Moon, Globe,
   Image as ImageIcon, KeyRound, RefreshCw, User, Loader2, Upload, Users, X, Menu,
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
@@ -398,6 +398,8 @@ export function TopBar({ title, onMenuClick }: TopBarProps) {
                       <span className="mt-0.5 shrink-0 rounded-full bg-slate-100 p-1">
                         {item.type === "escalation" ? (
                           <MessageSquare className="h-3.5 w-3.5 text-amber-600" />
+                        ) : item.type.startsWith("task_") ? (
+                          <ListTodo className={item.type === "task_overdue" ? "h-3.5 w-3.5 text-red-600" : "h-3.5 w-3.5 text-violet-600"} />
                         ) : (
                           <FileText className="h-3.5 w-3.5 text-brand-600" />
                         )}

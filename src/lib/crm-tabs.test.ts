@@ -4,11 +4,11 @@ import { getCrmTabs, CRM_PATHS } from "./crm-tabs";
 const keys = (modules: Parameters<typeof getCrmTabs>[0]) => getCrmTabs(modules).map((t) => t.key);
 
 describe("pestañas del CRM", () => {
-  it("con CRM: Hoy, Inbox, Contactos y Pipeline, en ese orden", () => {
-    expect(keys(["CRM"])).toEqual(["today", "inbox", "contacts", "pipeline"]);
+  it("con CRM: Hoy, Tareas, Inbox, Contactos y Pipeline, en ese orden", () => {
+    expect(keys(["CRM"])).toEqual(["today", "tasks", "inbox", "contacts", "pipeline"]);
   });
   it("Clientes del negocio solo con Reymen Foods", () => {
-    expect(keys(["CRM", "FOOD_OPS"])).toEqual(["today", "inbox", "contacts", "pipeline", "customers"]);
+    expect(keys(["CRM", "FOOD_OPS"])).toEqual(["today", "tasks", "inbox", "contacts", "pipeline", "customers"]);
   });
   it("sin CRM, Hoy/Contactos/Pipeline no aparecen; el Inbox sigue con el Agente IA", () => {
     expect(keys([])).toEqual([]);

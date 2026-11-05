@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getRealtyBellItems } from "@/lib/realty/bell";
+import { getTaskBellItems } from "@/lib/tasks";
 
 export async function GET() {
   const session = await auth();
@@ -12,7 +13,8 @@ export async function GET() {
   const isPortal = !!session.user.organizationId;
   const orgFilter = isPortal ? { organizationId: session.user.organizationId! } : {};
 
-  const [escalated, openRequests, seenAt, aiActions, alerts, lowFeedback, realtyItems] = await Promise.all([
+  const now = new Date();
+  const [escalated, openRequests, seenAt, aiActions, alerts, lowFeedback, realtyItems, tasks] = await Promise.all([
     prisma.conversation.findMany({
       where: { ...orgFilter, status: "ESCALATED" },
       take: 5,
@@ -51,6 +53,8 @@ export async function GET() {
       : Promise.resolve([]),
     // Real Estate: nuevos interesados de la landing, perfiles que propone la IA y demanda sin inventario.
     isPortal ? getRealtyBellItems(session.user.organizationId!, session.user.id, session.user.role) : Promise.resolve([]),
+    // Tareas del usuario vencidas o cuyo recordatorio ya llegó.
+    isPortal ? getTaskBellItems(session.user.organizationId!, session.user.id, now) : Promise.resolve([]),
   ]);
 
   const items = [
@@ -61,6 +65,18 @@ export async function GET() {
       href: isPortal ? "/portal/conversations" : "/admin/escalations",
       at: c.updatedAt,
     })),
+    ...tasks.map((task) => {
+      const late = !!task.dueAt && task.dueAt <= now;
+      // Cuenta como nuevo cuando llega el recordatorio y otra vez cuando vence.
+      const at = [task.remindAt, task.dueAt].filter((d): d is Date => !!d && d <= now).sort((a, b) => b.getTime() - a.getTime())[0] ?? now;
+      return {
+        type: late ? "task_overdue" : "task_reminder",
+        label: late ? "Tarea vencida" : "Recordatorio de tarea",
+        detail: `${task.title}${task.lead ? ` — ${task.lead.name}` : ""}`,
+        href: task.lead ? `/portal/leads/${task.lead.id}` : "/portal/tasks",
+        at,
+      };
+    }),
     // Lo de Real Estate es accionable y sensible al tiempo (el primer mensaje al interesado es el que cuenta): va antes que lo demás.
     ...realtyItems.map(({ type, label, detail, href, at }) => ({ type, label, detail, href, at })),
     ...aiActions.map((a) => ({
