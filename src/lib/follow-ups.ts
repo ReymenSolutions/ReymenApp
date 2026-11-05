@@ -4,6 +4,9 @@ import type { FollowUpLog } from "@prisma/client";
 export interface DueFollowUp {
   leadId: string;
   ruleId: string;
+  /** Nombre de la regla (lo ve el negocio) y estado del contacto que la dispara: n8n elige con ellos la plantilla. */
+  ruleName: string;
+  triggerStatus: string;
   channel: string;
   template: string;
   attemptNumber: number;
@@ -59,6 +62,8 @@ export async function getDueFollowUps(orgId: string, now = new Date()): Promise<
         .map((c) => ({
           leadId: c.id,
           ruleId: rule.id,
+          ruleName: rule.name,
+          triggerStatus: rule.triggerStatus,
           channel: rule.channel,
           template: rule.template,
           attemptNumber: (logsByLead.get(c.id)?.length ?? 0) + 1,
