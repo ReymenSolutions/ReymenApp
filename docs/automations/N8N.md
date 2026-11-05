@@ -32,7 +32,7 @@ El cuerpo trae organización, automatización, ejecución (`id`, `attempt`), dis
 - Respuestas: `200`, `400` cuerpo inválido, `401` firma/hora/token inválidos, `404` ejecución desconocida, `429`, `503` sin `N8N_WEBHOOK_SECRET`.
 
 ## Workflows
-`n8n/workflows/reymen-action-message.json` (importar en n8n y activar). **El proveedor es ficticio**: el nodo "Verificar, enviar (ficticio) y firmar" marca todo como enviado sin mandar nada. Cuando exista el número de WhatsApp y el aviso de privacidad, se cambia solo el bloque `PROVEEDOR` (las credenciales viven en n8n, nunca en Reymen).
+`n8n/workflows/reymen-action-message.json` (importar en n8n y activar). Envía por **WhatsApp con Twilio** usando **plantillas aprobadas** (`contentSid` por `templateKey` en el nodo «Verificar y preparar»; `variables` dice qué dato va en `{{1}}`, `{{2}}`…). Callback: `sent` si Twilio aceptó (con su `sid`), `failed` con el error de Twilio, `skipped` si el canal no es WhatsApp, el cliente no tiene número o la plantilla no está configurada (nunca manda texto suelto). La credencial «Twilio» vive en n8n.
 
 ## Avisos internos (alertas y reportes) — `reymen-action-notify`
 Mismo despachador, otro workflow genérico: `POST {N8N_BASE_URL}/webhook/reymen-action-notify` (tipo `action.notify.send`), con las **mismas firmas, headers, idempotencia (`<executionId>:<intento>`) y callback** que el de mensajes. Sirve a **todos** los clientes: no lleva nombres, teléfonos, plantillas ni horarios dentro.
@@ -76,3 +76,13 @@ Workflow por cliente: `n8n/workflows/reymen-followups-whatsapp.json` (importar, 
 4. Por cada mensaje que Twilio aceptó, avisa `POST /api/webhooks/n8n/followup-sent` `{ leadId, ruleId }` firmado (`x-reymen-orgid`, `x-reymen-timestamp`, `x-reymen-signature` = `sha256=` + HMAC-SHA256 hex de `"<timestamp>.<cuerpo>"` con la llave del cliente) y `x-reymen-event-id` = `followup:<lead>:<regla>:<intento>` para que un reintento no cuente doble. Los fallidos no se avisan: Reymen los ofrece de nuevo en la siguiente corrida.
 - **`modoPrueba: true`** (predeterminado): solo arma y muestra los mensajes, sin enviar ni avisar. Cambiarlo a `false` para operar.
 - Requiere `NODE_FUNCTION_ALLOW_BUILTIN=crypto` (igual que los demás). No usa la base de datos de n8n ni accede a la de Reymen: todo pasa por la API.
+
+## Bandeja de WhatsApp, Instagram y Messenger + Meta Lead Ads
+Guía paso a paso: `docs/crm/BANDEJA-N8N.md`. Dos workflows genéricos (sirven a varios clientes; cada cliente es un renglón en su nodo «Configuración»):
+
+| Workflow | Webhooks | Qué hace |
+|---|---|---|
+| `reymen-inbox-whatsapp-twilio.json` | `POST reymen-twilio-entrante` (Twilio) · `POST whatsapp-outbound` (Reymen) · `POST reymen-twilio-estado` (Twilio) | Entrante → `/api/webhooks/n8n/conversations` (`channel: whatsapp`, `x-reymen-event-id: twilio:<MessageSid>`). Saliente: verifica la firma de plataforma y envía con la credencial «Twilio», con `StatusCallback` al webhook de estado. Estado → `/api/webhooks/n8n/message-status` (enviado, entregado, leído, fallido). Verifica `X-Twilio-Signature` si se pone el Auth Token. |
+| `reymen-inbox-meta.json` | `GET`/`POST reymen-meta` (Meta) · `POST instagram-outbound` · `POST messenger-outbound` (Reymen) | Verificación del webhook (`hub.challenge`). Mensajes de Messenger/Instagram → `/conversations` (`contactHandle` = PSID/IGSID, nombre desde la Graph API, sin ecos). Lead Ads (`leadgen`) → pide el lead a la Graph API → `/api/webhooks/n8n/leads` (`externalId: meta-lead:<id>`, respuestas del formulario en `metadata`). Saliente: `POST /me/messages` con el token de la página. Verifica `X-Hub-Signature-256` si se pone el App Secret. |
+
+Reymen ya tenía los dos extremos (entrada firmada con la llave del cliente y salida a `<canal>-outbound` firmada con `N8N_WEBHOOK_SECRET`); estos workflows son el puente con cada proveedor.
