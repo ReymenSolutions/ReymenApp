@@ -223,7 +223,8 @@ describe("leads actions", () => {
     fdDup.set("email", "dup@example.com");
     const duplicate = await createLead(fdDup);
 
-    await prisma.pipelineStage.create({ data: { organizationId: orgA.id, name: "Merge Test Stage", order: 900 } });
+    const mergePipeline = await prisma.pipeline.create({ data: { organizationId: orgA.id, name: "Merge Test Pipeline" } });
+    await prisma.pipelineStage.create({ data: { organizationId: orgA.id, pipelineId: mergePipeline.id, name: "Merge Test Stage", order: 900 } });
     const stage = await prisma.pipelineStage.findFirstOrThrow({ where: { organizationId: orgA.id, name: "Merge Test Stage" } });
     const opp = await prisma.opportunity.create({
       data: { organizationId: orgA.id, leadId: duplicate.leadId, pipelineStageId: stage.id, title: "Deal on duplicate" },

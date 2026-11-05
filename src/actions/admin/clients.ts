@@ -11,6 +11,7 @@ import { UserError } from "@/lib/user-error";
 import { getPlans } from "@/lib/plans";
 import { NEW_ORG_AGENT_SETTINGS } from "@/lib/agent-cap";
 import { syncSmartcardMemberLimitForPlan } from "@/lib/smartcard-link";
+import { createPipelineWithStages, DEFAULT_PIPELINE_NAME, DEFAULT_STAGES } from "@/lib/pipelines";
 
 const createClientSchema = z.object({
   orgName: z.string().min(2),
@@ -54,24 +55,13 @@ export async function createClient(formData: FormData) {
           role: "OWNER",
         },
       },
-      // Same default pipeline every pre-existing org received via the
-      // add_crm_pipeline migration backfill — keeps new orgs consistent
-      // with it instead of starting with an empty, unusable pipeline.
       // Un cliente nuevo arranca con solo WhatsApp atendido por el agente; el resto de canales se enciende después (cuenta para el tope del plan).
       agentChannelSettings: { create: NEW_ORG_AGENT_SETTINGS },
-      pipelineStages: {
-        create: [
-          { name: "Nuevo", order: 0, leadStatus: "NEW" },
-          { name: "Contactado", order: 1, leadStatus: "CONTACTED" },
-          { name: "Calificado", order: 2, leadStatus: "QUALIFIED" },
-          { name: "Propuesta", order: 3, leadStatus: "PROPOSAL" },
-          { name: "Ganado", order: 4, isWon: true, leadStatus: "WON" },
-          { name: "Perdido", order: 5, isLost: true, leadStatus: "LOST" },
-        ],
-      },
     },
     include: { users: true },
   });
+  // El mismo embudo «Ventas» de 6 etapas que recibió cada organización existente: nunca arranca vacío.
+  await createPipelineWithStages(org.id, { name: DEFAULT_PIPELINE_NAME, stages: DEFAULT_STAGES, isDefault: true });
 
   await logAudit({
     userId: session.user.id,

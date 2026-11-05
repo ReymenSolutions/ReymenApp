@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { createTestOrg, cleanupOrg } from "@/test/helpers";
+import { createTestOrg, cleanupOrg, runTickWhenFree } from "@/test/helpers";
 import { processFoodPosOrder } from "./food";
 import { emitDomainEvent, processDomainEvents, purgeProcessedDomainEvents, MAX_ATTEMPTS, RETRY_BACKOFF_MINUTES } from "./domain-events";
 import { runAutomationTick } from "./automation-tick";
@@ -112,7 +112,7 @@ describe("bandeja de eventos de dominio", () => {
 
   it("el tick procesa la bandeja y no corre dos a la vez", async () => {
     await prisma.$transaction((tx) => emitDomainEvent(tx, { organizationId: org.id, type: "a", subjectType: "t", subjectId: "1", occurredAt: new Date(), dedupeKey: "tick" }));
-    const res = await runAutomationTick(new Date(), { organizationId: org.id });
+    const res = await runTickWhenFree(new Date(), { organizationId: org.id });
     expect(res.ran).toBe(true);
     // Mientras otra transacción sostiene el candado, el tick responde "locked".
     let locked: Awaited<ReturnType<typeof runAutomationTick>> | undefined;

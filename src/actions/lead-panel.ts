@@ -1,5 +1,6 @@
 "use server";
 
+import { stageOptionsFor } from "@/lib/pipelines";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { assertModuleEnabled } from "@/lib/modules";
@@ -44,7 +45,7 @@ export async function getLeadPanel(leadId: string): Promise<LeadPanelData> {
       orderBy: { updatedAt: "desc" },
       include: { pipelineStage: { select: { id: true, name: true } }, owner: { select: { name: true, email: true } } },
     }),
-    prisma.pipelineStage.findMany({ where: { organizationId: orgId }, orderBy: { order: "asc" }, select: { id: true, name: true } }),
+    stageOptionsFor(orgId).then((rows) => rows.map(({ id, name }) => ({ id, name }))),
     getLeadTimeline(lead, 15),
     prisma.pipelineAiAction.findMany({
       where: { leadId: lead.id, organizationId: orgId, OR: [{ status: "SUGGESTED" }, { status: "APPLIED", createdAt: { gte: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) } }] },

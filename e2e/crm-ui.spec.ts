@@ -27,11 +27,12 @@ test.describe("interfaz del CRM: pipeline, panel de detalle y movimiento", () =>
     });
     orgId = org.id;
     await prisma.organizationModule.create({ data: { organizationId: org.id, module: "CRM", status: "ACTIVE", source: "SUBSCRIBED" } });
+    const pipeline = await prisma.pipeline.create({ data: { organizationId: org.id, name: "Ventas", isDefault: true } });
     await prisma.pipelineStage.createMany({
       data: [
-        { organizationId: org.id, name: "Nuevo", order: 0 },
-        { organizationId: org.id, name: "Propuesta", order: 1 },
-        { organizationId: org.id, name: "Ganado", order: 2, isWon: true },
+        { organizationId: org.id, pipelineId: pipeline.id, name: "Nuevo", order: 0 },
+        { organizationId: org.id, pipelineId: pipeline.id, name: "Propuesta", order: 1 },
+        { organizationId: org.id, pipelineId: pipeline.id, name: "Ganado", order: 2, isWon: true },
       ],
     });
     const stages = await prisma.pipelineStage.findMany({ where: { organizationId: org.id } });
