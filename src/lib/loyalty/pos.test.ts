@@ -5,7 +5,7 @@ vi.mock("next/server", async (original) => ({ ...await original<typeof import("n
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createWebhookSignature } from "@/lib/webhook-validator";
-import { createTestOrg, createTestUser, cleanupOrg } from "@/test/helpers";
+import { createTestOrg, createTestUser, cleanupOrg, runTickWhenFree } from "@/test/helpers";
 import { emitDomainEvent, processDomainEvents } from "@/lib/domain-events";
 import { enrollMember, saveProgram, redeemReward, registerVisit } from "./service";
 import { recoverLegacyPosVisits } from "./recovery";
@@ -234,15 +234,14 @@ describe("POS customer before public enrollment", () => {
     await sell("after-card-first", 30);
     await sell("after-card-rapid", 60);
     await sell("after-card-later", 300);
-    const { runAutomationTick } = await import("@/lib/automation-tick");
-    await runAutomationTick(at(600), { organizationId: org.id });
+    await runTickWhenFree(at(600), { organizationId: org.id });
     const state = await prisma.loyaltyMember.findUniqueOrThrow({ where: { id: member.id } });
     expect(state.totalVisits).toBe(2);
     expect(await prisma.customer.count({ where: { organizationId: org.id } })).toBe(1);
     expect(await prisma.customer.findUniqueOrThrow({ where: { id: customer.id } })).toMatchObject({ visitCount: 4 });
     const receipts = await prisma.loyaltyEventReceipt.findMany({ where: { organizationId: org.id }, orderBy: { createdAt: "asc" } });
     expect(receipts.map(r => r.outcome)).toEqual(["not_enrolled", "earned", "cooldown", "earned"]);
-    await runAutomationTick(at(900), { organizationId: org.id });
+    await runTickWhenFree(at(900), { organizationId: org.id });
     expect((await prisma.loyaltyMember.findUniqueOrThrow({ where: { id: member.id } })).totalVisits).toBe(2);
   });
 });

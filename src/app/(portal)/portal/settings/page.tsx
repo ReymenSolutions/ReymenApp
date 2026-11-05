@@ -11,7 +11,7 @@ import { InviteUserForm } from "@/components/portal/InviteUserForm";
 import { RemoveUserButton } from "@/components/portal/RemoveUserButton";
 import { EditUserDialog } from "@/components/portal/EditUserDialog";
 import { BillingActions } from "@/components/portal/BillingActions";
-import { PipelineStagesPanel } from "@/components/portal/PipelineStagesPanel";
+import { PipelinesManager } from "@/components/portal/PipelinesManager";
 import { formatDate } from "@/lib/utils";
 import { can } from "@/lib/permissions";
 import { customPlanName, getOrgLimits, getPlan, monthlyPriceMxn, planDescription, planName } from "@/lib/plans";
@@ -31,7 +31,7 @@ export default async function PortalSettingsPage() {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
 
-  const [t, lang, org, crmEnabled, pipelineStages, customFields, foodEnabled, branches] = await Promise.all([
+  const [t, lang, org, crmEnabled, pipelines, customFields, foodEnabled, branches] = await Promise.all([
     getServerT(),
     getServerLang(),
     prisma.organization.findUnique({
@@ -45,10 +45,10 @@ export default async function PortalSettingsPage() {
       },
     }),
     hasModule(session.user.organizationId, "CRM"),
-    prisma.pipelineStage.findMany({
+    prisma.pipeline.findMany({
       where: { organizationId: session.user.organizationId },
-      orderBy: { order: "asc" },
-      include: { _count: { select: { opportunities: true } } },
+      orderBy: [{ isDefault: "desc" }, { order: "asc" }, { createdAt: "asc" }],
+      include: { stages: { orderBy: { order: "asc" }, include: { _count: { select: { opportunities: true } } } } },
     }),
     prisma.customField.findMany({ where: { organizationId: session.user.organizationId }, orderBy: [{ order: "asc" }, { createdAt: "asc" }] }),
     hasModule(session.user.organizationId, "FOOD_OPS"),
@@ -219,18 +219,23 @@ export default async function PortalSettingsPage() {
         {crmEnabled && (
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>{lang === "es" ? "Etapas del pipeline" : "Pipeline stages"}</CardTitle>
+              <CardTitle>{lang === "es" ? "Embudos y etapas" : "Pipelines and stages"}</CardTitle>
             </CardHeader>
             <CardContent>
-              <PipelineStagesPanel
-                stages={pipelineStages.map((s) => ({
-                  id: s.id,
-                  name: s.name,
-                  order: s.order,
-                  isWon: s.isWon,
-                  isLost: s.isLost,
-                  leadStatus: s.leadStatus,
-                  opportunityCount: s._count.opportunities,
+              <PipelinesManager
+                pipelines={pipelines.map((p) => ({
+                  id: p.id,
+                  name: p.name,
+                  isDefault: p.isDefault,
+                  stages: p.stages.map((s) => ({
+                    id: s.id,
+                    name: s.name,
+                    order: s.order,
+                    isWon: s.isWon,
+                    isLost: s.isLost,
+                    leadStatus: s.leadStatus,
+                    opportunityCount: s._count.opportunities,
+                  })),
                 }))}
                 canManage={canManagePipeline}
               />

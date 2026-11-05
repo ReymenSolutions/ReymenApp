@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { generateSlug, generateWebhookSecret } from "@/lib/utils";
 import type { UserRole } from "@prisma/client";
+import { createPipelineWithStages, DEFAULT_PIPELINE_NAME, DEFAULT_STAGES } from "@/lib/pipelines";
 
 /** Grants CRM + AI_WHATSAPP + AUTOMATIONS — mirrors the backfill every pre-existing org received when modules were introduced, so tests exercise the "already has access" case by default. */
 export async function grantCoreModules(orgId: string) {
@@ -23,18 +24,10 @@ export async function createTestOrg(namePrefix: string) {
   return org;
 }
 
-/** Mirrors the default 6-stage pipeline every org gets via createClient()/the add_crm_pipeline backfill. */
+/** Mirrors the default 6-stage «Ventas» pipeline every org gets via createClient()/the add_crm_pipeline backfill. */
 export async function createTestPipelineStages(orgId: string) {
-  const stages = [
-    { name: "Nuevo", order: 0, leadStatus: "NEW" as const },
-    { name: "Contactado", order: 1, leadStatus: "CONTACTED" as const },
-    { name: "Calificado", order: 2, leadStatus: "QUALIFIED" as const },
-    { name: "Propuesta", order: 3, leadStatus: "PROPOSAL" as const },
-    { name: "Ganado", order: 4, isWon: true, leadStatus: "WON" as const },
-    { name: "Perdido", order: 5, isLost: true, leadStatus: "LOST" as const },
-  ];
-  await prisma.pipelineStage.createMany({ data: stages.map((s) => ({ ...s, organizationId: orgId })) });
-  return prisma.pipelineStage.findMany({ where: { organizationId: orgId }, orderBy: { order: "asc" } });
+  const pipeline = await createPipelineWithStages(orgId, { name: DEFAULT_PIPELINE_NAME, stages: DEFAULT_STAGES, isDefault: true });
+  return prisma.pipelineStage.findMany({ where: { pipelineId: pipeline.id }, orderBy: { order: "asc" } });
 }
 
 export async function createTestUser(orgId: string | null, role: UserRole, emailPrefix: string) {
@@ -140,3 +133,17 @@ export async function cleanupOrg(orgId: string) {
 }
 
 export { generateWebhookSecret };
+
+/**
+ * El reloj de automatizaciones usa un candado global: si otro archivo de pruebas está corriendo su propio tick en ese
+ * momento, este responde «locked» y no hace nada. Las pruebas esperan su turno en lugar de fallar por casualidad.
+ */
+export async function runTickWhenFree(now: Date, opts: { organizationId?: string } = {}) {
+  const { runAutomationTick } = await import("@/lib/automation-tick");
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const result = await runAutomationTick(now, opts);
+    if (result.ran) return result;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  throw new Error("El reloj de automatizaciones siguió ocupado");
+}

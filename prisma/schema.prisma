@@ -103,6 +103,7 @@ model Organization {
   opportunities           Opportunity[]
   notes                   Note[]
   tasks                   Task[]
+  pipelines               Pipeline[]
   services                Service[]
   availabilityRules       AvailabilityRule[]
   reminderRules           AppointmentReminderRule[]
@@ -365,9 +366,27 @@ enum LeadStatus {
 // existing leads/webhooks/reports keep working unchanged; Opportunity is
 // purely additive.
 
+// Un embudo (pipeline) de ventas: cada negocio puede tener varios (ventas, renovaciones, postventa…). Uno es el
+// principal: ahí caen las oportunidades nuevas cuando no se indica otro.
+model Pipeline {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  order          Int      @default(0)
+  isDefault      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stages       PipelineStage[]
+
+  @@index([organizationId, order])
+}
+
 model PipelineStage {
   id             String      @id @default(cuid())
   organizationId String
+  pipelineId     String
   name           String
   order          Int
   isWon          Boolean     @default(false)
@@ -380,9 +399,10 @@ model PipelineStage {
   updatedAt      DateTime    @updatedAt
 
   organization  Organization  @relation(fields: [organizationId], references: [id])
+  pipeline      Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   opportunities Opportunity[]
 
-  @@unique([organizationId, order])
+  @@unique([pipelineId, order])
   @@index([organizationId])
 }
 

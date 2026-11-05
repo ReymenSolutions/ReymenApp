@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { stageOptionsFor } from "@/lib/pipelines";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, GitBranch, StickyNote, ArrowRightLeft, Home, Contact, ListTodo } from "lucide-react";
 import { auth } from "@/lib/auth";
@@ -58,7 +59,7 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
       orderBy: { createdAt: "desc" },
       include: { author: { select: { id: true, name: true, email: true } } },
     }),
-    prisma.pipelineStage.findMany({ where: { organizationId: orgId }, orderBy: { order: "asc" }, select: { id: true, name: true } }),
+    stageOptionsFor(orgId).then((rows) => rows.map(({ id, name }) => ({ id, name }))),
     prisma.user.findMany({ where: { organizationId: orgId, isActive: true }, select: { id: true, name: true, email: true }, orderBy: { createdAt: "asc" } }),
     findPotentialDuplicateLeads(orgId, lead, lead.id),
     getLeadTimeline(lead, timelineLimit),

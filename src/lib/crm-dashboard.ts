@@ -51,7 +51,15 @@ export async function getCrmDashboard(orgId: string, now: Date = new Date()) {
   const last7 = new Date(now.getTime() - 7 * day);
   const prev7 = new Date(now.getTime() - 14 * day);
   const [stages, opportunities, leadsLast7, leadsPrev7] = await Promise.all([
-    prisma.pipelineStage.findMany({ where: { organizationId: orgId }, orderBy: { order: "asc" }, select: { id: true, name: true, isWon: true, isLost: true } }),
+    prisma.pipelineStage.findMany({
+      where: { organizationId: orgId },
+      orderBy: [{ pipeline: { isDefault: "desc" } }, { pipeline: { order: "asc" } }, { order: "asc" }],
+      select: { id: true, name: true, isWon: true, isLost: true, pipelineId: true, pipeline: { select: { name: true } } },
+    }).then((rows) => {
+      // Con varios embudos cada etapa lleva el nombre de su embudo: dos «Nuevo» no se confunden.
+      const many = new Set(rows.map((r) => r.pipelineId)).size > 1;
+      return rows.map((r) => ({ id: r.id, name: many ? `${r.pipeline.name} › ${r.name}` : r.name, isWon: r.isWon, isLost: r.isLost }));
+    }),
     prisma.opportunity.findMany({ where: { organizationId: orgId }, select: { amount: true, currency: true, pipelineStageId: true } }),
     prisma.lead.count({ where: { organizationId: orgId, deletedAt: null, createdAt: { gte: last7 } } }),
     prisma.lead.count({ where: { organizationId: orgId, deletedAt: null, createdAt: { gte: prev7, lt: last7 } } }),

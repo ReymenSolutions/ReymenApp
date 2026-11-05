@@ -1,9 +1,8 @@
 // @vitest-environment node
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { createTestOrg, cleanupOrg } from "@/test/helpers";
+import { createTestOrg, cleanupOrg, runTickWhenFree } from "@/test/helpers";
 import { runClockDetectors } from "./detectors";
-import { runAutomationTick } from "@/lib/automation-tick";
 import { getBlueprint } from "./blueprints";
 import { parseBirthday, isBirthdayOn } from "@/lib/birthday";
 import { parsePosCustomer, upsertCustomer } from "@/lib/customers";
@@ -88,7 +87,7 @@ describe("customer.birthday y customer.vip", () => {
     const [ev] = await events("customer.birthday");
     expect(ev).toMatchObject({ subjectId: today.id, dedupeKey: `customer.birthday:${today.id}:2030` });
 
-    await runAutomationTick(NOW, { organizationId: org.id });
+    await runTickWhenFree(NOW, { organizationId: org.id });
     const [ex] = await executions("birthday_campaign");
     expect(ex).toMatchObject({ status: "DRY_RUN", subjectId: today.id });
     expect(ex.action).toMatchObject({ type: "message", templateKey: "birthday_campaign_v1", variables: { name: "Ana" } });
@@ -112,7 +111,7 @@ describe("customer.birthday y customer.vip", () => {
     expect((await runClockDetectors(NOW, { organizationId: org.id })).vips).toBe(2);
     expect((await runClockDetectors(new Date(NOW.getTime() + 300_000), { organizationId: org.id })).vips).toBe(0);
 
-    await runAutomationTick(NOW, { organizationId: org.id });
+    await runTickWhenFree(NOW, { organizationId: org.id });
     const ex = (await executions("vip_customer_alert")).find((e) => e.subjectId === vip.id)!;
     expect(ex.status).toBe("DRY_RUN");
     expect(ex.action).toMatchObject({ type: "alert", title: "Marta ya es cliente VIP" });
@@ -123,7 +122,7 @@ describe("customer.birthday y customer.vip", () => {
     await enable("vip_customer_alert", { minVisits: 5, minSpent: 3000 });
     await runClockDetectors(NOW, { organizationId: org.id });
     await prisma.automation.updateMany({ where: { organizationId: org.id }, data: { config: { ...getBlueprint("vip_customer_alert")!.defaultConfig, minSpent: 5000 } as object } });
-    await runAutomationTick(NOW, { organizationId: org.id });
+    await runTickWhenFree(NOW, { organizationId: org.id });
     expect(await executions("vip_customer_alert")).toMatchObject([{ status: "SKIPPED", skipReason: "not_vip" }]);
   });
 });

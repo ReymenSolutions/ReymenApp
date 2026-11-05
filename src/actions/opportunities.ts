@@ -11,6 +11,7 @@ import { syncLeadStatusFromOpportunity } from "@/lib/lead-status-sync";
 import type { UserRole } from "@prisma/client";
 import { UserError } from "@/lib/user-error";
 import { assertOrgUser } from "@/lib/org-guards";
+import { firstStageOfDefaultPipeline } from "@/lib/pipelines";
 
 async function requireOrgAndCrm() {
   const session = await auth();
@@ -39,9 +40,10 @@ export async function createOpportunity(data: z.infer<typeof createSchema>) {
   const lead = await prisma.lead.findFirst({ where: { id: parsed.leadId, organizationId: orgId } });
   if (!lead) throw new UserError("Lead no encontrado");
 
+  // Sin etapa indicada: la primera etapa del embudo principal.
   const pipelineStageId = parsed.pipelineStageId
     ? (await prisma.pipelineStage.findFirst({ where: { id: parsed.pipelineStageId, organizationId: orgId } }))?.id
-    : (await prisma.pipelineStage.findFirst({ where: { organizationId: orgId }, orderBy: { order: "asc" } }))?.id;
+    : (await firstStageOfDefaultPipeline(orgId))?.id;
 
   if (!pipelineStageId) throw new UserError("No hay etapas de pipeline configuradas");
   if (parsed.ownerId) await assertOrgUser(orgId, parsed.ownerId);
@@ -124,10 +126,9 @@ export async function markOpportunityLost(opportunityId: string, lossReason: str
   const orgId = session.user.organizationId!;
 
   const opportunity = await assertOpportunityAccess(orgId, opportunityId);
-  const [lostStage, fromStage] = await Promise.all([
-    prisma.pipelineStage.findFirst({ where: { organizationId: orgId, isLost: true } }),
-    prisma.pipelineStage.findFirst({ where: { id: opportunity.pipelineStageId, organizationId: orgId }, select: { name: true } }),
-  ]);
+  const fromStage = await prisma.pipelineStage.findFirst({ where: { id: opportunity.pipelineStageId, organizationId: orgId }, select: { name: true, pipelineId: true } });
+  // La etapa «perdida» de su mismo embudo: nunca se brinca a otro embudo al perderla.
+  const lostStage = fromStage ? await prisma.pipelineStage.findFirst({ where: { pipelineId: fromStage.pipelineId, isLost: true }, orderBy: { order: "asc" } }) : null;
   if (!lostStage) throw new UserError("No hay una etapa marcada como 'perdida' configurada");
 
   await prisma.opportunity.update({

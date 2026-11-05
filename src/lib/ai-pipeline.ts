@@ -1,3 +1,4 @@
+import { getDefaultPipeline } from "@/lib/pipelines";
 import { assertKnowledgeCurrent } from "@/lib/ai/knowledge/retrieval";
 import { connectionAiAllowed } from "./channel-connections/service";
 import { after } from "next/server";
@@ -141,13 +142,16 @@ export async function runPipelineAgent(organizationId: string, conversationId: s
     const lastRun = await prisma.pipelineAiRun.findFirst({ where: { conversationId }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
     if (lastRun && now.getTime() - lastRun.createdAt.getTime() < ANALYSIS_COOLDOWN_MS) return "skipped";
 
-    const stages = await prisma.pipelineStage.findMany({ where: { organizationId }, orderBy: { order: "asc" }, select: { id: true, name: true, order: true, isWon: true, isLost: true } });
-    if (stages.length === 0) return "skipped";
     const openOpp = await prisma.opportunity.findFirst({
       where: { leadId: lead.id, organizationId, closedAt: null, pipelineStage: { isWon: false, isLost: false } },
       orderBy: { updatedAt: "desc" },
-      select: { id: true, title: true, pipelineStageId: true },
+      select: { id: true, title: true, pipelineStageId: true, pipelineStage: { select: { pipelineId: true } } },
     });
+    // La IA trabaja en el embudo de la oportunidad abierta; si no hay, en el principal (ahí crearía la nueva).
+    const pipelineId = openOpp?.pipelineStage.pipelineId ?? (await getDefaultPipeline(organizationId))?.id;
+    if (!pipelineId) return "skipped";
+    const stages = await prisma.pipelineStage.findMany({ where: { pipelineId }, orderBy: { order: "asc" }, select: { id: true, name: true, order: true, isWon: true, isLost: true } });
+    if (stages.length === 0) return "skipped";
 
     const { instructions, knowledgeVersion, knowledgeManaged } = await buildBusinessContext(organizationId, last.content, `pipeline:${conversationId}:${last.id}`);
     const realty = await hasModule(organizationId, "REALTY");
