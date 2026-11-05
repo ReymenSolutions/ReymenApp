@@ -53,8 +53,22 @@ Para el sandbox externo:
 
 ## Despliegue y rollback
 
-Migración aditiva: `20261202090000_automation_usage`. Debe aplicarse antes de iniciar la aplicación nueva. El nombre respeta las migraciones ya presentes hasta diciembre de 2026. No ejecutar las versiones temporales anteriores del archivo de migración.
+Migración aditiva: `20261202090000_automation_usage`. Debe aplicarse antes de iniciar la aplicación nueva. El nombre respeta las dependencias del catálogo y planes a la medida de diciembre de 2026. Se integraron también las migraciones de tareas, pipelines y push presentes en main (1c52462). No ejecutar las versiones temporales anteriores del archivo de migración.
 
 Antes del despliegue: respaldo verificado, revisión de cuotas del catálogo y contratos externos. No hay comando de actualización de main hasta publicar e integrar este cambio.
 
 Rollback: detener despachos nuevos, volver a la imagen/commit anterior y mantener las columnas y tabla nuevas. **No borrar el registro de consumo ni revertir datos del cliente.** La versión anterior no impone esta cuota; mantener detenidos los flujos afectados hasta resolver o restaurar la versión corregida. Revisar reservas inciertas antes de reanudar.
+
+
+## Compatibilidad con el trabajo paralelo de Claude
+
+Se integró `main` hasta `1c52462` (PR 177–182) exclusivamente en la rama de este PR, sin modificar main ni producción. Los 68 archivos cambiados desde `59d63d6` se compararon: 62 permanecen idénticos a main y seis comparten cambios de esta implementación.
+
+- `prisma/schema.prisma`: se conservan íntegros Task, Pipeline, PushSubscription y sus relaciones; se añaden solo los campos y tabla de cuota.
+- `src/actions/admin/clients.ts`: se conserva la creación del embudo Ventas mediante `createPipelineWithStages`; convive con elegir plan y módulos al alta.
+- Configuración del portal: se conserva `PipelinesManager`, su consulta y presentación; solo se añade checkout de catálogo.
+- `src/lib/server-messages.ts`: se conservan mensajes existentes; se añaden cuatro traducciones comerciales.
+- `src/test/helpers.ts`: se conserva limpieza de tareas/pipelines y `runTickWhenFree`; se añade limpieza del consumo sintético.
+- `docs/automations/N8N.md`: se conserva la documentación de flujos multi-negocio, n8n 2.x y conectores; el contrato de cuota se agrega como sección independiente.
+
+No se editan los JSON de n8n, componentes de tareas/pipelines, sus migraciones ni avisos push de Claude. Sus flujos conservan su comportamiento; integrarles cuota requiere una adaptación posterior acordada y pruebas sandbox. Las pruebas anteriores al merge no se presentan como validación de esta combinación final.

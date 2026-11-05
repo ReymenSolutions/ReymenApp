@@ -1,10 +1,9 @@
 // @vitest-environment node
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { createTestOrg, cleanupOrg } from "@/test/helpers";
+import { createTestOrg, cleanupOrg, runTickWhenFree } from "@/test/helpers";
 import { atRiskDays, medianIntervalDays } from "./customer-signals";
 import { runClockDetectors } from "./detectors";
-import { runAutomationTick } from "@/lib/automation-tick";
 import { getBlueprint } from "./blueprints";
 
 const DAY = 86_400_000;
@@ -79,7 +78,7 @@ describe("second_visit y customer_recovery", () => {
     const [ev] = await events("customer.second_visit_due");
     expect(ev.subjectId).toBe(due.id);
 
-    await runAutomationTick(NOW, { organizationId: org.id });
+    await runTickWhenFree(NOW, { organizationId: org.id });
     const [ex] = await executions("second_visit");
     expect(ex).toMatchObject({ status: "DRY_RUN", subjectId: due.id });
     expect(ex.action).toMatchObject({ type: "message", templateKey: "second_visit_v1", variables: { name: "Ana" } });
@@ -90,7 +89,7 @@ describe("second_visit y customer_recovery", () => {
     await enable("second_visit");
     await runClockDetectors(NOW, { organizationId: org.id });
     await prisma.customer.update({ where: { id: c.id }, data: { visitCount: 2, lastVisitAt: NOW } });
-    await runAutomationTick(NOW, { organizationId: org.id });
+    await runTickWhenFree(NOW, { organizationId: org.id });
     expect(await executions("second_visit")).toMatchObject([{ status: "SKIPPED", skipReason: "already_returned" }]);
   });
 
@@ -105,7 +104,7 @@ describe("second_visit y customer_recovery", () => {
     const [ev] = await events("customer.at_risk");
     expect(ev.payload).toMatchObject({ customerId: away.id, daysSince: 32 });
 
-    await runAutomationTick(NOW, { organizationId: org.id });
+    await runTickWhenFree(NOW, { organizationId: org.id });
     const [ex] = await executions("customer_recovery");
     expect(ex).toMatchObject({ status: "DRY_RUN", subjectId: away.id });
     expect(ex.action).toMatchObject({ templateKey: "customer_recovery_v1", variables: { name: "Luis", daysSince: "32" } });
@@ -127,13 +126,13 @@ describe("second_visit y customer_recovery", () => {
     const c = await customer({ visits: [ago(80), ago(68), ago(56), ago(44), ago(32)] });
     await enable("customer_recovery", { dryRun: false });
     await runClockDetectors(NOW, { organizationId: org.id });
-    await runAutomationTick(NOW, { organizationId: org.id });
+    await runTickWhenFree(NOW, { organizationId: org.id });
     expect(await executions("customer_recovery")).toMatchObject([{ status: "PENDING" }]);
 
     await prisma.automationExecution.deleteMany({ where: { organizationId: org.id } });
     await prisma.domainEvent.updateMany({ where: { organizationId: org.id }, data: { status: "PENDING", nextAttemptAt: new Date(0) } });
     await prisma.customer.update({ where: { id: c.id }, data: { lastVisitAt: NOW } });
-    await runAutomationTick(NOW, { organizationId: org.id });
+    await runTickWhenFree(NOW, { organizationId: org.id });
     expect(await executions("customer_recovery")).toMatchObject([{ status: "SKIPPED", skipReason: "already_returned" }]);
   });
 

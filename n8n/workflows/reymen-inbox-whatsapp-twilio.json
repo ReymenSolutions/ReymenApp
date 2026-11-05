@@ -1,0 +1,444 @@
+{
+  "name": "Reymen · Bandeja de WhatsApp (Twilio)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "reymen-twilio-entrante",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "438a940b-7738-5b4d-a777-16f0017ccbe9",
+      "name": "Twilio: mensaje entrante",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "d381f4fb-64b4-5f98-a21b-e0affdf6a291"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-outbound",
+        "responseMode": "lastNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "3a458af3-a41b-5061-9abc-5a6e665a063c",
+      "name": "Reymen: enviar WhatsApp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "79382f85-662d-57f5-8fb2-4a6370210c75"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "reymen-twilio-estado",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "2f356fe3-df61-5f4b-a5f2-2dd8b89b7b40",
+      "name": "Twilio: estado del mensaje",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        600
+      ],
+      "webhookId": "98f3f22e-7254-517f-9411-51e77c41b417"
+    },
+    {
+      "parameters": {
+        "jsCode": "// CONFIGURACIÓN. Es lo único que se edita en este flujo; sirve a uno o a varios clientes de Reymen.\n// - reymenUrl: dirección de Reymen. n8nUrl: dirección PÚBLICA de este n8n (la que ve Twilio), sin \"/\" al final.\n// - twilioAccountSid: consola de Twilio. El token NO va aquí para enviar: va en la credencial \"Twilio\" de n8n.\n// - twilioAuthToken: el mismo Auth Token, SOLO para comprobar que los avisos que llegan son de Twilio (recomendado).\n// - clientes: un renglón por negocio. whatsapp = su número de WhatsApp en Twilio (+52…); orgId y llave en Reymen:\n//   Admin → Clientes → (cliente) → botón de webhook. La llave es secreta: no exportes ni compartas este flujo con ella.\nconst cfg = {\n  reymenUrl: 'https://app.reymen.mx',\n  n8nUrl: 'https://n8n.tu-dominio.mx',\n  twilioAccountSid: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',\n  twilioAuthToken: '',\n  // El mismo valor que N8N_WEBHOOK_SECRET de Reymen. Déjalo vacío si n8n permite leer variables de entorno.\n  secretoReymen: '',\n  clientes: [\n    { nombre: 'Mi negocio', whatsapp: '+528100000000', orgId: 'PEGA_AQUI_EL_ID_DE_LA_ORGANIZACION', llave: 'PEGA_AQUI_LA_LLAVE_DE_CONEXION' },\n  ],\n};\n// Qué webhook despertó al flujo: cada uno sigue su camino en el siguiente nodo.\nconst ruta = $('Twilio: mensaje entrante').isExecuted ? 'entrante' : $('Reymen: enviar WhatsApp').isExecuted ? 'saliente' : 'estado';\nconst item = $input.first();\nreturn [{ json: { ruta, cfg, req: item.json }, binary: item.binary }];\n"
+      },
+      "id": "b9ce5ee9-1c03-5b4e-97d5-a2c9019d99da",
+      "name": "Configuración",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "entrante",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "entrante"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "saliente",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "saliente"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "estado",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "estado"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c2c140b1-2cc7-5c7c-879b-ce892b0fc31b",
+      "name": "¿Qué llegó?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<Response></Response>",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml"
+              }
+            ]
+          }
+        }
+      },
+      "id": "5c8cd495-53c6-5404-99d2-158dd948b210",
+      "name": "Responder a Twilio",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst crypto = require('crypto');\n// Firma de Reymen (entrada /api/webhooks/n8n/*): sha256= + HMAC-SHA256 hex de \"<timestamp>.<cuerpo>\" con la llave del cliente.\nfunction firmar(llave, body) {\n  const ts = String(Date.now());\n  return { ts, sig: 'sha256=' + crypto.createHmac('sha256', llave).update(ts + '.' + body).digest('hex') };\n}\n// Cuerpo crudo que llegó al webhook (opción \"Raw Body\"), para verificar firmas byte por byte.\nfunction crudo(item) {\n  return item.binary && item.binary.data ? Buffer.from(item.binary.data.data, 'base64').toString('utf8') : JSON.stringify(item.json.body || {});\n}\n// Secreto de plataforma de Reymen (N8N_WEBHOOK_SECRET). n8n 2.x no deja leer variables de entorno desde el código\n// salvo que se permita (N8N_BLOCK_ENV_ACCESS_IN_NODE=false); por eso también se puede poner en Configuración.\nfunction secretoPlataforma(cfg) {\n  if (cfg && cfg.secretoReymen) return cfg.secretoReymen;\n  try { return $env.N8N_WEBHOOK_SECRET || ''; } catch (e) { return ''; }\n}\n// Verifica que el aviso venga de Reymen (firma de plataforma con N8N_WEBHOOK_SECRET y hora dentro de ±5 min).\nfunction verificarReymen(item, secret) {\n  if (!secret) throw new Error('Falta el secreto de Reymen: ponlo en Configuración → secretoReymen (el mismo N8N_WEBHOOK_SECRET de Reymen)');\n  const h = item.json.headers || {};\n  const raw = crudo(item);\n  const ts = String(h['x-reymen-timestamp'] || '');\n  const sig = String(h['x-reymen-signature'] || '');\n  const esperado = 'sha256=' + crypto.createHmac('sha256', secret).update(ts + '.' + raw).digest('hex');\n  if (!ts || Math.abs(Date.now() - Number(ts)) > 5 * 60 * 1000 || sig.length !== esperado.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(esperado))) {\n    throw new Error('Firma de Reymen inválida');\n  }\n  return JSON.parse(raw);\n}\n\n// Teléfono a formato internacional (+52 + 10 dígitos para México; otros países ya con su lada).\nfunction e164(raw) {\n  const s = String(raw || '').replace(/^whatsapp:/, '');\n  const d = s.replace(/\\D/g, '');\n  if (d.length === 10) return '+52' + d;\n  if (d.length === 13 && d.startsWith('521')) return '+52' + d.slice(3);\n  if (s.trim().startsWith('+') && d.length >= 11) return '+' + d;\n  if (d.length === 12 && d.startsWith('52')) return '+' + d;\n  return null;\n}\n// Firma de Twilio (X-Twilio-Signature): base64 de HMAC-SHA1 de la URL pública + cada parámetro (ordenados) con el Auth Token.\nfunction twilioValido(cfg, url, params, firma) {\n  if (!cfg.twilioAuthToken) return true; // sin token configurado no se verifica (ver la guía)\n  const data = url + Object.keys(params).sort().map((k) => k + params[k]).join('');\n  const esperado = crypto.createHmac('sha1', cfg.twilioAuthToken).update(Buffer.from(data, 'utf-8')).digest('base64');\n  return !!firma && firma.length === esperado.length && crypto.timingSafeEqual(Buffer.from(firma), Buffer.from(esperado));\n}\n// Cuerpo application/x-www-form-urlencoded para Twilio. (El código de n8n 2.x no trae URLSearchParams.)\nconst formulario = (campos) => Object.entries(campos).filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(String(v))).join('&');\nconst twilioUrl = (cfg, c) => 'https://api.twilio.com/2010-04-01/Accounts/' + (c.twilioAccountSid || cfg.twilioAccountSid) + '/Messages.json';\n\n// Mensaje que un cliente final escribió al WhatsApp del negocio → conversación en la bandeja de Reymen.\nconst { cfg, req } = $input.first().json;\nconst p = req.body || {};\nconst url = cfg.n8nUrl + '/webhook/reymen-twilio-entrante';\nif (!twilioValido(cfg, url, p, (req.headers || {})['x-twilio-signature'])) throw new Error('Firma de Twilio inválida');\nconst numeroNegocio = e164(p.To);\nconst c = cfg.clientes.find((x) => e164(x.whatsapp) === numeroNegocio);\nif (!c) throw new Error('El número ' + numeroNegocio + ' no está en Configuración → clientes');\nconst media = Number(p.NumMedia || 0);\nconst texto = String(p.Body || '').trim();\nconst contenido = texto || (media > 0 ? '📎 Envió un archivo (' + (p.MediaContentType0 || 'adjunto') + '). Ábrelo en WhatsApp.' : '');\nif (!contenido || !p.MessageSid) return [];\nconst body = JSON.stringify({\n  channel: 'whatsapp',\n  contactPhone: e164(p.From) || String(p.From || '').replace(/^whatsapp:/, ''),\n  contactName: p.ProfileName || undefined,\n  message: { role: 'USER', content: contenido, externalId: p.MessageSid },\n});\nconst f = firmar(c.llave, body);\nreturn [{ json: { url: cfg.reymenUrl + '/api/webhooks/n8n/conversations', orgId: c.orgId, body, ts: f.ts, sig: f.sig, eventId: 'twilio:' + p.MessageSid } }];\n"
+      },
+      "id": "e509ce1b-020a-51ee-b821-84f4fb8167d3",
+      "name": "Entrante → Reymen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-reymen-orgid",
+              "value": "={{ $json.orgId }}"
+            },
+            {
+              "name": "x-reymen-timestamp",
+              "value": "={{ $json.ts }}"
+            },
+            {
+              "name": "x-reymen-signature",
+              "value": "={{ $json.sig }}"
+            },
+            {
+              "name": "x-reymen-event-id",
+              "value": "={{ $json.eventId }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "628fad03-01fe-5809-9974-4d3322a75952",
+      "name": "Reymen: guardar en la bandeja",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst crypto = require('crypto');\n// Firma de Reymen (entrada /api/webhooks/n8n/*): sha256= + HMAC-SHA256 hex de \"<timestamp>.<cuerpo>\" con la llave del cliente.\nfunction firmar(llave, body) {\n  const ts = String(Date.now());\n  return { ts, sig: 'sha256=' + crypto.createHmac('sha256', llave).update(ts + '.' + body).digest('hex') };\n}\n// Cuerpo crudo que llegó al webhook (opción \"Raw Body\"), para verificar firmas byte por byte.\nfunction crudo(item) {\n  return item.binary && item.binary.data ? Buffer.from(item.binary.data.data, 'base64').toString('utf8') : JSON.stringify(item.json.body || {});\n}\n// Secreto de plataforma de Reymen (N8N_WEBHOOK_SECRET). n8n 2.x no deja leer variables de entorno desde el código\n// salvo que se permita (N8N_BLOCK_ENV_ACCESS_IN_NODE=false); por eso también se puede poner en Configuración.\nfunction secretoPlataforma(cfg) {\n  if (cfg && cfg.secretoReymen) return cfg.secretoReymen;\n  try { return $env.N8N_WEBHOOK_SECRET || ''; } catch (e) { return ''; }\n}\n// Verifica que el aviso venga de Reymen (firma de plataforma con N8N_WEBHOOK_SECRET y hora dentro de ±5 min).\nfunction verificarReymen(item, secret) {\n  if (!secret) throw new Error('Falta el secreto de Reymen: ponlo en Configuración → secretoReymen (el mismo N8N_WEBHOOK_SECRET de Reymen)');\n  const h = item.json.headers || {};\n  const raw = crudo(item);\n  const ts = String(h['x-reymen-timestamp'] || '');\n  const sig = String(h['x-reymen-signature'] || '');\n  const esperado = 'sha256=' + crypto.createHmac('sha256', secret).update(ts + '.' + raw).digest('hex');\n  if (!ts || Math.abs(Date.now() - Number(ts)) > 5 * 60 * 1000 || sig.length !== esperado.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(esperado))) {\n    throw new Error('Firma de Reymen inválida');\n  }\n  return JSON.parse(raw);\n}\n\n// Teléfono a formato internacional (+52 + 10 dígitos para México; otros países ya con su lada).\nfunction e164(raw) {\n  const s = String(raw || '').replace(/^whatsapp:/, '');\n  const d = s.replace(/\\D/g, '');\n  if (d.length === 10) return '+52' + d;\n  if (d.length === 13 && d.startsWith('521')) return '+52' + d.slice(3);\n  if (s.trim().startsWith('+') && d.length >= 11) return '+' + d;\n  if (d.length === 12 && d.startsWith('52')) return '+' + d;\n  return null;\n}\n// Firma de Twilio (X-Twilio-Signature): base64 de HMAC-SHA1 de la URL pública + cada parámetro (ordenados) con el Auth Token.\nfunction twilioValido(cfg, url, params, firma) {\n  if (!cfg.twilioAuthToken) return true; // sin token configurado no se verifica (ver la guía)\n  const data = url + Object.keys(params).sort().map((k) => k + params[k]).join('');\n  const esperado = crypto.createHmac('sha1', cfg.twilioAuthToken).update(Buffer.from(data, 'utf-8')).digest('base64');\n  return !!firma && firma.length === esperado.length && crypto.timingSafeEqual(Buffer.from(firma), Buffer.from(esperado));\n}\n// Cuerpo application/x-www-form-urlencoded para Twilio. (El código de n8n 2.x no trae URLSearchParams.)\nconst formulario = (campos) => Object.entries(campos).filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(String(v))).join('&');\nconst twilioUrl = (cfg, c) => 'https://api.twilio.com/2010-04-01/Accounts/' + (c.twilioAccountSid || cfg.twilioAccountSid) + '/Messages.json';\n\n// Respuesta escrita en la bandeja de Reymen (o por el Agente IA) → WhatsApp del cliente final, vía Twilio.\n// Si algo falla, el flujo responde error y Reymen marca el mensaje como «no enviado».\nconst { cfg } = $input.first().json;\nconst reymen = verificarReymen({ json: $input.first().json.req, binary: $input.first().binary }, secretoPlataforma(cfg));\nconst d = reymen.data || {};\nconst c = cfg.clientes.find((x) => x.orgId === reymen.organizationId);\nif (!c) throw new Error('La organización ' + reymen.organizationId + ' no está en Configuración → clientes');\nconst to = e164(d.contactPhone);\nif (!to) throw new Error('Teléfono del contacto inválido');\nconst campos = { From: 'whatsapp:' + e164(c.whatsapp), To: 'whatsapp:' + to, Body: d.content, MediaUrl: d.attachmentUrl };\n// Twilio avisa aquí si se entregó o se leyó; Reymen lo muestra en la bandeja.\nif (d.messageId) campos.StatusCallback = cfg.n8nUrl + '/webhook/reymen-twilio-estado?org=' + encodeURIComponent(c.orgId) + '&mid=' + encodeURIComponent(d.messageId);\nreturn [{ json: { twilioUrl: twilioUrl(cfg, c), form: formulario(campos) } }];\n"
+      },
+      "id": "ef8efea6-bec5-57fd-96d2-cdb1509abb03",
+      "name": "Armar envío",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.twilioUrl }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "twilioApi",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/x-www-form-urlencoded",
+        "body": "={{ $json.form }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "ec541d1d-e320-5c1f-aed9-5526962b297c",
+      "name": "Twilio: enviar WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst crypto = require('crypto');\n// Firma de Reymen (entrada /api/webhooks/n8n/*): sha256= + HMAC-SHA256 hex de \"<timestamp>.<cuerpo>\" con la llave del cliente.\nfunction firmar(llave, body) {\n  const ts = String(Date.now());\n  return { ts, sig: 'sha256=' + crypto.createHmac('sha256', llave).update(ts + '.' + body).digest('hex') };\n}\n// Cuerpo crudo que llegó al webhook (opción \"Raw Body\"), para verificar firmas byte por byte.\nfunction crudo(item) {\n  return item.binary && item.binary.data ? Buffer.from(item.binary.data.data, 'base64').toString('utf8') : JSON.stringify(item.json.body || {});\n}\n// Secreto de plataforma de Reymen (N8N_WEBHOOK_SECRET). n8n 2.x no deja leer variables de entorno desde el código\n// salvo que se permita (N8N_BLOCK_ENV_ACCESS_IN_NODE=false); por eso también se puede poner en Configuración.\nfunction secretoPlataforma(cfg) {\n  if (cfg && cfg.secretoReymen) return cfg.secretoReymen;\n  try { return $env.N8N_WEBHOOK_SECRET || ''; } catch (e) { return ''; }\n}\n// Verifica que el aviso venga de Reymen (firma de plataforma con N8N_WEBHOOK_SECRET y hora dentro de ±5 min).\nfunction verificarReymen(item, secret) {\n  if (!secret) throw new Error('Falta el secreto de Reymen: ponlo en Configuración → secretoReymen (el mismo N8N_WEBHOOK_SECRET de Reymen)');\n  const h = item.json.headers || {};\n  const raw = crudo(item);\n  const ts = String(h['x-reymen-timestamp'] || '');\n  const sig = String(h['x-reymen-signature'] || '');\n  const esperado = 'sha256=' + crypto.createHmac('sha256', secret).update(ts + '.' + raw).digest('hex');\n  if (!ts || Math.abs(Date.now() - Number(ts)) > 5 * 60 * 1000 || sig.length !== esperado.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(esperado))) {\n    throw new Error('Firma de Reymen inválida');\n  }\n  return JSON.parse(raw);\n}\n\n// Teléfono a formato internacional (+52 + 10 dígitos para México; otros países ya con su lada).\nfunction e164(raw) {\n  const s = String(raw || '').replace(/^whatsapp:/, '');\n  const d = s.replace(/\\D/g, '');\n  if (d.length === 10) return '+52' + d;\n  if (d.length === 13 && d.startsWith('521')) return '+52' + d.slice(3);\n  if (s.trim().startsWith('+') && d.length >= 11) return '+' + d;\n  if (d.length === 12 && d.startsWith('52')) return '+' + d;\n  return null;\n}\n// Firma de Twilio (X-Twilio-Signature): base64 de HMAC-SHA1 de la URL pública + cada parámetro (ordenados) con el Auth Token.\nfunction twilioValido(cfg, url, params, firma) {\n  if (!cfg.twilioAuthToken) return true; // sin token configurado no se verifica (ver la guía)\n  const data = url + Object.keys(params).sort().map((k) => k + params[k]).join('');\n  const esperado = crypto.createHmac('sha1', cfg.twilioAuthToken).update(Buffer.from(data, 'utf-8')).digest('base64');\n  return !!firma && firma.length === esperado.length && crypto.timingSafeEqual(Buffer.from(firma), Buffer.from(esperado));\n}\n// Cuerpo application/x-www-form-urlencoded para Twilio. (El código de n8n 2.x no trae URLSearchParams.)\nconst formulario = (campos) => Object.entries(campos).filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(String(v))).join('&');\nconst twilioUrl = (cfg, c) => 'https://api.twilio.com/2010-04-01/Accounts/' + (c.twilioAccountSid || cfg.twilioAccountSid) + '/Messages.json';\n\n// Twilio avisa el estado de un mensaje enviado (enviado, entregado, leído, fallido) → Reymen.\nconst { cfg, req } = $input.first().json;\nconst p = req.body || {};\nconst q = req.query || {};\nconst url = cfg.n8nUrl + '/webhook/reymen-twilio-estado?' + formulario(q);\nif (!twilioValido(cfg, url, p, (req.headers || {})['x-twilio-signature'])) throw new Error('Firma de Twilio inválida');\nconst MAPA = { sent: 'SENT', delivered: 'DELIVERED', read: 'READ', failed: 'FAILED', undelivered: 'FAILED' };\nconst status = MAPA[String(p.MessageStatus || '').toLowerCase()];\nconst c = cfg.clientes.find((x) => x.orgId === q.org);\nif (!status || !c || !q.mid) return []; // en cola / enviando: no hace falta avisar\nconst body = JSON.stringify({ messageId: q.mid, status, ...(status === 'FAILED' ? { errorMessage: 'Twilio ' + (p.ErrorCode || '') + ' ' + (p.ErrorMessage || '') } : {}) });\nconst f = firmar(c.llave, body);\nreturn [{ json: { url: cfg.reymenUrl + '/api/webhooks/n8n/message-status', orgId: c.orgId, body, ts: f.ts, sig: f.sig, eventId: 'twilio-status:' + (p.MessageSid || q.mid) + ':' + status } }];\n"
+      },
+      "id": "69cbfaf6-e70a-51a7-a8a9-3922caa2b213",
+      "name": "Estado → Reymen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-reymen-orgid",
+              "value": "={{ $json.orgId }}"
+            },
+            {
+              "name": "x-reymen-timestamp",
+              "value": "={{ $json.ts }}"
+            },
+            {
+              "name": "x-reymen-signature",
+              "value": "={{ $json.sig }}"
+            },
+            {
+              "name": "x-reymen-event-id",
+              "value": "={{ $json.eventId }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "05cbfb67-1745-5894-a2ef-b1913ba4d96c",
+      "name": "Reymen: estado del mensaje",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1000,
+        600
+      ]
+    }
+  ],
+  "connections": {
+    "Twilio: mensaje entrante": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reymen: enviar WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Twilio: estado del mensaje": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuración": {
+      "main": [
+        [
+          {
+            "node": "¿Qué llegó?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Qué llegó?": {
+      "main": [
+        [
+          {
+            "node": "Responder a Twilio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Armar envío",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Estado → Reymen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Responder a Twilio": {
+      "main": [
+        [
+          {
+            "node": "Entrante → Reymen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entrante → Reymen": {
+      "main": [
+        [
+          {
+            "node": "Reymen: guardar en la bandeja",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar envío": {
+      "main": [
+        [
+          {
+            "node": "Twilio: enviar WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Estado → Reymen": {
+      "main": [
+        [
+          {
+            "node": "Reymen: estado del mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

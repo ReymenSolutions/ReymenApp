@@ -46,6 +46,10 @@ test("admin creates a customer with its product and searches the operations hub"
   await expect(dialog).not.toBeVisible({ timeout: 20000 });
   const org = await db.organization.findFirstOrThrow({ where: { name }, include: { modules: true } });
   expect(org.modules.filter(m => m.status === "ACTIVE").map(m => m.module)).toEqual(["AUTOMATIONS"]);
+  // Preserve main's multi-pipeline onboarding while provisioning only the purchased product.
+  const pipeline = await db.pipeline.findFirstOrThrow({ where: { organizationId: org.id, isDefault: true }, include: { stages: true } });
+  expect(pipeline.name).toBe("Ventas");
+  expect(pipeline.stages).toHaveLength(6);
   await page.goto("/admin/automations");
   await expect(page.getByRole("heading", { name: "Centro de automatizaciones" })).toBeVisible();
   await page.locator('input[name="q"]').fill("no-such-automation");

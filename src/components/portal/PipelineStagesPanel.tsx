@@ -13,7 +13,7 @@ import {
 import { getErrorMessage } from "@/lib/user-error";
 import type { LeadStatus } from "@prisma/client";
 
-interface StageRow {
+export interface StageRow {
   id: string;
   name: string;
   order: number;
@@ -32,7 +32,7 @@ const STATUS_LABEL: Record<LeadStatus, { es: string; en: string }> = {
   LOST: { es: "Perdido", en: "Lost" },
 };
 
-export function PipelineStagesPanel({ stages, canManage }: { stages: StageRow[]; canManage: boolean }) {
+export function PipelineStagesPanel({ stages, canManage, pipelineId, showHelp = true }: { stages: StageRow[]; canManage: boolean; pipelineId?: string; showHelp?: boolean }) {
   const { lang } = usePreferences();
   const [newName, setNewName] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -101,7 +101,7 @@ export function PipelineStagesPanel({ stages, canManage }: { stages: StageRow[];
     if (!name) return;
     startTransition(async () => {
       try {
-        await createPipelineStage({ name });
+        await createPipelineStage({ name, pipelineId });
         setNewName("");
       } catch (e) {
         toast.error(getErrorMessage(e, (lang === "es" ? "Error al crear etapa" : "Error creating stage")));
@@ -111,11 +111,11 @@ export function PipelineStagesPanel({ stages, canManage }: { stages: StageRow[];
 
   return (
     <div className="space-y-2">
-      <p className="text-xs text-slate-500">
+      {showHelp && <p className="text-xs text-slate-500">
         {lang === "es"
           ? "Cuando una oportunidad llega a una etapa, el contacto pasa al estado que elijas aquí. El estado solo avanza (no retrocede) y un contacto sin más oportunidades abiertas se marca perdido al perder la última."
           : "When an opportunity reaches a stage, the contact moves to the status you choose here. Status only moves forward (never back), and a contact is marked lost when its last open opportunity is lost."}
-      </p>
+      </p>}
       {stages.map((stage, i) => (
         <div key={stage.id} className="flex items-center gap-2 rounded-md border border-slate-100 p-2">
           {canManage ? (

@@ -1,10 +1,9 @@
 // @vitest-environment node
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { createTestOrg, cleanupOrg } from "@/test/helpers";
+import { createTestOrg, cleanupOrg, runTickWhenFree } from "@/test/helpers";
 import { addDays, buildDailyReport, localDateString, pctChange, zonedDayStart } from "./report";
 import { runClockDetectors } from "./detectors";
-import { runAutomationTick } from "@/lib/automation-tick";
 import { dispatchPendingExecutions } from "./dispatcher";
 import { getBlueprint } from "./blueprints";
 
@@ -94,7 +93,7 @@ describe("reporte ejecutivo diario", () => {
 
   it("antes de la hora configurada no hay reporte; después, uno solo por día aunque el reloj corra muchas veces", async () => {
     await enable();
-    expect((await runClockDetectors(new Date("2030-10-07T13:00:00Z"))).reports).toBe(0); // 07:00 CDMX
+    expect((await runClockDetectors(new Date("2030-10-07T13:00:00Z"), { organizationId: org.id })).reports).toBe(0); // 07:00 CDMX
     expect((await runClockDetectors(SEND_TIME, { organizationId: org.id })).reports).toBe(1);
     expect((await runClockDetectors(new Date(SEND_TIME.getTime() + 300_000), { organizationId: org.id })).reports).toBe(0);
     const events = await prisma.domainEvent.findMany({ where: { organizationId: org.id, type: "report.daily_due" } });
@@ -106,7 +105,7 @@ describe("reporte ejecutivo diario", () => {
 
   it("con la automatización activa deja el aviso listo para n8n: correo SOLO a dueños y gerentes, con el mensaje ya armado", async () => {
     const auto = await enable();
-    await runAutomationTick(SEND_TIME, { organizationId: org.id });
+    await runTickWhenFree(SEND_TIME, { organizationId: org.id });
     const [ex] = await prisma.automationExecution.findMany({ where: { automationId: auto.id } });
     expect(ex).toMatchObject({ status: "PENDING", subjectType: "report" });
     const action = ex.action as { type: string; title: string; recipients: { channel: string; email?: string }[]; content: { subject: string; html: string; text: string } };
@@ -118,13 +117,13 @@ describe("reporte ejecutivo diario", () => {
     // La app ya NO manda correos por su cuenta: la entrega es del despachador (n8n).
     expect(sendEmail).not.toHaveBeenCalled();
     // Otro tick el mismo día no vuelve a crear nada.
-    await runAutomationTick(new Date(SEND_TIME.getTime() + 600_000), { organizationId: org.id });
+    await runTickWhenFree(new Date(SEND_TIME.getTime() + 600_000), { organizationId: org.id });
     expect(await prisma.automationExecution.count({ where: { automationId: auto.id } })).toBe(1);
   });
 
   it("el despachador lo entrega con el workflow genérico de avisos (destinatarios y mensaje, sin datos de clientes)", async () => {
     await enable();
-    await runAutomationTick(SEND_TIME, { organizationId: org.id });
+    await runTickWhenFree(SEND_TIME, { organizationId: org.id });
     const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => "" });
     vi.stubEnv("N8N_WEBHOOK_SECRET", "secret");
     vi.stubEnv("N8N_BASE_URL", "http://n8n.test");
@@ -143,13 +142,13 @@ describe("reporte ejecutivo diario", () => {
 
   it("modos de aviso: solo campana (sin n8n), WhatsApp al responsable, o correo y WhatsApp", async () => {
     const bell = await enable({ config: { notify: "app" } });
-    await runAutomationTick(SEND_TIME, { organizationId: org.id });
+    await runTickWhenFree(SEND_TIME, { organizationId: org.id });
     expect(await prisma.automationExecution.findFirstOrThrow({ where: { automationId: bell.id } })).toMatchObject({ status: "SUCCEEDED", action: expect.objectContaining({ recipients: [] }) });
 
     await prisma.automationExecution.deleteMany({ where: { organizationId: org.id } });
     await prisma.domainEvent.deleteMany({ where: { organizationId: org.id } });
     await prisma.automation.update({ where: { id: bell.id }, data: { config: { notify: "email_whatsapp", whatsappTo: "+5215512345678", sendHour: 8 } } });
-    await runAutomationTick(SEND_TIME, { organizationId: org.id });
+    await runTickWhenFree(SEND_TIME, { organizationId: org.id });
     const ex = await prisma.automationExecution.findFirstOrThrow({ where: { automationId: bell.id } });
     expect(ex.skipReason).toBeNull();
     expect(ex.status).toBe("PENDING");
@@ -159,7 +158,7 @@ describe("reporte ejecutivo diario", () => {
 
   it("en dry-run se registra a quién se habría avisado, sin avisar a nadie", async () => {
     const auto = await enable({ dryRun: true });
-    await runAutomationTick(SEND_TIME, { organizationId: org.id });
+    await runTickWhenFree(SEND_TIME, { organizationId: org.id });
     expect((await prisma.automationExecution.findFirstOrThrow({ where: { automationId: auto.id } })).status).toBe("DRY_RUN");
     expect(sendEmail).not.toHaveBeenCalled();
   });

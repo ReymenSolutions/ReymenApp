@@ -3,7 +3,7 @@
 import { PasswordInput } from "@/components/ui/password-input";
 import { useState, useEffect, useRef, useTransition } from "react";
 import {
-  Bell, LogOut, MessageSquare, FileText, Sun, Moon, Globe,
+  Bell, LogOut, MessageSquare, FileText, ListTodo, Sun, Moon, Globe,
   Image as ImageIcon, KeyRound, RefreshCw, User, Loader2, Upload, Users, X, Menu,
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PushOptIn } from "@/components/shared/PushOptIn";
 import { Label } from "@/components/ui/label";
 import { readImageFileAsSquareDataUrl, squareImageErrorMessage } from "@/lib/square-image";
 import { getErrorMessage } from "@/lib/user-error";
@@ -365,6 +366,7 @@ export function TopBar({ title, onMenuClick }: TopBarProps) {
           <button
             ref={notifBtnRef}
             onClick={toggleNotif}
+            aria-label={t.notifications}
             className="relative rounded-md p-2 text-slate-500 hover:bg-slate-200 transition-colors focus:outline-none"
           >
             <Bell className="h-4 w-4" />
@@ -383,6 +385,7 @@ export function TopBar({ title, onMenuClick }: TopBarProps) {
             >
               <div className="border-b border-slate-100 px-3 py-2">
                 <p className="text-xs font-semibold text-slate-700">{t.notifications}</p>
+                <div className="-mx-2 mt-1"><PushOptIn /></div>
               </div>
               {notifications.items.length === 0 ? (
                 <p className="px-3 py-4 text-center text-sm text-slate-400">{t.noNotifications}</p>
@@ -398,6 +401,8 @@ export function TopBar({ title, onMenuClick }: TopBarProps) {
                       <span className="mt-0.5 shrink-0 rounded-full bg-slate-100 p-1">
                         {item.type === "escalation" ? (
                           <MessageSquare className="h-3.5 w-3.5 text-amber-600" />
+                        ) : item.type.startsWith("task_") ? (
+                          <ListTodo className={item.type === "task_overdue" ? "h-3.5 w-3.5 text-red-600" : "h-3.5 w-3.5 text-violet-600"} />
                         ) : (
                           <FileText className="h-3.5 w-3.5 text-brand-600" />
                         )}

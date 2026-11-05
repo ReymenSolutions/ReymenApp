@@ -27,12 +27,13 @@ test.describe("pipeline board and lead detail golden path", () => {
       data: { organizationId: org.id, module: "CRM", status: "ACTIVE", source: "SUBSCRIBED" },
     });
 
+    const pipeline = await prisma.pipeline.create({ data: { organizationId: org.id, name: "Ventas", isDefault: true } });
     await prisma.pipelineStage.createMany({
       data: [
-        { organizationId: org.id, name: "Nuevo", order: 0 },
-        { organizationId: org.id, name: "Contactado", order: 1 },
-        { organizationId: org.id, name: "Ganado", order: 2, isWon: true },
-        { organizationId: org.id, name: "Perdido", order: 3, isLost: true },
+        { organizationId: org.id, pipelineId: pipeline.id, name: "Nuevo", order: 0 },
+        { organizationId: org.id, pipelineId: pipeline.id, name: "Contactado", order: 1 },
+        { organizationId: org.id, pipelineId: pipeline.id, name: "Ganado", order: 2, isWon: true },
+        { organizationId: org.id, pipelineId: pipeline.id, name: "Perdido", order: 3, isLost: true },
       ],
     });
 

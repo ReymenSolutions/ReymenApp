@@ -93,6 +93,6 @@ export const config = {
   // Excluir /api/auth aquí hace que esas rutas las maneje ÚNICAMENTE su
   // propio route handler, sin que el middleware las toque.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|manifest.webmanifest|icons/|public|api/auth).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|manifest.webmanifest|sw.js|icons/|public|api/auth).*)",
   ],
 };
