@@ -14,10 +14,10 @@ import { BillingActions } from "@/components/portal/BillingActions";
 import { PipelineStagesPanel } from "@/components/portal/PipelineStagesPanel";
 import { formatDate } from "@/lib/utils";
 import { can } from "@/lib/permissions";
-import { getPlan, monthlyPriceMxn, planDescription, planName } from "@/lib/plans";
+import { getPlan, getPlans, monthlyPriceMxn, planDescription, planName } from "@/lib/plans";
 import { accentTone } from "@/lib/plan-accent";
 import { getModuleLabel } from "@/lib/modules";
-import { isStripeConfigured } from "@/lib/stripe";
+import { isStripeConfigured, stripePriceIdFor } from "@/lib/stripe";
 import { getBillingView } from "@/lib/billing";
 import { SubscriptionStatus } from "@/components/portal/SubscriptionStatus";
 import type { UserRole } from "@prisma/client";
@@ -30,6 +30,7 @@ export default async function PortalSettingsPage() {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
 
+  const purchasablePlans = (await Promise.all((await getPlans()).map(async p => ({ key: p.key, name: p.name, price: await stripePriceIdFor(p.key) })))).filter(p => p.price);
   const [t, lang, org, crmEnabled, pipelineStages, customFields, foodEnabled, branches] = await Promise.all([
     getServerT(),
     getServerLang(),
@@ -128,7 +129,7 @@ export default async function PortalSettingsPage() {
             </p>
             {canManageBilling && <SubscriptionStatus view={billing} lang={lang} />}
             {stripeEnabled && canManageBilling ? (
-              <BillingActions hasActiveSubscription={hasActiveSubscription} />
+              <BillingActions hasActiveSubscription={hasActiveSubscription} plans={org.customMonthlyPriceMxn === null ? purchasablePlans : []} />
             ) : (
               <div className="info-box rounded-lg bg-brand-50 border border-brand-100 p-3">
                 <p className="info-box-text text-xs text-brand-700">{t.capacityMessage}</p>

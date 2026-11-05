@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { assertModuleEnabled } from "@/lib/modules";
 import { requireOrgPermission } from "@/lib/guards";
 
 
@@ -16,6 +17,7 @@ const ruleSchema = z.object({
 /** Replaces the organization's entire reminder rule set in one call — same rationale as setAvailabilityRules: a short, fully-owned settings list. */
 export async function setReminderRules(rules: z.infer<typeof ruleSchema>[]) {
   const session = await requireOrgPermission("settings:manage");
+  await assertModuleEnabled(session.user.organizationId!, "CRM");
   const parsed = z.array(ruleSchema).parse(rules);
   const orgId = session.user.organizationId!;
 

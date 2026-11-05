@@ -52,6 +52,18 @@ describe("despachador y callback de n8n", () => {
   });
   afterEach(() => vi.unstubAllEnvs());
 
+  it("does not overwrite a successful early callback or bill a retry twice", async () => {
+    const ex = await makeExecution();
+    const fetchImpl = vi.fn(async () => {
+      await applyExecutionCallback({ executionId: ex.id, token: callbackToken(ex.id), status: "sent" }, NOW);
+      return new Response("{}", { status: 200 });
+    }) as unknown as typeof fetch;
+    await dispatchPendingExecutions({ now: NOW, fetchImpl, organizationId: org.id });
+    expect((await prisma.automationExecution.findUniqueOrThrow({ where: { id: ex.id } })).status).toBe("SUCCEEDED");
+    await applyExecutionCallback({ executionId: ex.id, token: callbackToken(ex.id), status: "delivered" }, NOW);
+    expect(await prisma.automationUsage.count({ where: { organizationId: org.id, executionKey: `blueprint:${ex.id}`, state: "SUCCEEDED" } })).toBe(1);
+  });
+
   it("envía firmado, con el contrato y marca DISPATCHED", async () => {
     const ex = await makeExecution();
     const fetchImpl = okFetch();

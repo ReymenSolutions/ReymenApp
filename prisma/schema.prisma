@@ -2545,6 +2545,7 @@ model Plan {
   maxLeads       Int?
   maxUsers       Int?
   maxAutomations Int?
+  maxAutomationRuns Int?
   // Presupuesto interno de IA por ciclo (el costo máximo que Reymen asume) y tope de agentes IA activos (null = sin tope).
   aiBudgetMxn    Decimal          @db.Decimal(10, 2)
   maxAiAgents    Int?
@@ -3604,4 +3605,18 @@ model LoyaltyWalletDevice {
 
   @@unique([deviceLibraryId, passTypeId, memberId])
   @@index([memberId])
+}
+
+// Reservations and successful billable runs. Unknown outcomes retain their slot until reconciled.
+model AutomationUsage {
+  id String @id @default(cuid())
+  organizationId String
+  automationId String
+  executionKey String
+  period String
+  state String @default("RESERVED")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([organizationId, executionKey])
+  @@index([organizationId, period, state])
 }

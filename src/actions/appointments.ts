@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { assertModuleEnabled } from "@/lib/modules";
 import { auth } from "@/lib/auth";
 import { isWithinAvailability } from "@/lib/availability";
 import { logAudit } from "@/lib/audit";
@@ -138,6 +139,7 @@ const createSchema = z.object({
 export async function createAppointment(data: z.infer<typeof createSchema>) {
   const session = await auth();
   if (!session?.user.organizationId) throw new UserError("No autorizado");
+  await assertModuleEnabled(session.user.organizationId, "CRM");
 
   const parsed = createSchema.safeParse(data);
   if (!parsed.success) throw new UserError(parsed.error.issues[0]?.message ?? "Datos inválidos");
@@ -182,6 +184,7 @@ const rescheduleSchema = z.object({
 export async function rescheduleAppointment(data: z.infer<typeof rescheduleSchema>) {
   const session = await auth();
   if (!session?.user.organizationId) throw new UserError("No autorizado");
+  await assertModuleEnabled(session.user.organizationId, "CRM");
   const organizationId = session.user.organizationId;
 
   const parsed = rescheduleSchema.parse(data);
@@ -221,6 +224,7 @@ export async function rescheduleAppointment(data: z.infer<typeof rescheduleSchem
 export async function updateAppointmentStatus(appointmentId: string, status: AppointmentStatus) {
   const session = await auth();
   if (!session?.user.organizationId) throw new UserError("No autorizado");
+  await assertModuleEnabled(session.user.organizationId, "CRM");
 
   const apt = await prisma.appointment.findFirst({
     where: { id: appointmentId, organizationId: session.user.organizationId },

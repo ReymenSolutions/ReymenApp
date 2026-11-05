@@ -1,3 +1,5 @@
+import { withPlanCapacity } from "./plan-limits";
+import { assertModuleEnabled } from "./modules";
 import { prisma } from "./prisma";
 import { generateWebhookSecret } from "./utils";
 import { logAudit } from "./audit";
@@ -51,39 +53,46 @@ export async function applyTemplateInstall({
     }
   }
 
-  const automation = await prisma.automation.create({
-    data: {
-      organizationId: orgId,
-      name: template.name,
-      description: template.description,
-      type: template.category,
-      webhookSecret: generateWebhookSecret(),
-      n8nWorkflowId: version.n8nWorkflowId,
-      config: finalConfig ? (finalConfig as Prisma.InputJsonValue) : undefined,
-    },
-  });
-
-  if (existing) {
-    await prisma.templateInstallation.update({
-      where: { id: existing.id },
-      data: {
-        versionId: version.id,
-        automationId: automation.id,
-        status: "ACTIVE",
-        updatedAt: new Date(),
-      },
-    });
-  } else {
-    await prisma.templateInstallation.create({
+  await assertModuleEnabled(orgId, "AUTOMATIONS");
+  const automation = await withPlanCapacity(orgId, "automations", async tx => {
+    const current = await tx.templateInstallation.findUnique({ where: { organizationId_templateId: { organizationId: orgId, templateId } } });
+    if (current?.status === "ACTIVE") throw new UserError("Este template ya está instalado");
+    const automation = await tx.automation.create({
       data: {
         organizationId: orgId,
-        templateId,
-        versionId: version.id,
-        automationId: automation.id,
-        status: "ACTIVE",
+        name: template.name,
+        description: template.description,
+        type: template.category,
+        webhookSecret: generateWebhookSecret(),
+        n8nWorkflowId: version.n8nWorkflowId,
+        config: finalConfig ? (finalConfig as Prisma.InputJsonValue) : undefined,
       },
     });
-  }
+
+    if (current) {
+      await tx.templateInstallation.update({
+        where: { id: current.id },
+        data: {
+          versionId: version.id,
+          automationId: automation.id,
+          status: "ACTIVE",
+          updatedAt: new Date(),
+        },
+      });
+    } else {
+      await tx.templateInstallation.create({
+        data: {
+          organizationId: orgId,
+          templateId,
+          versionId: version.id,
+          automationId: automation.id,
+          status: "ACTIVE",
+        },
+      });
+    }
+
+    return automation;
+  });
 
   await logAudit({
     organizationId: orgId,

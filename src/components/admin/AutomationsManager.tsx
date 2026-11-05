@@ -502,11 +502,13 @@ function EditAutomationDialog({
 export function AutomationsManager({
   automations,
   orgs,
+  filtered = false,
 }: {
+  filtered?: boolean;
   automations: AutomationRow[];
   orgs: OrgOption[];
 }) {
-  const { t } = usePreferences();
+  const { t, lang } = usePreferences();
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<AutomationRow | null>(null);
   const [webhookTarget, setWebhookTarget] = useState<AutomationRow | null>(null);
@@ -572,7 +574,7 @@ export function AutomationsManager({
         <div className="min-w-0">
           <h1 className="text-xl font-semibold text-slate-900">{t.automations}</h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            {automations.length} {t.adminAutoTotalCount} · {activeCount} {t.adminAutoActiveCount}
+            {automations.length} {lang === "es" ? "en esta página" : "on this page"} · {activeCount} {t.adminAutoActiveCount}
             {errorCount > 0 && <span className="text-red-500"> · {errorCount} {t.adminAutoWithErrors}</span>}
           </p>
         </div>
@@ -586,7 +588,7 @@ export function AutomationsManager({
         <Card>
           <CardContent className="py-16 text-center">
             <Zap className="mx-auto h-10 w-10 text-slate-300 mb-3" />
-            <p className="text-sm text-slate-500">{t.adminAutoNoAuto}</p>
+            <p className="text-sm text-slate-500">{filtered ? (lang === "es" ? "No hay resultados para estos filtros. Prueba otro cliente o estado." : "No matches. Try another client or status.") : t.adminAutoNoAuto}</p>
             <Button className="mt-4" variant="outline" onClick={() => setCreateOpen(true)}>
               <Plus className="h-4 w-4" />
               {t.adminAutoCreateFirst}
@@ -595,8 +597,8 @@ export function AutomationsManager({
         </Card>
       ) : (
         <div className="rounded-lg border border-slate-200 bg-white overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
+          <table className="block w-full text-sm md:table">
+            <thead className="hidden md:table-header-group">
               <tr className="border-b border-slate-200 bg-slate-50">
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t.adminAutoColAutomation}</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t.adminColClient}</th>
@@ -607,12 +609,12 @@ export function AutomationsManager({
                 <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">{t.adminAutoColActions}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="block divide-y divide-slate-100 md:table-row-group">
               {automations.map((auto) => {
                 const isWorking = actionId === auto.id;
                 return (
-                  <tr key={auto.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3">
+                  <tr key={auto.id} className="block p-2 hover:bg-slate-50 transition-colors md:table-row md:p-0">
+                    <td className="block md:table-cell px-4 py-3">
                       <p className="font-medium text-slate-900">{auto.name}</p>
                       {auto.description && (
                         <p className="text-xs text-slate-400 truncate max-w-[200px]">{auto.description}</p>
@@ -623,25 +625,26 @@ export function AutomationsManager({
                         </p>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-700">{auto.organization.name}</td>
-                    <td className="px-4 py-3">
+                    <td className="block md:table-cell px-4 py-3 text-slate-700">{auto.organization.name}</td>
+                    <td className="block md:table-cell px-4 py-3">
                       <Badge variant="secondary" className="text-xs">{automationTypeLabel(auto.type)}</Badge>
                     </td>
-                    <td className="px-4 py-3 text-slate-700">{auto._count.events}</td>
-                    <td className="px-4 py-3">
+                    <td className="block md:table-cell px-4 py-3 text-slate-700">{auto._count.events}</td>
+                    <td className="block md:table-cell px-4 py-3">
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${STATUS_COLORS[auto.status] ?? STATUS_COLORS.ARCHIVED}`}
                       >
                         {statusLabels[auto.status] ?? auto.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-slate-500">{formatDate(auto.createdAt)}</td>
-                    <td className="px-4 py-3">
+                    <td className="block md:table-cell px-4 py-3 text-xs text-slate-500">{formatDate(auto.createdAt)}</td>
+                    <td className="block md:table-cell px-4 py-3">
                       <div className="flex items-center justify-end gap-1.5">
                         <Button
                           size="sm"
                           variant="outline"
                           className="h-7 px-2 text-xs gap-1"
+                          aria-label={lang === "es" ? `Conexión de ${auto.name}` : `Connection for ${auto.name}`}
                           onClick={() => setWebhookTarget(auto)}
                         >
                           <Webhook className="h-3 w-3" />
@@ -653,6 +656,7 @@ export function AutomationsManager({
                             size="sm"
                             variant="outline"
                             className="h-7 px-2 text-xs gap-1"
+                            aria-label={lang === "es" ? `Editar ${auto.name}` : `Edit ${auto.name}`}
                             onClick={() => setEditTarget(auto)}
                           >
                             <Pencil className="h-3 w-3" />
@@ -664,6 +668,7 @@ export function AutomationsManager({
                             size="sm"
                             variant="outline"
                             className="h-7 px-2 text-xs gap-1"
+                            aria-label={auto.status === "ACTIVE" ? `Pausar ${auto.name}` : `Activar ${auto.name}`}
                             onClick={() => handleToggle(auto.id)}
                             disabled={isWorking && (togglePending || archivePending)}
                           >
@@ -682,6 +687,7 @@ export function AutomationsManager({
                             size="sm"
                             variant="outline"
                             className="h-7 px-2 text-xs text-slate-400 hover:text-red-500 hover:border-red-300"
+                            aria-label={`Archivar ${auto.name}`}
                             onClick={() => handleArchive(auto.id, auto.name)}
                             disabled={isWorking && archivePending}
                           >

@@ -11,13 +11,14 @@ import { getErrorMessage } from "@/lib/user-error";
 
 interface BillingActionsProps {
   hasActiveSubscription: boolean;
+  plans: { key: string; name: string }[];
 }
 
-export function BillingActions({ hasActiveSubscription }: BillingActionsProps) {
+export function BillingActions({ hasActiveSubscription, plans }: BillingActionsProps) {
   const { lang } = usePreferences();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
-  async function handleUpgrade(plan: "professional") {
+  async function handleUpgrade(plan: string) {
     setLoadingPlan(plan);
     try {
       const { url } = await createCheckoutSession(plan);
@@ -49,23 +50,17 @@ export function BillingActions({ hasActiveSubscription }: BillingActionsProps) {
   }
 
   return (
-    <div className="flex gap-2">
-      <Button
-        variant="outline"
-        size="sm"
-        className="flex-1"
-        onClick={() => handleUpgrade("professional")}
-        disabled={loadingPlan !== null}
-      >
-        {loadingPlan === "professional" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-        {lang === "es" ? "Actualizar a Professional" : "Upgrade to Professional"}
-      </Button>
+    <div className="flex flex-wrap gap-2">
+      {plans.map(plan => <Button key={plan.key} variant="outline" size="sm" onClick={() => handleUpgrade(plan.key)} disabled={loadingPlan !== null}>
+        {loadingPlan === plan.key ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
+        {lang === "es" ? "Contratar" : "Subscribe to"} {plan.name}
+      </Button>)}
       {/* Business puede tener precio pactado por cliente: no hay un precio fijo que
           cobrar en Stripe, se pide una cotización por Solicitudes. */}
       <Button asChild variant="outline" size="sm" className="flex-1">
         <Link href="/portal/requests">
           <MessageSquare className="h-4 w-4" />
-          {lang === "es" ? "Cotizar plan Business" : "Get a Business plan quote"}
+          {lang === "es" ? "Solicitar cotización" : "Request a quote"}
         </Link>
       </Button>
     </div>

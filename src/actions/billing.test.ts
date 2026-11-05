@@ -10,6 +10,7 @@ vi.stubEnv("STRIPE_PRICE_BUSINESS", "price_ent_456");
 const authMock = vi.fn();
 vi.mock("@/lib/auth", () => ({ auth: () => authMock() }));
 
+const pricesRetrieve = vi.fn(async (id: string) => ({ active: true, currency: "mxn", recurring: { interval: "month", interval_count: 1 }, unit_amount: id === "price_ent_456" ? 399900 : 199900 }));
 const customersCreate = vi.fn().mockResolvedValue({ id: "cus_new_123" });
 const checkoutSessionsCreate = vi.fn().mockResolvedValue({ url: "https://checkout.stripe.com/pay/cs_test_123" });
 const billingPortalSessionsCreate = vi.fn().mockResolvedValue({ url: "https://billing.stripe.com/p/session_123" });
@@ -17,6 +18,7 @@ const billingPortalSessionsCreate = vi.fn().mockResolvedValue({ url: "https://bi
 vi.mock("stripe", () => ({
   default: class MockStripe {
     customers = { create: customersCreate };
+    prices = { retrieve: pricesRetrieve };
     checkout = { sessions: { create: checkoutSessionsCreate } };
     billingPortal = { sessions: { create: billingPortalSessionsCreate } };
   },
@@ -65,9 +67,21 @@ describe("billing actions", () => {
     expect(checkoutSessionsCreate).toHaveBeenCalledTimes(2);
   });
 
-  it("refuses an online checkout for Business, which is quoted per client", async () => {
+  it("refuses online checkout when the organization has an agreed custom price", async () => {
     authMock.mockResolvedValue(fakeSession({ id: "u1", role: "OWNER", organizationId: org.id }));
-    await expect(createCheckoutSession("business" as "professional")).rejects.toThrow(/cotización/);
+    await prisma.organization.update({ where: { id: org.id }, data: { customMonthlyPriceMxn: 99 } });
+    try { await expect(createCheckoutSession("business")).rejects.toThrow(/cotización/); }
+    finally { await prisma.organization.update({ where: { id: org.id }, data: { customMonthlyPriceMxn: null } }); }
+  });
+
+  it("offers other active catalog plans and rejects wrong Stripe amounts before checkout", async () => {
+    authMock.mockResolvedValue(fakeSession({ id: "u1", role: "OWNER", organizationId: org.id }));
+    await expect(createCheckoutSession("business")).resolves.toHaveProperty("url");
+    checkoutSessionsCreate.mockClear();
+    pricesRetrieve.mockResolvedValueOnce({ active: true, currency: "usd", recurring: { interval: "month", interval_count: 1 }, unit_amount: 199900 });
+    await expect(createCheckoutSession("professional")).rejects.toThrow(/no coincide/);
+    expect(checkoutSessionsCreate).not.toHaveBeenCalled();
+    await expect(createCheckoutSession("unknown")).rejects.toThrow(/no disponible/);
   });
 
   it("opens the billing portal only once a Stripe customer exists", async () => {

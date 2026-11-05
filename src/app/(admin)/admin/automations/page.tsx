@@ -1,4 +1,6 @@
 import Link from "next/link";
+import type { Prisma, AutomationStatus } from "@prisma/client";
+import { requireAdmin } from "@/lib/guards";
 import { prisma } from "@/lib/prisma";
 import { AutomationsManager } from "@/components/admin/AutomationsManager";
 import { Badge } from "@/components/ui/badge";
@@ -13,14 +15,17 @@ const CATEGORY_LABELS = {
   en: { onboarding: "Welcome", retention: "Retention", follow_up: "Follow-up", notifications: "Alerts & reports", lead_capture: "Lead capture", appointments: "Appointments", crm: "CRM" } as Record<string, string>,
 };
 
-async function getData() {
+async function getData(filters: { q: string; client: string; status: string; page: number }) {
+  const where: Prisma.AutomationWhereInput = { blueprintKey: null, ...(filters.q ? { OR: [{ name: { contains: filters.q, mode: "insensitive" } }, { organization: { name: { contains: filters.q, mode: "insensitive" } } }] } : {}), ...(filters.client ? { organizationId: filters.client } : {}), ...(filters.status ? { status: filters.status as AutomationStatus } : { status: { not: "ARCHIVED" } }) };
+  const total = await prisma.automation.count({ where });
+  const page = Math.min(filters.page, Math.max(1, Math.ceil(total / 20)));
   const [automations, orgs, blueprintInstances, templates] = await Promise.all([
     prisma.automation.findMany({
-      where: { blueprintKey: null },
+      where, skip: (page - 1) * 20, take: 20,
       orderBy: { createdAt: "desc" },
       include: { organization: { select: { name: true, slug: true } }, _count: { select: { events: true } } },
     }),
-    prisma.organization.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.organization.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true, modules: { where: { module: "AUTOMATIONS", status: "ACTIVE" }, select: { id: true } } } }),
     prisma.automation.findMany({
       where: { blueprintKey: { not: null } },
       select: { blueprintKey: true, status: true, dryRun: true, organization: { select: { id: true, name: true } } },
@@ -32,15 +37,20 @@ async function getData() {
       select: { id: true, name: true, description: true, category: true, industry: true, iconEmoji: true, _count: { select: { installations: { where: { status: "ACTIVE" } } } } },
     }),
   ]);
-  return { automations, orgs, blueprintInstances, templates };
+  return { automations, orgs, blueprintInstances, templates, total, page };
 }
 
 type CatalogItem =
   | { kind: "blueprint"; key: string; name: string; description: string; category: string; meta: string; instances: { orgId: string; orgName: string; state: "paused" | "dry" | "live" }[] }
   | { kind: "template"; key: string; name: string; description: string; category: string; meta: string; installs: number; coveredBy: string[] };
 
-export default async function AdminAutomationsPage() {
-  const [{ automations, orgs, blueprintInstances, templates }, lang] = await Promise.all([getData(), getServerLang()]);
+export default async function AdminAutomationsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  await requireAdmin();
+  const params = await searchParams;
+  const value = (key: string) => typeof params[key] === "string" ? params[key] as string : "";
+  const filters = { q: value("q").slice(0, 100), client: value("client"), status: ["ACTIVE", "PAUSED", "ERROR", "ARCHIVED"].includes(value("status")) ? value("status") : "", page: Math.max(1, Math.min(100000, Number.parseInt(value("page"), 10) || 1)) };
+  const [{ automations, orgs, blueprintInstances, templates, total, page }, lang] = await Promise.all([getData(filters), getServerLang()]);
+  const pageUrl = (n: number) => `/admin/automations?${new URLSearchParams({ q: filters.q, client: filters.client, status: filters.status, page: String(n) })}`;
   const es = lang === "es";
   const labels = CATEGORY_LABELS[es ? "es" : "en"];
   const moduleLabel = getModuleLabel(lang);
@@ -62,10 +72,27 @@ export default async function AdminAutomationsPage() {
   ];
   const categories = [...new Set(items.map((i) => i.category))].sort((a, b) => (labels[a] ?? a).localeCompare(labels[b] ?? b));
 
+  const usage = await prisma.automationUsage.groupBy({ by: ["state"], where: { period: new Date().toISOString().slice(0, 7), ...(filters.client ? { organizationId: filters.client } : {}) }, _count: { _all: true } });
+  const usageCount = (state: string) => usage.find(row => row.state === state)?._count._all ?? 0;
   const stateLabel = { paused: es ? "pausada" : "paused", dry: es ? "simulación" : "dry-run", live: es ? "envío real" : "live" };
 
   return (
     <div className="space-y-6">
+      <section aria-label={es ? "Operación diaria" : "Daily operations"} className="space-y-4">
+        <h1 className="text-xl font-semibold">{es ? "Centro de automatizaciones" : "Automation center"}</h1>
+        <p className="text-sm text-slate-500">{es ? "Encuentra un cliente, revisa errores y administra sus automatizaciones. Consulta el catálogo para ofrecer nuevos servicios." : "Find a client, review failures and manage their automations. Browse the catalog to offer new services."}</p>
+        <div className="grid grid-cols-2 gap-3"><Card><CardContent className="p-4"><p className="text-sm text-slate-500">{es ? "Ejecuciones exitosas del mes" : "Successful runs this month"}</p><p className="text-2xl font-semibold">{usageCount("SUCCEEDED")}</p></CardContent></Card><Card><CardContent className="p-4"><p className="text-sm text-slate-500">{es ? "Reservadas / por confirmar" : "Reserved / awaiting confirmation"}</p><p className="text-2xl font-semibold">{usageCount("RESERVED")}</p></CardContent></Card></div><p className="text-xs text-slate-500">{es ? "Mes calendario UTC. Solo ejecuciones con reserva; los workflows externos deben integrar el control de cuota." : "UTC calendar month. Reserved runs only; external workflows must integrate quota admission."}</p>
+        <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="text-sm">{es ? "Buscar" : "Search"}<input name="q" defaultValue={filters.q} placeholder={es ? "Nombre o cliente" : "Name or client"} className="mt-1 w-full rounded-md border border-slate-300 bg-transparent p-2" /></label>
+          <label className="text-sm">{es ? "Cliente" : "Client"}<select name="client" defaultValue={filters.client} className="mt-1 w-full rounded-md border border-slate-300 bg-transparent p-2"><option value="">{es ? "Todos" : "All"}</option>{orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label>
+          <label className="text-sm">{es ? "Estado" : "Status"}<select name="status" defaultValue={filters.status} className="mt-1 w-full rounded-md border border-slate-300 bg-transparent p-2"><option value="">{es ? "Sin archivadas" : "Not archived"}</option>{["ACTIVE", "PAUSED", "ERROR", "ARCHIVED"].map((state, index) => <option key={state} value={state}>{(es ? ["Activas", "Pausadas", "Con errores", "Archivadas"] : ["Active", "Paused", "Errors", "Archived"])[index]}</option>)}</select></label>
+          <div className="flex items-end gap-3"><button className="rounded-md bg-brand-600 px-4 py-2 text-white" type="submit">{es ? "Filtrar" : "Filter"}</button><Link href="/admin/automations" className="py-2 text-sm underline">{es ? "Limpiar" : "Clear"}</Link></div>
+        </form>
+        <AutomationsManager automations={automations} orgs={orgs.filter(o => o.modules.length > 0)} filtered={!!(filters.q || filters.client || filters.status)} />
+        <nav aria-label={es ? "Paginación" : "Pagination"} className="flex flex-wrap items-center justify-between gap-3 text-sm"><span>{total} {es ? "resultados" : "results"} · {page} / {Math.max(1, Math.ceil(total / 20))}</span><div className="flex gap-4">{page > 1 && <Link href={pageUrl(page - 1)}>{es ? "Anterior" : "Previous"}</Link>}{page * 20 < total && <Link href={pageUrl(page + 1)}>{es ? "Siguiente" : "Next"}</Link>}</div></nav>
+      </section>
+      <details className="rounded-lg border border-slate-200 p-4">
+      <summary className="cursor-pointer font-semibold">{es ? "Explorar catálogo y programas por cliente" : "Browse catalog and client programs"}</summary>
       <Card>
         <CardHeader className="pb-3">
           <p className="font-semibold text-slate-900">{es ? "Catálogo de automatizaciones" : "Automation catalog"}</p>
@@ -103,7 +130,7 @@ export default async function AdminAutomationsPage() {
                       {item.kind === "blueprint" && item.instances.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           {item.instances.map((i) => (
-                            <Link key={i.orgId} href={`/admin/clients/${i.orgId}`} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700 hover:bg-slate-200">
+                            <Link key={i.orgId} href={`/admin/clients/${i.orgId}/automations`} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700 hover:bg-slate-200">
                               {i.orgName} · {stateLabel[i.state]}
                             </Link>
                           ))}
@@ -127,10 +154,7 @@ export default async function AdminAutomationsPage() {
         </CardContent>
       </Card>
 
-      <div>
-        <p className="mb-2 text-sm font-semibold text-slate-900">{es ? "Automatizaciones n8n instaladas" : "Installed n8n automations"}</p>
-        <AutomationsManager automations={automations} orgs={orgs} />
-      </div>
+      </details>
     </div>
   );
 }

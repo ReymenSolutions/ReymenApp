@@ -73,6 +73,7 @@ describe("POST /api/webhooks/stripe", () => {
   });
 
   it("checkout.session.completed activates the subscribed plan on the org", async () => {
+    await prisma.organization.update({ where: { id: org.id }, data: { stripeCustomerId: "cus_123" } });
     subscriptionsRetrieve.mockResolvedValue(fakeSubscription());
     constructEvent.mockReturnValue({
       created: nextCreated(),
@@ -81,6 +82,7 @@ describe("POST /api/webhooks/stripe", () => {
         object: {
           metadata: { organizationId: org.id, plan: "professional" },
           subscription: "sub_123",
+          customer: "cus_123",
         },
       },
     });
@@ -148,7 +150,7 @@ describe("POST /api/webhooks/stripe", () => {
   it("invoice.paid recorre el vencimiento una sola vez por factura y subscription.updated fija el fin de periodo", async () => {
     await prisma.organization.update({ where: { id: org.id }, data: { stripeCustomerId: "cus_123", billingPeriodEnd: null } });
     const end = Math.floor(Date.now() / 1000) + 30 * 86400;
-    constructEvent.mockReturnValue({ created: nextCreated(), type: "invoice.paid", data: { object: { id: "in_test_1", customer: "cus_123", amount_paid: 129900, lines: { data: [{ period: { end } }] } } } });
+    constructEvent.mockReturnValue({ created: nextCreated(), type: "invoice.paid", data: { object: { id: "in_test_1", currency: "mxn", customer: "cus_123", amount_paid: 129900, lines: { data: [{ period: { end } }] } } } });
     expect((await POST(makeRequest("{}"))).status).toBe(200);
     expect((await POST(makeRequest("{}"))).status).toBe(200); // reintento del webhook
     expect(await prisma.billingPayment.count({ where: { organizationId: org.id, externalRef: "in_test_1" } })).toBe(1);
@@ -178,4 +180,18 @@ describe("POST /api/webhooks/stripe", () => {
     expect((await POST(makeRequest("{}"))).status).toBe(200);
     expect((await prisma.organization.findUniqueOrThrow({ where: { id: org.id } })).plan).toBe("business");
   });
+  it("does not provision unpaid subscriptions or accept mismatched checkout customers", async () => {
+    const fresh = await createTestOrg("Unpaid checkout");
+    try {
+      await prisma.organization.update({ where: { id: fresh.id }, data: { stripeCustomerId: "cus_unpaid" } });
+      await prisma.organizationModule.updateMany({ where: { organizationId: fresh.id }, data: { status: "SUSPENDED" } });
+      constructEvent.mockReturnValue({ created: nextCreated(), type: "customer.subscription.updated", data: { object: fakeSubscription({ customer: "cus_unpaid", status: "incomplete" }) } });
+      expect((await POST(makeRequest("{}"))).status).toBe(200);
+      expect(await prisma.organizationModule.count({ where: { organizationId: fresh.id, status: "ACTIVE" } })).toBe(0);
+      constructEvent.mockReturnValue({ created: nextCreated(), type: "checkout.session.completed", data: { object: { metadata: { organizationId: fresh.id }, customer: "cus_other", subscription: "sub_other" } } });
+      expect((await POST(makeRequest("{}"))).status).toBe(500);
+      expect(await prisma.organizationModule.count({ where: { organizationId: fresh.id, status: "ACTIVE" } })).toBe(0);
+    } finally { await cleanupOrg(fresh.id); }
+  });
+
 });

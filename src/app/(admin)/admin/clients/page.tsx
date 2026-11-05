@@ -1,3 +1,4 @@
+import { getPlans } from "@/lib/plans";
 import { Users } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getServerT } from "@/lib/i18n-server";
@@ -22,13 +23,14 @@ async function getClients() {
 export default async function AdminClientsPage() {
   const [t, clients, collections, lang] = await Promise.all([getServerT(), getClients(), listCollections(), getServerLang()]);
   const es = lang === "es";
+  const plans = (await getPlans()).map(p => ({ key: p.key, name: es ? p.name : p.nameEn }));
 
   return (
     <div>
       <PageHeader
         title={t.adminClientsTitle}
         description={`${clients.length} ${t.adminOrgsRegistered}`}
-        actions={<CreateClientDialog />}
+        actions={<CreateClientDialog plans={plans} />}
       />
 
       {collections.length > 0 && (

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
+import { assertModuleEnabled } from "@/lib/modules";
 import { requireOrgPermission } from "@/lib/guards";
 import { UserError } from "@/lib/user-error";
 
@@ -18,6 +19,7 @@ const createSchema = z.object({
 
 export async function createService(data: z.infer<typeof createSchema>) {
   const session = await requireOrgPermission("settings:manage");
+  await assertModuleEnabled(session.user.organizationId!, "CRM");
   const parsed = createSchema.parse(data);
   const orgId = session.user.organizationId!;
 
@@ -58,6 +60,7 @@ const updateSchema = z.object({
 
 export async function updateService(data: z.infer<typeof updateSchema>) {
   const session = await requireOrgPermission("settings:manage");
+  await assertModuleEnabled(session.user.organizationId!, "CRM");
   const { serviceId, ...rest } = updateSchema.parse(data);
   const orgId = session.user.organizationId!;
 
@@ -73,6 +76,7 @@ export async function updateService(data: z.infer<typeof updateSchema>) {
 
 export async function deleteService(serviceId: string) {
   const session = await requireOrgPermission("settings:manage");
+  await assertModuleEnabled(session.user.organizationId!, "CRM");
   const orgId = session.user.organizationId!;
 
   const service = await prisma.service.findFirst({

@@ -25,6 +25,7 @@ const planFields = z.object({
   maxLeads: limit,
   maxUsers: limit,
   maxAutomations: limit,
+  maxAutomationRuns: limit.optional(),
   aiBudgetMxn: money,
   maxAiAgents: limit,
   modules: z.array(z.nativeEnum(PlatformModule)).max(Object.values(PlatformModule).length),
@@ -90,7 +91,7 @@ export async function updatePlan(key: string, data: PlanInput) {
       where: { key },
       data: {
         name: d.name, nameEn: d.nameEn, description: d.description, descriptionEn: d.descriptionEn,
-        priceMxn: d.priceMxn, maxLeads: d.maxLeads, maxUsers: d.maxUsers, maxAutomations: d.maxAutomations,
+        priceMxn: d.priceMxn, maxLeads: d.maxLeads, maxUsers: d.maxUsers, maxAutomations: d.maxAutomations, maxAutomationRuns: d.maxAutomationRuns,
         aiBudgetMxn: d.aiBudgetMxn, maxAiAgents: d.maxAiAgents, modules: d.modules, features: d.features,
         stripePriceId: d.stripePriceId || null, accent: d.accent, sortOrder: d.sortOrder, isActive: d.isActive,
         version: { increment: 1 }, updatedById: session.user.id,
@@ -118,7 +119,7 @@ export async function createPlan(data: PlanInput & { key: string }) {
     const row = await tx.plan.create({
       data: {
         key: data.key, name: d.name, nameEn: d.nameEn, description: d.description, descriptionEn: d.descriptionEn, priceMxn: d.priceMxn,
-        maxLeads: d.maxLeads, maxUsers: d.maxUsers, maxAutomations: d.maxAutomations, aiBudgetMxn: d.aiBudgetMxn, maxAiAgents: d.maxAiAgents,
+        maxLeads: d.maxLeads, maxUsers: d.maxUsers, maxAutomations: d.maxAutomations, maxAutomationRuns: d.maxAutomationRuns, aiBudgetMxn: d.aiBudgetMxn, maxAiAgents: d.maxAiAgents,
         modules: d.modules, features: d.features, stripePriceId: d.stripePriceId || null, accent: d.accent, sortOrder: d.sortOrder, isActive: d.isActive, updatedById: session.user.id,
       },
     });

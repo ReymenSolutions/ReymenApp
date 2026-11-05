@@ -1,0 +1,27 @@
+// @vitest-environment node
+import { expect, it, afterAll } from "vitest";
+import { prisma } from "@/lib/prisma";
+import { createTestOrg, cleanupOrg } from "@/test/helpers";
+import { reserveAutomationRun, settleAutomationRun } from "./usage";
+let id = "";
+const key = `quota-${Date.now()}`;
+afterAll(async () => { if (id) await cleanupOrg(id); await prisma.plan.deleteMany({ where: { key } }); });
+it("serializes admission, reuses retry reservations and charges successes only once", async () => {
+  const org = await createTestOrg("Synthetic quota"); id = org.id;
+  await prisma.plan.create({ data: { key, name: "quota", nameEn: "quota", sortOrder: 999, priceMxn: 1, aiBudgetMxn: 0, modules: ["AUTOMATIONS"], maxAutomationRuns: 1 } });
+  await prisma.organization.update({ where: { id }, data: { plan: key } });
+  const a = await prisma.automation.create({ data: { organizationId: id, name: "Test", type: "custom", webhookSecret: "synthetic" } });
+  const results = await Promise.all(["one", "two"].map(run => reserveAutomationRun(id, a.id, run)));
+  expect(results.filter(r => r.allowed)).toHaveLength(1);
+  const winner = results[0].allowed ? "one" : "two";
+  expect((await reserveAutomationRun(id, a.id, winner)).allowed).toBe(true);
+  await settleAutomationRun(id, winner, false);
+  expect((await reserveAutomationRun(id, a.id, "three")).allowed).toBe(true);
+  await Promise.all([settleAutomationRun(id, "three", true), settleAutomationRun(id, "three", true)]);
+  expect(await prisma.automationUsage.count({ where: { organizationId: id, state: "SUCCEEDED" } })).toBe(1);
+  expect((await reserveAutomationRun(id, a.id, "four")).reason).toBe("monthly_quota");
+  expect((await reserveAutomationRun(id, a.id, "three")).allowed).toBe(false);
+  expect((await reserveAutomationRun(id, a.id, "next-month", new Date("2031-01-01T00:00:00Z"))).allowed).toBe(true);
+  await prisma.organizationModule.update({ where: { organizationId_module: { organizationId: id, module: "AUTOMATIONS" } }, data: { status: "SUSPENDED" } });
+  expect((await reserveAutomationRun(id, a.id, "next-month")).reason).toBe("module_disabled");
+});

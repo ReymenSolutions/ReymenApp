@@ -1,3 +1,4 @@
+import { requireModule } from "@/lib/modules";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Settings, Calendar } from "lucide-react";
@@ -26,6 +27,7 @@ function agendaWindow() {
 export default async function PortalAppointmentsPage() {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
+  await requireModule(session.user.organizationId, "CRM");
   const orgId = session.user.organizationId;
 
   const [t, lang, org, appointments, services] = await Promise.all([

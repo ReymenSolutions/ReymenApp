@@ -1,3 +1,4 @@
+import { hasModule } from "@/lib/modules";
 import type { Automation } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { triggerN8nWorkflow } from "@/lib/n8n";
@@ -53,6 +54,7 @@ export async function findAutomationForDelivery(input: { organizationId: string;
 export async function triggerAutomationWorkflow(automationId: string, webhookPath: string, event: string, data: Record<string, unknown> = {}): Promise<{ success: boolean; error?: string }> {
   const automation = await prisma.automation.findFirst({ where: { id: automationId, status: "ACTIVE" } });
   if (!automation) return { success: false, error: "Automation not active" };
+  if (!(await hasModule(automation.organizationId, "AUTOMATIONS"))) return { success: false, error: "Module disabled" };
   const envelope = await buildAutomationEnvelope(automation);
   return triggerN8nWorkflow(webhookPath, { organizationId: automation.organizationId, event, data, automation: envelope });
 }

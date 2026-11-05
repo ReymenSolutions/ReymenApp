@@ -5,6 +5,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { generateWebhookSecret } from "@/lib/utils";
 import { requireAdmin } from "@/lib/guards";
+import { withPlanCapacity } from "@/lib/plan-limits";
+import { assertModuleEnabled } from "@/lib/modules";
 import { UserError } from "@/lib/user-error";
 
 const automationSchema = z.object({
@@ -35,7 +37,8 @@ export async function createAutomation(data: {
   const parsed = automationSchema.safeParse(data);
   if (!parsed.success) throw new UserError("Datos inválidos: " + parsed.error.issues[0].message);
 
-  const automation = await prisma.automation.create({
+  await assertModuleEnabled(parsed.data.organizationId, "AUTOMATIONS");
+  const automation = await withPlanCapacity(parsed.data.organizationId, "automations", tx => tx.automation.create({
     data: {
       organizationId: parsed.data.organizationId,
       name: parsed.data.name,
@@ -44,7 +47,7 @@ export async function createAutomation(data: {
       n8nWorkflowId: parsed.data.n8nWorkflowId || null,
       webhookSecret: generateWebhookSecret(),
     },
-  });
+  }));
 
   revalidatePath("/admin/automations");
   return { success: true, id: automation.id };
@@ -58,7 +61,9 @@ export async function updateAutomation(
   const parsed = updateSchema.safeParse(data);
   if (!parsed.success) throw new UserError("Datos inválidos");
 
-  await prisma.automation.update({
+  const existing = await prisma.automation.findUniqueOrThrow({ where: { id } });
+  if (parsed.data.status && parsed.data.status !== "ARCHIVED") await assertModuleEnabled(existing.organizationId, "AUTOMATIONS");
+  const write = (tx: Pick<typeof prisma, "automation">) => tx.automation.update({
     where: { id },
     data: {
       ...(parsed.data.name ? { name: parsed.data.name } : {}),
@@ -69,6 +74,10 @@ export async function updateAutomation(
     },
   });
 
+  if (existing.status === "ARCHIVED" && parsed.data.status && parsed.data.status !== "ARCHIVED") {
+    await withPlanCapacity(existing.organizationId, "automations", write);
+  } else await write(prisma);
+
   revalidatePath("/admin/automations");
   return { success: true };
 }
@@ -78,7 +87,7 @@ export async function toggleAutomationStatus(id: string) {
   const automation = await prisma.automation.findUniqueOrThrow({ where: { id } });
   const newStatus = automation.status === "ACTIVE" ? "PAUSED" : "ACTIVE";
 
-  await prisma.automation.update({ where: { id }, data: { status: newStatus } });
+  await updateAutomation(id, { status: newStatus });
   revalidatePath("/admin/automations");
   return { success: true, status: newStatus };
 }

@@ -20,6 +20,7 @@ export type PlanDef = {
   aiBudgetMxn: number;
   /** Tope de agentes IA activos; null = sin tope. */
   maxAiAgents: number | null;
+  maxAutomationRuns?: number | null;
   modules: PlatformModule[];
   features: PlanFeature[];
   stripePriceId: string | null;
@@ -44,6 +45,7 @@ export function toPlanDef(row: Plan): PlanDef {
     limits: { leads: row.maxLeads, users: row.maxUsers, automations: row.maxAutomations },
     aiBudgetMxn: Number(row.aiBudgetMxn),
     maxAiAgents: row.maxAiAgents,
+    maxAutomationRuns: row.maxAutomationRuns,
     modules: row.modules,
     features,
     stripePriceId: row.stripePriceId,
