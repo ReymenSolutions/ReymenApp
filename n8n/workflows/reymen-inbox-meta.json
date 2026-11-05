@@ -1,0 +1,327 @@
+{
+  "name": "Reymen · Instagram, Messenger y Lead Ads (Meta)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "reymen-meta",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "3889db90-dea2-58d6-b5fa-ddff9001ca97",
+      "name": "Meta: verificación",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "786372e3-99a7-5983-bfbd-74f4c83e2400"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "reymen-meta",
+        "responseMode": "onReceived",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "f8948e17-5573-5acc-8fd0-372abbcf6ce2",
+      "name": "Meta: avisos",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "57fcf0f5-76fd-580a-9c92-13d44f4156ed"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "instagram-outbound",
+        "responseMode": "lastNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "d85d289c-8683-5944-b3a3-74496e4f8056",
+      "name": "Reymen: enviar Instagram",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        600
+      ],
+      "webhookId": "b19b1da0-d502-5385-9fcc-d2fc789e1d5e"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "messenger-outbound",
+        "responseMode": "lastNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "d6883fca-bfa8-5ac0-a6a1-2df9d87cf2ed",
+      "name": "Reymen: enviar Messenger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        800
+      ],
+      "webhookId": "df6998eb-6f2b-59da-afdc-7b003321a12e"
+    },
+    {
+      "parameters": {
+        "jsCode": "// CONFIGURACIÓN. Es lo único que se edita en este flujo; sirve a uno o a varios clientes de Reymen.\n// - verifyToken: palabra que tú inventas y pones igual en Meta (App → Webhooks → «Verify token»).\n// - appSecret: App → Configuración → Básica → «Clave secreta de la app». Sirve para comprobar que los avisos son de Meta.\n// - clientes: un renglón por negocio, con su Página de Facebook y (si tiene) su cuenta de Instagram conectada a esa página.\n//   pageToken = token de acceso de la PÁGINA (permisos pages_messaging, instagram_manage_messages, leads_retrieval,\n//   pages_manage_metadata). orgId y llave en Reymen: Admin → Clientes → (cliente) → botón de webhook.\n//   Tokens y llave son secretos: no exportes ni compartas este flujo con ellos puestos.\nconst cfg = {\n  reymenUrl: 'https://app.reymen.mx',\n  graph: 'https://graph.facebook.com/v21.0',\n  verifyToken: 'INVENTA_UNA_PALABRA_SECRETA',\n  appSecret: '',\n  clientes: [\n    { nombre: 'Mi negocio', pageId: '000000000000000', instagramId: '', pageToken: 'PEGA_AQUI_EL_TOKEN_DE_LA_PAGINA', orgId: 'PEGA_AQUI_EL_ID_DE_LA_ORGANIZACION', llave: 'PEGA_AQUI_LA_LLAVE_DE_CONEXION', fuenteLeads: 'Meta Lead Ads' },\n  ],\n};\nconst ruta = $('Meta: verificación').isExecuted ? 'verificar' : $('Meta: avisos').isExecuted ? 'avisos' : 'saliente';\nconst item = $input.first();\nreturn [{ json: { ruta, cfg, req: item.json }, binary: item.binary }];\n"
+      },
+      "id": "b9ce5ee9-1c03-5b4e-97d5-a2c9019d99da",
+      "name": "Configuración",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "verificar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "verificar"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "avisos",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "avisos"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.ruta }}",
+                    "rightValue": "saliente",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "saliente"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c2c140b1-2cc7-5c7c-879b-ce892b0fc31b",
+      "name": "¿Qué llegó?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        500,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Meta comprueba el webhook una vez: si el token coincide, se le regresa el «challenge».\nconst { cfg, req } = $input.first().json;\nconst q = req.query || {};\nif (q['hub.mode'] !== 'subscribe' || q['hub.verify_token'] !== cfg.verifyToken) throw new Error('Token de verificación incorrecto');\nreturn [{ json: { challenge: String(q['hub.challenge'] || '') } }];\n"
+      },
+      "id": "645b48d5-fa19-5a80-a3df-f86850971e1c",
+      "name": "Verificar token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.challenge }}",
+        "options": {}
+      },
+      "id": "849e0e02-57c3-5848-939d-ba305521e72a",
+      "name": "Responder a Meta",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst crypto = require('crypto');\n// Firma de Reymen (entrada /api/webhooks/n8n/*): sha256= + HMAC-SHA256 hex de \"<timestamp>.<cuerpo>\" con la llave del cliente.\nfunction firmar(llave, body) {\n  const ts = String(Date.now());\n  return { ts, sig: 'sha256=' + crypto.createHmac('sha256', llave).update(ts + '.' + body).digest('hex') };\n}\n// Cuerpo crudo que llegó al webhook (opción \"Raw Body\"), para verificar firmas byte por byte.\nfunction crudo(item) {\n  return item.binary && item.binary.data ? Buffer.from(item.binary.data.data, 'base64').toString('utf8') : JSON.stringify(item.json.body || {});\n}\n// Verifica que el aviso venga de Reymen (firma de plataforma con N8N_WEBHOOK_SECRET y hora dentro de ±5 min).\nfunction verificarReymen(item) {\n  const secret = $env.N8N_WEBHOOK_SECRET;\n  const h = item.json.headers || {};\n  const raw = crudo(item);\n  const ts = String(h['x-reymen-timestamp'] || '');\n  const sig = String(h['x-reymen-signature'] || '');\n  const esperado = 'sha256=' + crypto.createHmac('sha256', secret || '').update(ts + '.' + raw).digest('hex');\n  if (!secret || !ts || Math.abs(Date.now() - Number(ts)) > 5 * 60 * 1000 || sig.length !== esperado.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(esperado))) {\n    throw new Error('Firma de Reymen inválida');\n  }\n  return JSON.parse(raw);\n}\n\n// Avisos de Meta: mensajes de Messenger e Instagram → bandeja de Reymen; Lead Ads → contacto nuevo en Reymen.\n// Se responde a Meta al instante (el webhook está en «Immediately»); aquí se procesa con calma.\nconst { cfg, req } = $input.first().json;\nconst raw = crudo({ json: req, binary: $input.first().binary });\nif (cfg.appSecret) {\n  const firma = String((req.headers || {})['x-hub-signature-256'] || '');\n  const esperado = 'sha256=' + crypto.createHmac('sha256', cfg.appSecret).update(raw).digest('hex');\n  if (firma.length !== esperado.length || !crypto.timingSafeEqual(Buffer.from(firma), Buffer.from(esperado))) throw new Error('Firma de Meta inválida');\n}\nconst aviso = JSON.parse(raw);\nconst http = (opts) => this.helpers.httpRequest(opts);\nconst enviar = async (c, ruta, payload, eventId) => {\n  const body = JSON.stringify(payload);\n  const f = firmar(c.llave, body);\n  await http({ method: 'POST', url: cfg.reymenUrl + ruta, body, json: false, headers: { 'content-type': 'application/json', 'x-reymen-orgid': c.orgId, 'x-reymen-timestamp': f.ts, 'x-reymen-signature': f.sig, 'x-reymen-event-id': eventId } });\n};\nconst resultado = [];\nfor (const entry of aviso.entry || []) {\n  const esInstagram = aviso.object === 'instagram';\n  const c = cfg.clientes.find((x) => (esInstagram ? x.instagramId : x.pageId) === String(entry.id));\n  if (!c) { resultado.push({ omitido: 'cuenta ' + entry.id + ' no está en Configuración' }); continue; }\n\n  // Mensajes (Messenger o Instagram Direct)\n  for (const ev of entry.messaging || []) {\n    const m = ev.message;\n    if (!m || m.is_echo || !ev.sender || !m.mid) continue; // lo que escribe la propia página no se reingresa\n    const adjunto = (m.attachments || [])[0];\n    const contenido = String(m.text || '').trim() || (adjunto ? '📎 Envió un archivo (' + (adjunto.type || 'adjunto') + '). Ábrelo en ' + (esInstagram ? 'Instagram' : 'Messenger') + '.' : '');\n    if (!contenido) continue;\n    let nombre;\n    try {\n      const perfil = await http({ method: 'GET', url: cfg.graph + '/' + ev.sender.id, qs: { fields: esInstagram ? 'name,username' : 'name', access_token: c.pageToken }, json: true });\n      nombre = perfil.name || (perfil.username ? '@' + perfil.username : undefined);\n    } catch (e) { /* sin nombre: la bandeja muestra el usuario */ }\n    await enviar(c, '/api/webhooks/n8n/conversations', {\n      channel: esInstagram ? 'instagram' : 'messenger',\n      contactHandle: String(ev.sender.id),\n      contactName: nombre,\n      message: { role: 'USER', content: contenido, externalId: m.mid },\n    }, 'meta:' + m.mid);\n    resultado.push({ mensaje: m.mid, canal: esInstagram ? 'instagram' : 'messenger' });\n  }\n\n  // Lead Ads: Meta solo manda el id; los datos del formulario se piden a la Graph API.\n  for (const ch of entry.changes || []) {\n    if (ch.field !== 'leadgen' || !ch.value || !ch.value.leadgen_id) continue;\n    const lead = await http({ method: 'GET', url: cfg.graph + '/' + ch.value.leadgen_id, qs: { fields: 'created_time,field_data,ad_name,campaign_name,form_id,ad_id', access_token: c.pageToken }, json: true });\n    const campos = {};\n    for (const f of lead.field_data || []) campos[f.name] = (f.values || []).join(', ');\n    const nombre = campos.full_name || [campos.first_name, campos.last_name].filter(Boolean).join(' ') || campos.email || campos.phone_number || 'Lead de Meta';\n    const conocidos = ['full_name', 'first_name', 'last_name', 'email', 'phone_number'];\n    const respuestas = Object.fromEntries(Object.entries(campos).filter(([k]) => !conocidos.includes(k)));\n    await enviar(c, '/api/webhooks/n8n/leads', {\n      name: nombre,\n      email: campos.email || undefined,\n      phone: campos.phone_number || undefined,\n      source: c.fuenteLeads || 'Meta Lead Ads',\n      externalId: 'meta-lead:' + ch.value.leadgen_id,\n      metadata: { formId: ch.value.form_id || lead.form_id, adId: ch.value.ad_id || lead.ad_id, adName: lead.ad_name, campaign: lead.campaign_name, createdTime: lead.created_time, respuestas },\n    }, 'meta-lead:' + ch.value.leadgen_id);\n    resultado.push({ lead: ch.value.leadgen_id });\n  }\n}\nreturn [{ json: { procesados: resultado } }];\n"
+      },
+      "id": "9fea6649-b9b8-5e9d-928e-60f27879ee7a",
+      "name": "Mensajes y Lead Ads → Reymen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst crypto = require('crypto');\n// Firma de Reymen (entrada /api/webhooks/n8n/*): sha256= + HMAC-SHA256 hex de \"<timestamp>.<cuerpo>\" con la llave del cliente.\nfunction firmar(llave, body) {\n  const ts = String(Date.now());\n  return { ts, sig: 'sha256=' + crypto.createHmac('sha256', llave).update(ts + '.' + body).digest('hex') };\n}\n// Cuerpo crudo que llegó al webhook (opción \"Raw Body\"), para verificar firmas byte por byte.\nfunction crudo(item) {\n  return item.binary && item.binary.data ? Buffer.from(item.binary.data.data, 'base64').toString('utf8') : JSON.stringify(item.json.body || {});\n}\n// Verifica que el aviso venga de Reymen (firma de plataforma con N8N_WEBHOOK_SECRET y hora dentro de ±5 min).\nfunction verificarReymen(item) {\n  const secret = $env.N8N_WEBHOOK_SECRET;\n  const h = item.json.headers || {};\n  const raw = crudo(item);\n  const ts = String(h['x-reymen-timestamp'] || '');\n  const sig = String(h['x-reymen-signature'] || '');\n  const esperado = 'sha256=' + crypto.createHmac('sha256', secret || '').update(ts + '.' + raw).digest('hex');\n  if (!secret || !ts || Math.abs(Date.now() - Number(ts)) > 5 * 60 * 1000 || sig.length !== esperado.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(esperado))) {\n    throw new Error('Firma de Reymen inválida');\n  }\n  return JSON.parse(raw);\n}\n\n// Respuesta escrita en la bandeja de Reymen (o por el Agente IA) → Instagram o Messenger del cliente final.\n// Si algo falla, el flujo responde error y Reymen marca el mensaje como «no enviado».\n// Meta solo deja contestar dentro de las 24 h desde el último mensaje del cliente (política de mensajería estándar).\nconst { cfg } = $input.first().json;\nconst reymen = verificarReymen({ json: $input.first().json.req, binary: $input.first().binary });\nconst d = reymen.data || {};\nconst c = cfg.clientes.find((x) => x.orgId === reymen.organizationId);\nif (!c) throw new Error('La organización ' + reymen.organizationId + ' no está en Configuración → clientes');\nif (!d.contactHandle) throw new Error('La conversación no tiene el usuario de Meta del contacto');\nconst message = d.attachmentUrl\n  ? { attachment: { type: d.attachmentType === 'image' ? 'image' : 'file', payload: { url: d.attachmentUrl, is_reusable: false } } }\n  : { text: String(d.content || '') };\nconst res = await this.helpers.httpRequest({\n  method: 'POST', url: cfg.graph + '/me/messages', qs: { access_token: c.pageToken }, json: true,\n  body: { recipient: { id: d.contactHandle }, messaging_type: 'RESPONSE', message },\n});\nif (d.attachmentUrl && d.content) {\n  await this.helpers.httpRequest({ method: 'POST', url: cfg.graph + '/me/messages', qs: { access_token: c.pageToken }, json: true, body: { recipient: { id: d.contactHandle }, messaging_type: 'RESPONSE', message: { text: String(d.content) } } });\n}\nreturn [{ json: { enviado: true, metaMessageId: res.message_id || null } }];\n"
+      },
+      "id": "358ad3af-a13a-53c5-9f0d-c437e044eee0",
+      "name": "Enviar por Meta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        700
+      ]
+    }
+  ],
+  "connections": {
+    "Meta: verificación": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meta: avisos": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reymen: enviar Instagram": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reymen: enviar Messenger": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuración": {
+      "main": [
+        [
+          {
+            "node": "¿Qué llegó?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Qué llegó?": {
+      "main": [
+        [
+          {
+            "node": "Verificar token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mensajes y Lead Ads → Reymen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar por Meta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar token": {
+      "main": [
+        [
+          {
+            "node": "Responder a Meta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
