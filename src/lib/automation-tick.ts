@@ -8,6 +8,7 @@ import { attributeEvent } from "@/lib/automation/attribution";
 import { runClockDetectors } from "@/lib/automation/detectors";
 import { processDomainEvents, purgeProcessedDomainEvents, type OutboxResult } from "@/lib/domain-events";
 import { sendDueTaskReminders } from "@/lib/tasks";
+import { notifyTaskReminder } from "@/lib/push";
 
 // Llave del candado del reloj de automatizaciones (cualquier entero fijo; solo debe ser única en la base).
 const TICK_LOCK_KEY = 7_204_001;
@@ -36,7 +37,7 @@ export async function runAutomationTick(now: Date = new Date(), opts: { organiza
       const purged = await purgeProcessedDomainEvents(now);
       // Recordatorios de tareas (correo al responsable). Cada uno se reclama antes de enviarse: nunca se repite.
       let taskReminders = 0;
-      try { taskReminders = (await sendDueTaskReminders(now, { organizationId: opts.organizationId })).sent; }
+      try { taskReminders = (await sendDueTaskReminders(now, { organizationId: opts.organizationId, onReminder: notifyTaskReminder })).sent; }
       catch { console.error("[tasks] reminders failed; the next tick runs them again"); }
       return { ran: true as const, outbox, dispatch, purged, taskReminders };
     },

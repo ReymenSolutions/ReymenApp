@@ -11,13 +11,14 @@ import { logAudit } from "@/lib/audit";
 import { UserError } from "@/lib/user-error";
 import { assertOrgLead, assertOrgUser } from "@/lib/org-guards";
 import { canEditTask, remindAtFor, TASK_PRIORITIES, TASK_TYPES } from "@/lib/tasks";
+import { notifyTaskAssigned } from "@/lib/push";
 
 async function requireTaskUser() {
   const session = await auth();
   if (!session?.user.organizationId) throw new UserError("No autorizado");
   await assertModuleEnabled(session.user.organizationId, "CRM");
   if (!can(session.user.role as UserRole, "tasks:manage")) throw new UserError("No autorizado");
-  return { orgId: session.user.organizationId, user: { id: session.user.id, role: session.user.role as UserRole } };
+  return { orgId: session.user.organizationId, user: { id: session.user.id, role: session.user.role as UserRole, name: session.user.name ?? null } };
 }
 
 const isoDate = z
@@ -84,6 +85,7 @@ export async function createTask(input: TaskInput) {
       ...links,
     },
   });
+  if (assigneeId && assigneeId !== user.id) await notifyTaskAssigned({ id: task.id, title: task.title, leadId: links.leadId }, assigneeId, user.name);
   await logAudit({ organizationId: orgId, userId: user.id, action: "task.create", resource: "Task", resourceId: task.id, metadata: { title: task.title, assigneeId, leadId: links.leadId } });
   revalidateTaskViews(links.leadId);
   return { success: true, taskId: task.id };
@@ -122,6 +124,7 @@ export async function updateTask(taskId: string, input: TaskInput) {
       ...links,
     },
   });
+  if (assigneeId && assigneeId !== task.assigneeId && assigneeId !== user.id) await notifyTaskAssigned({ id: task.id, title: data.title, leadId: links.leadId }, assigneeId, user.name);
   await logAudit({ organizationId: orgId, userId: user.id, action: "task.update", resource: "Task", resourceId: task.id, metadata: { title: data.title, assigneeId } });
   revalidateTaskViews(links.leadId ?? task.leadId);
   if (task.leadId && task.leadId !== links.leadId) revalidatePath(`/portal/leads/${task.leadId}`);

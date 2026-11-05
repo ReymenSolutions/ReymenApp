@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { notifyInboundMessage, notifyNewLead } from "./push";
 import { z } from "zod";
 import { enqueueAutoReply, enqueuePipelineAnalysis } from "./ai-auto-jobs";
 import { prisma } from "./prisma";
@@ -110,6 +111,7 @@ export async function processLeadEvent(payload: unknown, orgId: string): Promise
   }
 
   await recordMetric(orgId, METRIC_KEYS.LEADS_CAPTURED);
+  await notifyNewLead(orgId, { id: created.id, name: body.name, source: body.source ?? null });
   await linkOrphanConversations(orgId, created.id, body.phone);
   await linkOrphanCustomers(orgId, created.id, body.phone);
 }
@@ -195,7 +197,10 @@ export async function processConversationEvent(payload: unknown, orgId: string, 
     const leadId = await resolveLeadForConversation(orgId, { contactPhone: body.contactPhone, contactEmail: email, contactHandle: handle, contactName: body.contactName, channel: conversation.channel, channelConnectionId: conversation.channelConnectionId }, body.message.role === "USER", conversation.id);
     if (leadId) await prisma.conversation.updateMany({ where: { id: conversation.id, organizationId: orgId, leadId: null }, data: { leadId } });
   }
-  if (inserted && body.message.role === "USER") await recordMetric(orgId, METRIC_KEYS.MESSAGES_RECEIVED);
+  if (inserted && body.message.role === "USER") {
+    await recordMetric(orgId, METRIC_KEYS.MESSAGES_RECEIVED);
+    await notifyInboundMessage(orgId, conversation.id);
+  }
   if (inserted && body.message.role === "ASSISTANT") await recordMetric(orgId, METRIC_KEYS.MESSAGES_SENT);
   return { conversationId: conversation.id };
 }
