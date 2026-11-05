@@ -1,0 +1,121 @@
+// Textos de Tareas (cliente y servidor). Un solo lugar para español e inglés.
+
+export type TaskLang = "es" | "en";
+
+export const TASK_TYPE_LABEL: Record<TaskLang, Record<"CALL" | "WHATSAPP" | "EMAIL" | "MEETING" | "VISIT" | "OTHER", string>> = {
+  es: { CALL: "Llamada", WHATSAPP: "WhatsApp", EMAIL: "Correo", MEETING: "Reunión", VISIT: "Visita", OTHER: "Pendiente" },
+  en: { CALL: "Call", WHATSAPP: "WhatsApp", EMAIL: "Email", MEETING: "Meeting", VISIT: "Visit", OTHER: "To-do" },
+};
+
+export const TASK_PRIORITY_LABEL: Record<TaskLang, Record<"LOW" | "NORMAL" | "HIGH", string>> = {
+  es: { LOW: "Baja", NORMAL: "Normal", HIGH: "Alta" },
+  en: { LOW: "Low", NORMAL: "Normal", HIGH: "High" },
+};
+
+function reminderLabel(lang: TaskLang, key: string): string {
+  if (key === "none") return lang === "en" ? "No reminder" : "Sin recordatorio";
+  const m = Number(key);
+  if (m === 0) return lang === "en" ? "At due time" : "A la hora";
+  if (m % 1440 === 0) return lang === "en" ? `${m / 1440} day(s) before` : `${m / 1440} día(s) antes`;
+  if (m % 60 === 0) return lang === "en" ? `${m / 60} hour(s) before` : `${m / 60} hora(s) antes`;
+  return lang === "en" ? `${m} min before` : `${m} min antes`;
+}
+
+export const TASK_COPY = {
+  es: {
+    title: "Tareas",
+    desc: "Los pendientes de tu equipo: llamadas, mensajes, reuniones y visitas, con responsable, fecha y recordatorio.",
+    newTask: "Nueva tarea",
+    editTask: "Editar tarea",
+    what: "¿Qué hay que hacer?",
+    titlePlaceholder: "Ej. Llamar para confirmar la cotización",
+    titleRequired: "Escribe qué hay que hacer",
+    type: "Tipo",
+    priority: "Prioridad",
+    due: "Vence",
+    reminder: "Recordatorio",
+    reminderOption: (k: string) => reminderLabel("es", k),
+    assignee: "Responsable",
+    unassigned: "Sin asignar",
+    me: "yo",
+    contact: "Contacto",
+    searchContact: "Buscar por nombre, correo o teléfono…",
+    change: "Cambiar",
+    opportunity: "Oportunidad",
+    noOpportunity: "Ninguna",
+    notes: "Notas",
+    cancel: "Cancelar",
+    save: "Guardar",
+    create: "Crear tarea",
+    created: "Tarea creada",
+    saved: "Tarea guardada",
+    saveError: "No se pudo guardar la tarea",
+    deleted: "Tarea eliminada",
+    confirmDelete: "¿Eliminar esta tarea?",
+    edit: "Editar",
+    remove: "Eliminar",
+    markDone: "Marcar como hecha",
+    reopen: "Reabrir",
+    overdue: "Vencidas",
+    today: "Hoy",
+    upcoming: "Próximas",
+    noDate: "Sin fecha",
+    done: "Terminadas (últimos 7 días)",
+    empty: "No hay tareas pendientes. Crea una para no olvidar el siguiente paso con un cliente.",
+    mine: "Mis tareas",
+    all: "Todo el equipo",
+    everyone: "Todos",
+    high: "Alta",
+    noTasksLead: "Sin tareas para este contacto.",
+    myTasks: "Mis tareas para hoy",
+    myTasksHint: "Vencidas y de hoy, asignadas a ti.",
+  },
+  en: {
+    title: "Tasks",
+    desc: "Your team's to-dos: calls, messages, meetings and visits, with owner, due date and reminder.",
+    newTask: "New task",
+    editTask: "Edit task",
+    what: "What needs to be done?",
+    titlePlaceholder: "E.g. Call to confirm the quote",
+    titleRequired: "Describe what needs to be done",
+    type: "Type",
+    priority: "Priority",
+    due: "Due",
+    reminder: "Reminder",
+    reminderOption: (k: string) => reminderLabel("en", k),
+    assignee: "Owner",
+    unassigned: "Unassigned",
+    me: "me",
+    contact: "Contact",
+    searchContact: "Search by name, email or phone…",
+    change: "Change",
+    opportunity: "Opportunity",
+    noOpportunity: "None",
+    notes: "Notes",
+    cancel: "Cancel",
+    save: "Save",
+    create: "Create task",
+    created: "Task created",
+    saved: "Task saved",
+    saveError: "Could not save the task",
+    deleted: "Task deleted",
+    confirmDelete: "Delete this task?",
+    edit: "Edit",
+    remove: "Delete",
+    markDone: "Mark as done",
+    reopen: "Reopen",
+    overdue: "Overdue",
+    today: "Today",
+    upcoming: "Upcoming",
+    noDate: "No date",
+    done: "Done (last 7 days)",
+    empty: "No pending tasks. Create one so you never forget the next step with a customer.",
+    mine: "My tasks",
+    all: "Whole team",
+    everyone: "Everyone",
+    high: "High",
+    noTasksLead: "No tasks for this contact.",
+    myTasks: "My tasks for today",
+    myTasksHint: "Overdue and due today, assigned to you.",
+  },
+} as const;

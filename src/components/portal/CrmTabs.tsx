@@ -8,8 +8,8 @@ import { getCrmTabs, type CrmTabKey } from "@/lib/crm-tabs";
 import { cn } from "@/lib/utils";
 
 const LABEL: Record<"es" | "en", Record<CrmTabKey, string>> = {
-  es: { today: "Hoy", inbox: "Inbox", contacts: "Contactos", pipeline: "Seguimiento", customers: "Clientes" },
-  en: { today: "Today", inbox: "Inbox", contacts: "Contacts", pipeline: "Follow-up", customers: "Customers" },
+  es: { today: "Hoy", tasks: "Tareas", inbox: "Inbox", contacts: "Contactos", pipeline: "Seguimiento", customers: "Clientes" },
+  en: { today: "Today", tasks: "Tasks", inbox: "Inbox", contacts: "Contacts", pipeline: "Follow-up", customers: "Customers" },
 };
 
 /** Pestañas del CRM (una sola entrada del menú): cada pestaña es la pantalla de siempre, con su dirección de siempre. */

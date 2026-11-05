@@ -31,12 +31,14 @@ export type Action =
   // Realty: configurar zonas, ajustes y campañas.
   | "realty:manage"
   // Realty: asesores — propiedades, prospectos, visitas y cierres.
-  | "realty:operate";
+  | "realty:operate"
+  // CRM: crear y trabajar tareas y pendientes. El Agente solo edita las suyas (asignadas o creadas por él).
+  | "tasks:manage";
 
 const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
   SUPER_ADMIN: [
     "leads:create", "leads:delete", "leads:update_status",
-    "opportunities:create", "opportunities:manage", "pipeline:manage",
+    "tasks:manage", "opportunities:create", "opportunities:manage", "pipeline:manage",
     "automations:view", "automations:manage",
     "conversations:view", "conversations:escalate", "conversations:resolve", "conversations:reply", "conversations:assign",
     "knowledge_base:manage", "team:manage",
@@ -45,7 +47,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
   ],
   ADMIN: [
     "leads:create", "leads:delete", "leads:update_status",
-    "opportunities:create", "opportunities:manage", "pipeline:manage",
+    "tasks:manage", "opportunities:create", "opportunities:manage", "pipeline:manage",
     "automations:view", "automations:manage",
     "conversations:view", "conversations:escalate", "conversations:resolve", "conversations:reply", "conversations:assign",
     "knowledge_base:manage", "team:manage",
@@ -54,7 +56,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
   ],
   OWNER: [
     "leads:create", "leads:delete", "leads:update_status",
-    "opportunities:create", "opportunities:manage", "pipeline:manage",
+    "tasks:manage", "opportunities:create", "opportunities:manage", "pipeline:manage",
     "automations:view", "automations:manage",
     "conversations:view", "conversations:escalate", "conversations:resolve", "conversations:reply", "conversations:assign",
     "knowledge_base:manage", "team:manage",
@@ -63,7 +65,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
   ],
   MANAGER: [
     "leads:create", "leads:update_status",
-    "opportunities:create", "opportunities:manage",
+    "tasks:manage", "opportunities:create", "opportunities:manage",
     "automations:view",
     "conversations:view", "conversations:escalate", "conversations:resolve", "conversations:reply", "conversations:assign",
     "knowledge_base:manage",
@@ -72,7 +74,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
   ],
   AGENT: [
     "leads:create", "leads:update_status",
-    "opportunities:create", "opportunities:manage",
+    "tasks:manage", "opportunities:create", "opportunities:manage",
     "automations:view",
     "conversations:view", "conversations:escalate", "conversations:resolve", "conversations:reply",
     "requests:create",

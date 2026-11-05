@@ -1,12 +1,13 @@
 import { CrmTabs } from "@/components/portal/CrmTabs";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, ArrowRight, Calendar, CheckCircle2, MessageSquare, Send, TrendingUp, UserPlus } from "lucide-react";
+import { ArrowRight, Calendar, CheckCircle2, ListTodo, MessageSquare, Send, TrendingUp, UserPlus } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requireModule } from "@/lib/modules";
 import { getServerLang } from "@/lib/i18n-server";
 import { getTodayView } from "@/lib/crm-today";
+import { getMyDueTasks } from "@/lib/tasks";
 import { formatMoney } from "@/lib/utils";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,8 @@ const COPY = {
     attempt: (n: number) => `Intento ${n}`,
     overdue: "Vencida",
     open: "Abrir",
+    tasks: "Mis tareas para hoy",
+    tasksHint: "Vencidas y de hoy, asignadas a ti.",
   },
   en: {
     title: "What to do today",
@@ -49,6 +52,8 @@ const COPY = {
     attempt: (n: number) => `Attempt ${n}`,
     overdue: "Overdue",
     open: "Open",
+    tasks: "My tasks for today",
+    tasksHint: "Overdue and due today, assigned to you.",
   },
 };
 
@@ -118,9 +123,10 @@ export default async function TodayPage() {
   const l = lang === "en" ? "en" : "es";
   const t = COPY[l];
   const tz = org?.timezone ?? "America/Mexico_City";
-  const view = await getTodayView(orgId, tz);
+  const now = new Date();
+  const [view, myTasks] = await Promise.all([getTodayView(orgId, tz, now), getMyDueTasks(orgId, session.user.id, tz, now)]);
 
-  const total = view.waiting.total + view.newLeads.total + view.followUps.total + view.appointments.total + view.staleOpportunities.total;
+  const total = myTasks.total + view.waiting.total + view.newLeads.total + view.followUps.total + view.appointments.total + view.staleOpportunities.total;
   const more = (shown: number, all: number) => t.more(all - shown);
 
   return (
@@ -135,6 +141,25 @@ export default async function TodayPage() {
         </div>
       ) : (
         <div className="space-y-4">
+          <Block
+            icon={ListTodo}
+            tone="bg-violet-50 text-violet-600"
+            title={t.tasks}
+            hint={t.tasksHint}
+            total={myTasks.total}
+            moreLabel={more(myTasks.items.length, myTasks.total)}
+            rows={myTasks.items.map((task) => {
+              const late = !!task.dueAt && task.dueAt < now;
+              return {
+                key: task.id,
+                href: task.leadId ? `/portal/leads/${task.leadId}` : "/portal/tasks",
+                title: task.title,
+                detail: task.lead?.name ?? undefined,
+                badge: late ? t.overdue : task.dueAt ? timeIn(task.dueAt, tz, l) : undefined,
+                badgeTone: late ? "red" : "amber",
+              };
+            })}
+          />
           <Block
             icon={MessageSquare}
             tone="bg-red-50 text-red-600"
