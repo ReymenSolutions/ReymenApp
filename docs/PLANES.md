@@ -31,3 +31,9 @@ En Admin → Planes, junto a los planes del catálogo, hay un card **Custom**: n
 - **Tope pactado (Custom):** Admin → Cliente → Presupuesto de IA → «Tope de agentes IA» reemplaza el del plan solo para ese cliente (auditado con motivo, acción `ai.agents_cap`); vacío vuelve al del plan.
 
 - **Cobro mensual:** ver `docs/COBRO.md` (vencimientos, pagos, avisos y cron).
+
+## Asignación y cuotas (2026-11)
+
+Crear un cliente con plan o cambiar su plan concilia los módulos contratados en la misma transacción: activa los incluidos y suspende los retirados conservando datos y excepciones administrativas. Volver desde A la medida también concilia. Editar el catálogo por sí solo no migra los módulos de todas las organizaciones existentes.
+
+`maxAutomations` limita instalaciones; `maxAutomationRuns` limita ejecuciones exitosas mensuales (UTC), con reservas para trabajo pendiente. Los planes A la medida tienen `customMaxAutomationRuns`. Nulo = ilimitado; cero = ninguna ejecución nueva. Reintentos no duplican consumo, y no hay excedentes automáticos. Integraciones externas requieren el contrato de admisión documentado en `automations/N8N.md`.

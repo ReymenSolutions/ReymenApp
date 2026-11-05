@@ -24,7 +24,7 @@ export async function applyExecutionCallback(input: CallbackInput, now: Date = n
     const executionKey = `blueprint:${ex.id}`;
     const usage = await tx.automationUsage.findUnique({ where: { organizationId_executionKey: { organizationId: ex.organizationId, executionKey } } });
     // A dispatcher timeout can exhaust retries before the provider confirms success.
-    const uncertain = ex.status === "FAILED" && usage?.state === "RESERVED";
+    const uncertain = (ex.status === "FAILED" || ex.status === "SKIPPED") && usage?.state === "RESERVED";
     if (ex.status !== "DISPATCHED" && ex.status !== "PENDING" && !uncertain) return { ok: true, changed: false, status: ex.status } as const;
     const status = TARGET[input.status];
     await tx.automationExecution.update({

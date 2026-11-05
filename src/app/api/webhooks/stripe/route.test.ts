@@ -185,13 +185,27 @@ describe("POST /api/webhooks/stripe", () => {
     try {
       await prisma.organization.update({ where: { id: fresh.id }, data: { stripeCustomerId: "cus_unpaid" } });
       await prisma.organizationModule.updateMany({ where: { organizationId: fresh.id }, data: { status: "SUSPENDED" } });
-      constructEvent.mockReturnValue({ created: nextCreated(), type: "customer.subscription.updated", data: { object: fakeSubscription({ customer: "cus_unpaid", status: "incomplete" }) } });
+      constructEvent.mockReturnValue({ created: nextCreated(), type: "customer.subscription.updated", data: { object: fakeSubscription({ id: "sub_unpaid", customer: "cus_unpaid", status: "incomplete" }) } });
       expect((await POST(makeRequest("{}"))).status).toBe(200);
       expect(await prisma.organizationModule.count({ where: { organizationId: fresh.id, status: "ACTIVE" } })).toBe(0);
       constructEvent.mockReturnValue({ created: nextCreated(), type: "checkout.session.completed", data: { object: { metadata: { organizationId: fresh.id }, customer: "cus_other", subscription: "sub_other" } } });
       expect((await POST(makeRequest("{}"))).status).toBe(500);
       expect(await prisma.organizationModule.count({ where: { organizationId: fresh.id, status: "ACTIVE" } })).toBe(0);
     } finally { await cleanupOrg(fresh.id); }
+  });
+
+  it("preserves custom modules and base plan through subscription activation and cancellation", async () => {
+    const custom = await createTestOrg("Custom subscription");
+    try {
+      await prisma.organization.update({ where: { id: custom.id }, data: { customPlan: true, plan: "starter", stripeCustomerId: "cus_custom_contract" } });
+      const before = await prisma.organizationModule.findMany({ where: { organizationId: custom.id }, orderBy: { module: "asc" } });
+      for (const type of ["customer.subscription.updated", "customer.subscription.deleted"]) {
+        constructEvent.mockReturnValue({ created: nextCreated(), type, data: { object: fakeSubscription({ id: "sub_custom_contract", customer: "cus_custom_contract" }) } });
+        expect((await POST(makeRequest("{}"))).status).toBe(200);
+        expect((await prisma.organization.findUniqueOrThrow({ where: { id: custom.id } })).plan).toBe("starter");
+        expect(await prisma.organizationModule.findMany({ where: { organizationId: custom.id }, orderBy: { module: "asc" } })).toEqual(before);
+      }
+    } finally { await cleanupOrg(custom.id); }
   });
 
 });

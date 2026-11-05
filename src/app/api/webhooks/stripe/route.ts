@@ -64,11 +64,13 @@ export async function POST(req: NextRequest) {
           // La baja de una suscripción vieja (otro id) o un evento atrasado no deben degradar a quien ya tiene otra vigente.
           const starter = await getPlan("starter");
           const downgraded = await prisma.$transaction(async tx => {
+          await tx.$queryRaw`SELECT id FROM "Organization" WHERE id = ${org.id} FOR UPDATE`;
+          const current = await tx.organization.findUniqueOrThrow({ where: { id: org.id }, select: { customPlan: true } });
           const result = await tx.organization.updateMany({
             where: { id: org.id, stripeSubscriptionId: subscription.id, OR: [{ stripeEventAt: null }, { stripeEventAt: { lt: new Date(event.created * 1000) } }] },
-            data: { plan: "starter", stripeSubscriptionId: null, stripeSubscriptionStatus: "canceled", stripeEventAt: new Date(event.created * 1000) },
+            data: { ...(current.customPlan ? {} : { plan: "starter" }), stripeSubscriptionId: null, stripeSubscriptionStatus: "canceled", stripeEventAt: new Date(event.created * 1000) },
           });
-          if (result.count) await reconcilePlanEntitlements(tx, org.id, starter.modules);
+          if (result.count && !current.customPlan) await reconcilePlanEntitlements(tx, org.id, starter.modules);
           return result;
           });
           if (downgraded.count === 0) break;
@@ -128,16 +130,18 @@ async function applySubscriptionToOrg(orgId: string, subscription: Stripe.Subscr
   // "updated" atrasado nunca restaura un plan anterior sobre uno más reciente.
   const eventAt = new Date(eventCreatedSec * 1000);
   const applied = await prisma.$transaction(async tx => {
+  await tx.$queryRaw`SELECT id FROM "Organization" WHERE id = ${orgId} FOR UPDATE`;
+  const current = await tx.organization.findUniqueOrThrow({ where: { id: orgId }, select: { customPlan: true } });
   const result = await tx.organization.updateMany({
     where: { id: orgId, OR: [{ stripeEventAt: null }, { stripeEventAt: { lte: eventAt } }] },
     data: {
-      ...(provision ? { plan } : {}),
+      ...(provision && !current.customPlan ? { plan } : {}),
       stripeSubscriptionId: subscription.id,
       stripeSubscriptionStatus: subscription.status,
       stripeEventAt: eventAt,
     },
   });
-  if (result.count && provision) await reconcilePlanEntitlements(tx, orgId, catalogPlan.modules);
+  if (result.count && provision && !current.customPlan) await reconcilePlanEntitlements(tx, orgId, catalogPlan.modules);
   return result;
   });
   if (applied.count === 0 || !provision) return;

@@ -76,3 +76,16 @@ Workflow por cliente: `n8n/workflows/reymen-followups-whatsapp.json` (importar, 
 4. Por cada mensaje que Twilio aceptó, avisa `POST /api/webhooks/n8n/followup-sent` `{ leadId, ruleId }` firmado (`x-reymen-orgid`, `x-reymen-timestamp`, `x-reymen-signature` = `sha256=` + HMAC-SHA256 hex de `"<timestamp>.<cuerpo>"` con la llave del cliente) y `x-reymen-event-id` = `followup:<lead>:<regla>:<intento>` para que un reintento no cuente doble. Los fallidos no se avisan: Reymen los ofrece de nuevo en la siguiente corrida.
 - **`modoPrueba: true`** (predeterminado): solo arma y muestra los mensajes, sin enviar ni avisar. Cambiarlo a `false` para operar.
 - Requiere `NODE_FUNCTION_ALLOW_BUILTIN=crypto` (igual que los demás). No usa la base de datos de n8n ni accede a la de Reymen: todo pasa por la API.
+
+## Cuota mensual de ejecuciones (2026-11)
+
+Para flujos externos, integrar `POST /api/v1/automations/runs` con JSON:
+
+```json
+{"automationId":"ID_DE_LA_AUTOMATIZACION","executionId":"ID_DURABLE_DEL_TRABAJO","action":"reserve"}
+```
+
+Usar la autenticación de webhook existente (`x-reymen-signature` con timestamp, o compatibilidad `x-reymen-secret`). Guardar el secreto en credenciales de n8n, nunca en el JSON exportado.
+Solo ejecutar efectos si HTTP 200 y `allowed: true`. HTTP 409 bloquea el trabajo; ante fallo de red no asumir permiso. Al terminar, enviar el mismo cuerpo con `action: "succeeded"` o `"failed"` si hay fallo definitivo. Un timeout de un tercero es incierto: no enviar `failed` hasta conciliarlo. Reutilizar executionId en reintentos y deduplicar los efectos en n8n. No enviar simulaciones a esta API.
+
+Las reservas pendientes ocupan capacidad, pero solo SUCCEEDED cuenta como consumo exitoso. Mes UTC de admisión. Sin excedentes automáticos. Los flujos previos que no llamen a esta API **todavía no tienen control de cuota**. Ver el [plan de validación](../production/SERVICIOS_COMERCIALES_IMPLEMENTACION_2026-11-05.md).

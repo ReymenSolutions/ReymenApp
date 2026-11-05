@@ -78,11 +78,8 @@ export async function setOrganizationModule(
  * Activates whichever modules the org's current plan (Admin → Planes) includes
  * that aren't already ACTIVE — additive only. Never suspends or cancels a
  * module the org already has, even one outside the plan's list (an
- * ADMIN_GRANTED courtesy module stays exactly as it is). This is the one
- * place ModuleSource.SUBSCRIBED actually gets tied to a plan; it's always an
- * explicit admin click here, never triggered by the Stripe webhook — a plan
- * change through Stripe (checkout or the billing portal) still only updates
- * Organization.plan, same as it always has.
+ * ADMIN_GRANTED courtesy module stays exactly as it is). This manual repair remains additive. Plan changes and paid Stripe
+ * provisioning use reconcilePlanEntitlements to also suspend removed products.
  */
 export async function syncModulesToPlan(orgId: string) {
   const session = await requireAdmin();

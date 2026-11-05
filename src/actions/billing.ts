@@ -44,7 +44,7 @@ export async function createCheckoutSession(plan: string): Promise<{ url: string
   const chosen = (await getPlans()).find(p => p.key === plan);
   if (!chosen) throw new UserError("Plan no disponible");
   const org = await prisma.organization.findUniqueOrThrow({ where: { id: session.user.organizationId! } });
-  if (org.customMonthlyPriceMxn !== null) throw new UserError("Tu precio pactado requiere una cotización de pago");
+  if (org.customPlan || org.customMonthlyPriceMxn !== null) throw new UserError("Tu precio pactado requiere una cotización de pago");
   if (org.stripeSubscriptionId && ["active", "trialing", "past_due", "unpaid", "incomplete"].includes(org.stripeSubscriptionStatus ?? "")) throw new UserError("Administra tu suscripción actual desde el portal de pagos");
   const priceId = await stripePriceIdFor(plan);
   if (!priceId) throw new UserError(`No hay un precio de Stripe configurado para el plan ${plan}`);

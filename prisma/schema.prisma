@@ -38,6 +38,7 @@ model Organization {
   customMaxLeads           Int?
   customMaxUsers           Int?
   customMaxAutomations     Int?
+  customMaxAutomationRuns  Int?
   customMaxAiAgents        Int?
   // Hasta cuándo está pagada la suscripción (próximo vencimiento). Null = este cliente aún no se factura por la plataforma:
   // no hay avisos ni estado de pago. Lo fija un pago registrado (manual o de Stripe) o un admin.

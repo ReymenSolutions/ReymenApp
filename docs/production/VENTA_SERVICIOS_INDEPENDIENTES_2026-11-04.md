@@ -34,3 +34,8 @@ Base PostgreSQL local desechable reymen_remediation_test, contenedor de auditor�
 
 ## Cambios y despliegue
 Solo se añadieron una prueba de integración y este documento. No hay cambios de producto, migraciones, envíos ni cambios de producción; no se necesita actualizar el VPS por esta revisión. No se publicó ni fusionó esta rama.
+
+
+## Seguimiento 2026-11-05
+
+Este documento conserva la auditoría inicial. Las correcciones, pruebas, limitaciones externas y rollback están documentados en [Servicios comerciales: implementación](SERVICIOS_COMERCIALES_IMPLEMENTACION_2026-11-05.md).

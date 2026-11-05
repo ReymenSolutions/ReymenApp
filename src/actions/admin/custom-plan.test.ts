@@ -20,7 +20,7 @@ const KEY = "qa-custom-base";
 const basePlan = { name: "Base QA", nameEn: "QA Base", description: "", descriptionEn: "", priceMxn: 900, maxLeads: 50, maxUsers: 2, maxAutomations: 1, aiBudgetMxn: 30, maxAiAgents: 1, modules: ["CRM"] as ("CRM")[], features: [], stripePriceId: null, accent: "slate" as const, sortOrder: 95, isActive: true };
 const admin = () => authMock.mockResolvedValue(fakeSession({ id: "admin1", role: "SUPER_ADMIN", organizationId: null }));
 const input = (orgId: string, over: Partial<Parameters<typeof saveCustomPlan>[0]> = {}) => ({
-  orgId, basePlan: KEY, priceMxn: 4321, aiBudgetMxn: 250, modules: ["CRM", "AUTOMATIONS", "AI_WHATSAPP"] as ("CRM" | "AUTOMATIONS" | "AI_WHATSAPP")[],
+  orgId, basePlan: KEY, maxAutomationRuns: 7, priceMxn: 4321, aiBudgetMxn: 250, modules: ["CRM", "AUTOMATIONS", "AI_WHATSAPP"] as ("CRM" | "AUTOMATIONS" | "AI_WHATSAPP")[],
   limits: { leads: 1000, users: 1, automations: 0, aiAgents: 3 }, ...over,
 });
 
@@ -60,7 +60,7 @@ describe("Plan «A la medida» (Custom Service) por cliente", () => {
     expect(out.success).toBe(true);
 
     const row = await prisma.organization.findUniqueOrThrow({ where: { id: org.id } });
-    expect(row).toMatchObject({ customPlan: true, plan: KEY, customMaxLeads: 1000, customMaxUsers: 1, customMaxAutomations: 0, customMaxAiAgents: 3 });
+    expect(row).toMatchObject({ customPlan: true, plan: KEY, customMaxLeads: 1000, customMaxUsers: 1, customMaxAutomations: 0, customMaxAutomationRuns: 7, customMaxAiAgents: 3 });
     expect(Number(row.customMonthlyPriceMxn)).toBe(4321);
 
     const active = (await prisma.organizationModule.findMany({ where: { organizationId: org.id, status: "ACTIVE" } })).map((m) => m.module).sort();
@@ -114,6 +114,8 @@ describe("Plan «A la medida» (Custom Service) por cliente", () => {
     expect(row).toMatchObject({ customPlan: false, customMonthlyPriceMxn: null, customMaxLeads: null, customMaxAiAgents: null });
     expect(await getOrgLimits(org.id)).toMatchObject({ custom: false, leads: 50, users: 2, automations: 1, aiAgents: 1 });
     expect((await getBudgetState(org.id)).baseMxn).toBe(30);
+    expect((await getCustomPlanState(org.id)).maxAutomationRuns).toBeNull();
+    expect((await prisma.organizationModule.findMany({ where: { organizationId: org.id, status: "ACTIVE" } })).map(m => m.module)).toEqual(["CRM"]);
 
     await saveCustomPlan(input(org.id));
     await changePlan(org.id, KEY);

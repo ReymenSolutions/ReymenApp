@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 export async function reserveAutomationRun(organizationId: string, automationId: string, executionKey: string, now = new Date()) {
   return prisma.$transaction(async tx => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`automation-usage:${organizationId}`}))`;
-    const org = await tx.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { plan: true, isActive: true } });
+    const org = await tx.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { plan: true, isActive: true, customPlan: true, customMaxAutomationRuns: true } });
     const entitlement = await tx.organizationModule.findUnique({ where: { organizationId_module: { organizationId, module: "AUTOMATIONS" } } });
     if (!org.isActive || entitlement?.status !== "ACTIVE") return { allowed: false, reason: "module_disabled" } as const;
     const automation = await tx.automation.findFirst({ where: { id: automationId, organizationId, status: "ACTIVE" } });
@@ -14,9 +14,10 @@ export async function reserveAutomationRun(organizationId: string, automationId:
     const period = now.toISOString().slice(0, 7);
     const plan = await tx.plan.findUnique({ where: { key: org.plan } });
     if (!plan) return { allowed: false, reason: "plan_unavailable" } as const;
-    if (plan.maxAutomationRuns !== null) {
+    const monthlyLimit = org.customPlan ? org.customMaxAutomationRuns : plan.maxAutomationRuns;
+    if (monthlyLimit !== null) {
       const used = await tx.automationUsage.count({ where: { organizationId, period, state: { in: ["RESERVED", "SUCCEEDED"] } } });
-      if (used >= plan.maxAutomationRuns) return { allowed: false, reason: "monthly_quota" } as const;
+      if (used >= monthlyLimit) return { allowed: false, reason: "monthly_quota" } as const;
     }
     await tx.automationUsage.create({ data: { organizationId, automationId, executionKey, period } });
     return { allowed: true, reason: "reserved" } as const;

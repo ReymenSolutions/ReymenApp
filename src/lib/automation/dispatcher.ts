@@ -78,7 +78,7 @@ export async function dispatchPendingExecutions(opts: { now?: Date; limit?: numb
       const org = await prisma.organization.findUnique({ where: { id: ex.organizationId }, select: { isActive: true } });
       const reason = !org?.isActive || !(await hasModule(ex.organizationId, "LOYALTY")) || !(await hasModule(ex.organizationId, "AUTOMATIONS")) ? "module_disabled" : !customer?.consentAccepted ? "no_consent" : !reward ? "reward_unavailable" : null;
       if (reason) {
-        await prisma.automationExecution.update({ where: { id: ex.id }, data: { status: "SKIPPED", skipReason: reason } });
+        await prisma.automationExecution.updateMany({ where: { id: ex.id, status: "PENDING" }, data: { status: "SKIPPED", skipReason: reason } });
         continue;
       }
     }
@@ -87,14 +87,14 @@ export async function dispatchPendingExecutions(opts: { now?: Date; limit?: numb
     const base = sendAfter ? Math.max(ex.createdAt.getTime(), new Date(sendAfter).getTime()) : ex.createdAt.getTime();
     const deadline = new Date(base + DEADLINE_HOURS * 3_600_000);
     if (now > deadline) {
-      await prisma.automationExecution.update({ where: { id: ex.id }, data: { status: "SKIPPED", skipReason: "expired" } });
+      await prisma.automationExecution.updateMany({ where: { id: ex.id, status: "PENDING" }, data: { status: "SKIPPED", skipReason: "expired" } });
       result.expired++;
       continue;
     }
     const action = (ex.action ?? {}) as { type?: string; channel?: string; templateKey?: string; variables?: Record<string, string>; recipient?: { phone?: string; name?: string | null }; recipients?: unknown[]; content?: Record<string, string> };
     const workflow = action.type ? ACTION_WORKFLOW[action.type] : undefined;
     if (!workflow) {
-      await prisma.automationExecution.update({ where: { id: ex.id }, data: { status: "FAILED", lastError: "unsupported_action", completedAt: now } });
+      await prisma.automationExecution.updateMany({ where: { id: ex.id, status: "PENDING" }, data: { status: "FAILED", lastError: "unsupported_action", completedAt: now } });
       result.failed++;
       continue;
     }

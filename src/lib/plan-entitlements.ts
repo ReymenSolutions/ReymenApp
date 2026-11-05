@@ -2,6 +2,8 @@ import type { Prisma, PlatformModule } from "@prisma/client";
 
 /** Reconcile subscribed products atomically with the plan change. Explicit admin grants/suspensions remain authoritative. */
 export async function reconcilePlanEntitlements(tx: Prisma.TransactionClient, organizationId: string, modules: PlatformModule[]) {
+  // Older custom-plan grants were tagged as ADMIN_GRANTED; they belong to the purchased package, not a courtesy override.
+  await tx.organizationModule.updateMany({ where: { organizationId, notes: "Plan A la medida", source: "ADMIN_GRANTED" }, data: { source: "SUBSCRIBED" } });
   const existing = await tx.organizationModule.findMany({ where: { organizationId } });
   const overrides = new Set(existing.filter(row => row.source === "ADMIN_GRANTED").map(row => row.module));
   const desired = new Set(modules);

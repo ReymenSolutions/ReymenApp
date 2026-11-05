@@ -1,5 +1,6 @@
 "use server";
 
+import { reconcilePlanEntitlements } from "@/lib/plan-entitlements";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { PlatformModule, type Prisma } from "@prisma/client";
@@ -72,7 +73,7 @@ const snapshotOf = (p: PlanDef) => JSON.parse(JSON.stringify(p)) as Prisma.Input
 
 /**
  * Edita un plan. El cambio aplica de inmediato a todos los clientes de ese plan (límites, precio de lista, presupuesto de IA,
- * "qué incluye", módulos…). Los precios pactados con un cliente (plan personalizado) no se tocan. Cada edición sube la versión,
+ * "qué incluye"). La composición de módulos se concilia al asignar el plan, no masivamente al editarlo. Los precios pactados con un cliente (plan personalizado) no se tocan. Cada edición sube la versión,
  * guarda cómo quedó el plan y queda en la bitácora con el antes y el después.
  */
 export async function updatePlan(key: string, data: PlanInput) {
@@ -144,6 +145,7 @@ export type CustomPlanClient = {
   priceMxn: number;
   listPriceMxn: number;
   modules: PlatformModule[];
+  maxAutomationRuns?: number | null;
   limits: { leads: number | null; users: number | null; automations: number | null; aiAgents: number | null };
 };
 
@@ -153,7 +155,7 @@ export async function listCustomPlanClients(): Promise<CustomPlanClient[]> {
   const [orgs, plans] = await Promise.all([
     prisma.organization.findMany({
       where: { isActive: true, OR: [{ customPlan: true }, { customMonthlyPriceMxn: { not: null } }] },
-      select: { id: true, name: true, customMonthlyPriceMxn: true, ...ORG_PLAN_SELECT, modules: { where: { status: "ACTIVE" }, select: { module: true } } },
+      select: { id: true, name: true, customMonthlyPriceMxn: true, customMaxAutomationRuns: true, ...ORG_PLAN_SELECT, modules: { where: { status: "ACTIVE" }, select: { module: true } } },
       orderBy: { name: "asc" },
     }),
     getPlans({ includeInactive: true }),
@@ -164,6 +166,7 @@ export async function listCustomPlanClients(): Promise<CustomPlanClient[]> {
     return {
       id: o.id, name: o.name, plan: o.plan, planName: plan.name, customPlan: o.customPlan,
       priceMxn: o.customMonthlyPriceMxn !== null ? Number(o.customMonthlyPriceMxn) : plan.priceMxn, listPriceMxn: plan.priceMxn,
+      maxAutomationRuns: o.customPlan ? o.customMaxAutomationRuns : plan.maxAutomationRuns,
       modules: o.modules.map((m) => m.module), limits: { leads: l.leads, users: l.users, automations: l.automations, aiAgents: l.aiAgents },
     };
   }));
@@ -183,6 +186,7 @@ export type CustomPlanState = {
   priceMxn: number | null;
   aiBudgetMxn: number;
   modules: PlatformModule[];
+  maxAutomationRuns?: number | null;
   limits: { leads: number | null; users: number | null; automations: number | null; aiAgents: number | null };
 };
 
@@ -191,7 +195,7 @@ export async function getCustomPlanState(orgId: string): Promise<CustomPlanState
   await requireAdmin();
   const org = await prisma.organization.findUnique({
     where: { id: z.string().min(1).parse(orgId) },
-    select: { id: true, name: true, customMonthlyPriceMxn: true, ...ORG_PLAN_SELECT, aiBudgetSetting: { select: { monthlyBudgetMxn: true } }, modules: { where: { status: "ACTIVE" }, select: { module: true } } },
+    select: { id: true, name: true, customMonthlyPriceMxn: true, customMaxAutomationRuns: true, ...ORG_PLAN_SELECT, aiBudgetSetting: { select: { monthlyBudgetMxn: true } }, modules: { where: { status: "ACTIVE" }, select: { module: true } } },
   });
   if (!org) throw new UserError("Cliente no encontrado");
   const plan = await getPlan(org.plan);
@@ -201,6 +205,7 @@ export async function getCustomPlanState(orgId: string): Promise<CustomPlanState
     priceMxn: org.customMonthlyPriceMxn !== null ? Number(org.customMonthlyPriceMxn) : null,
     aiBudgetMxn: org.aiBudgetSetting?.monthlyBudgetMxn != null ? Number(org.aiBudgetSetting.monthlyBudgetMxn) : plan.aiBudgetMxn,
     modules: org.modules.map((m) => m.module),
+    maxAutomationRuns: org.customPlan ? org.customMaxAutomationRuns : plan.maxAutomationRuns,
     limits: { leads: l.leads, users: l.users, automations: l.automations, aiAgents: l.aiAgents },
   };
 }
@@ -210,6 +215,7 @@ const customPlanSchema = z.object({
   orgId: z.string().min(1),
   basePlan: z.string().min(1),
   priceMxn: z.number().positive().max(1_000_000),
+  maxAutomationRuns: count(10_000_000).optional(),
   aiBudgetMxn: z.number().min(0).max(1_000_000),
   modules: z.array(z.enum(ALL_MODULES as [PlatformModule, ...PlatformModule[]])).max(ALL_MODULES.length),
   limits: z.object({ leads: count(10_000_000), users: count(10_000), automations: count(10_000), aiAgents: count(100) }),
@@ -242,20 +248,20 @@ export async function saveCustomPlan(input: CustomPlanInput) {
       where: { id: d.orgId },
       data: {
         plan: d.basePlan, customPlan: true, customMonthlyPriceMxn: d.priceMxn,
-        customMaxLeads: d.limits.leads, customMaxUsers: d.limits.users, customMaxAutomations: d.limits.automations, customMaxAiAgents: d.limits.aiAgents,
+        customMaxLeads: d.limits.leads, customMaxUsers: d.limits.users, customMaxAutomations: d.limits.automations, customMaxAutomationRuns: d.maxAutomationRuns, customMaxAiAgents: d.limits.aiAgents,
       },
     });
     const rows = await tx.organizationModule.findMany({ where: { organizationId: d.orgId } });
     const changes: { module: PlatformModule; status: "ACTIVE" | "CANCELLED" }[] = [];
     for (const m of ALL_MODULES) {
       const row = rows.find((r) => r.module === m);
-      if (modules.has(m) && row?.status !== "ACTIVE") {
+      if (modules.has(m)) {
         await tx.organizationModule.upsert({
           where: { organizationId_module: { organizationId: d.orgId, module: m } },
-          create: { organizationId: d.orgId, module: m, status: "ACTIVE", source: "ADMIN_GRANTED", notes: "Plan A la medida" },
-          update: { status: "ACTIVE", suspendedAt: null, cancelledAt: null },
+          create: { organizationId: d.orgId, module: m, status: "ACTIVE", source: "SUBSCRIBED", notes: "Plan A la medida" },
+          update: { status: "ACTIVE", source: "SUBSCRIBED", notes: "Plan A la medida", suspendedAt: null, cancelledAt: null },
         });
-        changes.push({ module: m, status: "ACTIVE" });
+        if (row?.status !== "ACTIVE") changes.push({ module: m, status: "ACTIVE" });
       } else if (!modules.has(m) && row?.status === "ACTIVE") {
         await tx.organizationModule.update({ where: { id: row.id }, data: { status: "CANCELLED", cancelledAt: new Date() } });
         changes.push({ module: m, status: "CANCELLED" });
@@ -268,7 +274,7 @@ export async function saveCustomPlan(input: CustomPlanInput) {
 
   await logAudit({
     userId: session.user.id, organizationId: d.orgId, action: "client.custom_plan", resource: "Organization", resourceId: d.orgId,
-    metadata: { before: { customPlan: before.customPlan, basePlan: before.basePlan, priceMxn: before.priceMxn, aiBudgetMxn: before.aiBudgetMxn, limits: before.limits }, after: { basePlan: d.basePlan, priceMxn: d.priceMxn, aiBudgetMxn: d.aiBudgetMxn, limits: d.limits }, modules: changedModules, smartcardMemberLimit },
+    metadata: { before: { customPlan: before.customPlan, basePlan: before.basePlan, priceMxn: before.priceMxn, aiBudgetMxn: before.aiBudgetMxn, maxAutomationRuns: before.maxAutomationRuns, limits: before.limits }, after: { basePlan: d.basePlan, priceMxn: d.priceMxn, aiBudgetMxn: d.aiBudgetMxn, maxAutomationRuns: d.maxAutomationRuns, limits: d.limits }, modules: changedModules, smartcardMemberLimit },
   });
   propagate();
   revalidatePath(`/admin/clients/${d.orgId}`);
@@ -277,7 +283,7 @@ export async function saveCustomPlan(input: CustomPlanInput) {
 
 /**
  * Quita el plan «A la medida»: el cliente vuelve a su plan base con su precio de lista y los límites de ese plan. Sus módulos
- * se quedan como están (se ajustan en Cliente → Módulos); el presupuesto de IA vuelve al predeterminado del plan.
+ * contratados se ajustan al catálogo (se conservan las excepciones administrativas); el presupuesto de IA vuelve al predeterminado del plan.
  */
 export async function removeCustomPlan(orgId: string) {
   const session = await requireAdmin();
@@ -285,9 +291,13 @@ export async function removeCustomPlan(orgId: string) {
   const org = await prisma.organization.findUnique({ where: { id }, select: { plan: true, customPlan: true } });
   if (!org) throw new UserError("Cliente no encontrado");
   if (!org.customPlan) return { success: true };
-  await prisma.organization.update({
-    where: { id },
-    data: { customPlan: false, customMonthlyPriceMxn: null, customMaxLeads: null, customMaxUsers: null, customMaxAutomations: null, customMaxAiAgents: null },
+  const base = await getPlan(org.plan);
+  await prisma.$transaction(async tx => {
+    await tx.organization.update({
+      where: { id },
+      data: { customPlan: false, customMonthlyPriceMxn: null, customMaxLeads: null, customMaxUsers: null, customMaxAutomations: null, customMaxAutomationRuns: null, customMaxAiAgents: null },
+    });
+    await reconcilePlanEntitlements(tx, id, base.modules);
   });
   await setMonthlyBudget(id, null, session.user.id);
   const smartcardMemberLimit = await syncSmartcardMemberLimitForPlan(id, org.plan);

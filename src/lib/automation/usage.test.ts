@@ -22,6 +22,12 @@ it("serializes admission, reuses retry reservations and charges successes only o
   expect((await reserveAutomationRun(id, a.id, "four")).reason).toBe("monthly_quota");
   expect((await reserveAutomationRun(id, a.id, "three")).allowed).toBe(false);
   expect((await reserveAutomationRun(id, a.id, "next-month", new Date("2031-01-01T00:00:00Z"))).allowed).toBe(true);
+  await prisma.organization.update({ where: { id }, data: { customPlan: true, customMaxAutomationRuns: 0 } });
+  expect((await reserveAutomationRun(id, a.id, "custom-blocked", new Date("2032-01-01T00:00:00Z"))).reason).toBe("monthly_quota");
+  await prisma.organization.update({ where: { id }, data: { customMaxAutomationRuns: 2 } });
+  expect((await reserveAutomationRun(id, a.id, "custom-one", new Date("2032-01-01T00:00:00Z"))).allowed).toBe(true);
+  expect((await reserveAutomationRun(id, a.id, "custom-two", new Date("2032-01-01T00:00:00Z"))).allowed).toBe(true);
+  expect((await reserveAutomationRun(id, a.id, "custom-three", new Date("2032-01-01T00:00:00Z"))).reason).toBe("monthly_quota");
   await prisma.organizationModule.update({ where: { organizationId_module: { organizationId: id, module: "AUTOMATIONS" } }, data: { status: "SUSPENDED" } });
   expect((await reserveAutomationRun(id, a.id, "next-month")).reason).toBe("module_disabled");
 });

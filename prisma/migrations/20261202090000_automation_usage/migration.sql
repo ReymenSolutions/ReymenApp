@@ -1,3 +1,4 @@
+ALTER TABLE "Organization" ADD COLUMN "customMaxAutomationRuns" INTEGER;
 ALTER TABLE "Plan" ADD COLUMN "maxAutomationRuns" INTEGER;
 CREATE TABLE "AutomationUsage" (
   "id" TEXT NOT NULL,

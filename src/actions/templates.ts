@@ -15,7 +15,7 @@ import { UserError } from "@/lib/user-error";
  * install — the client self-service path (always latest, subject to the
  * org's own plan capacity). installTemplateForClient() (src/actions/admin/
  * templates.ts) is the admin equivalent: it lets an admin pin a specific
- * version and isn't subject to plan capacity, but both funnel into the
+ * version with the same plan capacity checks. Both funnel into the
  * same applyTemplateInstall() so neither can drift from the other.
  */
 async function installTemplateCore(

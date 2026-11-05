@@ -165,4 +165,14 @@ describe("despachador y callback de n8n", () => {
     expect(await applyExecutionCallback({ executionId: b.id, token: callbackToken(b.id, SECRET), status: "skipped" })).toMatchObject({ status: "SKIPPED" });
     expect((await prisma.automationExecution.findUniqueOrThrow({ where: { id: b.id } })).skipReason).toBe("provider_skipped");
   });
+  it("settles a late success after an uncertain dispatch has expired", async () => {
+    const ex = await makeExecution();
+    const down = vi.fn(async () => { throw new Error("timeout"); }) as unknown as typeof fetch;
+    await dispatchPendingExecutions({ now: NOW, fetchImpl: down, organizationId: org.id });
+    await dispatchPendingExecutions({ now: new Date(NOW.getTime() + 25 * 3_600_000), fetchImpl: okFetch(), organizationId: org.id });
+    expect((await prisma.automationExecution.findUniqueOrThrow({ where: { id: ex.id } })).status).toBe("SKIPPED");
+    expect(await applyExecutionCallback({ executionId: ex.id, token: callbackToken(ex.id, SECRET), status: "sent" })).toMatchObject({ changed: true, status: "SUCCEEDED" });
+    expect(await prisma.automationUsage.count({ where: { organizationId: org.id, executionKey: `blueprint:${ex.id}`, state: "SUCCEEDED" } })).toBe(1);
+  });
+
 });
