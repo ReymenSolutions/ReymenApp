@@ -1,3 +1,4 @@
+import { reserveAutomationRun } from "./usage";
 import { hasModule } from "@/lib/modules";
 import { createHmac } from "crypto";
 import { prisma } from "@/lib/prisma";
@@ -77,7 +78,7 @@ export async function dispatchPendingExecutions(opts: { now?: Date; limit?: numb
       const org = await prisma.organization.findUnique({ where: { id: ex.organizationId }, select: { isActive: true } });
       const reason = !org?.isActive || !(await hasModule(ex.organizationId, "LOYALTY")) || !(await hasModule(ex.organizationId, "AUTOMATIONS")) ? "module_disabled" : !customer?.consentAccepted ? "no_consent" : !reward ? "reward_unavailable" : null;
       if (reason) {
-        await prisma.automationExecution.update({ where: { id: ex.id }, data: { status: "SKIPPED", skipReason: reason } });
+        await prisma.automationExecution.updateMany({ where: { id: ex.id, status: "PENDING" }, data: { status: "SKIPPED", skipReason: reason } });
         continue;
       }
     }
@@ -86,15 +87,20 @@ export async function dispatchPendingExecutions(opts: { now?: Date; limit?: numb
     const base = sendAfter ? Math.max(ex.createdAt.getTime(), new Date(sendAfter).getTime()) : ex.createdAt.getTime();
     const deadline = new Date(base + DEADLINE_HOURS * 3_600_000);
     if (now > deadline) {
-      await prisma.automationExecution.update({ where: { id: ex.id }, data: { status: "SKIPPED", skipReason: "expired" } });
+      await prisma.automationExecution.updateMany({ where: { id: ex.id, status: "PENDING" }, data: { status: "SKIPPED", skipReason: "expired" } });
       result.expired++;
       continue;
     }
     const action = (ex.action ?? {}) as { type?: string; channel?: string; templateKey?: string; variables?: Record<string, string>; recipient?: { phone?: string; name?: string | null }; recipients?: unknown[]; content?: Record<string, string> };
     const workflow = action.type ? ACTION_WORKFLOW[action.type] : undefined;
     if (!workflow) {
-      await prisma.automationExecution.update({ where: { id: ex.id }, data: { status: "FAILED", lastError: "unsupported_action", completedAt: now } });
+      await prisma.automationExecution.updateMany({ where: { id: ex.id, status: "PENDING" }, data: { status: "FAILED", lastError: "unsupported_action", completedAt: now } });
       result.failed++;
+      continue;
+    }
+    const reservation = await reserveAutomationRun(ex.organizationId, ex.automationId, `blueprint:${ex.id}`, now);
+    if (!reservation.allowed) {
+      await prisma.automationExecution.update({ where: { id: ex.id }, data: { nextAttemptAt: new Date(now.getTime() + 60_000), lastError: reservation.reason } });
       continue;
     }
     const org = await prisma.organization.findUniqueOrThrow({ where: { id: ex.organizationId }, select: { id: true, name: true, timezone: true } });
@@ -142,16 +148,18 @@ export async function dispatchPendingExecutions(opts: { now?: Date; limit?: numb
     }
 
     if (!error) {
-      await prisma.automationExecution.update({ where: { id: ex.id }, data: { status: "DISPATCHED", attempts: attempt, dispatchedAt: now, nextAttemptAt: null, lastError: null } });
+      const updated = await prisma.automationExecution.updateMany({ where: { id: ex.id, status: "PENDING" }, data: { status: "DISPATCHED", attempts: attempt, dispatchedAt: now, nextAttemptAt: null, lastError: null } });
+      if (!updated.count) continue; // provider callback may have completed while fetch was in flight
       await prisma.automation.update({ where: { id: ex.automation.id }, data: { lastRunAt: now, lastStatus: "DISPATCHED" } });
       result.dispatched++;
     } else if (attempt >= DISPATCH_MAX_ATTEMPTS) {
-      await prisma.automationExecution.update({ where: { id: ex.id }, data: { status: "FAILED", attempts: attempt, lastError: error, completedAt: now, nextAttemptAt: null } });
+      const updated = await prisma.automationExecution.updateMany({ where: { id: ex.id, status: "PENDING" }, data: { status: "FAILED", attempts: attempt, lastError: error, completedAt: now, nextAttemptAt: null } });
+      if (!updated.count) continue;
       await prisma.automation.update({ where: { id: ex.automation.id }, data: { lastRunAt: now, lastStatus: "FAILED" } });
       result.failed++;
     } else {
       const wait = DISPATCH_BACKOFF_MINUTES[attempt - 1] * 60_000;
-      await prisma.automationExecution.update({ where: { id: ex.id }, data: { attempts: attempt, lastError: error, nextAttemptAt: new Date(now.getTime() + wait) } });
+      await prisma.automationExecution.updateMany({ where: { id: ex.id, status: "PENDING" }, data: { attempts: attempt, lastError: error, nextAttemptAt: new Date(now.getTime() + wait) } });
       result.retried++;
     }
   }

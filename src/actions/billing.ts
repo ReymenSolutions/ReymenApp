@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getStripeClient, isStripeConfigured, stripePriceIdFor } from "@/lib/stripe";
 import type { UserRole } from "@prisma/client";
 import { getAppUrl } from "@/lib/app-url";
+import { getPlans } from "@/lib/plans";
 import { UserError } from "@/lib/user-error";
 
 async function requireBillingManager() {
@@ -25,7 +26,7 @@ async function getOrCreateStripeCustomer(orgId: string): Promise<string> {
   const customer = await stripe.customers.create({
     name: org.name,
     metadata: { organizationId: org.id },
-  });
+  }, { idempotencyKey: `organization-customer:${org.id}` });
   await prisma.organization.update({
     where: { id: orgId },
     data: { stripeCustomerId: customer.id },
@@ -34,18 +35,22 @@ async function getOrCreateStripeCustomer(orgId: string): Promise<string> {
 }
 
 /** Starts a Stripe Checkout session to subscribe the org to a paid plan. Returns the URL to redirect to. */
-/**
- * Solo Professional: Business tiene precio pactado por cliente
- * (Organization.customMonthlyPriceUsd), no un precio fijo de Stripe.
- */
-export async function createCheckoutSession(plan: "professional"): Promise<{ url: string }> {
+/** Active catalog plans with a configured Stripe price; custom quotes remain manual. */
+export async function createCheckoutSession(plan: string): Promise<{ url: string }> {
   const session = await requireBillingManager();
   const stripe = getStripeClient();
   if (!stripe) throw new UserError("La facturación no está configurada");
 
-  if (plan !== "professional") throw new UserError("Este plan se contrata con una cotización, no con pago en línea");
+  const chosen = (await getPlans()).find(p => p.key === plan);
+  if (!chosen) throw new UserError("Plan no disponible");
+  const org = await prisma.organization.findUniqueOrThrow({ where: { id: session.user.organizationId! } });
+  if (org.customPlan || org.customMonthlyPriceMxn !== null) throw new UserError("Tu precio pactado requiere una cotización de pago");
+  if (org.stripeSubscriptionId && ["active", "trialing", "past_due", "unpaid", "incomplete"].includes(org.stripeSubscriptionStatus ?? "")) throw new UserError("Administra tu suscripción actual desde el portal de pagos");
   const priceId = await stripePriceIdFor(plan);
   if (!priceId) throw new UserError(`No hay un precio de Stripe configurado para el plan ${plan}`);
+
+  const price = await stripe.prices.retrieve(priceId);
+  if (!price.active || price.currency !== "mxn" || price.recurring?.interval !== "month" || price.recurring.interval_count !== 1 || price.unit_amount !== Math.round(chosen.priceMxn * 100)) throw new UserError("El precio de Stripe no coincide con la mensualidad del plan en MXN");
 
   const customerId = await getOrCreateStripeCustomer(session.user.organizationId!);
   const baseUrl = getAppUrl();

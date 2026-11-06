@@ -29,3 +29,9 @@ Admin → Cliente → Suscripción → «Fijar vencimiento» con su próxima fec
 ## Con Stripe (cuando lo configures)
 `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` y el precio del plan (Admin → Planes o `STRIPE_PRICE_<LLAVE>`). El webhook toma el fin de periodo de la suscripción, registra cada `invoice.paid` (idempotente por factura) y avisa a los admins si falla un cobro (`invoice.payment_failed`).
 Pendiente a propósito: compra de recargas de IA en línea (debe llamar a `applyTopup` solo con el pago confirmado) y checkout para planes con precio pactado.
+
+## Checkout de catálogo (2026-11)
+
+El autoservicio admite planes activos con precio Stripe configurado y verificado: MXN, recurrente mensual e importe igual al catálogo. Clientes con plan A la medida o precio pactado continúan con contratación asistida. Una suscripción ya vigente o pendiente no inicia otro checkout desde esta acción. El webhook vincula el cliente Stripe y no concede módulos por suscripciones incompletas ni precios desconocidos. Los planes A la medida preservan sus módulos ante eventos de suscripción.
+
+Pendiente de aceptación: recorrido completo con Stripe test-mode y n8n sandbox; las pruebas locales no sustituyen esa validación.

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { assertModuleEnabled } from "@/lib/modules";
 import { requireOrgPermission } from "@/lib/guards";
 import { UserError } from "@/lib/user-error";
 
@@ -25,6 +26,7 @@ const setRulesSchema = z.array(ruleSchema).refine(
  */
 export async function setAvailabilityRules(rules: z.infer<typeof setRulesSchema>) {
   const session = await requireOrgPermission("settings:manage");
+  await assertModuleEnabled(session.user.organizationId!, "CRM");
   const parsed = setRulesSchema.parse(rules);
   const orgId = session.user.organizationId!;
 
@@ -45,6 +47,7 @@ export async function setAvailabilityRules(rules: z.infer<typeof setRulesSchema>
 
 export async function setOrgTimezone(timezone: string) {
   const session = await requireOrgPermission("settings:manage");
+  await assertModuleEnabled(session.user.organizationId!, "CRM");
   // Validate against the runtime's own IANA database rather than a hardcoded
   // list — throws for a bogus zone name.
   try {

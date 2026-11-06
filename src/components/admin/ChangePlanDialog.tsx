@@ -144,6 +144,7 @@ export function ChangePlanDialog({ orgId, currentPlan, currentCustomPrice, plans
             </p>
         </div>
 
+        <p className="text-sm text-slate-500">{lang === "es" ? "Al guardar se activan los módulos incluidos y se suspenden los del plan anterior que ya no correspondan. Se conservan los datos y las excepciones otorgadas por el administrador." : "Saving activates included modules and suspends products no longer included. Data and administrator overrides are preserved."}</p>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>{lang === "es" ? "Cancelar" : "Cancel"}</Button>
           <Button onClick={handleSave} disabled={loading || unchanged || customPriceInvalid}>

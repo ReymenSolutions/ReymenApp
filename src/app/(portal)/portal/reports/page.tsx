@@ -73,6 +73,8 @@ export default async function PortalReportsPage({ searchParams }: { searchParams
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
   const orgId = session.user.organizationId;
+  const access = await getEnabledModules(orgId);
+  if (!["CRM", "AUTOMATIONS", "AI_WHATSAPP", "FOOD_OPS", "LOYALTY"].some(m => access.includes(m as PlatformModule))) return redirect("/portal/home");
   const range = parseReportRange((await searchParams).range);
 
   const [t, data, enabledModules, org, lang] = await Promise.all([
@@ -119,7 +121,7 @@ export default async function PortalReportsPage({ searchParams }: { searchParams
             <MetricCard title={t.conversion} value={`${conversionRate}%`} icon={Users} iconClassName="bg-brand-50" />
           </>
         )}
-        <MetricCard title={t.confirmedAppointments} value={data.confirmedAppointments} icon={Calendar} iconClassName="bg-amber-50" />
+        {hasModule("CRM") && <MetricCard title={t.confirmedAppointments} value={data.confirmedAppointments} icon={Calendar} iconClassName="bg-amber-50" />}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 mb-6">

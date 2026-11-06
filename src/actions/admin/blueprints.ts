@@ -4,6 +4,7 @@ import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { AutomationExecutionStatus } from "@prisma/client";
+import { withPlanCapacity } from "@/lib/plan-limits";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
 import { requireAdmin } from "@/lib/guards";
@@ -67,9 +68,9 @@ export async function enableBlueprint(data: z.infer<typeof enableSchema>) {
     if (!(await hasModule(orgId, required))) throw new UserError("Activa primero los módulos que necesita esta automatización");
   }
   const existing = await prisma.automation.findUnique({ where: { organizationId_blueprintKey: { organizationId: orgId, blueprintKey: key } } });
-  const automation = existing
-    ? await prisma.automation.update({ where: { id: existing.id }, data: { status: "ACTIVE" } })
-    : await prisma.automation.create({
+  const save = (tx: Pick<typeof prisma, "automation">) => existing
+    ? tx.automation.update({ where: { id: existing.id }, data: { status: "ACTIVE" } })
+    : tx.automation.create({
         data: {
           organizationId: orgId,
           name: blueprint.name,
@@ -84,6 +85,7 @@ export async function enableBlueprint(data: z.infer<typeof enableSchema>) {
           dryRun: true,
         },
       });
+  const automation = !existing || existing.status === "ARCHIVED" ? await withPlanCapacity(orgId, "automations", save) : await save(prisma);
   await logAudit({ userId: session.user.id, organizationId: orgId, action: "automation.blueprint_enable", resource: "Automation", resourceId: automation.id, metadata: { key } });
   revalidatePath(`/admin/clients/${orgId}`);
   return { success: true };

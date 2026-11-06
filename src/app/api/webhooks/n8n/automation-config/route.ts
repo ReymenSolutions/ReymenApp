@@ -1,3 +1,4 @@
+import { hasModule } from "@/lib/modules";
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { isTimestampFresh, verifyWebhookSignature } from "@/lib/webhook-validator";
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
   const templateId = typeof body.templateId === "string" ? body.templateId : undefined;
   if (!organizationId || (!automationId && !templateId)) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
 
-  if (!(await isOrgActive(organizationId))) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!(await isOrgActive(organizationId)) || !(await hasModule(organizationId, "AUTOMATIONS"))) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const automation = await findAutomationForDelivery({ organizationId, automationId, templateId });
   if (!automation) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(await buildAutomationEnvelope(automation));

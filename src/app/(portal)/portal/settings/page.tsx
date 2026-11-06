@@ -6,7 +6,6 @@ import { hasModule } from "@/lib/modules";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { InviteUserForm } from "@/components/portal/InviteUserForm";
 import { RemoveUserButton } from "@/components/portal/RemoveUserButton";
 import { EditUserDialog } from "@/components/portal/EditUserDialog";
@@ -14,11 +13,12 @@ import { BillingActions } from "@/components/portal/BillingActions";
 import { PipelinesManager } from "@/components/portal/PipelinesManager";
 import { formatDate } from "@/lib/utils";
 import { can } from "@/lib/permissions";
-import { customPlanName, getOrgLimits, getPlan, monthlyPriceMxn, planDescription, planName } from "@/lib/plans";
+import { customPlanName, getOrgLimits, getPlan, getPlans, monthlyPriceMxn, planDescription, planName } from "@/lib/plans";
 import { getEnabledModules } from "@/lib/modules";
+
 import { accentTone } from "@/lib/plan-accent";
 import { getModuleLabel } from "@/lib/modules";
-import { isStripeConfigured } from "@/lib/stripe";
+import { isStripeConfigured, stripePriceIdFor } from "@/lib/stripe";
 import { getBillingView } from "@/lib/billing";
 import { SubscriptionStatus } from "@/components/portal/SubscriptionStatus";
 import type { UserRole } from "@prisma/client";
@@ -31,6 +31,7 @@ export default async function PortalSettingsPage() {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
 
+  const purchasablePlans = (await Promise.all((await getPlans()).map(async p => ({ key: p.key, name: p.name, price: await stripePriceIdFor(p.key) })))).filter(p => p.price);
   const [t, lang, org, crmEnabled, pipelines, customFields, foodEnabled, branches] = await Promise.all([
     getServerT(),
     getServerLang(),
@@ -67,7 +68,7 @@ export default async function PortalSettingsPage() {
   const planModules = limits.custom ? await getEnabledModules(org.id) : plan.modules;
   const stripeEnabled = isStripeConfigured();
   const hasActiveSubscription =
-    org.stripeSubscriptionStatus === "active" || org.stripeSubscriptionStatus === "trialing";
+    Boolean(org.stripeSubscriptionId) && ["active", "trialing", "past_due", "unpaid", "incomplete"].includes(org.stripeSubscriptionStatus ?? "");
 
   return (
     <div>
@@ -132,7 +133,7 @@ export default async function PortalSettingsPage() {
             </p>
             {canManageBilling && <SubscriptionStatus view={billing} lang={lang} />}
             {stripeEnabled && canManageBilling ? (
-              <BillingActions hasActiveSubscription={hasActiveSubscription} />
+              <BillingActions hasActiveSubscription={hasActiveSubscription} plans={!org.customPlan && org.customMonthlyPriceMxn === null ? purchasablePlans : []} />
             ) : (
               <div className="info-box rounded-lg bg-brand-50 border border-brand-100 p-3">
                 <p className="info-box-text text-xs text-brand-700">{t.capacityMessage}</p>

@@ -17,25 +17,29 @@ const TARGET: Record<CallbackStatus, AutomationExecutionStatus> = { sent: "SUCCE
  */
 export async function applyExecutionCallback(input: CallbackInput, now: Date = new Date()): Promise<CallbackOutcome> {
   if (!verifyCallbackToken(input.executionId, input.token)) return { ok: false, reason: "invalid_token" };
-  const ex = await prisma.automationExecution.findUnique({ where: { id: input.executionId } });
-  if (!ex) return { ok: false, reason: "not_found" };
-  // Solo una ejecución que ya salió hacia n8n (o que n8n confirma antes de que se marque) puede cerrarse.
-  if (ex.status !== "DISPATCHED" && ex.status !== "PENDING") return { ok: true, changed: false, status: ex.status };
-
-  const status = TARGET[input.status];
-  await prisma.automationExecution.update({
-    where: { id: ex.id },
-    data: {
-      status,
-      providerMessageId: input.providerMessageId ?? ex.providerMessageId,
-      lastError: status === "FAILED" || status === "SKIPPED" ? (input.error ?? null)?.slice(0, 500) ?? null : null,
-      skipReason: status === "SKIPPED" ? "provider_skipped" : ex.skipReason,
-      completedAt: now,
-      nextAttemptAt: null,
-    },
+  const outcome = await prisma.$transaction(async tx => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`automation-callback:${input.executionId}`}))`;
+    const ex = await tx.automationExecution.findUnique({ where: { id: input.executionId } });
+    if (!ex) return { ok: false, reason: "not_found" } as const;
+    const executionKey = `blueprint:${ex.id}`;
+    const usage = await tx.automationUsage.findUnique({ where: { organizationId_executionKey: { organizationId: ex.organizationId, executionKey } } });
+    // A dispatcher timeout can exhaust retries before the provider confirms success.
+    const uncertain = (ex.status === "FAILED" || ex.status === "SKIPPED") && usage?.state === "RESERVED";
+    if (ex.status !== "DISPATCHED" && ex.status !== "PENDING" && !uncertain) return { ok: true, changed: false, status: ex.status } as const;
+    const status = TARGET[input.status];
+    await tx.automationExecution.update({
+      where: { id: ex.id },
+      data: {
+        status, providerMessageId: input.providerMessageId ?? ex.providerMessageId,
+        lastError: status === "FAILED" || status === "SKIPPED" ? (input.error ?? null)?.slice(0, 500) ?? null : null,
+        skipReason: status === "SKIPPED" ? "provider_skipped" : ex.skipReason,
+        completedAt: now, nextAttemptAt: null,
+      },
+    });
+    await tx.automationUsage.updateMany({ where: { organizationId: ex.organizationId, executionKey, state: "RESERVED" }, data: { state: status === "SUCCEEDED" ? "SUCCEEDED" : "RELEASED" } });
+    await tx.automation.update({ where: { id: ex.automationId }, data: { lastRunAt: now, lastStatus: status } });
+    return { ok: true, changed: true, status } as const;
   });
-  await prisma.automation.update({ where: { id: ex.automationId }, data: { lastRunAt: now, lastStatus: status } });
-  // Solo un envío exitoso cuenta como contacto para la atribución (los fallidos y omitidos no).
-  if (input.status === "sent" || input.status === "delivered") await recordTouchForExecution(ex.id, now);
-  return { ok: true, changed: true, status };
+  if (outcome.ok && outcome.status === "SUCCEEDED") await recordTouchForExecution(input.executionId, now);
+  return outcome;
 }

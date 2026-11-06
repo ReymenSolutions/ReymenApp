@@ -6,6 +6,10 @@
 // su versión en español). Un mensaje que no esté aquí se muestra tal cual.
 
 const EN: Record<string, string> = {
+  "El precio de Stripe no coincide con la mensualidad del plan en MXN": "The Stripe price does not match the plan’s monthly MXN price",
+  "Plan no disponible": "Plan unavailable",
+  "Tu precio pactado requiere una cotización de pago": "Your agreed price requires a payment quote",
+  "Administra tu suscripción actual desde el portal de pagos": "Manage your existing subscription from the billing portal",
   "Responde desde el panel privado de Lía para este piloto": "Reply from the private Lía panel for this pilot",
   "El piloto privado usa su propio envío revisado": "The private pilot uses its own reviewed sender",
   "El presupuesto piloto no está habilitado": "Pilot budgeting is not enabled",

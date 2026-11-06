@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripeClient, planForPriceId } from "@/lib/stripe";
+import { reconcilePlanEntitlements } from "@/lib/plan-entitlements";
+import { getPlan } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
 import { syncSmartcardMemberLimitForPlan } from "@/lib/smartcard-link";
@@ -30,9 +32,14 @@ export async function POST(req: NextRequest) {
         const session = event.data.object as Stripe.Checkout.Session;
         const orgId = session.metadata?.organizationId;
         if (orgId && session.subscription) {
+          const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
+          const owner = await prisma.organization.findFirst({ where: { id: orgId, stripeCustomerId: customerId ?? "" }, select: { id: true } });
+          if (!owner) throw new Error("Checkout customer mismatch");
           const subscriptionId =
             typeof session.subscription === "string" ? session.subscription : session.subscription.id;
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          const subscriptionCustomer = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
+          if (subscriptionCustomer !== customerId) throw new Error("Subscription customer mismatch");
           await applySubscriptionToOrg(orgId, subscription, event.created);
         }
         break;
@@ -55,9 +62,16 @@ export async function POST(req: NextRequest) {
         });
         if (org) {
           // La baja de una suscripción vieja (otro id) o un evento atrasado no deben degradar a quien ya tiene otra vigente.
-          const downgraded = await prisma.organization.updateMany({
+          const starter = await getPlan("starter");
+          const downgraded = await prisma.$transaction(async tx => {
+          await tx.$queryRaw`SELECT id FROM "Organization" WHERE id = ${org.id} FOR UPDATE`;
+          const current = await tx.organization.findUniqueOrThrow({ where: { id: org.id }, select: { customPlan: true } });
+          const result = await tx.organization.updateMany({
             where: { id: org.id, stripeSubscriptionId: subscription.id, OR: [{ stripeEventAt: null }, { stripeEventAt: { lt: new Date(event.created * 1000) } }] },
-            data: { plan: "starter", stripeSubscriptionId: null, stripeSubscriptionStatus: "canceled", stripeEventAt: new Date(event.created * 1000) },
+            data: { ...(current.customPlan ? {} : { plan: "starter" }), stripeSubscriptionId: null, stripeSubscriptionStatus: "canceled", stripeEventAt: new Date(event.created * 1000) },
+          });
+          if (result.count && !current.customPlan) await reconcilePlanEntitlements(tx, org.id, starter.modules);
+          return result;
           });
           if (downgraded.count === 0) break;
           const smartcardMemberLimit = await syncSmartcardMemberLimitForPlan(org.id, "starter");
@@ -77,6 +91,7 @@ export async function POST(req: NextRequest) {
         const org = await prisma.organization.findFirst({ where: { stripeCustomerId: invoice.customer as string }, select: { id: true } });
         const periodEndSec = invoice.lines?.data?.[0]?.period?.end;
         if (org && invoice.id && periodEndSec) {
+          if (invoice.currency !== "mxn") throw new Error("Unsupported invoice currency");
           const out = await recordPayment(org.id, { amountMxn: (invoice.amount_paid ?? 0) / 100, method: "STRIPE", periodEnd: new Date(periodEndSec * 1000), externalRef: invoice.id });
           if (out.applied) await logAudit({ organizationId: org.id, action: "billing.payment", resource: "Organization", resourceId: org.id, metadata: { source: "stripe", invoice: invoice.id, periodEnd: out.periodEnd.toISOString() } });
         }
@@ -105,21 +120,31 @@ export async function POST(req: NextRequest) {
 
 async function applySubscriptionToOrg(orgId: string, subscription: Stripe.Subscription, eventCreatedSec: number) {
   const priceId = subscription.items.data[0]?.price.id;
-  const plan = (await planForPriceId(priceId)) ?? "starter";
+  const plan = await planForPriceId(priceId);
+  if (!plan) throw new Error("Unknown subscription price");
+  const catalogPlan = await getPlan(plan);
+  // An incomplete/unpaid checkout must not provision paid products. Existing access on payment trouble is retained for manual review.
+  const provision = ["active", "trialing"].includes(subscription.status);
 
   // Stripe no garantiza el orden de entrega: solo se aplica un evento más nuevo que el último aplicado. Así un
   // "updated" atrasado nunca restaura un plan anterior sobre uno más reciente.
   const eventAt = new Date(eventCreatedSec * 1000);
-  const applied = await prisma.organization.updateMany({
+  const applied = await prisma.$transaction(async tx => {
+  await tx.$queryRaw`SELECT id FROM "Organization" WHERE id = ${orgId} FOR UPDATE`;
+  const current = await tx.organization.findUniqueOrThrow({ where: { id: orgId }, select: { customPlan: true } });
+  const result = await tx.organization.updateMany({
     where: { id: orgId, OR: [{ stripeEventAt: null }, { stripeEventAt: { lte: eventAt } }] },
     data: {
-      plan,
+      ...(provision && !current.customPlan ? { plan } : {}),
       stripeSubscriptionId: subscription.id,
       stripeSubscriptionStatus: subscription.status,
       stripeEventAt: eventAt,
     },
   });
-  if (applied.count === 0) return;
+  if (result.count && provision && !current.customPlan) await reconcilePlanEntitlements(tx, orgId, catalogPlan.modules);
+  return result;
+  });
+  if (applied.count === 0 || !provision) return;
   // El fin del periodo actual de Stripe es el "pagado hasta" del cliente (nunca lo acorta: ver recordPayment).
   const periodEndSec = subscription.items.data[0]?.current_period_end;
   if (periodEndSec && (subscription.status === "active" || subscription.status === "trialing")) {

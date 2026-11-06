@@ -19,15 +19,16 @@ const MODULES = ALL_MODULES;
 
 type Form = {
   key: string; name: string; nameEn: string; description: string; descriptionEn: string; priceMxn: string;
-  leads: string; users: string; automations: string; aiBudgetMxn: string; aiAgents: string;
+  leads: string; users: string; automations: string; runs: string; aiBudgetMxn: string; aiAgents: string;
   modules: PlatformModule[]; features: { es: string; en: string }[]; stripePriceId: string; accent: PlanAccent; sortOrder: string; isActive: boolean;
 };
 
-const EMPTY: Form = { key: "", name: "", nameEn: "", description: "", descriptionEn: "", priceMxn: "", leads: "", users: "", automations: "", aiBudgetMxn: "", aiAgents: "", modules: ["CRM"], features: [], stripePriceId: "", accent: "slate", sortOrder: "10", isActive: true };
+const EMPTY: Form = { key: "", name: "", nameEn: "", description: "", descriptionEn: "", priceMxn: "", leads: "", users: "", automations: "", runs: "", aiBudgetMxn: "", aiAgents: "", modules: ["CRM"], features: [], stripePriceId: "", accent: "slate", sortOrder: "10", isActive: true };
 
 const fromPlan = (p: PlanRow): Form => ({
   key: p.key, name: p.name, nameEn: p.nameEn, description: p.description, descriptionEn: p.descriptionEn, priceMxn: String(p.priceMxn),
   leads: p.limits.leads === null ? "" : String(p.limits.leads), users: p.limits.users === null ? "" : String(p.limits.users), automations: p.limits.automations === null ? "" : String(p.limits.automations),
+  runs: p.maxAutomationRuns == null ? "" : String(p.maxAutomationRuns),
   aiBudgetMxn: String(p.aiBudgetMxn), aiAgents: p.maxAiAgents === null ? "" : String(p.maxAiAgents), modules: p.modules, features: p.features.map((f) => ({ ...f })),
   stripePriceId: p.stripePriceId ?? "", accent: (PLAN_ACCENTS as readonly string[]).includes(p.accent) ? (p.accent as PlanAccent) : "slate", sortOrder: String(p.sortOrder), isActive: p.isActive,
 });
@@ -44,7 +45,7 @@ export function PlanEditorDialog({ plan }: { plan?: PlanRow }) {
   const moduleLabel = getModuleLabel(es ? "es" : "en");
 
   /** Límite numérico con la opción "Ilimitado" (campo vacío = ilimitado). */
-  const limitField = (k: "leads" | "users" | "automations" | "aiAgents", label: string, unlimitedLabel: string) => (
+  const limitField = (k: "leads" | "users" | "automations" | "runs" | "aiAgents", label: string, unlimitedLabel: string) => (
     <div className="space-y-1">
       <Label htmlFor={`plan-${k}`}>{label}</Label>
       <div className="flex items-center gap-2">
@@ -62,7 +63,7 @@ export function PlanEditorDialog({ plan }: { plan?: PlanRow }) {
       try {
         const body = {
           name: form.name, nameEn: form.nameEn || form.name, description: form.description, descriptionEn: form.descriptionEn,
-          priceMxn: form.priceMxn, maxLeads: form.leads, maxUsers: form.users, maxAutomations: form.automations, aiBudgetMxn: form.aiBudgetMxn, maxAiAgents: form.aiAgents,
+          priceMxn: form.priceMxn, maxLeads: form.leads, maxUsers: form.users, maxAutomations: form.automations, maxAutomationRuns: form.runs, aiBudgetMxn: form.aiBudgetMxn, maxAiAgents: form.aiAgents,
           modules: form.modules, features: form.features.filter((f) => f.es.trim()).map((f) => ({ es: f.es, en: f.en.trim() || f.es })),
           stripePriceId: form.stripePriceId || null, accent: form.accent, sortOrder: form.sortOrder, isActive: form.isActive,
         };
@@ -118,7 +119,8 @@ export function PlanEditorDialog({ plan }: { plan?: PlanRow }) {
             <div className="space-y-1"><Label htmlFor="plan-order">{es ? "Orden" : "Order"}</Label><Input id="plan-order" type="number" min="0" step="1" value={form.sortOrder} onChange={(e) => set("sortOrder", e.target.value)} /></div>
             {limitField("leads", es ? "Leads" : "Leads", es ? "Ilimitado" : "Unlimited")}
             {limitField("users", es ? "Usuarios" : "Users", es ? "Ilimitado" : "Unlimited")}
-            {limitField("automations", es ? "Automatizaciones" : "Automations", es ? "Ilimitadas" : "Unlimited")}
+            {limitField("automations", es ? "Automatizaciones instaladas" : "Installed automations", es ? "Ilimitadas" : "Unlimited")}
+            {limitField("runs", es ? "Ejecuciones mensuales" : "Monthly executions", es ? "Sin tope" : "Unlimited")}
             {limitField("aiAgents", es ? "Agentes IA activos" : "Active AI agents", es ? "Sin tope" : "No cap")}
           </section>
 

@@ -1,3 +1,4 @@
+import { requireModule } from "@/lib/modules";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -16,6 +17,7 @@ import type { UserRole } from "@prisma/client";
 export default async function AppointmentSettingsPage() {
   const session = await auth();
   if (!session?.user.organizationId) return redirect("/login");
+  await requireModule(session.user.organizationId, "CRM");
   if (!can(session.user.role as UserRole, "settings:manage")) return redirect("/portal/appointments");
 
   const orgId = session.user.organizationId;

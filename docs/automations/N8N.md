@@ -92,3 +92,16 @@ Guía paso a paso: `docs/crm/BANDEJA-N8N.md`. Dos workflows genéricos (sirven a
 | `reymen-inbox-meta.json` | `GET`/`POST reymen-meta` (Meta) · `POST instagram-outbound` · `POST messenger-outbound` (Reymen) | Verificación del webhook (`hub.challenge`). Mensajes de Messenger/Instagram → `/conversations` (`contactHandle` = PSID/IGSID, nombre desde la Graph API, sin ecos). Lead Ads (`leadgen`) → pide el lead a la Graph API → `/api/webhooks/n8n/leads` (`externalId: meta-lead:<id>`, respuestas del formulario en `metadata`). Saliente: `POST /me/messages` con el token de la página. Verifica `X-Hub-Signature-256` si se pone el App Secret. |
 
 Reymen ya tenía los dos extremos (entrada firmada con la llave del cliente y salida a `<canal>-outbound` firmada con `N8N_WEBHOOK_SECRET`); estos workflows son el puente con cada proveedor.
+
+## Cuota mensual de ejecuciones (2026-11)
+
+Para flujos externos, integrar `POST /api/v1/automations/runs` con JSON:
+
+```json
+{"automationId":"ID_DE_LA_AUTOMATIZACION","executionId":"ID_DURABLE_DEL_TRABAJO","action":"reserve"}
+```
+
+Usar la autenticación de webhook existente (`x-reymen-signature` con timestamp). `x-reymen-secret` solo se acepta en desarrollo; staging compilado exige HMAC. Guardar el secreto en credenciales de n8n, nunca en el JSON exportado.
+Solo ejecutar efectos si HTTP 200 y `allowed: true`. HTTP 409 bloquea el trabajo; ante fallo de red no asumir permiso. Al terminar, enviar el mismo cuerpo con `action: "succeeded"` o `"failed"` si hay fallo definitivo. Un timeout de un tercero es incierto: no enviar `failed` hasta conciliarlo. Reutilizar executionId en reintentos y deduplicar los efectos en n8n. No enviar simulaciones a esta API.
+
+Las reservas pendientes ocupan capacidad, pero solo SUCCEEDED cuenta como consumo exitoso. Mes UTC de admisión. Sin excedentes automáticos. Los flujos previos que no llamen a esta API **todavía no tienen control de cuota**. Ver el [plan de validación](../production/SERVICIOS_COMERCIALES_IMPLEMENTACION_2026-11-05.md).

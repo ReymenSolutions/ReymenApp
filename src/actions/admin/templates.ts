@@ -122,8 +122,7 @@ export async function addTemplateVersion(
  * Admin equivalent of installTemplate() (src/actions/templates.ts), for
  * installing a template on a client's behalf. Two real differences from
  * the client self-service path: an admin can pin any version, not just
- * the latest, and this isn't subject to the org's own plan capacity (a
- * deliberate admin override, not an oversight). Both still funnel into
+ * the latest. Both paths enforce the organization’s installed capacity and funnel into
  * the same applyTemplateInstall() for the actual Automation/
  * TemplateInstallation/audit-log work.
  */
@@ -143,7 +142,7 @@ export async function installTemplateForClient(
     }),
   ]);
   if (!org) throw new UserError("Cliente no encontrado");
-  if (!version) throw new UserError("Versión no encontrada");
+  if (!version || version.templateId !== templateId) throw new UserError("Versión no encontrada");
 
   const { automationId } = await applyTemplateInstall({
     orgId,

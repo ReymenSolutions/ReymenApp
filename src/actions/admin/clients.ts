@@ -8,6 +8,7 @@ import { generateSlug, generateWebhookSecret } from "@/lib/utils";
 import { logAudit } from "@/lib/audit";
 import { requireAdmin } from "@/lib/guards";
 import { UserError } from "@/lib/user-error";
+import { reconcilePlanEntitlements } from "@/lib/plan-entitlements";
 import { getPlans } from "@/lib/plans";
 import { NEW_ORG_AGENT_SETTINGS } from "@/lib/agent-cap";
 import { syncSmartcardMemberLimitForPlan } from "@/lib/smartcard-link";
@@ -16,6 +17,7 @@ import { createPipelineWithStages, DEFAULT_PIPELINE_NAME, DEFAULT_STAGES } from 
 const createClientSchema = z.object({
   orgName: z.string().min(2),
   orgIndustry: z.string().optional(),
+  plan: z.string().optional(),
   userName: z.string().min(2),
   userEmail: z.string().email(),
   password: z.string().min(8),
@@ -27,6 +29,7 @@ export async function createClient(formData: FormData) {
   const parsed = createClientSchema.safeParse({
     orgName: formData.get("orgName"),
     orgIndustry: formData.get("orgIndustry") || undefined,
+    plan: formData.get("plan") || undefined,
     userName: formData.get("userName"),
     userEmail: formData.get("userEmail"),
     password: formData.get("password"),
@@ -35,6 +38,8 @@ export async function createClient(formData: FormData) {
   if (!parsed.success) throw new UserError("Datos inválidos");
 
   const { orgName, orgIndustry, userName, userEmail, password } = parsed.data;
+  const chosen = parsed.data.plan ? (await getPlans()).find(p => p.key === parsed.data.plan) : null;
+  if (parsed.data.plan && !chosen) throw new UserError("Plan inválido");
   const slug = generateSlug(orgName);
   const passwordHash = await bcrypt.hash(password, 12);
 
@@ -46,6 +51,7 @@ export async function createClient(formData: FormData) {
       name: orgName,
       slug: finalSlug,
       industry: orgIndustry,
+      ...(chosen ? { plan: chosen.key, modules: { create: chosen.modules.map(product => ({ module: product, status: "ACTIVE" as const, source: "SUBSCRIBED" as const })) } } : {}),
       n8nWebhookSecret: generateWebhookSecret(),
       users: {
         create: {
@@ -90,10 +96,11 @@ export async function changePlan(orgId: string, plan: string, customMonthlyPrice
     throw new UserError("El precio personalizado debe ser mayor a 0");
   }
 
-  const org = await prisma.organization.update({
-    where: { id: orgId },
-    // Elegir un plan del catálogo saca al cliente del plan «A la medida» (sus límites propios dejan de aplicar).
-    data: { plan, customMonthlyPriceMxn: customPrice, customPlan: false, customMaxLeads: null, customMaxUsers: null, customMaxAutomations: null, customMaxAiAgents: null },
+  const org = await prisma.$transaction(async tx => {
+    const updated = await tx.organization.update({ where: { id: orgId }, data: { plan, customMonthlyPriceMxn: customPrice, customPlan: false, customMaxLeads: null, customMaxUsers: null, customMaxAutomations: null, customMaxAutomationRuns: null, customMaxAiAgents: null } });
+    await reconcilePlanEntitlements(tx, orgId, chosen.modules);
+    return updated;
+
   });
 
   // SmartCard guarda su propio límite de integrantes; se iguala al del plan.
@@ -105,7 +112,7 @@ export async function changePlan(orgId: string, plan: string, customMonthlyPrice
     action: "client.plan_change",
     resource: "Organization",
     resourceId: orgId,
-    metadata: { newPlan: plan, customMonthlyPriceMxn: customPrice, smartcardMemberLimit },
+    metadata: { newPlan: plan, customMonthlyPriceMxn: customPrice, smartcardMemberLimit, modulesReconciled: true },
   });
 
   revalidatePath(`/admin/clients/${orgId}`);

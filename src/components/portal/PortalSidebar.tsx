@@ -74,14 +74,14 @@ const NAV_ITEMS: { href: string; key: keyof ReturnType<typeof useNavItems>; icon
   { href: "/portal/today", key: "crm", icon: Users, section: "customers", module: "CRM", alsoActiveFor: CRM_PATHS },
   { href: "/portal/customers", key: "customersNav", icon: Contact, section: "customers", module: "FOOD_OPS", hiddenWithModule: "CRM" },
   // Citas es su propia entrada, visible siempre y separada del CRM.
-  { href: "/portal/appointments", key: "appointments", icon: Calendar, section: "customers" },
+  { href: "/portal/appointments", key: "appointments", icon: Calendar, section: "customers", module: "CRM" },
 
   { href: "/portal/inbox", key: "inbox", icon: MessageSquare, section: "communication", anyModule: ["CRM", "AI_WHATSAPP"], hiddenWithModule: "CRM", alsoActiveFor: ["/portal/conversations"] },
   { href: "/portal/whatsapp", key: "whatsapp", icon: Bot, section: "communication", module: "AI_WHATSAPP", alsoActiveFor: ["/portal/knowledge-base", "/portal/ai-lab", "/portal/ai-usage", "/portal/ai-agents", "/portal/ai-channels"] },
   { href: "/portal/automations", key: "automations", icon: Zap, section: "communication", module: "AUTOMATIONS", alsoActiveFor: ["/portal/templates"] },
 
   { href: "/portal/dashboard", key: "dashboard", icon: LayoutDashboard, section: "results" },
-  { href: "/portal/reports", key: "reports", icon: BarChart3, section: "results" },
+  { href: "/portal/reports", key: "reports", icon: BarChart3, section: "results", anyModule: ["CRM", "AUTOMATIONS", "AI_WHATSAPP", "FOOD_OPS", "LOYALTY"] },
 
   { href: "/portal/onboarding", key: "onboarding", icon: Rocket, section: "account" },
   { href: "/portal/requests", key: "requests", icon: FileText, section: "account" },

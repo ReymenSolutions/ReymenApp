@@ -26,6 +26,7 @@ import { getErrorMessage, translateMessage } from "@/lib/user-error";
 const schema = z.object({
   orgName: z.string().min(2, "Mínimo 2 caracteres"),
   orgIndustry: z.string().optional(),
+  plan: z.string().optional(),
   userName: z.string().min(2, "Mínimo 2 caracteres"),
   userEmail: z.string().email("Email inválido"),
   password: z.string().min(8, "Mínimo 8 caracteres"),
@@ -53,7 +54,7 @@ const INDUSTRIES_EN = [
   { value: "other", label: "Other" },
 ];
 
-export function CreateClientDialog() {
+export function CreateClientDialog({ plans = [] }: { plans?: { key: string; name: string }[] }) {
   const { lang } = usePreferences();
   const INDUSTRIES = lang === "es" ? INDUSTRIES_ES : INDUSTRIES_EN;
   const [open, setOpen] = useState(false);
@@ -92,6 +93,7 @@ export function CreateClientDialog() {
           <DialogTitle>{lang === "es" ? "Crear nuevo cliente" : "Create new client"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-2"><Label htmlFor="new-client-plan">{lang === "es" ? "Plan y servicios" : "Plan and services"}</Label><select id="new-client-plan" {...register("plan")} className="w-full rounded-md border border-slate-300 bg-transparent p-2"><option value="">{lang === "es" ? "Configurar después" : "Configure later"}</option>{plans.map(p => <option key={p.key} value={p.key}>{p.name}</option>)}</select><p className="text-xs text-slate-500">{lang === "es" ? "Activa los módulos incluidos. No realiza un cobro." : "Activates included modules. Does not charge a payment."}</p></div>
           <div className="space-y-2">
             <Label htmlFor="createclientdialog-f1">{lang === "es" ? "Nombre de empresa" : "Company name"}</Label>
             <Input id="createclientdialog-f1" placeholder={lang === "es" ? "Clínica San Rafael" : "San Rafael Clinic"} {...register("orgName")} />

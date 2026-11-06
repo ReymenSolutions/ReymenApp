@@ -16,7 +16,7 @@ import { getErrorMessage } from "@/lib/user-error";
 import { cn } from "@/lib/utils";
 
 type Limits = CustomPlanState["limits"];
-type Form = { orgId: string; basePlan: string; price: string; aiBudget: number; modules: PlatformModule[]; limits: Limits };
+type Form = { orgId: string; basePlan: string; price: string; aiBudget: number; modules: PlatformModule[]; limits: Limits; runs: number | null };
 
 /** Interruptor accesible (sí/no) para encender o apagar un módulo. */
 function Switch({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
@@ -89,7 +89,7 @@ function Counter({ id, label, value, onChange, step = 1, min = 0, max, unlimited
 const fromState = (s: CustomPlanState, plans: PlanDef[]): Form => {
   // Un cliente que aún no es «A la medida» arranca con lo que hoy tiene: sus módulos activos y los límites de su plan.
   const base = plans.find((p) => p.key === s.basePlan);
-  return { orgId: s.orgId, basePlan: s.basePlan, price: s.priceMxn !== null ? String(s.priceMxn) : base ? String(base.priceMxn) : "", aiBudget: s.aiBudgetMxn, modules: s.modules, limits: s.limits };
+  return { orgId: s.orgId, basePlan: s.basePlan, price: s.priceMxn !== null ? String(s.priceMxn) : base ? String(base.priceMxn) : "", aiBudget: s.aiBudgetMxn, modules: s.modules, limits: s.limits, runs: s.maxAutomationRuns ?? null };
 };
 
 /**
@@ -133,7 +133,7 @@ export function CustomPlanDialog({ orgId, clients, plans, lang }: { orgId?: stri
   const startFrom = (key: string) => {
     const p = plans.find((x) => x.key === key);
     if (!p) return;
-    setForm((f) => (f ? { ...f, basePlan: key, modules: p.modules, aiBudget: p.aiBudgetMxn, limits: { leads: p.limits.leads, users: p.limits.users, automations: p.limits.automations, aiAgents: p.maxAiAgents } } : f));
+    setForm((f) => (f ? { ...f, basePlan: key, runs: p.maxAutomationRuns ?? null, modules: p.modules, aiBudget: p.aiBudgetMxn, limits: { leads: p.limits.leads, users: p.limits.users, automations: p.limits.automations, aiAgents: p.maxAiAgents } } : f));
   };
 
   const price = form ? Number(form.price) : NaN;
@@ -143,7 +143,7 @@ export function CustomPlanDialog({ orgId, clients, plans, lang }: { orgId?: stri
     if (!form || priceInvalid) return;
     startSave(async () => {
       try {
-        const r = await saveCustomPlan({ orgId: form.orgId, basePlan: form.basePlan, priceMxn: price, aiBudgetMxn: form.aiBudget, modules: form.modules, limits: form.limits });
+        const r = await saveCustomPlan({ orgId: form.orgId, basePlan: form.basePlan, priceMxn: price, aiBudgetMxn: form.aiBudget, modules: form.modules, limits: form.limits, maxAutomationRuns: form.runs });
         toast.success(es ? `${name}: plan A la medida guardado${r.modulesChanged ? ` · ${r.modulesChanged} módulo(s) actualizados` : ""}` : `${name}: Custom Service plan saved${r.modulesChanged ? ` · ${r.modulesChanged} module(s) updated` : ""}`);
         setOpen(false);
         router.refresh();
@@ -155,7 +155,7 @@ export function CustomPlanDialog({ orgId, clients, plans, lang }: { orgId?: stri
 
   function remove() {
     if (!form) return;
-    if (!confirm(es ? `¿Quitar A la medida a ${name}? Vuelve a su plan base con su precio de lista y sus límites. Sus módulos se quedan como están.` : `Remove Custom Service from ${name}? It goes back to its base plan's list price and limits. Its modules stay as they are.`)) return;
+    if (!confirm(es ? `¿Quitar A la medida a ${name}? Vuelve a su plan base con su precio de lista y sus límites. Sus módulos contratados se ajustarán al plan base; se conservarán las excepciones administrativas.` : `Remove Custom Service from ${name}? It goes back to its base plan's list price and limits. Subscribed modules will match the base plan; administrative overrides will be preserved.`)) return;
     startSave(async () => {
       try {
         await removeCustomPlan(form.orgId);
@@ -178,7 +178,7 @@ export function CustomPlanDialog({ orgId, clients, plans, lang }: { orgId?: stri
             <Counter id="cp-ai" label={es ? "Presupuesto de IA (MXN/mes)" : "AI budget (MXN/mo)"} value={form.aiBudget} onChange={(v) => setForm((f) => (f ? { ...f, aiBudget: v ?? 0 } : f))} step={100} max={1_000_000} prefix="$" />
           </div>
         ),
-        AUTOMATIONS: <Counter id="cp-auto" label={es ? "Automatizaciones" : "Automations"} value={form.limits.automations} onChange={(v) => setLimit("automations", v)} max={10_000} unlimitedLabel={es ? "Ilimitadas" : "Unlimited"} />,
+        AUTOMATIONS: <div className="space-y-3"><Counter id="cp-runs" label={es ? "Ejecuciones mensuales" : "Monthly executions"} value={form.runs} onChange={v => setForm(f => f ? { ...f, runs: v } : f)} max={10_000_000} unlimitedLabel={es ? "Sin tope" : "Unlimited"} /><Counter id="cp-auto" label={es ? "Automatizaciones" : "Automations"} value={form.limits.automations} onChange={(v) => setLimit("automations", v)} max={10_000} unlimitedLabel={es ? "Ilimitadas" : "Unlimited"} /></div>,
       }
     : {};
 
