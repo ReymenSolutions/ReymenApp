@@ -72,3 +72,16 @@ Se integró `main` hasta `1c52462` (PR 177–182) exclusivamente en la rama de e
 - `docs/automations/N8N.md`: se conserva la documentación de flujos multi-negocio, n8n 2.x y conectores; el contrato de cuota se agrega como sección independiente.
 
 No se editan los JSON de n8n, componentes de tareas/pipelines, sus migraciones ni avisos push de Claude. Sus flujos conservan su comportamiento; integrarles cuota requiere una adaptación posterior acordada y pruebas sandbox. Las pruebas anteriores al merge no se presentan como validación de esta combinación final.
+
+
+## Cierre de validación de la integración — 2026-11-06
+
+Código validado: `8479d11`, con main incorporado hasta `1c52462`.
+
+- Suite completa combinada: **264 archivos, 1,825 pruebas aprobadas, cero fallos** (402.20 s). Comando: `npm test -- --maxWorkers=2 --testTimeout=15000 --hookTimeout=30000`, con `TEST_DATABASE_URL` apuntando exclusivamente a PostgreSQL local desechable. Los timeouts son del ejecutor de pruebas, no del producto.
+- `npm run build`: aprobado, incluida verificación TypeScript.
+- `npm run lint`: cero errores; 64 advertencias existentes pendientes de limpieza separada.
+- Navegador sobre el build combinado: **2/2 aprobadas** (18.8 s). El alta con plan conserva el embudo Ventas con seis etapas; navegación móvil, filtros y bloqueo de módulos no contratados correctos.
+- Conflictos resueltos preservando ambas aportaciones. PR [183](https://github.com/ReymenSolutions/ReymenApp/pull/183) en borrador; main y producción sin modificaciones por esta implementación.
+
+La compatibilidad comprobada corresponde a esta revisión concreta, no a cambios posteriores de otros colaboradores. Quedan pendientes las pruebas sandbox Stripe/n8n y la adaptación explícita de los flujos externos al contrato de cuota. Estos resultados no certifican todavía el proceso comercial externo completo.
