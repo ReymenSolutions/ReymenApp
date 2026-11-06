@@ -85,3 +85,8 @@ Código validado: `8479d11`, con main incorporado hasta `1c52462`.
 - Conflictos resueltos preservando ambas aportaciones. PR [183](https://github.com/ReymenSolutions/ReymenApp/pull/183) en borrador; main y producción sin modificaciones por esta implementación.
 
 La compatibilidad comprobada corresponde a esta revisión concreta, no a cambios posteriores de otros colaboradores. Quedan pendientes las pruebas sandbox Stripe/n8n y la adaptación explícita de los flujos externos al contrato de cuota. Estos resultados no certifican todavía el proceso comercial externo completo.
+
+
+## Preparación externa — 2026-11-06
+
+Se añade [guía de sandbox comercial](SANDBOX_COMERCIAL.md) y `deploy/commercial/check-stripe-test.mjs`, verificación de precio Stripe de solo lectura. Rechaza claves live antes de realizar solicitudes y valida precio mensual MXN, modo test e importe. Cuatro pruebas con respuestas simuladas aprobadas; no se llamó a Stripe real por falta de credenciales conectadas. Se documenta además que el staging de Lía tiene red interna y n8n deshabilitado: requiere preparar conectividad sandbox antes de un checkout completo. Ningún workflow de Claude se modifica.
