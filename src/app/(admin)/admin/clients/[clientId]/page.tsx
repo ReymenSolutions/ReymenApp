@@ -19,6 +19,7 @@ import { ClientAutomationsHub } from "@/components/admin/ClientAutomationsHub";
 import { getOrganizationBlueprints } from "@/actions/admin/blueprints";
 import { OrganizationModulesPanel } from "@/components/admin/OrganizationModulesPanel";
 import { PurgePosSalesPanel } from "@/components/admin/PurgePosSalesPanel";
+import { ClientResetPanel } from "@/components/admin/ClientResetPanel";
 import { SmartcardLinkPanel } from "@/components/admin/SmartcardLinkPanel";
 import { getSmartcardLinkState } from "@/lib/smartcard-link";
 import { AdminClientUsersPanel } from "@/components/admin/AdminClientUsersPanel";
@@ -287,6 +288,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
         <div className="grid grid-cols-1 gap-6">
           <OrganizationModulesPanel orgId={client.id} modules={await getOrganizationModules(clientId)} planLabel={planInfo.name} planModules={planModules} />
           {hasModule("FOOD_OPS") && <PurgePosSalesPanel orgId={client.id} />}
+          <ClientResetPanel orgId={client.id} orgName={client.name} />
         </div>
       )}
 
