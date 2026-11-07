@@ -59,10 +59,10 @@ describe("carga de menú (aditiva)", () => {
     expect(Number(extras.options.find((o) => o.name === "Aguacate")!.priceDelta)).toBe(25);
     expect(extras.options.find((o) => o.name === "Pechuga de pollo")?.priceDelta.toString()).toBe("40");
     // Su mínimo/máximo se ajusta al menú.
-    expect(extras.maxSelect).toBe(10);
-    expect(report.updated.some((r) => r.includes("Extras") && r.includes("máx. 10"))).toBe(true);
+    expect(extras.maxSelect).toBe(12);
+    expect(report.updated.some((r) => r.includes("Extras") && r.includes("máx. 12"))).toBe(true);
     const salsa = await prisma.foodModifierGroup.findFirstOrThrow({ where: { organizationId: orgId, name: "Chilaquiles · Salsa" } });
-    expect(salsa.maxSelect).toBe(2);
+    expect(salsa.maxSelect).toBe(3);
 
     // Nuevo: licuado con tamaños Vaso/Litro y sus grupos; desayuno completo separado en dos.
     const berry = await prisma.foodDish.findFirstOrThrow({ where: { organizationId: orgId, name: "Berry Bloom" }, include: { variants: true, modifierGroups: true } });
@@ -94,13 +94,17 @@ describe("carga de menú · duplicados", () => {
     await prisma.foodDish.create({ data: { organizationId: orgId, name: "Chilaquiles", variants: { create: [v("Chico", 120), v("Grande", 160)] } } });
     // Se parece por nombre pero solo con «Único»: no se toca, solo se reporta.
     await prisma.foodDish.create({ data: { organizationId: orgId, name: "Bowl", variants: { create: [v("Único", 150)] } } });
+    // Jugo con tamaños de más: solo deben quedar Medio (el «Vaso» de antes) y Litro.
+    const jugo = await prisma.foodDish.create({ data: { organizationId: orgId, name: "Jugo Verde", variants: { create: [v("Chico", 60), v("Grande", 90), v("Vaso", 70), v("Litro", 100)] } }, include: { variants: true } });
+    vasoId = jugo.variants.find((x) => x.label === "Vaso")!.id;
   });
+  let vasoId: string;
   afterAll(async () => cleanupOrg(orgId));
 
   it("deja un solo Chico/Grande con el nombre del menú y desactiva el platillo repetido", async () => {
     const preview = await loadMenu(prisma, orgId, villaGardeniaMenu, { apply: false });
     expect(preview.updated.some((r) => r.includes("«Chilaquiles» es un duplicado"))).toBe(true);
-    expect(await prisma.foodDishVariant.count({ where: { organizationId: orgId } })).toBe(7);
+    expect(await prisma.foodDishVariant.count({ where: { organizationId: orgId } })).toBe(11);
 
     const report = await loadMenu(prisma, orgId, villaGardeniaMenu, { apply: true });
     const chil = await prisma.foodDish.findFirstOrThrow({ where: { organizationId: orgId, name: "Chilaquiles Gardenia" }, include: { variants: true } });
@@ -108,6 +112,9 @@ describe("carga de menú · duplicados", () => {
     expect((await prisma.foodDish.findFirstOrThrow({ where: { organizationId: orgId, name: "Chilaquiles" } })).isActive).toBe(false);
     expect((await prisma.foodDish.findFirstOrThrow({ where: { organizationId: orgId, name: "Bowl" } })).isActive).toBe(true);
     expect(report.review.some((r) => r.includes("«Bowl» se parece"))).toBe(true);
+    const jugo = await prisma.foodDish.findFirstOrThrow({ where: { organizationId: orgId, name: "Jugo Verde" }, include: { variants: true } });
+    expect(jugo.variants.map((x) => `${x.label} ${Number(x.price)}`).sort()).toEqual(["Litro 100", "Medio 70"]);
+    expect(jugo.variants.find((x) => x.label === "Medio")!.id).toBe(vasoId);
 
     const again = await loadMenu(prisma, orgId, villaGardeniaMenu, { apply: true });
     expect(again.created).toEqual([]);
