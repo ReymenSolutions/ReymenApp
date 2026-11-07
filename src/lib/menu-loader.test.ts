@@ -59,10 +59,10 @@ describe("carga de menú (aditiva)", () => {
     expect(Number(extras.options.find((o) => o.name === "Aguacate")!.priceDelta)).toBe(25);
     expect(extras.options.find((o) => o.name === "Pechuga de pollo")?.priceDelta.toString()).toBe("40");
     // Su mínimo/máximo se ajusta al menú.
-    expect(extras.maxSelect).toBe(10);
-    expect(report.updated.some((r) => r.includes("Extras") && r.includes("máx. 10"))).toBe(true);
+    expect(extras.maxSelect).toBe(12);
+    expect(report.updated.some((r) => r.includes("Extras") && r.includes("máx. 12"))).toBe(true);
     const salsa = await prisma.foodModifierGroup.findFirstOrThrow({ where: { organizationId: orgId, name: "Chilaquiles · Salsa" } });
-    expect(salsa.maxSelect).toBe(2);
+    expect(salsa.maxSelect).toBe(3);
 
     // Nuevo: licuado con tamaños Vaso/Litro y sus grupos; desayuno completo separado en dos.
     const berry = await prisma.foodDish.findFirstOrThrow({ where: { organizationId: orgId, name: "Berry Bloom" }, include: { variants: true, modifierGroups: true } });

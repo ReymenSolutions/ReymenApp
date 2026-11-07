@@ -7,37 +7,46 @@ const free = (...names: string[]) => names.map((name) => ({ name }));
 const U = (price: number) => [{ label: "Único", price }];
 const VL = (vaso: number, litro: number) => [{ label: "Vaso", price: vaso }, { label: "Litro", price: litro }];
 
+/**
+ * El cliente puede elegir todas las opciones que quiera (verde y roja, pollo y huevo…); los extras se cobran por
+ * cada uno. Solo estos grupos se quedan con su límite porque es una sola cosa o lo marca la carta: una leche o base
+ * por bebida, una Coca, una bebida incluida en el desayuno completo y 2 frutas en el personalizado.
+ */
+const KEEP_LIMIT = new Set(["leche", "persBase", "coca", "dcBebida", "persFrutas"]);
+
+const groups: MenuSpec["groups"] = [
+  { key: "chilBase", name: "Chilaquiles · Base", min: 1, max: 1, options: free("Totopos horneados", "Totopos tradicionales") },
+  { key: "chilSalsa", name: "Chilaquiles · Salsa", min: 1, max: 1, options: free("Verde", "Roja", "Suiza") },
+  { key: "chilProt", name: "Chilaquiles · Proteína", min: 1, max: 1, options: free("Pollo", "Huevo estrellado", "Huevo revuelto", "Chorizo de champiñón") },
+  { key: "huevEstilo", name: "Huevos · Estilo", min: 1, max: 1, options: free("Clásicos (pavo y queso gratinado)", "Omelette (espinaca y queso)", "Huerto (brócoli)", "Miguitas especiales", "Divorciados", "Rancheros", "A la mexicana", "Con espinaca y tomate") },
+  { key: "huevPrep", name: "Huevos · Preparación", min: 0, max: 1, options: free("Revueltos", "Estrellados") },
+  { key: "spread", name: "Spread", min: 1, max: 1, options: free("Miel", "Crema de cacahuate", "Crema de almendra", "Nutella") },
+  { key: "spreadParadise", name: "Spread · Paradise", min: 1, max: 1, options: free("Cacahuate", "Almendra", "Nutella", "Moca canela") },
+  { key: "crema", name: "Crema (cacahuate o almendra)", min: 1, max: 1, options: free("Crema de cacahuate", "Crema de almendra") },
+  { key: "acomp", name: "Acompañamiento", min: 1, max: 1, options: free("Papitas", "Camote horneado") },
+  { key: "tacoGuisado", name: "Tacos · Guisado", min: 1, max: 1, options: free("Huevo revuelto", "Pechuga de pollo", "Guacamole", "Frijoles de chipotle con queso panela", "Quesadilla con pechuga de pavo") },
+  { key: "entomRelleno", name: "Entomatadas · Relleno", min: 1, max: 1, options: free("Pechuga de pollo", "Queso panela") },
+  {
+    key: "extras", name: "Extras", min: 0, max: 10,
+    options: [
+      { name: "Frutas", price: 15 }, { name: "Tomate", price: 15 }, { name: "Frijoles", price: 15 }, { name: "Chile", price: 15 },
+      { name: "Camote", price: 20 }, { name: "Papas", price: 20 }, { name: "Aguacate", price: 20 }, { name: "Huevo", price: 20 },
+      { name: "Queso", price: 20 }, { name: "Yogurt", price: 20 }, { name: "Pechuga de pavo", price: 20 }, { name: "Pechuga de pollo", price: 40 },
+    ],
+  },
+  { key: "avoExtra", name: "Avocado Toast · Extra", min: 0, max: 2, options: [{ name: "Huevo", price: 20 }, { name: "Chorizo de champiñón", price: 20 }, { name: "Salmón a la plancha 100 g", price: 70 }] },
+  { key: "proteina", name: "Proteína en polvo", min: 0, max: 1, options: [{ name: "Vainilla", price: 60 }, { name: "Chocolate", price: 60 }] },
+  { key: "leche", name: "Leche", min: 1, max: 1, options: free("Entera", "Deslactosada", "Almendra", "Coco") },
+  { key: "persFrutas", name: "Personalizado · Frutas", min: 1, max: 2, options: free("Fresa / Berries", "Papaya", "Melón", "Plátano", "Mango") },
+  { key: "persBase", name: "Personalizado · Base", min: 1, max: 1, options: free("Leche entera", "Leche deslactosada", "Leche de almendra", "Leche de coco", "Naranja") },
+  { key: "persGrasa", name: "Personalizado · Grasa", min: 1, max: 1, options: free("Coco", "Linaza", "Cacao", "Peanut butter", "Almendra / Nutella") },
+  { key: "persExtras", name: "Personalizado · Extras", min: 0, max: 5, options: [{ name: "Proteína", price: 60 }, { name: "Yogurt", price: 30 }, { name: "Café espresso", price: 20 }, { name: "Avena", price: 15 }, { name: "Espinaca", price: 15 }] },
+  { key: "coca", name: "Coca-Cola", min: 1, max: 1, options: free("Normal", "Sin azúcar") },
+  { key: "dcBebida", name: "Desayuno completo · Bebida", min: 1, max: 1, options: free("Jugo", "Agua del día") },
+];
+
 export const villaGardeniaMenu: MenuSpec = {
-  groups: [
-    { key: "chilBase", name: "Chilaquiles · Base", min: 1, max: 1, options: free("Totopos horneados", "Totopos tradicionales") },
-    { key: "chilSalsa", name: "Chilaquiles · Salsa", min: 1, max: 2, options: free("Verde", "Roja", "Suiza") },
-    { key: "chilProt", name: "Chilaquiles · Proteína", min: 1, max: 2, options: free("Pollo", "Huevo estrellado", "Huevo revuelto", "Chorizo de champiñón") },
-    { key: "huevEstilo", name: "Huevos · Estilo", min: 1, max: 1, options: free("Clásicos (pavo y queso gratinado)", "Omelette (espinaca y queso)", "Huerto (brócoli)", "Miguitas especiales", "Divorciados", "Rancheros", "A la mexicana", "Con espinaca y tomate") },
-    { key: "huevPrep", name: "Huevos · Preparación", min: 0, max: 1, options: free("Revueltos", "Estrellados") },
-    { key: "spread", name: "Spread", min: 1, max: 1, options: free("Miel", "Crema de cacahuate", "Crema de almendra", "Nutella") },
-    { key: "spreadParadise", name: "Spread · Paradise", min: 1, max: 1, options: free("Cacahuate", "Almendra", "Nutella", "Moca canela") },
-    { key: "crema", name: "Crema (cacahuate o almendra)", min: 1, max: 1, options: free("Crema de cacahuate", "Crema de almendra") },
-    { key: "acomp", name: "Acompañamiento", min: 1, max: 1, options: free("Papitas", "Camote horneado") },
-    { key: "tacoGuisado", name: "Tacos · Guisado", min: 1, max: 1, options: free("Huevo revuelto", "Pechuga de pollo", "Guacamole", "Frijoles de chipotle con queso panela", "Quesadilla con pechuga de pavo") },
-    { key: "entomRelleno", name: "Entomatadas · Relleno", min: 1, max: 1, options: free("Pechuga de pollo", "Queso panela") },
-    {
-      key: "extras", name: "Extras", min: 0, max: 10,
-      options: [
-        { name: "Frutas", price: 15 }, { name: "Tomate", price: 15 }, { name: "Frijoles", price: 15 }, { name: "Chile", price: 15 },
-        { name: "Camote", price: 20 }, { name: "Papas", price: 20 }, { name: "Aguacate", price: 20 }, { name: "Huevo", price: 20 },
-        { name: "Queso", price: 20 }, { name: "Yogurt", price: 20 }, { name: "Pechuga de pavo", price: 20 }, { name: "Pechuga de pollo", price: 40 },
-      ],
-    },
-    { key: "avoExtra", name: "Avocado Toast · Extra", min: 0, max: 2, options: [{ name: "Huevo", price: 20 }, { name: "Chorizo de champiñón", price: 20 }, { name: "Salmón a la plancha 100 g", price: 70 }] },
-    { key: "proteina", name: "Proteína en polvo", min: 0, max: 1, options: [{ name: "Vainilla", price: 60 }, { name: "Chocolate", price: 60 }] },
-    { key: "leche", name: "Leche", min: 1, max: 1, options: free("Entera", "Deslactosada", "Almendra", "Coco") },
-    { key: "persFrutas", name: "Personalizado · Frutas", min: 1, max: 2, options: free("Fresa / Berries", "Papaya", "Melón", "Plátano", "Mango") },
-    { key: "persBase", name: "Personalizado · Base", min: 1, max: 1, options: free("Leche entera", "Leche deslactosada", "Leche de almendra", "Leche de coco", "Naranja") },
-    { key: "persGrasa", name: "Personalizado · Grasa", min: 1, max: 1, options: free("Coco", "Linaza", "Cacao", "Peanut butter", "Almendra / Nutella") },
-    { key: "persExtras", name: "Personalizado · Extras", min: 0, max: 5, options: [{ name: "Proteína", price: 60 }, { name: "Yogurt", price: 30 }, { name: "Café espresso", price: 20 }, { name: "Avena", price: 15 }, { name: "Espinaca", price: 15 }] },
-    { key: "coca", name: "Coca-Cola", min: 1, max: 1, options: free("Normal", "Sin azúcar") },
-    { key: "dcBebida", name: "Desayuno completo · Bebida", min: 1, max: 1, options: free("Jugo", "Agua del día") },
-  ],
+  groups: groups.map((g) => (KEEP_LIMIT.has(g.key) ? g : { ...g, max: g.options.length })),
   categories: [
     {
       name: "Desayunos",
