@@ -14,8 +14,10 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 
 export interface MenuOptionSpec { name: string; price?: number }
 export interface MenuGroupSpec { key: string; name: string; min: number; max: number; options: MenuOptionSpec[] }
-export interface MenuVariantSpec { label: string; price: number }
-export interface MenuDishSpec { name: string; variants: MenuVariantSpec[]; groups?: string[] }
+/** `aliases`: nombres viejos de este tamaño; si existe uno y no el nuevo, se renombra (conserva receta y ventas). */
+export interface MenuVariantSpec { label: string; price: number; aliases?: string[] }
+/** `onlyListedVariants`: los tamaños que no están en el menú se quitan (con ventas: se desactivan). */
+export interface MenuDishSpec { name: string; variants: MenuVariantSpec[]; groups?: string[]; onlyListedVariants?: boolean }
 export interface MenuCategorySpec { name: string; dishes: MenuDishSpec[] }
 export interface MenuSpec { groups: MenuGroupSpec[]; categories: MenuCategorySpec[] }
 
@@ -172,6 +174,14 @@ export async function loadMenu(db: Db, organizationId: string, spec: MenuSpec, o
         if (write) await db.foodDish.update({ where: { id: found.id }, data: { categoryId: catId } });
       }
       let variants = await dedupeVariants(db, found, d, write, report);
+      for (const v of d.variants) {
+        if (!v.aliases?.length || variants.some((e) => e.isActive && loose(e.label) === loose(v.label))) continue;
+        const old = variants.find((e) => e.isActive && v.aliases!.some((a) => loose(a) === loose(e.label)));
+        if (!old) continue;
+        report.updated.push(`«${found.name}»: el tamaño «${old.label}» pasa a llamarse «${v.label}» (conserva su receta y ventas)`);
+        if (write) await db.foodDishVariant.update({ where: { id: old.id }, data: { label: v.label } });
+        variants = variants.map((e) => (e === old ? { ...e, label: v.label } : e));
+      }
       const single = variants.length === 1 && norm(variants[0].label) === norm(SINGLE_VARIANT);
       if (single && d.variants.length > 1 && !d.variants.some((v) => norm(v.label) === norm(SINGLE_VARIANT))) {
         const first = d.variants[0];
@@ -187,6 +197,17 @@ export async function loadMenu(db: Db, organizationId: string, spec: MenuSpec, o
           if (write) await db.foodDishVariant.create({ data: { organizationId, dishId: found.id, label: v.label, price: v.price } });
         } else if (Number(match.price) !== v.price && !(single && v === d.variants[0] && d.variants.length > 1)) {
           report.review.push(`«${found.name}${variants.length > 1 || d.variants.length > 1 ? ` › ${match.label}` : ""}» cuesta ${money(Number(match.price))}; el menú dice ${money(v.price)}. No se cambió.`);
+        }
+      }
+      if (d.onlyListedVariants) {
+        const wanted = new Set(d.variants.map((v) => loose(v.label)));
+        for (const e of variants) {
+          if (!e.isActive || wanted.has(loose(e.label))) continue;
+          const used = e._count.sales + e._count.recipeUsages > 0;
+          report.updated.push(`«${found.name}»: se quita el tamaño «${e.label}»${used ? " (tiene ventas: se desactiva)" : ""}`);
+          if (!write) continue;
+          if (used) await db.foodDishVariant.update({ where: { id: e.id }, data: { isActive: false } });
+          else await db.foodDishVariant.delete({ where: { id: e.id } });
         }
       }
       const linked = new Set(found.modifierGroups.map((l) => l.groupId));

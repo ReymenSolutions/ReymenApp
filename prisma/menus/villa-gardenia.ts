@@ -6,6 +6,8 @@ import type { MenuSpec } from "../../src/lib/menu-loader";
 const free = (...names: string[]) => names.map((name) => ({ name }));
 const U = (price: number) => [{ label: "Único", price }];
 const VL = (vaso: number, litro: number) => [{ label: "Vaso", price: vaso }, { label: "Litro", price: litro }];
+// Aguas y jugos: solo Medio y Litro. Un «Vaso» que ya exista pasa a ser «Medio»; Chico, Grande, etc. se quitan.
+const ML = (medio: number, litro: number) => [{ label: "Medio", price: medio, aliases: ["Vaso"] }, { label: "Litro", price: litro }];
 
 /**
  * El cliente puede elegir todas las opciones que quiera (verde y roja, pollo y huevo…); los extras se cobran por
@@ -130,10 +132,10 @@ export const villaGardeniaMenu: MenuSpec = {
         { name: "Agua Mineral", variants: U(40) },
         { name: "Suero Mineral", variants: U(40) },
         { name: "CocaCola", variants: U(40), groups: ["coca"] },
-        { name: "Agua del Día", variants: VL(50, 80) },
-        { name: "Jugo de Naranja", variants: VL(70, 100) },
-        { name: "Jugo Verde", variants: VL(70, 100) },
-        { name: "Jugo Zanahoria y Betabel", variants: VL(80, 120) },
+        { name: "Agua del Día", variants: ML(50, 80), onlyListedVariants: true },
+        { name: "Jugo de Naranja", variants: ML(70, 100), onlyListedVariants: true },
+        { name: "Jugo Verde", variants: ML(70, 100), onlyListedVariants: true },
+        { name: "Jugo Zanahoria y Betabel", variants: ML(80, 120), onlyListedVariants: true },
       ],
     },
   ],
