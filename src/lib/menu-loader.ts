@@ -1,10 +1,13 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 
 // Carga de un menú completo (categorías, platillos con variantes y grupos de modificadores) desde un archivo de datos.
-// Es aditiva y segura para un negocio que ya opera:
-//   - nunca borra ni desactiva nada;
+// Es segura para un negocio que ya opera:
 //   - nunca cambia el precio de algo que ya existe (lo reporta para revisarlo a mano);
-//   - empata por nombre sin importar mayúsculas ni acentos ("Sándwich" = "Sandwich");
+//   - empata por nombre sin importar mayúsculas, acentos ni plural ("Sándwich" = "Sandwich", "Chico" = "Chicos");
+//   - ajusta el mínimo/máximo de los grupos a lo que dice el menú (p. ej. poder elegir dos salsas);
+//   - limpia duplicados: dos tamaños que son el mismo («Chico» y «Chicos») quedan en uno, y un platillo que ya existía
+//     con otro nombre («Chilaquiles» frente a «Chilaquiles Gardenia») se desactiva. Lo que tiene ventas nunca se
+//     borra: se desactiva, para conservar su historial;
 //   - un platillo que ya existe con una sola variante «Único» y que en el menú tiene tamaños: esa variante pasa a ser
 //     el primer tamaño (conserva su receta y su historial de ventas) y se agregan los demás;
 //   - se puede correr varias veces: la segunda vez no hace nada.
@@ -27,6 +30,16 @@ export const SINGLE_VARIANT = "Único";
 
 export function norm(s: string): string {
   return s.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/** Como `norm`, pero además sin plural ni signos: "Chicos" = "Chico", "Grandes" = "Grande", "Tradicionales" = "Tradicional". */
+export function loose(s: string): string {
+  return norm(s)
+    .replace(/[^a-z0-9ñ ]+/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => (w.length > 3 ? w.replace(/s$/, "").replace(/e$/, "") : w))
+    .join(" ");
 }
 
 /** Errores del archivo de datos (grupos repetidos, referencias inexistentes, mínimos imposibles…). */
@@ -58,8 +71,8 @@ export function validateMenuSpec(spec: MenuSpec): string[] {
       const labels = new Set<string>();
       for (const v of d.variants) {
         if (!(v.price > 0)) errors.push(`Precio inválido en ${d.name} › ${v.label}`);
-        if (labels.has(norm(v.label))) errors.push(`Variante repetida en ${d.name}: ${v.label}`);
-        labels.add(norm(v.label));
+        if (labels.has(loose(v.label))) errors.push(`Variante repetida en ${d.name}: ${v.label}`);
+        labels.add(loose(v.label));
       }
       for (const k of d.groups ?? []) if (!keys.has(k)) errors.push(`${d.name} usa un grupo que no existe: ${k}`);
     }
@@ -99,7 +112,10 @@ export async function loadMenu(db: Db, organizationId: string, spec: MenuSpec, o
     }
     groupIdByKey.set(g.key, found.id);
     if (!found.isActive) report.review.push(`El grupo «${found.name}» existe pero está desactivado: actívalo en Foods → Recetas si lo vas a usar.`);
-    if (found.minSelect !== g.min || found.maxSelect !== g.max) report.review.push(`Grupo «${found.name}»: tiene mín. ${found.minSelect} / máx. ${found.maxSelect}; el menú propone ${g.min} / ${g.max}. No se cambió.`);
+    if (found.minSelect !== g.min || found.maxSelect !== g.max) {
+      report.updated.push(`Grupo «${found.name}»: elige mín. ${found.minSelect} / máx. ${found.maxSelect} → mín. ${g.min} / máx. ${g.max}`);
+      if (write) await db.foodModifierGroup.update({ where: { id: found.id }, data: { minSelect: g.min, maxSelect: g.max } });
+    }
     let nextSort = Math.max(-1, ...found.options.map((o) => o.sortOrder)) + 1;
     for (const o of g.options) {
       const opt = found.options.find((e) => norm(e.name) === norm(o.name));
@@ -114,7 +130,11 @@ export async function loadMenu(db: Db, organizationId: string, spec: MenuSpec, o
 
   // ── Categorías y platillos ──
   const existingCats = await db.foodDishCategory.findMany({ where: { organizationId } });
-  const existingDishes = await db.foodDish.findMany({ where: { organizationId }, include: { variants: true, modifierGroups: true } });
+  const existingDishes = await db.foodDish.findMany({
+    where: { organizationId },
+    include: { variants: { include: { _count: { select: { sales: true, recipeUsages: true, ingredients: true } } }, orderBy: { createdAt: "asc" } }, modifierGroups: true },
+  });
+  const specDishIds = new Set<string>();
   let catSort = Math.max(-1, ...existingCats.map((c) => c.sortOrder)) + 1;
 
   for (const cat of spec.categories) {
@@ -126,7 +146,8 @@ export async function loadMenu(db: Db, organizationId: string, spec: MenuSpec, o
 
     for (const d of cat.dishes) {
       const groupIds = (d.groups ?? []).map((k) => groupIdByKey.get(k)!);
-      const found = existingDishes.find((e) => norm(e.name) === norm(d.name));
+      const found = existingDishes.find((e) => norm(e.name) === norm(d.name)) ?? existingDishes.find((e) => loose(e.name) === loose(d.name));
+      if (found) specDishIds.add(found.id);
       const variantsText = d.variants.map((v) => (d.variants.length === 1 ? money(v.price) : `${v.label} ${money(v.price)}`)).join(" · ");
       const groupsText = (d.groups ?? []).map((k) => spec.groups.find((g) => g.key === k)!.name).join(", ");
 
@@ -150,7 +171,7 @@ export async function loadMenu(db: Db, organizationId: string, spec: MenuSpec, o
         report.updated.push(`«${found.name}» → categoría ${cat.name}`);
         if (write) await db.foodDish.update({ where: { id: found.id }, data: { categoryId: catId } });
       }
-      let variants = found.variants;
+      let variants = await dedupeVariants(db, found, d, write, report);
       const single = variants.length === 1 && norm(variants[0].label) === norm(SINGLE_VARIANT);
       if (single && d.variants.length > 1 && !d.variants.some((v) => norm(v.label) === norm(SINGLE_VARIANT))) {
         const first = d.variants[0];
@@ -160,7 +181,7 @@ export async function loadMenu(db: Db, organizationId: string, spec: MenuSpec, o
         variants = [{ ...variants[0], label: first.label }];
       }
       for (const v of d.variants) {
-        const match = variants.find((e) => norm(e.label) === norm(v.label)) ?? (d.variants.length === 1 && variants.length === 1 ? variants[0] : undefined);
+        const match = variants.find((e) => norm(e.label) === norm(v.label)) ?? variants.find((e) => loose(e.label) === loose(v.label)) ?? (d.variants.length === 1 && variants.length === 1 ? variants[0] : undefined);
         if (!match) {
           report.created.push(`Variante «${found.name} › ${v.label}» ${money(v.price)}`);
           if (write) await db.foodDishVariant.create({ data: { organizationId, dishId: found.id, label: v.label, price: v.price } });
@@ -177,5 +198,67 @@ export async function loadMenu(db: Db, organizationId: string, spec: MenuSpec, o
       }
     }
   }
+
+  // ── Platillos que ya existían con otro nombre ──
+  // «Chilaquiles» (Chico/Grande) cuando el menú trae «Chilaquiles Gardenia» (Chicos/Grandes): todas las palabras del
+  // viejo están en el nuevo y comparten al menos un tamaño. Si se parece a más de un platillo del menú, solo se reporta.
+  const specDishes = spec.categories.flatMap((c) => c.dishes);
+  for (const e of existingDishes) {
+    if (!e.isActive || specDishIds.has(e.id)) continue;
+    const words = loose(e.name).split(" ");
+    const single = loose(SINGLE_VARIANT);
+    const labels = new Set(e.variants.filter((v) => v.isActive).map((v) => loose(v.label)));
+    const named = specDishes.filter((d) => { const target = new Set(loose(d.name).split(" ")); return words.every((w) => target.has(w)); });
+    // Se desactiva solo si comparte tamaños reales (Chico/Grande…); un «Único» no basta para estar seguros.
+    const like = named.filter((d) => d.variants.some((v) => loose(v.label) !== single && labels.has(loose(v.label))));
+    if (like.length !== 1) {
+      if (named.length) report.review.push(`«${e.name}» se parece a ${named.map((d) => `«${d.name}»`).join(", ")}. Si es un duplicado, desactívalo en Foods → Recetas.`);
+      continue;
+    }
+    report.updated.push(`«${e.name}» es un duplicado de «${like[0].name}»: se desactiva (deja de salir en el menú y en el POS; conserva su historial)`);
+    if (write) await db.foodDish.update({ where: { id: e.id }, data: { isActive: false } });
+  }
   return report;
+}
+
+type ExistingVariant = { id: string; label: string; price: Prisma.Decimal; isActive: boolean; createdAt: Date; _count: { sales: number; recipeUsages: number; ingredients: number } };
+
+/**
+ * Dos tamaños activos del mismo platillo que son el mismo («Chico» y «Chicos»): se queda el que tiene ventas (o
+ * receta, o el más antiguo) con el nombre del menú; el otro se borra, o se desactiva si tiene ventas.
+ */
+async function dedupeVariants(db: Db, dish: { id: string; name: string; variants: ExistingVariant[] }, d: MenuDishSpec, write: boolean, report: MenuLoadReport): Promise<ExistingVariant[]> {
+  const active = dish.variants.filter((v) => v.isActive);
+  const byKey = new Map<string, ExistingVariant[]>();
+  for (const v of active) byKey.set(loose(v.label), [...(byKey.get(loose(v.label)) ?? []), v]);
+  const result: ExistingVariant[] = [];
+  for (const [key, list] of byKey) {
+    if (list.length === 1) {
+      result.push(list[0]);
+      continue;
+    }
+    const specLabel = d.variants.find((v) => loose(v.label) === key)?.label ?? list[0].label;
+    const score = (v: ExistingVariant) => [v._count.sales + v._count.recipeUsages, v._count.ingredients, norm(v.label) === norm(specLabel) ? 1 : 0];
+    const keep = [...list].sort((a, b) => {
+      const [x, y] = [score(a), score(b)];
+      return y[0] - x[0] || y[1] - x[1] || y[2] - x[2] || a.createdAt.getTime() - b.createdAt.getTime();
+    })[0];
+    for (const v of list) {
+      if (v === keep) continue;
+      const used = v._count.sales + v._count.recipeUsages > 0;
+      report.updated.push(`«${dish.name}»: el tamaño «${v.label}» está repetido con «${keep.label}»: ${used ? "se desactiva (tiene ventas)" : "se quita"}`);
+      if (!write) continue;
+      if (used) await db.foodDishVariant.update({ where: { id: v.id }, data: { isActive: false, label: `${v.label} (duplicado ${v.id.slice(-4)})` } });
+      else await db.foodDishVariant.delete({ where: { id: v.id } });
+    }
+    let kept = keep;
+    if (keep.label !== specLabel) {
+      report.updated.push(`«${dish.name}»: el tamaño «${keep.label}» pasa a llamarse «${specLabel}»`);
+      if (write) await db.foodDishVariant.update({ where: { id: keep.id }, data: { label: specLabel } });
+      kept = { ...keep, label: specLabel };
+    }
+    result.push(kept);
+  }
+  // Las inactivas se conservan para que una variante desactivada con el mismo nombre no se vuelva a crear.
+  return [...result, ...dish.variants.filter((v) => !v.isActive)];
 }

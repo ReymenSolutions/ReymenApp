@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { createTestOrg, cleanupOrg } from "@/test/helpers";
-import { loadMenu, validateMenuSpec, norm } from "./menu-loader";
+import { loadMenu, validateMenuSpec, norm, loose } from "./menu-loader";
 import { villaGardeniaMenu } from "../../prisma/menus/villa-gardenia";
 
 describe("carga de menú (aditiva)", () => {
@@ -23,6 +23,9 @@ describe("carga de menú (aditiva)", () => {
   it("el menú de Villa Gardenia es válido", () => {
     expect(validateMenuSpec(villaGardeniaMenu)).toEqual([]);
     expect(norm("Sándwich  Clásico")).toBe(norm("sandwich clasico"));
+    expect(loose("Chicos")).toBe(loose("chico"));
+    expect(loose("Grandes")).toBe(loose("Grande"));
+    expect(loose("Totopos tradicionales")).toBe(loose("Totopo tradicional"));
   });
 
   it("la vista previa no escribe nada", async () => {
@@ -55,8 +58,11 @@ describe("carga de menú (aditiva)", () => {
     expect(extras.options.find((o) => o.name === "Tocino")).toBeTruthy();
     expect(Number(extras.options.find((o) => o.name === "Aguacate")!.priceDelta)).toBe(25);
     expect(extras.options.find((o) => o.name === "Pechuga de pollo")?.priceDelta.toString()).toBe("40");
-    expect(extras.maxSelect).toBe(3);
-    expect(report.review.some((r) => r.includes("Extras") && r.includes("10"))).toBe(true);
+    // Su mínimo/máximo se ajusta al menú.
+    expect(extras.maxSelect).toBe(10);
+    expect(report.updated.some((r) => r.includes("Extras") && r.includes("máx. 10"))).toBe(true);
+    const salsa = await prisma.foodModifierGroup.findFirstOrThrow({ where: { organizationId: orgId, name: "Chilaquiles · Salsa" } });
+    expect(salsa.maxSelect).toBe(2);
 
     // Nuevo: licuado con tamaños Vaso/Litro y sus grupos; desayuno completo separado en dos.
     const berry = await prisma.foodDish.findFirstOrThrow({ where: { organizationId: orgId, name: "Berry Bloom" }, include: { variants: true, modifierGroups: true } });
@@ -75,5 +81,36 @@ describe("carga de menú (aditiva)", () => {
     expect(report.created).toEqual([]);
     expect(report.updated).toEqual([]);
     expect(await counts()).toEqual(before);
+  });
+});
+
+describe("carga de menú · duplicados", () => {
+  let orgId: string;
+  beforeAll(async () => {
+    orgId = (await createTestOrg("Villa Gardenia Duplicados")).id;
+    const v = (label: string, price: number) => ({ organizationId: orgId, label, price });
+    // Tamaños repetidos en el mismo platillo y un platillo viejo con otro nombre.
+    await prisma.foodDish.create({ data: { organizationId: orgId, name: "Chilaquiles Gardenia", variants: { create: [v("Chico", 120), v("Grande", 160), v("Chicos", 120), v("Grandes", 160)] } } });
+    await prisma.foodDish.create({ data: { organizationId: orgId, name: "Chilaquiles", variants: { create: [v("Chico", 120), v("Grande", 160)] } } });
+    // Se parece por nombre pero solo con «Único»: no se toca, solo se reporta.
+    await prisma.foodDish.create({ data: { organizationId: orgId, name: "Bowl", variants: { create: [v("Único", 150)] } } });
+  });
+  afterAll(async () => cleanupOrg(orgId));
+
+  it("deja un solo Chico/Grande con el nombre del menú y desactiva el platillo repetido", async () => {
+    const preview = await loadMenu(prisma, orgId, villaGardeniaMenu, { apply: false });
+    expect(preview.updated.some((r) => r.includes("«Chilaquiles» es un duplicado"))).toBe(true);
+    expect(await prisma.foodDishVariant.count({ where: { organizationId: orgId } })).toBe(7);
+
+    const report = await loadMenu(prisma, orgId, villaGardeniaMenu, { apply: true });
+    const chil = await prisma.foodDish.findFirstOrThrow({ where: { organizationId: orgId, name: "Chilaquiles Gardenia" }, include: { variants: true } });
+    expect(chil.variants.map((x) => `${x.label} ${Number(x.price)} ${x.isActive}`).sort()).toEqual(["Chicos 120 true", "Grandes 160 true"]);
+    expect((await prisma.foodDish.findFirstOrThrow({ where: { organizationId: orgId, name: "Chilaquiles" } })).isActive).toBe(false);
+    expect((await prisma.foodDish.findFirstOrThrow({ where: { organizationId: orgId, name: "Bowl" } })).isActive).toBe(true);
+    expect(report.review.some((r) => r.includes("«Bowl» se parece"))).toBe(true);
+
+    const again = await loadMenu(prisma, orgId, villaGardeniaMenu, { apply: true });
+    expect(again.created).toEqual([]);
+    expect(again.updated).toEqual([]);
   });
 });
