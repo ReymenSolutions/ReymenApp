@@ -185,3 +185,22 @@ describe("filterSnapshotByBranch", () => {
     expect(principal.kitchen.preparingCount).toBe(1);
   });
 });
+
+describe("summarizeOperations · reportes de días anteriores", () => {
+  it("no suma ventas ni agotados de una caja que no ha reportado hoy", () => {
+    const snap = snapshot();
+    snap.devices = [
+      { deviceId: "a", number: 1, lastSeenAt: minAgo(0.5), statusAt: minAgo(0.5), status: device() },
+      { deviceId: "old", number: 9, lastSeenAt: minAgo(60 * 30), statusAt: minAgo(60 * 30), status: device({ code: "C9", today: { salesCount: 40, salesCents: 700000, cancelledCount: 1 }, soldOut: [{ dishId: "x", name: "Pozole" }], outbox: { pending: 3, failed: 0, lastError: null } }) },
+    ];
+    const dayStart = new Date(Date.parse(NOW) - 8 * 3600_000);
+    const s = summarizeOperations(snap, new Date(NOW), { dayStart });
+    const fresh = summarizeOperations({ ...snap, devices: [snap.devices[0]] }, new Date(NOW), { dayStart });
+    expect(s.posToday).toEqual(fresh.posToday);
+    expect(s.soldOut.some((x) => x.dishId === "x")).toBe(false);
+    expect(s.devices.find((d) => d.deviceId === "old")?.stale).toBe(true);
+    expect(s.devices.find((d) => d.deviceId === "a")?.stale).toBe(false);
+    // Lo que sigue pendiente de enviar sí cuenta: esas ventas aún no llegan a Reymen.
+    expect(s.pendingEvents).toBe(fresh.pendingEvents + 3);
+  });
+});
