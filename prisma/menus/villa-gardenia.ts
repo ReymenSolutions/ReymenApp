@@ -10,8 +10,8 @@ const VL = (vaso: number, litro: number) => [{ label: "Vaso", price: vaso }, { l
 export const villaGardeniaMenu: MenuSpec = {
   groups: [
     { key: "chilBase", name: "Chilaquiles · Base", min: 1, max: 1, options: free("Totopos horneados", "Totopos tradicionales") },
-    { key: "chilSalsa", name: "Chilaquiles · Salsa", min: 1, max: 1, options: free("Verde", "Roja", "Suiza") },
-    { key: "chilProt", name: "Chilaquiles · Proteína", min: 1, max: 1, options: free("Pollo", "Huevo estrellado", "Huevo revuelto", "Chorizo de champiñón") },
+    { key: "chilSalsa", name: "Chilaquiles · Salsa", min: 1, max: 2, options: free("Verde", "Roja", "Suiza") },
+    { key: "chilProt", name: "Chilaquiles · Proteína", min: 1, max: 2, options: free("Pollo", "Huevo estrellado", "Huevo revuelto", "Chorizo de champiñón") },
     { key: "huevEstilo", name: "Huevos · Estilo", min: 1, max: 1, options: free("Clásicos (pavo y queso gratinado)", "Omelette (espinaca y queso)", "Huerto (brócoli)", "Miguitas especiales", "Divorciados", "Rancheros", "A la mexicana", "Con espinaca y tomate") },
     { key: "huevPrep", name: "Huevos · Preparación", min: 0, max: 1, options: free("Revueltos", "Estrellados") },
     { key: "spread", name: "Spread", min: 1, max: 1, options: free("Miel", "Crema de cacahuate", "Crema de almendra", "Nutella") },

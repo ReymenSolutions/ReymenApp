@@ -106,6 +106,11 @@ export interface DeviceRow {
   online: boolean;
   lastSeenAt: string;
   status: PosDeviceStatus | null;
+  /**
+   * Su último reporte es de un día anterior (la caja está apagada o sin conexión desde entonces): sus ventas «de hoy»
+   * y su caja son de ese día, así que no se suman ni se muestran como actuales.
+   */
+  stale: boolean;
 }
 
 export interface OperationsSummary {
@@ -135,8 +140,13 @@ const minutesBetween = (from: string, to: number) => Math.max(0, Math.floor((to 
 
 const inKitchen = (s: PosItemStatus) => s === "new" || s === "preparing" || s === "ready";
 
-export function summarizeOperations(snapshot: PosSnapshot, now = new Date(snapshot.serverTime)): OperationsSummary {
+/**
+ * `dayStart`: inicio del día del negocio. Los reportes de caja anteriores a ese instante se marcan como viejos y no
+ * cuentan en las ventas de hoy ni en los agotados (sí en lo pendiente de enviar, que sigue esperando).
+ */
+export function summarizeOperations(snapshot: PosSnapshot, now = new Date(snapshot.serverTime), opts: { dayStart?: Date } = {}): OperationsSummary {
   const t = now.getTime();
+  const dayStart = opts.dayStart?.getTime();
   const lateMinutes = snapshot.floor.kitchen.lateMinutes;
   const orders = snapshot.floor.orders.filter((o) => o.status !== "cancelled");
   const open = orders.filter((o) => o.status === "open");
@@ -200,10 +210,12 @@ export function summarizeOperations(snapshot: PosSnapshot, now = new Date(snapsh
     online: t - Date.parse(d.lastSeenAt) < DEVICE_ONLINE_MS,
     lastSeenAt: d.lastSeenAt,
     status: d.status,
+    stale: !!d.status && dayStart !== undefined && (d.statusAt === null || Date.parse(d.statusAt) < dayStart),
   }));
 
   const soldOutMap = new Map<string, { dishId: string; name: string; devices: string[] }>();
   for (const d of devices) {
+    if (d.stale) continue;
     for (const s of d.status?.soldOut ?? []) {
       const entry = soldOutMap.get(s.dishId) ?? { dishId: s.dishId, name: s.name, devices: [] };
       entry.devices.push(d.code);
@@ -212,6 +224,7 @@ export function summarizeOperations(snapshot: PosSnapshot, now = new Date(snapsh
   }
 
   const reporting = devices.map((d) => d.status).filter((s): s is PosDeviceStatus => s !== null);
+  const current = devices.filter((d) => !d.stale).map((d) => d.status).filter((s): s is PosDeviceStatus => s !== null);
   return {
     tables: { total: activeTables.length, occupied: new Set(open.filter((o) => o.tableId).map((o) => o.tableId)).size },
     openOrders,
@@ -229,9 +242,9 @@ export function summarizeOperations(snapshot: PosSnapshot, now = new Date(snapsh
     devices,
     soldOut: [...soldOutMap.values()].sort((a, b) => a.name.localeCompare(b.name, "es")),
     posToday: {
-      salesCount: reporting.reduce((n, s) => n + s.today.salesCount, 0),
-      salesCents: reporting.reduce((n, s) => n + s.today.salesCents, 0),
-      cancelledCount: reporting.reduce((n, s) => n + s.today.cancelledCount, 0),
+      salesCount: current.reduce((n, s) => n + s.today.salesCount, 0),
+      salesCents: current.reduce((n, s) => n + s.today.salesCents, 0),
+      cancelledCount: current.reduce((n, s) => n + s.today.cancelledCount, 0),
     },
     pendingEvents: reporting.reduce((n, s) => n + s.outbox.pending, 0),
     failedEvents: reporting.reduce((n, s) => n + s.outbox.failed, 0),

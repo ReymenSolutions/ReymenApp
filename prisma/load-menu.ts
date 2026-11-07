@@ -4,7 +4,8 @@
 //   APPLY=1 npx tsx prisma/load-menu.ts villa-gardenia         # aplica (en una sola transacción)
 //   ORG_ID=<id> npx tsx prisma/load-menu.ts villa-gardenia     # si el nombre del negocio no basta para encontrarlo
 //
-// Nunca borra ni cambia precios existentes: solo agrega lo que falta y reporta diferencias (ver src/lib/menu-loader.ts).
+// Nunca cambia precios existentes: agrega lo que falta, ajusta mín./máx. de los grupos, limpia duplicados y reporta
+// diferencias (ver src/lib/menu-loader.ts).
 import { PrismaClient } from "@prisma/client";
 import { loadMenu, norm, type MenuLoadReport, type MenuSpec } from "../src/lib/menu-loader";
 import { villaGardeniaMenu } from "./menus/villa-gardenia";

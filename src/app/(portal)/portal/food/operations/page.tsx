@@ -125,7 +125,9 @@ function DeviceCard({ d, now, f, timeFmt }: { d: DeviceRow; now: number; f: F; t
         </span>
       </div>
       {s?.kitchenMode && <Badge className="mt-2" variant="secondary">{f.opKitchenScreen}</Badge>}
-      {s?.cash ? (
+      {s && d.stale ? (
+        <p className="mt-3 text-sm text-slate-500">{f.opStaleReport}</p>
+      ) : s?.cash ? (
         <div className="mt-3 space-y-1 text-sm">
           <p className="text-xs text-slate-500">{f.opShiftOpen(s.cash.number, s.cash.openedByName, timeFmt.format(new Date(s.cash.openedAt)))}</p>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1">
@@ -144,12 +146,14 @@ function DeviceCard({ d, now, f, timeFmt }: { d: DeviceRow; now: number; f: F; t
       )}
       {s && (
         <div className="mt-3 space-y-1 border-t border-slate-100 pt-2 text-xs">
-          <p className="flex justify-between text-slate-600">
-            <span>{f.opSalesToday}</span>
-            <span className="tabular-nums">
-              {s.today.salesCount} · {pesos(s.today.salesCents)}
-            </span>
-          </p>
+          {!d.stale && (
+            <p className="flex justify-between text-slate-600">
+              <span>{f.opSalesToday}</span>
+              <span className="tabular-nums">
+                {s.today.salesCount} · {pesos(s.today.salesCents)}
+              </span>
+            </p>
+          )}
           <p className={cn(s.outbox.failed ? "font-semibold text-red-600" : s.outbox.pending ? "text-amber-700" : "text-emerald-700")}>
             {s.outbox.failed ? f.opRejected(s.outbox.failed) : s.outbox.pending ? f.opPending(s.outbox.pending) : f.opAllSent}
             {s.outbox.failed > 0 && s.outbox.lastError && <span className="block font-normal text-red-500">{s.outbox.lastError}</span>}
@@ -215,9 +219,9 @@ export default async function FoodOperationsPage({ searchParams }: { searchParam
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Kpi
           icon={Receipt}
-          label={ops ? f.opPosSalesToday : f.salesToday}
-          value={ops ? pesos(ops.posToday.salesCents) : formatMoney(data.reymenToday.gross)}
-          hint={ops ? f.opPosSalesHint(ops.posToday.salesCount, ops.posToday.cancelledCount) : f.opReymenSalesHint(data.reymenToday.count)}
+          label={f.salesToday}
+          value={formatMoney(data.reymenToday.gross)}
+          hint={ops && ops.pendingEvents > 0 ? f.opReymenSalesPendingHint(data.reymenToday.count, ops.pendingEvents) : f.opReymenSalesHint(data.reymenToday.count)}
           tone="orange"
         />
         <Kpi
