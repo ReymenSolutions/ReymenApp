@@ -1,0 +1,50 @@
+# Ambiente de PRUEBA de ReymenApp (apptest.reymen.mx) en el mismo VPS que producción.
+# Base, contenedores, volumen y llaves propios: nunca toca producción. Lo manejan los scripts de deploy/test/
+# (guía: docs/AMBIENTE-PRUEBA.md). Las variables salen de .env.test (lo crea deploy/test/init.sh).
+name: reymen-test
+
+services:
+  test-postgres:
+    image: ${TEST_PG_IMAGE:-postgres:16-alpine}
+    container_name: reymen-test-postgres
+    environment:
+      POSTGRES_DB: reymen_test
+      POSTGRES_USER: reymen_test
+      POSTGRES_PASSWORD: ${TEST_DB_PASSWORD:?Corre deploy/test/init.sh primero}
+    volumes:
+      - test-db:/var/lib/postgresql/data
+    networks: [test]
+    mem_limit: 768m
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U reymen_test -d reymen_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: reymen-test-app
+    container_name: reymen-test-app
+    env_file: ../.env.test
+    environment:
+      # nginx-proxy + acme-companion (red proxy-net) publican el dominio y sacan el certificado.
+      VIRTUAL_HOST: ${TEST_APP_DOMAIN:-apptest.reymen.mx}
+      VIRTUAL_PORT: "3000"
+      LETSENCRYPT_HOST: ${TEST_APP_DOMAIN:-apptest.reymen.mx}
+    networks: [test, proxy-net]
+    depends_on:
+      test-postgres:
+        condition: service_healthy
+    mem_limit: 1536m
+    restart: unless-stopped
+
+networks:
+  test:
+  proxy-net:
+    external: true
+
+volumes:
+  test-db:
