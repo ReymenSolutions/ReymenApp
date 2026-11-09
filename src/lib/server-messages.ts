@@ -333,6 +333,7 @@ const EN: Record<string, string> = {
   "Oportunidad no encontrada": "Opportunity not found",
   "La oportunidad no es de ese contacto": "That opportunity doesn't belong to this contact",
   "Tarea no encontrada": "Task not found",
+  "Escribe el nombre exacto del negocio para confirmar": "Type the exact business name to confirm",
   "Embudo no encontrado": "Pipeline not found",
   "Las etapas son de embudos distintos": "Those stages belong to different pipelines",
   "Llegaste al máximo de embudos": "You've reached the maximum number of pipelines",

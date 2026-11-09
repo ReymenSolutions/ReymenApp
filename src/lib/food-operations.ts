@@ -5,6 +5,7 @@ import { fetchPosSnapshot } from "./pos-operations";
 import { filterSnapshotByBranch, summarizeOperations, type OperationsSummary } from "./pos-operations-summary";
 import type { BranchFilter } from "./branches";
 import { FINISHED_STATUSES, isDeliveryLate } from "./delivery";
+import { dayRangeIn } from "./crm-today";
 
 // Datos del centro de operaciones (Food → Operación): lo que pasa ahora en
 // el POS (mesas, cocina, cajas) más lo que Reymen ya sabe (ventas
@@ -40,7 +41,7 @@ const DAY_MS = 24 * 3600_000;
 export async function getOperationsData(organizationId: string, branch?: BranchFilter): Promise<OperationsData> {
   const since = new Date(Date.now() - DAY_MS);
   const [org, posEnabled, summary, lowStock, automationGroups, failed24h, recentFailures, posRejected24h, deliveryActive] = await Promise.all([
-    prisma.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { n8nWebhookSecret: true } }),
+    prisma.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { n8nWebhookSecret: true, timezone: true } }),
     hasModule(organizationId, "REYMEN_POS"),
     getFoodSalesSummary(organizationId, branch),
     getFoodLowStockItems(organizationId, 8),
@@ -64,7 +65,12 @@ export async function getOperationsData(organizationId: string, branch?: BranchF
     const result = await fetchPosSnapshot(organizationId, org.n8nWebhookSecret);
     pos =
       result.kind === "ok"
-        ? { kind: "ok", summary: summarizeOperations(filterSnapshotByBranch(result.snapshot, branch)), serverTime: result.snapshot.serverTime }
+        ? (() => {
+            // Solo cuentan los reportes de caja de hoy (día del negocio): una caja apagada desde ayer no suma.
+            const now = new Date(result.snapshot.serverTime);
+            const dayStart = dayRangeIn(org.timezone, now).start;
+            return { kind: "ok" as const, summary: summarizeOperations(filterSnapshotByBranch(result.snapshot, branch), now, { dayStart }), serverTime: result.snapshot.serverTime };
+          })()
         : { kind: result.kind };
     if (result.kind === "unreachable") console.warn("Centro de operaciones: POS no disponible", result.detail);
   }
