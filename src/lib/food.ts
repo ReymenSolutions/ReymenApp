@@ -1,7 +1,7 @@
 import { dayKey, daysAgoKey, daysAgoStart, getOrgTimezone, localDateString, localHour } from "./business-day";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
-import { hasModule } from "./modules";
+import { hasContractedModule } from "./modules";
 import { consumeRecipes, effectiveStockBranch } from "./food-inventory";
 import { branchWhere, type BranchFilter } from "./branches";
 import { emitDomainEvent } from "./domain-events";
@@ -1104,7 +1104,7 @@ export interface FoodPosOrderPayload {
 }
 
 export async function processFoodPosOrder(payload: unknown, organizationId: string): Promise<void> {
-  if (!(await hasModule(organizationId, "FOOD_OPS"))) {
+  if (!(await hasContractedModule(organizationId, "FOOD_OPS"))) {
     throw new Error("El módulo Food no está habilitado para esta organización");
   }
 

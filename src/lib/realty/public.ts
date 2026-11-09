@@ -1,3 +1,4 @@
+import { billingAccessWhere } from "@/lib/billing-access";
 // Solo servidor. Lo público de Realty: la landing /p/<slug> y sus eventos.
 // Nunca expone la dirección exacta (salvo que el negocio lo active), ni
 // datos internos (asesor, notas, prospectos). Los eventos no guardan IP ni
@@ -61,7 +62,7 @@ export async function getPublicProperty(slug: string) {
     },
   });
   if (!p || !p.organization.isActive) return null;
-  const realtyModule = await prisma.organizationModule.findFirst({ where: { organizationId: p.organizationId, module: "REALTY", status: "ACTIVE" }, select: { id: true } });
+  const realtyModule = await prisma.organizationModule.findFirst({ where: { organizationId: p.organizationId, module: "REALTY", status: "ACTIVE", organization: billingAccessWhere() }, select: { id: true } });
   if (!realtyModule) return null;
   const { addressLine, latitude, longitude, showExactLocation, advisor, ...rest } = p;
   return {

@@ -1,3 +1,4 @@
+import { isBillingSuspended } from "@/lib/billing-access";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -76,6 +77,7 @@ async function finish(id: string, organizationId: string, provider: string, mode
  * para que quien llama decida qué hacer; una llamada con el mismo `requestId` ya registrada no se vuelve a cobrar.
  */
 export async function runAiCall(ctx: AiUsageContext, input: AiCallInput): Promise<AiCallResult> {
+  if (await isBillingSuspended(ctx.organizationId)) throw new Error("billing_suspended");
   if (!ctx.organizationId) throw new Error("ai_gateway_missing_tenant");
   if (ctx.agentKey === "mark:pilot") throw new Error("pilot_requires_durable_gateway");
   const providerName = activeProviderName();

@@ -1,5 +1,7 @@
 "use server";
 
+import { syncCustomSubscription } from "@/lib/stripe-contracts";
+
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -117,6 +119,7 @@ export async function changePlan(orgId: string, plan: string, customMonthlyPrice
 
   revalidatePath(`/admin/clients/${orgId}`);
   revalidatePath("/portal/smartcard");
+  await syncCustomSubscription(orgId).catch(() => undefined);
   return { success: true, plan: org.plan };
 }
 

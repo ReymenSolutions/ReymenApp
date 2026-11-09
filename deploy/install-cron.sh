@@ -27,8 +27,8 @@ APP_CONTAINER=$container
 */5 * * * * root $runner tick >> /var/log/reymen/cron.log 2>&1
 # Reintento de webhooks fallidos
 */10 * * * * root $runner retry >> /var/log/reymen/cron.log 2>&1
-# Avisos de vencimiento de suscripción: 8:00 hora de México (14:00 UTC)
-0 14 * * * root $runner billing >> /var/log/reymen/cron.log 2>&1
+# Avisos de vencimiento y reintentos de sincronización de precios pactados
+*/15 * * * * root $runner billing >> /var/log/reymen/cron.log 2>&1
 # Respaldo diario de la base (9:30 UTC); configura BACKUP_REMOTE en /etc/reymen-backup.env para copiarlo fuera del VPS
 # Respaldo de SmartCard (Supabase → B2), diario 10:15 UTC; se omite solo si no está configurado
 15 10 * * * root $repo/deploy/backup-smartcard.sh >> /var/log/reymen/backup.log 2>&1

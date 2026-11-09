@@ -1,3 +1,4 @@
+import { billingAccessWhere } from "./billing-access";
 import { consumeCustomerContactEvent, syncCustomerContacts } from "@/lib/customer-contacts";
 import { consumeLoyaltyEvent } from "@/lib/loyalty/events";
 import { consumeWalletEvent } from "@/lib/loyalty/wallet-sync";
@@ -28,7 +29,7 @@ export async function runAutomationTick(now: Date = new Date(), opts: { organiza
       // Lo que lo dispara la hora (no un hecho) se convierte en eventos antes de procesar la bandeja.
       await runClockDetectors(now, { organizationId: opts.organizationId });
       const outbox = await processDomainEvents({ now, organizationId: opts.organizationId, consumers: [consumeCustomerContactEvent, consumeLoyaltyEvent, (event) => runAutomationsForEvent(event, now), attributeEvent, consumeWalletEvent] });
-      const orgs = await prisma.organizationModule.findMany({ where: { module: "CRM", status: "ACTIVE", ...(opts.organizationId ? { organizationId: opts.organizationId } : {}) }, select: { organizationId: true } });
+      const orgs = await prisma.organizationModule.findMany({ where: { module: "CRM", status: "ACTIVE", organization: billingAccessWhere(now), ...(opts.organizationId ? { organizationId: opts.organizationId } : {}) }, select: { organizationId: true } });
       for (const org of orgs) {
         try { await syncCustomerContacts(org.organizationId); }
         catch { console.error("[customer-contacts] periodic sync will retry"); }

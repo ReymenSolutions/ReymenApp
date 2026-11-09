@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
+import { reconcileCustomSubscriptions } from "@/lib/stripe-contracts";
 import { runBillingNotices } from "@/lib/billing-notices";
 
 function secretsMatch(a: string, b: string): boolean {
@@ -19,5 +20,6 @@ export async function POST(req: NextRequest) {
   const authHeader = req.headers.get("authorization") ?? "";
   const provided = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : "";
   if (!provided || !secretsMatch(provided, secret)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  return NextResponse.json({ success: true, ...(await runBillingNotices()) });
+  const contracts = await reconcileCustomSubscriptions();
+  return NextResponse.json({ success: true, ...(await runBillingNotices()), contracts });
 }

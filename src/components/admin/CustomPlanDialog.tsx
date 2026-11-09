@@ -144,6 +144,7 @@ export function CustomPlanDialog({ orgId, clients, plans, lang }: { orgId?: stri
     startSave(async () => {
       try {
         const r = await saveCustomPlan({ orgId: form.orgId, basePlan: form.basePlan, priceMxn: price, aiBudgetMxn: form.aiBudget, modules: form.modules, limits: form.limits, maxAutomationRuns: form.runs });
+        if (r.stripeSync === "pending") toast.warning(es ? "Precio guardado. Sincronización con Stripe pendiente; se reintentará automáticamente." : "Price saved. Stripe sync is pending and will be retried automatically.");
         toast.success(es ? `${name}: plan A la medida guardado${r.modulesChanged ? ` · ${r.modulesChanged} módulo(s) actualizados` : ""}` : `${name}: Custom Service plan saved${r.modulesChanged ? ` · ${r.modulesChanged} module(s) updated` : ""}`);
         setOpen(false);
         router.refresh();
@@ -221,6 +222,7 @@ export function CustomPlanDialog({ orgId, clients, plans, lang }: { orgId?: stri
               <div className="space-y-1">
                 <Label htmlFor="cp-price">{es ? "Precio mensual pactado (MXN)" : "Agreed monthly price (MXN)"}</Label>
                 <Input id="cp-price" type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} aria-invalid={priceInvalid} />
+                <p className="text-xs text-slate-500">{es ? "Stripe cobrará este importe mensual. En suscripciones existentes, cambia desde la siguiente renovación, sin prorrateos." : "Stripe charges this monthly amount. Existing subscriptions change on their next renewal, without proration."}</p>
                 {priceInvalid && <p className="text-xs text-red-600">{es ? "Debe ser mayor a 0." : "Must be greater than 0."}</p>}
               </div>
               <div className="space-y-1">

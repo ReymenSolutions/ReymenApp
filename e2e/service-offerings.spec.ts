@@ -14,7 +14,6 @@ let adminId = "";
 test.describe.configure({ mode: "serial" });
 test.beforeAll(async () => {
   adminId = (await db.user.create({ data: { email, name: "Synthetic admin", role: "SUPER_ADMIN", language: "es", passwordHash: await bcrypt.hash(password, 10) } })).id;
-  await db.plan.create({ data: { key, name, nameEn: name, sortOrder: 999, priceMxn: 500, aiBudgetMxn: 0, maxAutomations: 2, modules: ["AUTOMATIONS"] } });
 });
 test.afterAll(async () => {
   const org = await db.organization.findFirst({ where: { name } });
@@ -34,6 +33,18 @@ async function login(page: import("@playwright/test").Page, account: string) {
 test("admin creates a customer with its product and searches the operations hub", async ({ page }) => {
   test.setTimeout(240000);
   await login(page, email);
+  // Provision through the real action so the catalog cache is invalidated too.
+  await page.goto("/admin/plans");
+  await page.getByRole("button", { name: "Nuevo plan", exact: true }).click();
+  const planDialog = page.getByRole("dialog");
+  await planDialog.locator("#plan-key").fill(key);
+  await planDialog.locator("#plan-name").fill(name);
+  await planDialog.locator("#plan-price").fill("500");
+  await planDialog.locator("#plan-ai").fill("0");
+  await planDialog.getByRole("checkbox", { name: "CRM", exact: true }).uncheck();
+  await planDialog.getByRole("checkbox", { name: "Automatizaciones", exact: true }).check();
+  await planDialog.getByRole("button", { name: "Guardar", exact: true }).click();
+  await expect(planDialog).not.toBeVisible({ timeout: 20000 });
   await page.goto("/admin/clients");
   await page.getByRole("button", { name: "Nuevo cliente", exact: true }).click();
   const dialog = page.getByRole("dialog");
@@ -69,4 +80,29 @@ test("owner sees purchased automation access, cannot open CRM appointments or ch
   }
   await page.goto("/portal/automations");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+test("billing suspension retains billing/support and payment restores the purchased module", async ({ page, browser }) => {
+  test.setTimeout(180000);
+  const org = await db.organization.findFirstOrThrow({ where: { name } });
+  await db.organization.update({ where: { id: org.id }, data: { billingPeriodEnd: new Date(Date.now() - 4 * 86400_000) } });
+  await login(page, ownerEmail);
+  await page.goto("/portal/automations");
+  await expect(page).toHaveURL(/\/portal\/settings\?billing=overdue/);
+  await expect(page.getByRole("alert").filter({ hasText: "Módulos suspendidos" })).toContainText("Módulos suspendidos");
+  await expect(page.getByRole("alert").filter({ hasText: "Módulos suspendidos" })).toContainText("UTC");
+  await page.goto("/portal/requests");
+  await expect(page).toHaveURL(/\/portal\/requests/);
+  const adminContext = await browser.newContext({ baseURL: new URL(page.url()).origin });
+  try {
+    const adminPage = await adminContext.newPage();
+    await login(adminPage, email);
+    await adminPage.goto(`/admin/clients/${org.id}?tab=suscripcion`);
+    await adminPage.getByLabel("Monto en MXN", { exact: true }).fill("500");
+    await adminPage.getByPlaceholder("Referencia o folio (evita duplicar)").fill(`browser-${suffix}`);
+    await adminPage.getByRole("button", { name: "Registrar pago", exact: true }).click();
+    await expect.poll(() => db.billingPayment.count({ where: { organizationId: org.id, externalRef: `browser-${suffix}` } })).toBe(1);
+  } finally { await adminContext.close(); }
+  await page.goto("/portal/automations");
+  await expect(page).toHaveURL(/\/portal\/automations/);
+  await expect(page.getByRole("alert").filter({ hasText: "Módulos suspendidos" })).not.toBeVisible();
 });

@@ -1,3 +1,4 @@
+import { billingAccessWhere } from "@/lib/billing-access";
 import { AUTO_JOB_SOURCE, AUTO_JOB_MAX_ATTEMPTS } from "@/lib/ai-job-contract";
 import { z } from "zod";
 import type { Prisma, ChannelConnection } from "@prisma/client";
@@ -33,7 +34,7 @@ export async function assertRoutable(tx: Prisma.TransactionClient, organizationI
   const row = await tx.channelConnection.findFirst({ where: { id, organizationId }, include: { route: { include: { agent: true } } } });
   if (!row || row.channel !== channel || effectiveConnectionState(row) !== "HEALTHY" || !row.canReceive || (send && !row.canSend)) throw new UserError("La conexión no está disponible; verifica la cuenta antes de responder");
   const org = await tx.organization.findFirst({ where: { id: organizationId, isActive: true }, select: { id: true } });
-  const entitlement = await tx.organizationModule.findFirst({ where: { organizationId, module: { in: ["CRM", "AI_WHATSAPP"] }, status: "ACTIVE" }, select: { id: true } });
+  const entitlement = await tx.organizationModule.findFirst({ where: { organizationId, module: { in: ["CRM", "AI_WHATSAPP"] }, status: "ACTIVE", ...(send ? { organization: billingAccessWhere() } : {}) }, select: { id: true } });
   if (!org || !entitlement) throw new UserError("Organización o módulo inactivo");
   return row;
 }
@@ -41,7 +42,7 @@ export async function connectionAiAllowed(tx: Prisma.TransactionClient, organiza
   if (!conv.channelConnectionId) return true;
   try {
     const row = await assertRoutable(tx, organizationId, conv.channelConnectionId, conv.channel, true);
-    if (!await tx.organizationModule.findFirst({ where: { organizationId, module: "AI_WHATSAPP", status: "ACTIVE" }, select: { id: true } })) return false;
+    if (!await tx.organizationModule.findFirst({ where: { organizationId, module: "AI_WHATSAPP", status: "ACTIVE", organization: billingAccessWhere() }, select: { id: true } })) return false;
     if (!row.route?.enabled || row.route.agent.status !== "LEGACY" || row.route.agent.definitionKey !== "legacy-assistant") return false;
     return !!await tx.whatsAppAssistant.findFirst({ where: { organizationId, id: row.route.agent.legacyAssistantId ?? "", isActive: true }, select: { id: true } });
   } catch (error) {

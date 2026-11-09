@@ -1,3 +1,4 @@
+import { billingAccessWhere } from "@/lib/billing-access";
 import { connectionAiAllowed } from "./channel-connections/service";
 import type { Prisma } from "@prisma/client";
 import { observeLegacyAdmission } from "./ai/agents/executions";
@@ -11,7 +12,7 @@ export async function enqueueAutoReply(tx: Prisma.TransactionClient, organizatio
   if (!conv || conv.status !== "OPEN" || !conv.aiHandled || conv.assignedToId || !await connectionAiAllowed(tx, organizationId, conv)) return null;
   const mode = await tx.agentChannelSetting.findUnique({ where: { organizationId_channel: { organizationId, channel: conv.channel } }, select: { mode: true } });
   if (mode?.mode !== "AUTO") return null;
-  const entitlement = await tx.organizationModule.findUnique({ where: { organizationId_module: { organizationId, module: "AI_WHATSAPP" } }, select: { status: true } });
+  const entitlement = await tx.organizationModule.findUnique({ where: { organizationId_module: { organizationId, module: "AI_WHATSAPP" }, organization: billingAccessWhere() }, select: { status: true } });
   const org = await tx.organization.findUnique({ where: { id: organizationId }, select: { isActive: true } });
   if (!org?.isActive || entitlement?.status !== "ACTIVE") return null;
   const payload: AutoJobPayload = { conversationId, messageId, stage: "queued" };
@@ -31,7 +32,7 @@ export async function enqueuePipelineAnalysis(tx: Prisma.TransactionClient, orga
   if (!conv || !await connectionAiAllowed(tx, organizationId, conv)) return;
   const [mode, modules, org] = await Promise.all([
     tx.agentChannelSetting.findUnique({ where: { organizationId_channel: { organizationId, channel: conv.channel } }, select: { mode: true } }),
-    tx.organizationModule.count({ where: { organizationId, module: { in: ["CRM", "AI_WHATSAPP"] }, status: "ACTIVE" } }),
+    tx.organizationModule.count({ where: { organizationId, module: { in: ["CRM", "AI_WHATSAPP"] }, status: "ACTIVE", organization: billingAccessWhere() } }),
     tx.organization.findUnique({ where: { id: organizationId }, select: { isActive: true } }),
   ]);
   if ((mode?.mode ?? "SUGGEST") === "OFF" || modules !== 2 || !org?.isActive) return;

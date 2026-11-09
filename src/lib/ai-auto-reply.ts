@@ -1,3 +1,4 @@
+import { billingAccessWhere } from "@/lib/billing-access";
 import { assertKnowledgeCurrent } from "@/lib/ai/knowledge/retrieval";
 import { connectionAiAllowed, lockConnection } from "./channel-connections/service";
 import { sendConversationOutbound } from "./channel-connections/outbound";
@@ -86,7 +87,7 @@ async function eligibleTurn(tx: Prisma.TransactionClient, organizationId: string
   const conv = await tx.conversation.findFirst({ where: { id: payload.conversationId, organizationId }, include: { organization: { select: { isActive: true } }, lead: { select: { status: true } } } });
   if (!conv || !conv.organization.isActive || conv.status !== "OPEN" || !conv.aiHandled || conv.assignedToId || !await connectionAiAllowed(tx, organizationId, conv)) return null;
   const [entitlement, mode, recent] = await Promise.all([
-    tx.organizationModule.findUnique({ where: { organizationId_module: { organizationId, module: "AI_WHATSAPP" } }, select: { status: true } }),
+    tx.organizationModule.findUnique({ where: { organizationId_module: { organizationId, module: "AI_WHATSAPP" }, organization: billingAccessWhere() }, select: { status: true } }),
     tx.agentChannelSetting.findUnique({ where: { organizationId_channel: { organizationId, channel: conv.channel } }, select: { mode: true } }),
     tx.message.findMany({ where: { conversationId: conv.id }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 30 }),
   ]);

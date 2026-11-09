@@ -1,3 +1,4 @@
+import { billingAccessWhere } from "@/lib/billing-access";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -51,7 +52,7 @@ export async function assignPrivatePilotSource(organizationId: string, actorId: 
   return prisma.$transaction(async tx => {
     await lockPilotBudget(tx, organizationId); await lockKnowledge(tx, organizationId);
     if (!await tx.user.findFirst({ where: { id: actorId, isActive: true, role: { in: ["ADMIN", "SUPER_ADMIN"] } } })) throw new Error("pilot_admin_forbidden");
-    if (!await tx.organization.findFirst({ where: { id: organizationId, isActive: true, modules: { some: { module: "AI_WHATSAPP", status: "ACTIVE" } } } })) throw new Error("pilot_organization_unavailable");
+    if (!await tx.organization.findFirst({ where: { id: organizationId, isActive: true, ...billingAccessWhere(), modules: { some: { module: "AI_WHATSAPP", status: "ACTIVE" } } } })) throw new Error("pilot_organization_unavailable");
     const instance = await mark(tx, organizationId);
     const policy = await tx.knowledgeAccessPolicy.findUnique({ where: { organizationId } });
     if ((policy?.version ?? 0) !== input.policyVersion) throw new Error("pilot_sources_changed");

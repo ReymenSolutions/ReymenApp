@@ -1,3 +1,4 @@
+import { isBillingSuspended } from "./billing-access";
 import { redirect } from "next/navigation";
 import { prisma } from "./prisma";
 import type { PlatformModule } from "@prisma/client";
@@ -45,6 +46,12 @@ export function getModuleLabel(lang: "es" | "en"): Record<PlatformModule, string
 }
 
 export async function hasModule(organizationId: string, module: PlatformModule): Promise<boolean> {
+  if (await isBillingSuspended(organizationId)) return false;
+  return hasContractedModule(organizationId, module);
+}
+
+/** For inbound POS persistence only: keep sales/history even during billing suspension. */
+export async function hasContractedModule(organizationId: string, module: PlatformModule): Promise<boolean> {
   const entitlement = await prisma.organizationModule.findUnique({
     where: { organizationId_module: { organizationId, module } },
     select: { status: true },
@@ -68,7 +75,7 @@ export const MANUAL_SALES_BLOCKED_MESSAGE =
   "Las ventas llegan desde Reymen POS; la captura manual está desactivada para no duplicarlas ni reemplazarlas.";
 
 export async function assertManualSalesAllowed(organizationId: string): Promise<void> {
-  if (await hasModule(organizationId, "REYMEN_POS")) throw new UserError(MANUAL_SALES_BLOCKED_MESSAGE);
+  if (await hasContractedModule(organizationId, "REYMEN_POS")) throw new UserError(MANUAL_SALES_BLOCKED_MESSAGE);
 }
 
 /** For Server Component pages: redirects instead of throwing, since there's no toast to catch an error. */
@@ -79,6 +86,7 @@ export async function requireModule(organizationId: string, module: PlatformModu
 }
 
 export async function getEnabledModules(organizationId: string): Promise<PlatformModule[]> {
+  if (await isBillingSuspended(organizationId)) return [];
   const rows = await prisma.organizationModule.findMany({
     where: { organizationId, status: "ACTIVE" },
     select: { module: true },

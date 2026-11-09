@@ -1,3 +1,4 @@
+import { billingAccess } from "./billing-access";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
 import { getPlan, monthlyPriceMxn } from "@/lib/plans";
@@ -6,15 +7,17 @@ import { UserError } from "@/lib/user-error";
 // ─── Cobro de la suscripción mensual ─────────────────────────────────────────────────────────────────────────────
 // Funciona SIN Stripe: `Organization.billingPeriodEnd` es "pagado hasta" (próximo vencimiento) y cada pago —registrado por un
 // admin (transferencia, efectivo…) o por el webhook de Stripe— lo recorre un mes. Con billingPeriodEnd nulo el cliente no se
-// factura por aquí: no hay avisos ni estado de pago. Nada se suspende solo: el sistema avisa y el admin decide.
+// factura por aquí: no hay avisos ni estado de pago. El acceso se suspende al cumplirse tres días de gracia, sin cambiar los módulos contratados.
 
 const DAY = 86_400_000;
-/** Aviso previo: faltan 7, 3 y 1 días. Después de vencer: el primer día y a los 5 días. */
-export type NoticeKind = "D7" | "D3" | "D1" | "OVERDUE" | "OVERDUE_5";
+/** Aviso previo: faltan 7, 3 y 1 días. Después de vencer: aviso de gracia y suspensión a las 72 horas. */
+export type NoticeKind = "D7" | "D3" | "D1" | "OVERDUE" | "OVERDUE_5" | "SUSPENDED";
 export type BillingState = "NONE" | "ACTIVE" | "DUE_SOON" | "OVERDUE";
 
 export type BillingStatus = {
   state: BillingState;
+  suspendAt: Date | null;
+  suspended: boolean;
   dueAt: Date | null;
   /** Días que faltan (redondeado hacia arriba; 0 o negativo = ya venció). */
   daysLeft: number | null;
@@ -23,15 +26,16 @@ export type BillingStatus = {
 };
 
 export function billingStatus(periodEnd: Date | null, now: Date = new Date()): BillingStatus {
-  if (!periodEnd) return { state: "NONE", dueAt: null, daysLeft: null, daysOver: 0 };
+  if (!periodEnd) return { ...billingAccess(periodEnd, now), state: "NONE", dueAt: null, daysLeft: null, daysOver: 0 };
   const diff = periodEnd.getTime() - now.getTime();
-  if (diff < 0) return { state: "OVERDUE", dueAt: periodEnd, daysLeft: Math.ceil(diff / DAY), daysOver: Math.floor(-diff / DAY) };
+  if (diff < 0) return { ...billingAccess(periodEnd, now), state: "OVERDUE", dueAt: periodEnd, daysLeft: Math.ceil(diff / DAY), daysOver: Math.floor(-diff / DAY) };
   const daysLeft = Math.ceil(diff / DAY);
-  return { state: daysLeft <= 7 ? "DUE_SOON" : "ACTIVE", dueAt: periodEnd, daysLeft, daysOver: 0 };
+  return { ...billingAccess(periodEnd, now), state: daysLeft <= 7 ? "DUE_SOON" : "ACTIVE", dueAt: periodEnd, daysLeft, daysOver: 0 };
 }
 
 /** El aviso que corresponde ahora (solo el vigente, para no inundar si el cron estuvo parado). */
 export function noticeKindFor(status: BillingStatus): NoticeKind | null {
+  if (status.suspended) return "SUSPENDED";
   if (status.state === "OVERDUE") return status.daysOver >= 5 ? "OVERDUE_5" : "OVERDUE";
   if (status.state !== "DUE_SOON" || status.daysLeft === null) return null;
   return status.daysLeft <= 1 ? "D1" : status.daysLeft <= 3 ? "D3" : "D7";
@@ -75,6 +79,7 @@ export async function recordPayment(organizationId: string, input: RecordPayment
   if (!input.periodEnd && (!Number.isInteger(months) || months < 1 || months > 24)) throw new UserError("Los meses del pago no son válidos");
 
   return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Organization" WHERE id = ${organizationId} FOR UPDATE`;
     const org = await tx.organization.findUnique({ where: { id: organizationId }, select: { billingPeriodEnd: true } });
     if (!org) throw new UserError("Cliente no encontrado");
     const externalRef = input.externalRef?.trim() || null;

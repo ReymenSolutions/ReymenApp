@@ -1,3 +1,4 @@
+import { billingAccessWhere } from "@/lib/billing-access";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { AgentMode, Prisma } from "@prisma/client";
@@ -18,7 +19,7 @@ const id = z.string().min(1).max(128), text = z.string().trim().min(1).max(500);
 const hash = (token: string) => createHash("sha256").update(token).digest("hex");
 async function authority(tx: Tx, organizationId: string, actorId: string, action: Action) {
   const user = await tx.user.findFirst({ where: { id: actorId, organizationId, isActive: true, organization: { isActive: true } }, select: { id: true, role: true } });
-  const entitlement = await tx.organizationModule.findUnique({ where: { organizationId_module: { organizationId, module: "AI_WHATSAPP" } } });
+  const entitlement = await tx.organizationModule.findUnique({ where: { organizationId_module: { organizationId, module: "AI_WHATSAPP" }, organization: billingAccessWhere() } });
   if (!user || !can(user.role, action) || entitlement?.status !== "ACTIVE") throw new Error("pilot_chat_forbidden");
   return user;
 }

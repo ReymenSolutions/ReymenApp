@@ -6,6 +6,9 @@
 // su versión en español). Un mensaje que no esté aquí se muestra tal cual.
 
 const EN: Record<string, string> = {
+  "Configura primero el precio mensual pactado": "Set the agreed monthly price first",
+  "El acuerdo cambió; actualiza antes de contratar": "The agreement changed; refresh before subscribing",
+  "Elige tu plan personalizado vigente": "Choose your current custom plan",
   "El precio de Stripe no coincide con la mensualidad del plan en MXN": "The Stripe price does not match the plan’s monthly MXN price",
   "Plan no disponible": "Plan unavailable",
   "Tu precio pactado requiere una cotización de pago": "Your agreed price requires a payment quote",

@@ -1,10 +1,12 @@
+import { billingAccess } from "../billing-access";
 import { prisma } from "@/lib/prisma";
 
 /** UTC calendar month of admission. Pending/uncertain calls reserve capacity; retrying the same key does not reserve again. */
 export async function reserveAutomationRun(organizationId: string, automationId: string, executionKey: string, now = new Date()) {
   return prisma.$transaction(async tx => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`automation-usage:${organizationId}`}))`;
-    const org = await tx.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { plan: true, isActive: true, customPlan: true, customMaxAutomationRuns: true } });
+    const org = await tx.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { billingPeriodEnd: true, plan: true, isActive: true, customPlan: true, customMaxAutomationRuns: true } });
+    if (billingAccess(org.billingPeriodEnd, now).suspended) return { allowed: false, reason: "billing_suspended" } as const;
     const entitlement = await tx.organizationModule.findUnique({ where: { organizationId_module: { organizationId, module: "AUTOMATIONS" } } });
     if (!org.isActive || entitlement?.status !== "ACTIVE") return { allowed: false, reason: "module_disabled" } as const;
     const automation = await tx.automation.findFirst({ where: { id: automationId, organizationId, status: "ACTIVE" } });
