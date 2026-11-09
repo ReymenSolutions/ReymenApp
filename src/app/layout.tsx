@@ -5,12 +5,13 @@ import { SessionProvider } from "next-auth/react";
 import { cookies } from "next/headers";
 import { auth } from "@/lib/auth";
 import { PreferencesProvider } from "@/context/preferences";
+import { isTestEnv } from "@/lib/app-env";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Reymen Solutions",
+  title: process.env.REYMEN_ENV === "test" ? "PRUEBA · Reymen Solutions" : "Reymen Solutions",
   description: "Automatización inteligente para hacer crecer tu negocio.",
   // Nombre corto al agregarla a la pantalla de inicio del iPhone/iPad (ícono: app/apple-icon.png).
   appleWebApp: { title: "Reymen", capable: true, statusBarStyle: "default" },
@@ -38,6 +39,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <PreferencesProvider initialTheme={initialTheme} initialLang={initialLang}>
             {children}
             <Toaster position="top-right" richColors />
+            {isTestEnv() && (
+              <div role="status" className="pointer-events-none fixed inset-x-0 bottom-0 z-[100] bg-amber-400 py-0.5 text-center text-xs font-bold uppercase tracking-wide text-amber-950">
+                Ambiente de prueba · los cambios aquí no afectan a producción
+              </div>
+            )}
           </PreferencesProvider>
         </SessionProvider>
       </body>

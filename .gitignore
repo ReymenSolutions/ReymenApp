@@ -47,5 +47,6 @@ next-env.d.ts
 .env.preview
 .env.preview.bak
 .env.staging
+.env.test
 .pg_password_preview.txt
 *.dump
