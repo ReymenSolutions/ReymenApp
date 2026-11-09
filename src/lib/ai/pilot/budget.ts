@@ -1,3 +1,4 @@
+import { billingAccessWhere } from "@/lib/billing-access";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -14,7 +15,7 @@ export { authority as assertPilotAuthority, lock as lockPilotBudget, state as lo
 function gate() { if (!enabled()) throw new UserError("El presupuesto piloto no está habilitado"); }
 async function authority(tx: Tx, organizationId: string, actorId: string) {
   const user = await tx.user.findFirst({ where: { id: actorId, organizationId, isActive: true, organization: { isActive: true } }, select: { role: true } });
-  const entitlement = await tx.organizationModule.findUnique({ where: { organizationId_module: { organizationId, module: "AI_WHATSAPP" } }, select: { status: true } });
+  const entitlement = await tx.organizationModule.findUnique({ where: { organizationId_module: { organizationId, module: "AI_WHATSAPP" }, organization: billingAccessWhere() }, select: { status: true } });
   if (!user || !can(user.role, "knowledge_base:manage") || entitlement?.status !== "ACTIVE") throw new UserError("No autorizado");
 }
 async function lock(tx: Tx, organizationId: string) {

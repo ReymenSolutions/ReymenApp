@@ -18,7 +18,8 @@ const billingPortalSessionsCreate = vi.fn().mockResolvedValue({ url: "https://bi
 vi.mock("stripe", () => ({
   default: class MockStripe {
     customers = { create: customersCreate };
-    prices = { retrieve: pricesRetrieve };
+    products = { create: vi.fn().mockResolvedValue({ id: "prod_custom" }) };
+    prices = { retrieve: pricesRetrieve, create: vi.fn().mockResolvedValue({ id: "price_custom" }) };
     checkout = { sessions: { create: checkoutSessionsCreate } };
     billingPortal = { sessions: { create: billingPortalSessionsCreate } };
   },
@@ -67,11 +68,21 @@ describe("billing actions", () => {
     expect(checkoutSessionsCreate).toHaveBeenCalledTimes(2);
   });
 
-  it("refuses online checkout when the organization has an agreed custom price", async () => {
+  it("refuses selecting a different plan over an agreed custom price", async () => {
     authMock.mockResolvedValue(fakeSession({ id: "u1", role: "OWNER", organizationId: org.id }));
     await prisma.organization.update({ where: { id: org.id }, data: { customMonthlyPriceMxn: 99 } });
-    try { await expect(createCheckoutSession("business")).rejects.toThrow(/cotización/); }
+    try { await expect(createCheckoutSession("business")).rejects.toThrow(/personalizado vigente/); }
     finally { await prisma.organization.update({ where: { id: org.id }, data: { customMonthlyPriceMxn: null } }); }
+  });
+
+  it("checks out the saved custom amount instead of the catalog price", async () => {
+    authMock.mockResolvedValue(fakeSession({ id: "u1", role: "OWNER", organizationId: org.id }));
+    await prisma.organization.update({ where: { id: org.id }, data: { plan: "professional", customPlan: true, customMonthlyPriceMxn: 750.50 } });
+    pricesRetrieve.mockResolvedValueOnce({ active: true, currency: "mxn", recurring: { interval: "month", interval_count: 1 }, unit_amount: 75050 });
+    try {
+      await createCheckoutSession("professional");
+      expect(checkoutSessionsCreate).toHaveBeenCalledWith(expect.objectContaining({ line_items: [{ price: "price_custom", quantity: 1 }], subscription_data: { metadata: { organizationId: org.id } } }));
+    } finally { await prisma.organization.update({ where: { id: org.id }, data: { customPlan: false, customMonthlyPriceMxn: null } }); }
   });
 
   it("offers other active catalog plans and rejects wrong Stripe amounts before checkout", async () => {

@@ -1,37 +1,63 @@
-# Cobro de la suscripción mensual
+# Cobro, gracia y planes personalizados
 
-Funciona **sin Stripe** y se activa solo cuando configures Stripe.
+## Política de acceso
 
-## Cómo funciona
-- `Organization.billingPeriodEnd` = «pagado hasta» (próximo vencimiento). **Nulo = el cliente aún no se factura por la plataforma**: no hay avisos ni estado de pago. Así nadie existente recibe avisos por sorpresa.
-- Cada pago (`BillingPayment`, solo se agrega) recorre el vencimiento un mes de calendario. Un pago adelantado suma al vencimiento actual; uno de un cliente vencido cuenta desde hoy. La `externalRef` (folio de transferencia, factura de Stripe) evita registrar el mismo pago dos veces. Un pago nunca acorta lo ya pagado.
-- Estados: **Al corriente**, **Por vencer** (≤ 7 días), **Vencida**. **Nada se suspende solo**: el sistema avisa y tú decides.
+- `Organization.billingPeriodEnd` es la fecha pagada hasta. Nulo significa que la organización todavía no está incorporada al cobro: no se suspende por mora.
+- Se conceden **72 horas de gracia** desde esa fecha. Al llegar exactamente al límite, se bloquea el acceso a módulos en servidor y se dirige al usuario a Configuración. Facturación y Solicitudes/soporte conservan sus permisos habituales.
+- Los avisos muestran fecha y hora exactas en **UTC**, explícitamente indicada. También aparece en Mi suscripción.
+- No se borra información, no se desactiva la organización y no se reescriben los módulos contratados. Un pago confirmado que cubra el periodo vigente elimina la restricción por mora. Una suspensión administrativa de un módulo se conserva.
+- Se mantienen la recepción firmada de ventas, cajas y cocina del POS, los historiales y su conciliación. Este cambio no apaga una terminal POS ni detiene ventas locales; bloquea el acceso a módulos en ReymenApp y nuevas ejecuciones/llamadas IA. No configura remotamente n8n o SmartCard: las ejecuciones externas deben respetar el contrato de admisión existente.
+- Al cancelar la suscripción Stripe se conserva el contrato y el periodo ya pagado; el acceso vence con la misma gracia. Cancelar no equivale a borrar o cambiar a Starter.
 
-## Dónde se ve
-- **Portal**: banner en todas las pantallas para quien administra la cuenta (ámbar → naranja a ≤ 3 días → rojo al vencer) y bloque «Mi suscripción» en Configuración (vencimiento, mensualidad, últimos pagos).
-- **Admin → Cliente → Suscripción**: estado, registrar pago (transferencia/efectivo/otro, meses, referencia) y fijar o quitar el vencimiento (con motivo). Todo auditado (`billing.payment`, `billing.due_date`).
-- **Admin → Clientes**: tarjeta de **Cobranza** con vencidos y por vencer.
+## Pagos
 
-## Avisos
-Un correo por tipo y vencimiento (llave única): 7, 3 y 1 días antes; al vencer; y a los 5 días de atraso. Si el cron estuvo parado se manda solo el aviso vigente. Los atrasos también avisan a los admins de Reymen. Con cobro automático de Stripe activo se omiten los avisos previos (solo el de atraso).
+Cada `BillingPayment` se agrega con una referencia única por organización. El bloqueo de fila serializa pagos concurrentes y reintentos. Una transferencia registrada por administración recorre meses de calendario; una factura de suscripción pagada utiliza el periodo de su línea recurrente. Un pago antiguo nunca acorta lo ya pagado.
 
-Se disparan con un cron diario (`deploy/install-cron.sh` lo instala en el VPS junto con el reloj de automatizaciones y el reintento de webhooks). A mano:
+**Solo `invoice.paid` amplía la vigencia de Stripe.** `customer.subscription.updated`, aunque diga `active`, no prueba que la renovación se haya pagado. Una factura independiente de implementación no amplía la suscripción. El webhook valida cliente, suscripción y pertenencia del precio personalizado; no concede módulos por suscripciones incompletas.
+
+## Precio pactado y Stripe
+
+1. Administración guarda el precio mensual en **A la medida** o **Cambiar plan → Precio mensual pactado**.
+2. Al contratar, el servidor crea y conserva un precio Stripe mensual en MXN asociado exclusivamente a esa organización (`StripeContractPrice`). El navegador no decide el importe. Checkout usa ese precio, no el precio del plan base.
+3. Si ya hay una suscripción compatible, guardar intenta sincronizar el importe. Se mantiene la fecha de renovación y `proration_behavior=none`: **el importe nuevo se cobra en la siguiente renovación**, sin diferencias del periodo actual.
+4. La tarifa guardada es el estado deseado durable. El cron reintenta si hay fallo de red; compara primero la tarifa Stripe para no repetir cambios ya aplicados. El resultado `contracts.pending` y los registros del cron permiten detectar pendientes. El diálogo advierte cuando la sincronización inmediata quedó pendiente.
+5. Quitar A la medida devuelve el precio de catálogo en la próxima renovación si existe un precio Stripe válido. Un precio ausente/incompatible deja pendiente la sincronización y exige corregir la configuración; no se inventa un importe.
+
+La sincronización automática admite una única línea mensual MXN con cantidad uno. Las suscripciones con schedules, múltiples líneas u otra periodicidad requieren revisión; no se reescriben. Descuentos/impuestos ya configurados en Stripe siguen aplicando al importe base. La factura ya emitida no se recalcula. Cambiar justo después de que Stripe emita la renovación afecta la siguiente factura aún no emitida.
+
+No se deben intercambiar claves test/live sobre la misma base: clientes, precios y suscripciones pertenecen a su cuenta y modo Stripe. La transición a cobros reales requiere configuración independiente y validación explícita.
+
+## Implementación primero, mensualidad después
+
+Recomendación comercial: separar ambos conceptos.
+
+- **Implementación:** cargo único (por ejemplo $3,000 MXN), cobrado con una factura o Payment Link de Stripe de pago único.
+- **Suscripción:** precio recurrente pactado (por ejemplo $500 MXN/mes), contratado cuando se entregue/active el servicio. La fecha de ese inicio determina sus renovaciones.
+- Si ambos comienzan el mismo día, Stripe permite una primera factura con cargo único más mensualidad; el cargo único no debe convertirse en precio recurrente.
+- Si el comienzo será posterior y se conoce la fecha, Stripe puede programarlo mediante schedules/trial. Esa configuración no está automatizada por este cambio; las suscripciones con schedules requieren revisión y no pasan por el sincronizador automático.
+
+El panel de Reymen aún no crea cargos únicos de implementación ni administra hitos de entrega. Este cambio evita confundir su pago con la mensualidad. No registrar una implementación como pago mensual desde Admin, pues esa acción sí extiende acceso.
+
+## Avisos y reintentos
+
+Avisos a responsables activos: 7, 3 y 1 días antes; al vencer; al finalizar la gracia. Incluyen fecha exacta de suspensión, conservación de datos y acceso a facturación/soporte. Stripe activo también recibe recordatorio, indicando que se intentará el cargo automático.
+
+`POST /api/cron/billing` requiere `CRON_SECRET`. El cron se instala cada 15 minutos. La suspensión se calcula al acceder: no depende de que el cron esté puntual. El correo necesita `RESEND_API_KEY`; no se considera enviado si el proveedor falta o devuelve error.
+
+`BillingNotice` conserva intentos, próxima oportunidad y fecha de envío. Hay hasta cinco intentos, con separación mínima de 15 minutos y reserva atómica para trabajadores concurrentes. Los correos anteriores a esta migración se conservan como enviados para evitar reenvíos masivos. Un fallo después de que el proveedor acepte el correo pero antes de guardar la confirmación puede producir un correo repetido; no se promete entrega exactamente una vez. Si se agotan intentos, revisar proveedor y registros antes de reabrir un aviso manualmente.
+
+## Actualización y validación
+
+La migración `20261208090000_billing_grace_contracts` es aditiva. **Antes de desplegar revisar los vencimientos existentes:** una organización con más de tres días de atraso quedará restringida inmediatamente; nulo queda exento. Respaldar la base. El script `deploy/update.sh` respalda antes de aplicar migraciones pendientes.
+
+Después de fusionar el cambio en main, en Termius:
 
 ```bash
-curl -fsS -X POST https://TU_DOMINIO/api/cron/billing -H "Authorization: Bearer $CRON_SECRET"
+sudo bash /home/emilianorm/reymen-ai-ops-preview/deploy/update.sh && sudo bash /home/emilianorm/reymen-ai-ops-preview/deploy/install-cron.sh
 ```
 
-Requiere `CRON_SECRET` (sin él responde 401).
+El instalador conserva el programa de backups y reemplaza el archivo cron gestionado por Reymen; revisar personalizaciones locales antes de usarlo. Comprobar `contracts.pending=0` y envíos en `/var/log/reymen/cron.log`. No imprimir secretos.
 
-## Dar de alta a un cliente
-Admin → Cliente → Suscripción → «Fijar vencimiento» con su próxima fecha de pago y un motivo. Desde ahí recibe avisos; al registrar su pago se recorre un mes.
+En Stripe **test** verificar: checkout de precio pactado, renovación fallida, 72 horas de gracia, acceso a facturación/soporte, pago confirmado/reactivación, edición de importe sin factura/prorrateo inmediato, renovación con importe nuevo y factura de implementación sin ampliación de vigencia. Un Test Clock de Stripe no mueve el reloj del VPS; para probar mora usar una organización sintética con vencimiento controlado.
 
-## Con Stripe (cuando lo configures)
-`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` y el precio del plan (Admin → Planes o `STRIPE_PRICE_<LLAVE>`). El webhook toma el fin de periodo de la suscripción, registra cada `invoice.paid` (idempotente por factura) y avisa a los admins si falla un cobro (`invoice.payment_failed`).
-Pendiente a propósito: compra de recargas de IA en línea (debe llamar a `applyTopup` solo con el pago confirmado) y checkout para planes con precio pactado.
-
-## Checkout de catálogo (2026-11)
-
-El autoservicio admite planes activos con precio Stripe configurado y verificado: MXN, recurrente mensual e importe igual al catálogo. Clientes con plan A la medida o precio pactado continúan con contratación asistida. Una suscripción ya vigente o pendiente no inicia otro checkout desde esta acción. El webhook vincula el cliente Stripe y no concede módulos por suscripciones incompletas ni precios desconocidos. Los planes A la medida preservan sus módulos ante eventos de suscripción.
-
-Pendiente de aceptación: recorrido completo con Stripe test-mode y n8n sandbox; las pruebas locales no sustituyen esa validación.
+Rollback: volver a la imagen/commit anterior conservando las columnas/tablas aditivas, sin borrar pagos ni contratos. La reversión de código no revierte los precios ya sincronizados en Stripe; revisar las suscripciones afectadas y restaurar el precio anterior sin prorrateo si corresponde. Mantener webhooks y registrar cualquier pago recibido durante el rollback.

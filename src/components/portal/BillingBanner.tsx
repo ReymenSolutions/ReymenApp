@@ -9,8 +9,11 @@ export function BillingBanner({ status, lang }: { status: BillingStatus; lang: s
   const es = lang !== "en";
   const overdue = status.state === "OVERDUE";
   const date = formatDate(status.dueAt, lang);
-  const msg = overdue
-    ? es ? `Tu suscripción venció el ${date}. Regulariza tu pago para evitar que se suspenda el servicio.` : `Your subscription expired on ${date}. Settle your payment to avoid a service suspension.`
+  const deadline = status.suspendAt?.toLocaleString(es ? "es-MX" : "en-US", { timeZone: "UTC", dateStyle: "long", timeStyle: "short" }) + " UTC";
+  const msg = status.suspended
+    ? es ? `Módulos suspendidos desde ${deadline}. Tus datos se conservan. Facturación y soporte siguen disponibles; el acceso se recupera al confirmarse el pago vigente.` : `Modules suspended since ${deadline}. Your data is retained. Billing and support remain available; access resumes when the current payment is confirmed.`
+    : overdue
+    ? es ? `Tu suscripción venció el ${date}. Tienes 3 días de gracia: suspensión el ${deadline} si no se confirma el pago.` : `Your subscription expired on ${date}. Your 3-day grace period ends ${deadline}; modules will be suspended unless payment is confirmed.`
     : status.daysLeft !== null && status.daysLeft <= 1
       ? es ? `Tu suscripción vence mañana (${date}).` : `Your subscription is due tomorrow (${date}).`
       : es ? `Tu suscripción vence en ${status.daysLeft} días (${date}).` : `Your subscription is due in ${status.daysLeft} days (${date}).`;

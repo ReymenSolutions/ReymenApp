@@ -9,7 +9,8 @@ export function SubscriptionStatus({ view, lang }: { view: BillingView; lang: st
   if (view.state === "NONE" || !view.dueAt) return null;
   const es = lang !== "en";
   const badge =
-    view.state === "OVERDUE" ? <Badge variant="destructive">{es ? "Vencida" : "Overdue"}</Badge>
+    view.suspended ? <Badge variant="destructive">{es ? "Suspendida por pago pendiente" : "Suspended: payment overdue"}</Badge>
+    : view.state === "OVERDUE" ? <Badge variant="destructive">{es ? "Vencida" : "Overdue"}</Badge>
     : view.state === "DUE_SOON" ? <Badge variant="warning">{es ? "Por vencer" : "Due soon"}</Badge>
     : <Badge variant="success">{es ? "Al corriente" : "Paid up"}</Badge>;
   return (
@@ -24,6 +25,7 @@ export function SubscriptionStatus({ view, lang }: { view: BillingView; lang: st
           : es ? `Pagada hasta el ${formatDate(view.dueAt, lang)}.` : `Paid through ${formatDate(view.dueAt, lang)}.`}{" "}
         {es ? "Mensualidad" : "Monthly"}: ${view.amountMxn.toLocaleString("en-US")} MXN.
       </p>
+      {view.suspendAt && <p className="text-xs text-slate-500">{es ? "Suspensión si no se confirma el pago: " : "Suspension unless payment is confirmed: "}{view.suspendAt.toLocaleString(es ? "es-MX" : "en-US", { timeZone: "UTC", dateStyle: "long", timeStyle: "short" })} UTC. {es ? "Conservas facturación, soporte y tus datos." : "Billing, support and your data are retained."}</p>}
       {view.state !== "ACTIVE" && !view.stripeSubscription && (
         <p className="text-xs text-slate-500">{es ? "Para pagar, realiza tu transferencia y avísanos desde Solicitudes: registramos tu pago y se actualiza tu vencimiento." : "To pay, make your transfer and let us know from Requests: we record your payment and your due date updates."}</p>
       )}

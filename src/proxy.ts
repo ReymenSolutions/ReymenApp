@@ -1,13 +1,11 @@
+import { isBillingSuspended, billingRecoveryPath } from "@/lib/billing-access";
 import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import { authConfig } from "@/lib/auth.config";
 import { IMPERSONATION_COOKIE, decodeImpersonationCookie } from "@/lib/impersonation-cookie";
 
-// Middleware runs on every request, so it uses the edge-safe config alone
-// (no Credentials provider, no PrismaAdapter) instead of importing the full
-// auth() from @/lib/auth — that would pull bcrypt, the Prisma client and
-// otpauth into the middleware bundle for no reason, since middleware only
-// ever reads the already-issued JWT, it never signs in.
+// Next 16 proxy runs on Node. Keep lightweight JWT authentication; billing access
+// is revalidated in the database so payment or suspension takes effect immediately.
 const { auth } = NextAuth(authConfig);
 
 export default auth(async (req) => {
@@ -55,6 +53,9 @@ export default auth(async (req) => {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
+  if (isPortalRoute && session.user.organizationId && !billingRecoveryPath(pathname) && await isBillingSuspended(session.user.organizationId)) {
+    return NextResponse.redirect(new URL("/portal/settings?billing=overdue#facturacion", req.url));
+  }
   const role = session.user.role;
 
   // Admin routes require SUPER_ADMIN or ADMIN

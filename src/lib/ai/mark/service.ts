@@ -1,3 +1,4 @@
+import { billingAccessWhere } from "@/lib/billing-access";
 import { Prisma, type AgentSandboxRun } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { can } from "@/lib/permissions";
@@ -16,7 +17,7 @@ export function assertMarkSandboxEnabled() {
 export async function sandboxAuthority(organizationId: string, actorId: string) {
   const [user, module] = await Promise.all([
     prisma.user.findFirst({ where: { id: actorId, organizationId, isActive: true, organization: { isActive: true } }, select: { role: true } }),
-    prisma.organizationModule.findUnique({ where: { organizationId_module: { organizationId, module: "AI_WHATSAPP" } }, select: { status: true } }),
+    prisma.organizationModule.findUnique({ where: { organizationId_module: { organizationId, module: "AI_WHATSAPP" }, organization: billingAccessWhere() }, select: { status: true } }),
   ]);
   return !!user && can(user.role, "knowledge_base:manage") && module?.status === "ACTIVE";
 }

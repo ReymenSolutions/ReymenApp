@@ -6,7 +6,7 @@ set -euo pipefail
 
 case "${1:-}" in
   tick) path="/api/cron/automations/tick" ;;      # reloj de automatizaciones (cada 5 min)
-  billing) path="/api/cron/billing" ;;            # avisos de vencimiento de suscripción (diario)
+  billing) path="/api/cron/billing" ;;            # avisos y conciliación de precios (cada 15 minutos)
   retry) path="/api/cron/retry-webhooks" ;;       # reintento de webhooks fallidos (cada 10 min)
   *) echo "Uso: $0 <tick|billing|retry>" >&2; exit 2 ;;
 esac

@@ -1,3 +1,4 @@
+import { billingAccessWhere } from "@/lib/billing-access";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -22,7 +23,7 @@ export async function preparePrivateMark(organizationId: string, actorId: string
     // Definition is shared, configuration and budget are scoped to one tenant.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('private-mark-definition-v1'))`;
     await lockPilotBudget(tx, organizationId);
-    const org = await tx.organization.findFirst({ where: { id: organizationId, isActive: true, modules: { some: { module: "AI_WHATSAPP", status: "ACTIVE" } } }, select: { id: true } });
+    const org = await tx.organization.findFirst({ where: { id: organizationId, isActive: true, ...billingAccessWhere(), modules: { some: { module: "AI_WHATSAPP", status: "ACTIVE" } } }, select: { id: true } });
     if (!org) throw new Error("pilot_organization_unavailable");
     const definition = await tx.agentDefinition.upsert({
       where: { key_version: { key: "mark", version: 1 } }, update: {}, create: PRIVATE_MARK_DEFINITION,

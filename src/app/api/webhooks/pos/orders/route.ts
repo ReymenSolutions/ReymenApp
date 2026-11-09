@@ -3,7 +3,7 @@ import { syncCustomerContacts } from "@/lib/customer-contacts";
 import { NextResponse } from "next/server";
 import { createOrgWebhookHandler } from "@/lib/org-webhook-route";
 import { processFoodPosOrder } from "@/lib/food";
-import { hasModule } from "@/lib/modules";
+import { hasContractedModule } from "@/lib/modules";
 
 /** Mensaje que el POS muestra tal cual al dueño cuando el módulo está apagado. */
 const POS_MODULE_DISABLED_MESSAGE =
@@ -32,7 +32,7 @@ export const POST = createOrgWebhookHandler({
   // Sin el módulo "Reymen POS" no se aceptan ventas del POS. 403 con un code
   // propio: el POS las deja pendientes y las reenvía cuando se active.
   precheck: async (organizationId) => {
-    const [pos, food] = await Promise.all([hasModule(organizationId, "REYMEN_POS"), hasModule(organizationId, "FOOD_OPS")]);
+    const [pos, food] = await Promise.all([hasContractedModule(organizationId, "REYMEN_POS"), hasContractedModule(organizationId, "FOOD_OPS")]);
     if (pos && food) return null;
     return NextResponse.json({ error: POS_MODULE_DISABLED_MESSAGE, code: "pos_module_disabled" }, { status: 403 });
   },

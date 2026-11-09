@@ -1,3 +1,4 @@
+import { billingAccessWhere } from "@/lib/billing-access";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { UserError } from "@/lib/user-error";
@@ -67,7 +68,7 @@ export async function setAgentModelShadow(organizationId: string, enabled: boole
     const source = await readLegacyConfiguration(tx, organizationId);
     if (source.sourceHash !== expectedHash) throw new UserError("La configuración cambió; repite la comparación");
     if (enabled) {
-      const entitlement = await tx.organizationModule.findUnique({ where: { organizationId_module: { organizationId, module: "AI_WHATSAPP" } } });
+      const entitlement = await tx.organizationModule.findUnique({ where: { organizationId_module: { organizationId, module: "AI_WHATSAPP" }, organization: billingAccessWhere() } });
       if (!source.snapshot.rights.isActive || entitlement?.status !== "ACTIVE") throw new UserError("Organización o módulo inactivo");
       const synced = await syncLegacyInstance(tx, organizationId, actorId);
       if (synced.source.sourceHash !== expectedHash) throw new UserError("La configuración cambió durante la comparación; repite la revisión");

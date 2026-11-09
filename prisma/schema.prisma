@@ -128,6 +128,7 @@ model Organization {
   aiBudgetSetting         AiBudgetSetting?
   aiBudgetAdjustments     AiBudgetAdjustment[]
   aiBudgetAlerts          AiBudgetAlert[]
+  stripeContractPrices StripeContractPrice[]
   billingPayments         BillingPayment[]
   billingNotices          BillingNotice[]
   branches                Branch[]
@@ -2553,9 +2554,12 @@ model BillingNotice {
   id             String   @id @default(cuid())
   organizationId String
   periodEnd      DateTime
-  /// D7 | D3 | D1 | OVERDUE | OVERDUE_5
+  /// D7 | D3 | D1 | OVERDUE | OVERDUE_5 | SUSPENDED
   kind           String
   createdAt      DateTime @default(now())
+  sentAt DateTime?
+  attempts Int @default(0)
+  nextAttemptAt DateTime?
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -3730,4 +3734,16 @@ model PushSubscription {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+
+// Immutable Stripe prices belonging to one negotiated customer agreement.
+model StripeContractPrice {
+  id String @id @default(cuid())
+  organizationId String
+  amountCents Int
+  stripePriceId String @unique
+  createdAt DateTime @default(now())
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  @@unique([organizationId, amountCents])
 }

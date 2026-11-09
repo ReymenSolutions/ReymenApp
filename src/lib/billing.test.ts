@@ -30,7 +30,7 @@ describe("estado y avisos de vencimiento", () => {
     expect(kind(3)).toBe("D3");
     expect(kind(0.5)).toBe("D1");
     expect(kind(-0.5)).toBe("OVERDUE");
-    expect(kind(-6)).toBe("OVERDUE_5");
+    expect(kind(-6)).toBe("SUSPENDED");
   });
 
   it("suma meses de calendario conservando el día", () => {
@@ -44,7 +44,7 @@ describe("pagos y avisos (base de datos)", () => {
   beforeAll(async () => { org = await createTestOrg("Billing Lib"); });
   afterAll(async () => { await cleanupOrg(org.id); });
   beforeEach(async () => {
-    sendEmail.mockClear();
+    sendEmail.mockReset().mockResolvedValue({ sent: true });
     notifyAdmins.mockClear();
     await prisma.billingNotice.deleteMany({ where: { organizationId: org.id } });
     await prisma.billingPayment.deleteMany({ where: { organizationId: org.id } });
@@ -87,10 +87,20 @@ describe("pagos y avisos (base de datos)", () => {
     expect(notifyAdmins).toHaveBeenCalled();
   });
 
-  it("con cobro automático de Stripe no manda el aviso previo, solo el de atraso", async () => {
+  it("does not mark failed delivery as sent and retries after the lease", async () => {
+    await prisma.organization.update({ where: { id: org.id }, data: { billingPeriodEnd: inDays(-3) } });
+    sendEmail.mockResolvedValue({ sent: false });
+    await runBillingNotices(now);
+    expect(await prisma.billingNotice.findFirst({ where: { organizationId: org.id } })).toMatchObject({ kind: "SUSPENDED", sentAt: null, attempts: 1 });
+    sendEmail.mockResolvedValue({ sent: true });
+    await runBillingNotices(new Date(now.getTime() + 16 * 60_000));
+    expect(await prisma.billingNotice.findFirst({ where: { organizationId: org.id } })).toMatchObject({ attempts: 2, sentAt: expect.any(Date) });
+  });
+
+  it("con Stripe avisa antes del cobro indicando la suspensión exacta", async () => {
     await prisma.organization.update({ where: { id: org.id }, data: { billingPeriodEnd: inDays(2.5), stripeSubscriptionStatus: "active" } });
     await runBillingNotices(now);
-    expect(await prisma.billingNotice.count({ where: { organizationId: org.id } })).toBe(0);
+    expect(await prisma.billingNotice.count({ where: { organizationId: org.id } })).toBe(1);
     await prisma.organization.update({ where: { id: org.id }, data: { stripeSubscriptionStatus: null } });
   });
 });

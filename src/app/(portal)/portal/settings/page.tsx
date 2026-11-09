@@ -133,7 +133,7 @@ export default async function PortalSettingsPage() {
             </p>
             {canManageBilling && <SubscriptionStatus view={billing} lang={lang} />}
             {stripeEnabled && canManageBilling ? (
-              <BillingActions hasActiveSubscription={hasActiveSubscription} plans={!org.customPlan && org.customMonthlyPriceMxn === null ? purchasablePlans : []} />
+              <BillingActions hasActiveSubscription={hasActiveSubscription} plans={!org.customPlan && org.customMonthlyPriceMxn === null ? purchasablePlans : [{ key: org.plan, name: lang === "es" ? "mi plan personalizado" : "my custom plan" }]} />
             ) : (
               <div className="info-box rounded-lg bg-brand-50 border border-brand-100 p-3">
                 <p className="info-box-text text-xs text-brand-700">{t.capacityMessage}</p>

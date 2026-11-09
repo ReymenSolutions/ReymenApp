@@ -1,5 +1,7 @@
 "use server";
 
+import { syncCustomSubscription } from "@/lib/stripe-contracts";
+
 import { reconcilePlanEntitlements } from "@/lib/plan-entitlements";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -278,7 +280,8 @@ export async function saveCustomPlan(input: CustomPlanInput) {
   });
   propagate();
   revalidatePath(`/admin/clients/${d.orgId}`);
-  return { success: true, modulesChanged: changedModules.length };
+  const stripeSync = await syncCustomSubscription(d.orgId).catch(() => "pending");
+  return { success: true, modulesChanged: changedModules.length, stripeSync };
 }
 
 /**
@@ -299,6 +302,7 @@ export async function removeCustomPlan(orgId: string) {
     });
     await reconcilePlanEntitlements(tx, id, base.modules);
   });
+  await syncCustomSubscription(id).catch(() => "pending");
   await setMonthlyBudget(id, null, session.user.id);
   const smartcardMemberLimit = await syncSmartcardMemberLimitForPlan(id, org.plan);
   await logAudit({ userId: session.user.id, organizationId: id, action: "client.custom_plan_removed", resource: "Organization", resourceId: id, metadata: { basePlan: org.plan, smartcardMemberLimit } });

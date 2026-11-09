@@ -54,6 +54,16 @@ describe("POST /api/webhooks/pos/orders", () => {
     expect(sale?.quantity).toBe(1);
   });
 
+  it("retains signed POS sales during billing suspension", async () => {
+    await prisma.organization.update({ where: { id: org.id }, data: { billingPeriodEnd: new Date(Date.now() - 4 * 86400_000) } });
+    const before = await prisma.foodSale.count({ where: { organizationId: org.id } });
+    const body = JSON.stringify({ grossAmount: 25, netAmount: 22, items: [{ variantId, quantity: 1 }] });
+    try {
+      expect((await POST(makeRequest(body, { ...signed(body, org.n8nWebhookSecret), "x-reymen-orgid": org.id }))).status).toBe(200);
+      expect(await prisma.foodSale.count({ where: { organizationId: org.id } })).toBe(before + 1);
+    } finally { await prisma.organization.update({ where: { id: org.id }, data: { billingPeriodEnd: null } }); }
+  });
+
   it("rejects a request signed with the wrong secret", async () => {
     const body = JSON.stringify({ grossAmount: 25, netAmount: 22, items: [{ variantId, quantity: 1 }] });
     const res = await POST(makeRequest(body, { ...signed(body, "wrong-secret"), "x-reymen-orgid": org.id }));

@@ -70,3 +70,20 @@ test("owner sees purchased automation access, cannot open CRM appointments or ch
   await page.goto("/portal/automations");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
+test("billing suspension retains billing/support and payment restores the purchased module", async ({ page }) => {
+  test.setTimeout(180000);
+  const org = await db.organization.findFirstOrThrow({ where: { name } });
+  await db.organization.update({ where: { id: org.id }, data: { billingPeriodEnd: new Date(Date.now() - 4 * 86400_000) } });
+  await login(page, ownerEmail);
+  await page.goto("/portal/automations");
+  await expect(page).toHaveURL(/\/portal\/settings\?billing=overdue/);
+  await expect(page.getByRole("alert")).toContainText("Módulos suspendidos");
+  await expect(page.getByRole("alert")).toContainText("UTC");
+  await page.goto("/portal/requests");
+  await expect(page).toHaveURL(/\/portal\/requests/);
+  const { recordPayment } = await import("../src/lib/billing");
+  await recordPayment(org.id, { amountMxn: 500, method: "TRANSFER", externalRef: `browser-${suffix}` });
+  await page.goto("/portal/automations");
+  await expect(page).toHaveURL(/\/portal\/automations/);
+  await expect(page.getByRole("alert")).not.toBeVisible();
+});

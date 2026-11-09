@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
 const runBillingNotices = vi.fn();
+vi.mock("@/lib/stripe-contracts", () => ({ reconcileCustomSubscriptions: vi.fn().mockResolvedValue({ checked: 0, pending: 0 }) }));
 vi.mock("@/lib/billing-notices", () => ({ runBillingNotices: (...a: unknown[]) => runBillingNotices(...a) }));
 const { POST } = await import("./route");
 const req = (h?: string) => new NextRequest("http://localhost/api/cron/billing", { method: "POST", headers: h ? { authorization: h } : {} });
@@ -24,6 +25,6 @@ describe("POST /api/cron/billing", () => {
     runBillingNotices.mockResolvedValue({ checked: 2, sent: 1 });
     const res = await POST(req("Bearer s3cret"));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true, checked: 2, sent: 1 });
+    expect(await res.json()).toEqual({ success: true, checked: 2, sent: 1, contracts: { checked: 0, pending: 0 } });
   });
 });
