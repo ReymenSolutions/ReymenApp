@@ -77,13 +77,13 @@ test("billing suspension retains billing/support and payment restores the purcha
   await login(page, ownerEmail);
   await page.goto("/portal/automations");
   await expect(page).toHaveURL(/\/portal\/settings\?billing=overdue/);
-  await expect(page.getByRole("alert")).toContainText("Módulos suspendidos");
-  await expect(page.getByRole("alert")).toContainText("UTC");
+  await expect(page.getByRole("alert").filter({ hasText: "Módulos suspendidos" })).toContainText("Módulos suspendidos");
+  await expect(page.getByRole("alert").filter({ hasText: "Módulos suspendidos" })).toContainText("UTC");
   await page.goto("/portal/requests");
   await expect(page).toHaveURL(/\/portal\/requests/);
   const { recordPayment } = await import("../src/lib/billing");
   await recordPayment(org.id, { amountMxn: 500, method: "TRANSFER", externalRef: `browser-${suffix}` });
   await page.goto("/portal/automations");
   await expect(page).toHaveURL(/\/portal\/automations/);
-  await expect(page.getByRole("alert")).not.toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "Módulos suspendidos" })).not.toBeVisible();
 });

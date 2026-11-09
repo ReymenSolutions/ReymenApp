@@ -61,3 +61,12 @@ El instalador conserva el programa de backups y reemplaza el archivo cron gestio
 En Stripe **test** verificar: checkout de precio pactado, renovación fallida, 72 horas de gracia, acceso a facturación/soporte, pago confirmado/reactivación, edición de importe sin factura/prorrateo inmediato, renovación con importe nuevo y factura de implementación sin ampliación de vigencia. Un Test Clock de Stripe no mueve el reloj del VPS; para probar mora usar una organización sintética con vencimiento controlado.
 
 Rollback: volver a la imagen/commit anterior conservando las columnas/tablas aditivas, sin borrar pagos ni contratos. La reversión de código no revierte los precios ya sincronizados en Stripe; revisar las suscripciones afectadas y restaurar el precio anterior sin prorrateo si corresponde. Mantener webhooks y registrar cualquier pago recibido durante el rollback.
+
+## Evidencia local de validación (2026-11-09)
+
+- Migración aplicada únicamente a PostgreSQL local desechable; Prisma generado correctamente.
+- Pruebas dirigidas: 71 aprobadas (gracia exacta, datos/permisos preservados, pagos concurrentes, precios por organización, reintentos, IA y ventas POS). Después se agregó el caso de renovación con módulo suspendido: 15 pruebas finales de webhook/contratos aprobadas. Traducciones: 5 aprobadas.
+- Compilación de producción y TypeScript aprobados. ESLint: cero errores, 64 advertencias preexistentes.
+- Playwright sobre la compilación de producción: 3 recorridos aprobados, incluyendo alta comercial, aislamiento de módulos y suspensión → facturación/soporte → pago → recuperación del módulo.
+- La primera suite general tuvo 1829 éxitos y 7 fallos: traducciones, identificador reutilizado en un fixture y timeouts concurrentes bajo compilación. Se corrigieron los dos primeros y se repitieron exitosamente todos los casos afectados sin esa carga. El resultado de CI sobre el commit publicado es la referencia para la regresión completa.
+- Proveedor Stripe simulado en pruebas automatizadas; no se usaron claves del VPS ni se efectuaron cobros. Queda la aceptación externa en Stripe test con el precio personalizado y la renovación sin prorrateo, y confirmar entrega de correo en el VPS.
