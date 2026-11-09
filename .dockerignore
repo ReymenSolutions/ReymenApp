@@ -3,3 +3,6 @@ backups/
 
 # smartcard-public/ es otra app (su propio package.json); no entra a la imagen de ReymenApp.
 smartcard-public/
+
+# Llaves del ambiente de prueba (deploy/test/init.sh): nunca entran a la imagen.
+.env.test

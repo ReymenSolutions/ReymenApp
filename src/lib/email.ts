@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { isTestEnv, testEmailAllowed } from "./app-env";
 
 const FROM = process.env.EMAIL_FROM || "Reymen Solutions <onboarding@resend.dev>";
 
@@ -23,6 +24,11 @@ export interface SendEmailInput {
  * keep working end-to-end without a real provider wired up.
  */
 export async function sendEmail(input: SendEmailInput): Promise<{ sent: boolean }> {
+  // Ambiente de prueba (copia de producción): nunca le llega un correo a una persona real que no esté en la lista.
+  if (isTestEnv() && !testEmailAllowed(input.to)) {
+    console.log(`[email:prueba] no se envió "${input.subject}": el destinatario no está en TEST_EMAIL_ALLOWLIST`);
+    return { sent: false };
+  }
   const resend = getClient();
 
   if (!resend) {
