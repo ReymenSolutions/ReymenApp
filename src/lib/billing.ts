@@ -110,6 +110,7 @@ export async function setBillingDueDate(organizationId: string, dueAt: Date | nu
 export type BillingView = BillingStatus & {
   amountMxn: number;
   stripeSubscription: boolean;
+  stripeSubscriptionStatus: string | null;
   payments: { id: string; amountMxn: number; method: string; periodEnd: Date; createdAt: Date; note: string | null; externalRef: string | null }[];
 };
 
@@ -123,6 +124,7 @@ export async function getBillingView(organizationId: string, now: Date = new Dat
     ...billingStatus(org.billingPeriodEnd, now),
     amountMxn: monthlyPriceMxn(plan, org.customMonthlyPriceMxn !== null ? Number(org.customMonthlyPriceMxn) : null),
     stripeSubscription: org.stripeSubscriptionStatus === "active" || org.stripeSubscriptionStatus === "trialing",
+    stripeSubscriptionStatus: org.stripeSubscriptionStatus,
     payments: payments.map((p) => ({ id: p.id, amountMxn: Number(p.amountMxn), method: p.method, periodEnd: p.periodEnd, createdAt: p.createdAt, note: p.note, externalRef: p.externalRef })),
   };
 }
