@@ -19,6 +19,7 @@ export function SubscriptionStatus({ view, lang }: { view: BillingView; lang: st
         <p className="text-sm font-medium text-slate-900">{es ? "Mi suscripción" : "My subscription"}</p>
         {badge}
       </div>
+      {view.stripeSubscriptionStatus === "canceled" && <p className="text-xs text-slate-600">{es ? "Suscripción Stripe cancelada. No habrá renovación automática; conservas el acceso hasta la fecha pagada y los 3 días de gracia." : "Stripe subscription canceled. It will not renew automatically; access remains until the paid-through date plus the 3-day grace period."}</p>}
       <p className="text-sm text-slate-600">
         {view.state === "OVERDUE"
           ? es ? `Venció el ${formatDate(view.dueAt, lang)} (${view.daysOver} ${view.daysOver === 1 ? "día" : "días"} de atraso).` : `Expired on ${formatDate(view.dueAt, lang)} (${view.daysOver} day${view.daysOver === 1 ? "" : "s"} overdue).`

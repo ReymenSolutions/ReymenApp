@@ -61,6 +61,7 @@ export function BillingAdminPanel({ orgId, view }: { orgId: string; view: Billin
           <span className="text-slate-600">{es ? "Mensualidad" : "Monthly"}: <strong>${view.amountMxn.toLocaleString("en-US")} MXN</strong></span>
           {view.dueAt && <span className="text-slate-600">{es ? "Pagado hasta" : "Paid through"}: <strong>{formatDate(view.dueAt, lang)}</strong></span>}
           {view.stripeSubscription && <Badge variant="secondary">{es ? "Cobro automático con Stripe" : "Automatic Stripe billing"}</Badge>}
+          {view.stripeSubscriptionStatus === "canceled" && <Badge variant="secondary">{es ? "Suscripción Stripe cancelada" : "Stripe subscription canceled"}</Badge>}
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
@@ -83,7 +84,7 @@ export function BillingAdminPanel({ orgId, view }: { orgId: string; view: Billin
             <Input type="date" value={due} onChange={(e) => setDue(e.target.value)} aria-label={es ? "Próximo vencimiento" : "Next due date"} />
             <Input placeholder={es ? "Motivo (queda en la bitácora)" : "Reason (goes to the audit log)"} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} aria-label={es ? "Motivo" : "Reason"} />
             <Button size="sm" variant="outline" disabled={pending || reason.trim().length < 5} onClick={() => run(() => setOrgBillingDueDate({ orgId, dueAt: due || null, reason }), es ? "Vencimiento guardado" : "Due date saved")}>{es ? "Guardar (vacío = sin cobro)" : "Save (empty = not billed)"}</Button>
-            <p className="text-xs text-slate-500">{es ? "Da de alta al cliente en el cobro: desde ahí recibe avisos de vencimiento. Nada se suspende solo." : "Enrolls the client in billing: from then on it gets due-date notices. Nothing is suspended automatically."}</p>
+            <p className="text-xs text-slate-500">{es ? "Da de alta al cliente en el cobro y activa los avisos. Si el pago no se confirma, los módulos se suspenden 3 días después del vencimiento; facturación y soporte siguen disponibles." : "Enrolls the client in billing and enables notices. Without confirmed payment, modules are suspended 3 days after the due date; billing and support remain available."}</p>
           </div>
         </div>
 
