@@ -7,3 +7,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Reymen Talleres
+
+Antes de trabajar en el módulo Talleres, lee `docs/workshop/reymen-talleres-spec.md` como fuente principal, luego `docs/workshop/FASE0_AUDITORIA.md` y `docs/workshop/PROGRESS.md`. El módulo está en desarrollo y no está listo para activarse en producción. No uses Contractors como patrón: todavía no existe; sigue Realty donde corresponda.
