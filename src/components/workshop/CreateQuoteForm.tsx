@@ -6,10 +6,10 @@ import { toast } from "sonner";
 import { createWorkshopQuote } from "@/actions/workshop";
 import { getErrorMessage } from "@/lib/user-error";
 
-type Line = { tipo: "REFACCION" | "MANO_DE_OBRA" | "SERVICIO"; concepto: string; cantidad: string; unidad: string; precioUnitarioNeto: string; costoUnitarioNeto: string };
-const blankLine = (): Line => ({ tipo: "SERVICIO", concepto: "", cantidad: "1", unidad: "serv.", precioUnitarioNeto: "", costoUnitarioNeto: "" });
+type Line = { tipo: "REFACCION" | "MANO_DE_OBRA" | "SERVICIO"; partId: string; concepto: string; cantidad: string; unidad: string; precioUnitarioNeto: string; costoUnitarioNeto: string };
+const blankLine = (): Line => ({ tipo: "SERVICIO", partId: "", concepto: "", cantidad: "1", unidad: "serv.", precioUnitarioNeto: "", costoUnitarioNeto: "" });
 
-export function CreateQuoteForm({ lang, vehicles }: { lang: string; vehicles: { id: string; placas: string | null; vin: string | null; customer: { name: string | null; phone: string } }[] }) {
+export function CreateQuoteForm({ lang, vehicles, parts }: { lang: string; vehicles: { id: string; placas: string | null; vin: string | null; customer: { name: string | null; phone: string } }[]; parts: { id: string; nombre: string; sku: string; unidad: string; precioVentaNeto: string; costoNeto: string }[] }) {
   const [items, setItems] = useState<Line[]>([blankLine()]);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -30,7 +30,7 @@ export function CreateQuoteForm({ lang, vehicles }: { lang: string; vehicles: { 
         vehicleId: String(data.get("vehicleId") ?? ""),
         servicioTitulo: String(data.get("servicioTitulo") ?? ""),
         tiempoEstimado: String(data.get("tiempoEstimado") ?? ""),
-        items: items.map((item) => ({ ...item, costoUnitarioNeto: item.costoUnitarioNeto || undefined })),
+        items: items.map((item) => ({ ...item, partId: item.partId || undefined, costoUnitarioNeto: item.costoUnitarioNeto || undefined })),
       });
       toast.success(es ? "Borrador de cotización guardado" : "Quote draft saved");
       form.reset();
@@ -52,6 +52,10 @@ export function CreateQuoteForm({ lang, vehicles }: { lang: string; vehicles: { 
     </div>
     <div className="space-y-3">{items.map((item, index) => <div key={index} className="grid gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-4">
       <select aria-label={es ? "Tipo" : "Type"} className={field} value={item.tipo} onChange={(e) => change(index, "tipo", e.target.value)}><option value="SERVICIO">{es ? "Servicio" : "Service"}</option><option value="MANO_DE_OBRA">{es ? "Mano de obra" : "Labor"}</option><option value="REFACCION">{es ? "Refacción" : "Part"}</option></select>
+      {item.tipo === "REFACCION" && <select aria-label={es ? "Refacción de inventario" : "Inventory part"} className={field} value={item.partId} required onChange={(e) => {
+        const part = parts.find((p) => p.id === e.target.value);
+        setItems((current) => current.map((line, i) => i === index ? { ...line, partId: part?.id ?? "", concepto: part?.nombre ?? line.concepto, unidad: part?.unidad ?? line.unidad, precioUnitarioNeto: part?.precioVentaNeto ?? line.precioUnitarioNeto, costoUnitarioNeto: part?.costoNeto ?? line.costoUnitarioNeto } : line));
+      }}><option value="">{es ? "Seleccionar refacción" : "Select part"}</option>{parts.map((part) => <option key={part.id} value={part.id}>{part.sku} · {part.nombre}</option>)}</select>}
       <input aria-label={es ? "Concepto" : "Description"} className={field} placeholder={es ? "Concepto" : "Description"} value={item.concepto} onChange={(e) => change(index, "concepto", e.target.value)} required />
       <input aria-label={es ? "Cantidad" : "Quantity"} className={field} type="number" min="0.001" step="0.001" value={item.cantidad} onChange={(e) => change(index, "cantidad", e.target.value)} required />
       <input aria-label={es ? "Unidad" : "Unit"} className={field} value={item.unidad} onChange={(e) => change(index, "unidad", e.target.value)} required />

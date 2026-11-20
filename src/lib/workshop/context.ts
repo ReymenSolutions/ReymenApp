@@ -13,11 +13,12 @@ export const getWorkshopContext = cache(async () => {
   await requireModule(organizationId, "WORKSHOP");
   const [lang, org] = await Promise.all([
     getServerLang(),
-    prisma.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { name: true } }),
+    prisma.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { name: true, timezone: true } }),
   ]);
   return {
     organizationId,
     orgName: org.name,
+    timezone: org.timezone,
     lang,
     canManageFinancials: ["OWNER", "ADMIN", "SUPER_ADMIN"].includes(session.user.role),
   };
