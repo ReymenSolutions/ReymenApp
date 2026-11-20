@@ -163,6 +163,14 @@ model Organization {
   realtyCampaigns         RealtyCampaign[]
   realtyClosings          RealtyClosing[]
   realtySettings          RealtySettings?
+  workshopSettings        WorkshopSettings?
+  workshopVehicles        WorkshopVehicle[]
+  workshopQuotes          WorkshopQuote[]
+  workshopOrders          WorkshopWorkOrder[]
+  workshopParts           WorkshopPart[]
+  workshopInventoryMovements WorkshopInventoryMovement[]
+  workshopPurchases       WorkshopPurchase[]
+  workshopCashMovements   WorkshopCashMovement[]
   loyaltyEventReceipts    LoyaltyEventReceipt[]
 
   @@index([slug])
@@ -209,6 +217,8 @@ model User {
   loyaltyRedemptions    LoyaltyReward[] @relation("LoyaltyRewardRedeemedBy")
   realtyPropertiesAdvised RealtyProperty[]    @relation("RealtyPropertyAdvisor")
   realtyProfilesAdvised   RealtyLeadProfile[] @relation("RealtyProfileAdvisor")
+  workshopOrdersAssigned  WorkshopWorkOrder[] @relation("WorkshopMechanic")
+  workshopCashRecorded    WorkshopCashMovement[] @relation("WorkshopCashRecorder")
 
   @@index([organizationId])
   @@index([email])
@@ -1362,6 +1372,307 @@ enum PlatformModule {
   // en Lead; Realty solo guarda lo inmobiliario (preferencias, propiedades,
   // matches, visitas ligadas a Appointment, cierres y campañas).
   REALTY
+  WORKSHOP
+}
+
+// Talleres: importes siempre netos en Decimal; IVA y total se calculan y guardan
+// en la misma transacción. Ninguna entidad se comparte entre organizaciones.
+enum WorkshopQuoteStatus {
+  BORRADOR
+  ENVIADA
+  APROBADA
+  RECHAZADA
+  VENCIDA
+  CONVERTIDA
+}
+
+enum WorkshopOrderStatus {
+  RECEPCION
+  DIAGNOSTICO
+  ESPERA_AUTORIZACION
+  EN_REPARACION
+  LISTA_PARA_ENTREGA
+  ENTREGADA
+  CANCELADA
+}
+
+enum WorkshopItemType {
+  REFACCION
+  MANO_DE_OBRA
+  SERVICIO
+}
+
+enum WorkshopInventoryMovementType {
+  ENTRADA_COMPRA
+  SALIDA_ORDEN
+  DEVOLUCION
+  AJUSTE
+}
+
+enum WorkshopCashType {
+  INGRESO
+  EGRESO
+}
+
+enum WorkshopPaymentMethod {
+  EFECTIVO
+  TRANSFERENCIA
+  TARJETA
+}
+
+model WorkshopSettings {
+  id String @id @default(cuid())
+  organizationId String @unique
+  vigenciaDias Int @default(15)
+  garantiaDias Int @default(90)
+  garantiaKm Int @default(5000)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id])
+}
+
+model WorkshopVehicle {
+  id String @id @default(cuid())
+  organizationId String
+  customerId String
+  placas String?
+  vin String?
+  marca String?
+  modelo String?
+  anio Int?
+  version String?
+  motor String?
+  kilometrajeActual Int?
+  color String?
+  proximoServicioKm Int?
+  proximoServicioFecha DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+  quotes WorkshopQuote[]
+  orders WorkshopWorkOrder[]
+  @@unique([organizationId, placas])
+  @@unique([organizationId, vin])
+  @@index([organizationId, customerId])
+}
+
+model WorkshopQuote {
+  id String @id @default(cuid())
+  organizationId String
+  folio String?
+  customerId String
+  vehicleId String
+  estado WorkshopQuoteStatus @default(BORRADOR)
+  servicioTitulo String
+  tiempoEstimado String?
+  vigenciaDias Int @default(15)
+  garantiaDias Int @default(90)
+  garantiaKm Int @default(5000)
+  subtotalNeto Decimal @default(0) @db.Decimal(12, 2)
+  iva Decimal @default(0) @db.Decimal(12, 2)
+  total Decimal @default(0) @db.Decimal(12, 2)
+  costoTotalNeto Decimal? @db.Decimal(12, 2)
+  utilidadNeta Decimal? @db.Decimal(12, 2)
+  aprobadaEn DateTime?
+  aprobadaVia String?
+  notas String? @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+  vehicle WorkshopVehicle @relation(fields: [vehicleId], references: [id])
+  items WorkshopQuoteItem[]
+  workOrder WorkshopWorkOrder?
+  @@unique([organizationId, folio])
+  @@index([organizationId, estado])
+  @@index([organizationId, vehicleId, createdAt])
+}
+
+model WorkshopQuoteItem {
+  id String @id @default(cuid())
+  organizationId String
+  quoteId String
+  partId String?
+  tipo WorkshopItemType
+  concepto String
+  detalle String? @db.Text
+  cantidad Decimal @db.Decimal(12, 3)
+  unidad String
+  precioUnitarioNeto Decimal @db.Decimal(12, 2)
+  costoUnitarioNeto Decimal? @db.Decimal(12, 2)
+  importeNeto Decimal @db.Decimal(12, 2)
+  ivaImporte Decimal @db.Decimal(12, 2)
+  importeConIva Decimal @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  quote WorkshopQuote @relation(fields: [quoteId], references: [id])
+  part WorkshopPart? @relation(fields: [partId], references: [id])
+  @@index([organizationId, quoteId])
+}
+
+model WorkshopWorkOrder {
+  id String @id @default(cuid())
+  organizationId String
+  folio String
+  quoteId String @unique
+  customerId String
+  vehicleId String
+  estado WorkshopOrderStatus @default(RECEPCION)
+  fallaReportada String? @db.Text
+  diagnostico String? @db.Text
+  kilometrajeIngreso Int
+  nivelCombustible String?
+  checklistRecepcion Json?
+  fotosRecepcion Json?
+  fotosProceso Json?
+  fotosEntrega Json?
+  mecanicoAsignadoId String?
+  fechaPrometida DateTime?
+  anticipo Decimal @default(0) @db.Decimal(12, 2)
+  saldo Decimal @default(0) @db.Decimal(12, 2)
+  entregadaEn DateTime?
+  garantiaDias Int @default(90)
+  garantiaKm Int @default(5000)
+  facturaSolicitada Boolean @default(false)
+  creditoAutorizadoEn DateTime?
+  creditoAutorizadoNota String? @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id])
+  quote WorkshopQuote @relation(fields: [quoteId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+  vehicle WorkshopVehicle @relation(fields: [vehicleId], references: [id])
+  mecanicoAsignado User? @relation("WorkshopMechanic", fields: [mecanicoAsignadoId], references: [id])
+  items WorkshopOrderItem[]
+  inventoryMovements WorkshopInventoryMovement[]
+  purchases WorkshopPurchase[]
+  cashMovements WorkshopCashMovement[]
+  @@unique([organizationId, folio])
+  @@index([organizationId, estado])
+  @@index([organizationId, vehicleId, createdAt])
+}
+
+model WorkshopOrderItem {
+  id String @id @default(cuid())
+  organizationId String
+  workOrderId String
+  partId String?
+  tipo WorkshopItemType
+  concepto String
+  detalle String? @db.Text
+  cantidad Decimal @db.Decimal(12, 3)
+  unidad String
+  precioUnitarioNeto Decimal @db.Decimal(12, 2)
+  costoUnitarioNeto Decimal? @db.Decimal(12, 2)
+  importeNeto Decimal @db.Decimal(12, 2)
+  ivaImporte Decimal @db.Decimal(12, 2)
+  importeConIva Decimal @db.Decimal(12, 2)
+  autorizadaEn DateTime?
+  autorizadaVia String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workOrder WorkshopWorkOrder @relation(fields: [workOrderId], references: [id])
+  part WorkshopPart? @relation(fields: [partId], references: [id])
+  @@index([organizationId, workOrderId])
+}
+
+model WorkshopPart {
+  id String @id @default(cuid())
+  organizationId String
+  sku String
+  nombre String
+  descripcion String? @db.Text
+  unidad String
+  costoNeto Decimal @db.Decimal(12, 2)
+  precioVentaNeto Decimal @db.Decimal(12, 2)
+  stockMinimo Decimal @default(0) @db.Decimal(12, 3)
+  proveedorHabitual String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id])
+  quoteItems WorkshopQuoteItem[]
+  orderItems WorkshopOrderItem[]
+  movements WorkshopInventoryMovement[]
+  purchaseLines WorkshopPurchaseLine[]
+  @@unique([organizationId, sku])
+}
+
+model WorkshopInventoryMovement {
+  id String @id @default(cuid())
+  organizationId String
+  partId String
+  tipo WorkshopInventoryMovementType
+  cantidad Decimal @db.Decimal(12, 3)
+  costoUnitarioNeto Decimal @db.Decimal(12, 2)
+  workOrderId String?
+  purchaseId String?
+  motivo String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id])
+  part WorkshopPart @relation(fields: [partId], references: [id])
+  workOrder WorkshopWorkOrder? @relation(fields: [workOrderId], references: [id])
+  purchase WorkshopPurchase? @relation(fields: [purchaseId], references: [id])
+  @@index([organizationId, partId, createdAt])
+  @@index([organizationId, workOrderId])
+}
+
+model WorkshopPurchase {
+  id String @id @default(cuid())
+  organizationId String
+  proveedor String
+  fecha DateTime
+  folioProveedor String?
+  subtotalNeto Decimal @db.Decimal(12, 2)
+  iva Decimal @db.Decimal(12, 2)
+  total Decimal @db.Decimal(12, 2)
+  workOrderId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id])
+  workOrder WorkshopWorkOrder? @relation(fields: [workOrderId], references: [id])
+  lines WorkshopPurchaseLine[]
+  inventoryMovements WorkshopInventoryMovement[]
+  cashMovements WorkshopCashMovement[]
+  @@index([organizationId, fecha])
+}
+
+model WorkshopPurchaseLine {
+  id String @id @default(cuid())
+  organizationId String
+  purchaseId String
+  partId String
+  cantidad Decimal @db.Decimal(12, 3)
+  costoUnitarioNeto Decimal @db.Decimal(12, 2)
+  importeNeto Decimal @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  purchase WorkshopPurchase @relation(fields: [purchaseId], references: [id])
+  part WorkshopPart @relation(fields: [partId], references: [id])
+  @@index([organizationId, purchaseId])
+}
+
+model WorkshopCashMovement {
+  id String @id @default(cuid())
+  organizationId String
+  tipo WorkshopCashType
+  concepto String
+  monto Decimal @db.Decimal(12, 2)
+  metodo WorkshopPaymentMethod
+  workOrderId String?
+  purchaseId String?
+  fecha DateTime @default(now())
+  registradoPorId String?
+  notas String? @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id])
+  workOrder WorkshopWorkOrder? @relation(fields: [workOrderId], references: [id])
+  purchase WorkshopPurchase? @relation(fields: [purchaseId], references: [id])
+  registradoPor User? @relation("WorkshopCashRecorder", fields: [registradoPorId], references: [id])
+  @@index([organizationId, fecha])
+  @@index([organizationId, workOrderId])
 }
 
 enum ModuleStatus {
@@ -1553,6 +1864,9 @@ model Customer {
   lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
   sales        FoodSale[]
   loyaltyMembers LoyaltyMember[]
+  workshopVehicles WorkshopVehicle[]
+  workshopQuotes WorkshopQuote[]
+  workshopOrders WorkshopWorkOrder[]
 
   @@unique([organizationId, phoneKey])
   @@index([leadId])

@@ -22,6 +22,7 @@ describe("modules", () => {
     org = await createTestOrg("Modules No Row Org");
     await expect(hasModule(org.id, "NFC_QR")).resolves.toBe(false);
     await expect(hasModule(org.id, "MARKETING_ADS")).resolves.toBe(false);
+    await expect(hasModule(org.id, "WORKSHOP")).resolves.toBe(false);
   });
 
   it("a SUSPENDED module is not enabled", async () => {
@@ -45,6 +46,7 @@ describe("modules", () => {
   it("assertModuleEnabled throws a clear error when the module isn't active", async () => {
     org = await createTestOrg("Modules Assert Org");
     await expect(assertModuleEnabled(org.id, "NFC_QR")).rejects.toThrow(/Smart Cards/i);
+    await expect(assertModuleEnabled(org.id, "WORKSHOP")).rejects.toThrow(/Talleres/i);
     await expect(assertModuleEnabled(org.id, "CRM")).resolves.toBeUndefined();
   });
 

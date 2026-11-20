@@ -24,6 +24,7 @@ export const MODULE_LABEL: Record<PlatformModule, string> = {
   REYMEN_POS: "Reymen POS",
   LOYALTY: "Reymen Programa de lealtad",
   REALTY: "Reymen Real Estate",
+  WORKSHOP: "Reymen Talleres",
 };
 
 const MODULE_LABEL_EN: Record<PlatformModule, string> = {
@@ -36,10 +37,11 @@ const MODULE_LABEL_EN: Record<PlatformModule, string> = {
   REYMEN_POS: "Reymen POS",
   LOYALTY: "Reymen Loyalty Program",
   REALTY: "Reymen Real Estate",
+  WORKSHOP: "Reymen Workshop",
 };
 
 /** Todos los módulos, en el orden en que se muestran. */
-export const ALL_MODULES: PlatformModule[] = ["CRM", "AI_WHATSAPP", "AUTOMATIONS", "NFC_QR", "MARKETING_ADS", "FOOD_OPS", "REYMEN_POS", "LOYALTY", "REALTY"];
+export const ALL_MODULES: PlatformModule[] = ["CRM", "AI_WHATSAPP", "AUTOMATIONS", "NFC_QR", "MARKETING_ADS", "FOOD_OPS", "REYMEN_POS", "LOYALTY", "REALTY", "WORKSHOP"];
 
 export function getModuleLabel(lang: "es" | "en"): Record<PlatformModule, string> {
   return lang === "es" ? MODULE_LABEL : MODULE_LABEL_EN;
