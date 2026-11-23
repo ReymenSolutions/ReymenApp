@@ -9,7 +9,7 @@ lo necesita. Formato: contexto → opciones → recomendación → estado.
 |---|---|---|
 | C-01 | Retail se construye **dentro de Reymen App** como un módulo más (`RETAIL`), no como app ni sistema aparte | 23 nov 2026 |
 | C-02 | POS: **lo hace Reymen**, sin facturación inicial y con el gancho listo (`facturaSolicitada`, totales separados). GESEM solo como origen de migración por Excel; sin integración en vivo | 23 nov 2026 |
-| C-03 | Una sola organización (Grupo Carvallo) con varias ubicaciones; Casa Carballo nace inactiva; Las Misiones **no existe** como tienda | 18–23 nov 2026 |
+| C-03 | Una sola organización (Grupo Carvallo) con Labash y Outlet del Norte activas, Casa Carballo inactiva, Bodega y Las Misiones como distribuidora de mayoreo inactiva para Fase 3; Las Misiones no es tienda de menudeo | 23 nov 2026 |
 | C-04 | Inventario **por pieza única** (una fila = una prenda, código único + QR) | 23 nov 2026 |
 | C-05 | Web Fase 2 = apartado + confirmación por WhatsApp. Sin checkout, sin pasarela, sin envíos | 23 nov 2026 |
 | C-06 | El POS solo registra método y monto; no procesa tarjetas ni guarda datos de tarjeta | 23 nov 2026 |
@@ -54,6 +54,14 @@ Las 5 se confirmaron tal como se recomendaron. Se dejan el contexto y las opcion
 - **Recomendación:** **B**. Además, el límite del plan (10 usuarios) cuenta usuarios del sistema, no vendedores.
 - **Estado:** ✅ CONFIRMADA (B) — 23 nov 2026. Siguen pendientes los nombres y roles reales de los vendedores (datos del cliente).
 
+## Web pública (23 nov 2026)
+
+| ID | Decisión |
+|---|---|
+| W-01 | **Opción A:** la web muestra todo lo DISPONIBLE de canal TIENDA o EN_LINEA (con foto, en tienda activa). MAYOREO nunca sale suelto |
+| W-02 | Logo: el **RM** que ya está en el repo (`src/app/icon.png`); no hay otro archivo del logo de Reymen |
+| W-03 | WhatsApp por tienda (Labash y Outlet del Norte): **pendiente**, lo pasa Reynol. Sin número no se muestra el botón de apartar |
+
 ## Reparto de trabajo (23 nov 2026)
 
 | Quién | Qué | Carpetas que le pertenecen |
@@ -65,13 +73,12 @@ La web **no crea tablas ni reglas de inventario**: lee y llama a lo que construy
 [`WEB-CONTRACT.md`](WEB-CONTRACT.md). Si la web necesita algo del núcleo que no está en el contrato, se agrega primero al
 contrato y lo implementa el dueño de esa carpeta.
 
-## Pendientes detectados en la revisión del 23 nov 2026
+## Pendientes de implementación detectados en la revisión del 23 nov 2026
 
 | ID | Decisión pendiente | Estado para trabajar con seguridad |
 |---|---|---|
-| W-01 | ¿Publicar en web solo `EN_LINEA` o también prendas asignadas a `TIENDA`? | Abierta. No publicar catálogo hasta confirmar. Siempre compartir una sola fila por pieza. |
-| W-02 | ¿El precio de etiqueta es el importe final al consumidor con impuestos incluidos? | Abierta. No inferir IVA ni timbrado. |
-| W-03 | ¿De dónde se obtiene la comisión real del medio de pago? | Abierta. Contribución operativa «pendiente» si falta el dato. |
-| W-04 | ¿Cuánto dura un apartado por canal y se permite prórroga? | Abierta. Configurable; no habilitar apartados públicos con un plazo inventado. |
+| I-01 | ¿El precio de etiqueta es el importe final al consumidor con impuestos incluidos? | Abierta. No inferir IVA ni timbrado. |
+| I-02 | ¿De dónde se obtiene la comisión real del medio de pago? | Abierta. Contribución operativa «pendiente» si falta el dato. |
+| I-03 | ¿Cuánto dura un apartado por canal y se permite prórroga? | Abierta. Configurable; no habilitar apartados públicos con un plazo inventado. |
 
 **Seguridad del contrato web:** el nombre y teléfono capturados en una solicitud pública son datos declarados, no identidad comprobada. `createHold` debe crear un Lead de solicitud y no adjuntar automáticamente un Customer ni su historial por teléfono. La vinculación se hace tras verificación o confirmación humana.

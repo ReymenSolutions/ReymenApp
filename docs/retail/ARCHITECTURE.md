@@ -1,6 +1,6 @@
 # Arquitectura — Reymen Retail
 
-Propuesta sobre el patrón verificado en [`AUDIT-2026-11-23.md`](AUDIT-2026-11-23.md). DEC-01 a DEC-05 ya están confirmadas; W-01 a W-04 siguen abiertas. Ninguna ruta Retail está implementada todavía.
+Propuesta sobre el patrón verificado en [`AUDIT-2026-11-23.md`](AUDIT-2026-11-23.md). DEC-01 a DEC-05 y W-01 ya están confirmadas; I-01 a I-03 siguen abiertas. La web pública existe con fuente inactiva; ninguna ruta del núcleo Retail está implementada todavía.
 
 ## Dónde vive
 - Módulo `RETAIL` en `PlatformModule`, registrado en `src/lib/modules.ts`, con entitlement por `OrganizationModule`.
@@ -17,4 +17,4 @@ Propuesta sobre el patrón verificado en [`AUDIT-2026-11-23.md`](AUDIT-2026-11-2
 ## Decisiones vigentes
 
 - DEC-01: `Branch` + `RetailLocationSettings`; DEC-02: POS web en App; DEC-03: fotos en volumen privado con respaldo; DEC-04: CSV y muestra real antes de XLSX; DEC-05: vendedor con PIN en Fase 1.
-- W-01 a W-04 y los datos operativos siguen pendientes en [`DECISIONS.md`](DECISIONS.md) y [`TASKS.md`](TASKS.md).
+- I-01 a I-03 y los datos operativos siguen pendientes en [`DECISIONS.md`](DECISIONS.md) y [`TASKS.md`](TASKS.md). Las Misiones es una distribuidora inactiva para Fase 3, sin POS ni catálogo de menudeo.

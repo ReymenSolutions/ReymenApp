@@ -9,4 +9,4 @@ Se conservan estos archivos tal como fueron compartidos el 23 de noviembre de 20
 | [`PROMPT_FASE1_RECIBIDO.md`](PROMPT_FASE1_RECIBIDO.md) | Prompt técnico recibido para el módulo; sus rutas antiguas y supuestos se contrastan con el repo. |
 | [`PROMPT_FASE2_RECIBIDO.md`](PROMPT_FASE2_RECIBIDO.md) | Trabajo futuro condicionado a aceptar Fase 1; no autoriza comenzar Fase 2. |
 
-La copia de `SPEC.md` en `docs/retail/` coincide byte por byte con el spec adjunto en esta conversación. No hay una segunda versión divergente.
+El spec fue actualizado después de recibir esos adjuntos. La versión vigente está en [`../SPEC.md`](../SPEC.md), junto con [`../PROMPT-MODULO-RETAIL.md`](../PROMPT-MODULO-RETAIL.md) y [`../PROMPT-FASE2-CODEX.md`](../PROMPT-FASE2-CODEX.md). Las copias aquí son históricas y pueden contradecir la corrección de Las Misiones.

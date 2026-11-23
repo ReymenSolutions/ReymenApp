@@ -12,7 +12,7 @@ La web consulta directo con Prisma, siempre filtrando por `organizationId`, desd
 |---|---|---|
 | Módulo activo | `hasModule(orgId, "RETAIL")` | Sin RETAIL la web no publica (404) |
 | Organización | `Organization.slug` | URL: `/tienda/<slug>` |
-| Tiendas | `Branch` + `RetailLocationSettings` (DEC-01): nombre, `type` (TIENDA/BODEGA), `format` (PREMIUM/OUTLET/HOGAR/BODEGA), `isActive`, `whatsappPhone` configurable | Solo tiendas activas tipo TIENDA. Casa Carballo inactiva = «Próximamente», sin catálogo. La Bodega nunca aparece |
+| Tiendas | `Branch` + `RetailLocationSettings` (DEC-01): nombre, `type` (TIENDA/BODEGA), `format` (PREMIUM/OUTLET/HOGAR/BODEGA), `isActive`, **`whatsappPhone`** (WhatsApp de la tienda para apartar; TBD hasta que lo dé el cliente) | Solo tiendas activas tipo TIENDA. Casa Carballo inactiva = «Próximamente», sin catálogo. La Bodega nunca aparece |
 | Prenda | `RetailItem`: `id`, `code`, `brand`, `category`, `garmentType`, `size`, `color`, `style`, `salePrice`, `status`, `channel`, `locationId`, foto | Catálogo y detalle |
 | Foto | Ruta servida por la app (DEC-03), no `Bytes` | Imagen de la tarjeta y del detalle |
 | Descuento vigente | `RetailDiscountPlan` con `status = APLICADO`, vigente hoy, que aplique al canal web | Precio con descuento. Sin plan aprobado = precio normal |
@@ -20,9 +20,10 @@ La web consulta directo con Prisma, siempre filtrando por `organizationId`, desd
 **Nunca se leen ni se envían al navegador:** `cost`, márgenes, quién dio de alta, movimientos, ventas, clientes.
 
 ### Qué prendas se publican
-- `status = DISPONIBLE`, en una tienda **activa** tipo TIENDA. `channel = MAYOREO` nunca sale en el catálogo de menudeo.
-- **Pendiente (W-01):** confirmar si se publican solo prendas `EN_LINEA` o también `TIENDA`. Mientras esté abierto, no publicar el catálogo. Cualquiera que se publique usa la **misma fila `RetailItem`** que el POS: si se vende en tienda, desaparece de la web.
-- La ruta pública usa el `slug` para resolver una organización fija en el servidor; no recibe `organizationId` del navegador. La consulta selecciona solo campos públicos. Nunca envía `cost`, margen, datos personales ni identificadores de personal.
+- `status = DISPONIBLE`, en una tienda **activa** tipo TIENDA.
+- `channel = MAYOREO` nunca sale en el catálogo de menudeo.
+- **W-01 (resuelta 23 nov 2026, opción A):** salen las prendas DISPONIBLES de canal `TIENDA` **y** `EN_LINEA`, solo si tienen foto. Implementado en `isPublishable` (`src/lib/retail/public/catalog.ts`).
+- La ruta pública resuelve la organización desde el `slug` en el servidor; no acepta `organizationId` del navegador. La consulta selecciona solo campos públicos y usa la misma fila `RetailItem` del POS.
 
 ## 2. Lo que la web LLAMA (escritura, implementada por Codex en el núcleo)
 
@@ -55,11 +56,16 @@ Reglas que garantiza el núcleo, no la web:
 - **El número de WhatsApp de cada tienda es TBD**: sin él, el botón no se muestra.
 - Mayoreo (Fase 3): solo se deja la ruta preparada, sin publicar.
 
-## Integración con el PR #194 de Claude
+## 4. Estado de la implementación de la web (Claude Code)
+- Hecho (sin datos reales todavía):
+  - rutas `src/app/tienda/[slug]/` (inicio, `catalogo`, `prenda/[code]`);
+  - reglas puras y pruebas en `src/lib/retail/public/catalog.ts`;
+  - acción pública de apartar en `src/lib/retail/public/actions.ts` (límite por IP y teléfono);
+  - componentes en `src/components/retail-public/`;
+  - ruta pública en `src/proxy.ts`.
+- Marca: logo **RM** del repo (`src/app/icon.png`, servido como `/icon.png`), azul marino y azul rey (tokens `.rt` en `globals.css`).
+- **Único punto por conectar:** `src/lib/retail/public/source.ts`. Hoy `getStorefront` devuelve `null` (la tienda da 404) y `requestHold` responde `NOT_READY`. Cuando Codex entregue `RetailItem`, `RetailLocationSettings` y `createHold`, se implementan ahí siguiendo las instrucciones del propio archivo.
 
-El PR [#194](https://github.com/ReymenSolutions/ReymenApp/pull/194) ya contiene la estructura de la web. Su `source.ts` devuelve `null`/`NOT_READY`, por lo que no ofrece apartados reales. Antes de conectar el núcleo:
+## 5. Integración pendiente con el núcleo
 
-1. Conciliar W-01: el PR #194 implementa la opción A (`TIENDA` + `EN_LINEA`); la decisión aún requiere confirmación del negocio antes de publicar el catálogo.
-2. Adaptar `src/lib/retail/public/actions.ts` y `source.ts` a `requester` y `requestKey` del contrato anterior. Una repetición de la misma solicitud debe devolver el mismo apartado y no crear otro Lead.
-3. Confirmar que `getStorefront` resuelva la organización desde el slug, aplique entitlement y seleccione campos públicos. Asegurar que `requestHold` verifique que la pieza sigue disponible para esa organización en la transacción.
-4. Mantener `NOT_READY` hasta confirmar W-04, número de WhatsApp, pruebas de concurrencia y recorrido en `apptest`.
+Antes de conectar `source.ts`, adaptar `src/lib/retail/public/actions.ts` y `source.ts` a `requester` y `requestKey`. Una repetición de la misma solicitud debe devolver el mismo apartado y no crear otro Lead. Confirmar el filtro por organización y campos públicos, comprobar concurrencia y mantener `NOT_READY` hasta configurar el plazo I-03 y probar el recorrido en `apptest`.

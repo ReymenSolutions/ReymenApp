@@ -18,4 +18,6 @@ tablero, para Labash y Outlet del Norte (Casa Carballo inactiva). Piloto: Grupo 
 | [PRD.md](PRD.md) · [ARCHITECTURE.md](ARCHITECTURE.md) · [DATABASE.md](DATABASE.md) · [API.md](API.md) · [SECURITY.md](SECURITY.md) | Producto, arquitectura, datos, acciones y seguridad |
 | [references/](references/README.md) | Cuatro archivos recibidos como antecedentes: ideas, mayoreo y prompts de Fase 1/2 |
 
-**Estado:** Fase 0 terminada y decisiones DEC-01 a DEC-05 confirmadas. No hay código Retail en `main@6703eb6`. Fase 1 → Codex; web pública → Claude Code. W-01 a W-04 siguen abiertos; la activación será primero en `apptest`.
+**Estado:** spec y prompts vigentes en `main@995f674`; la estructura web de Claude ya está en `main` pero responde 404/NOT_READY. El núcleo Fase 1 aún no existe. W-01 está cerrada; I-01 a I-03 siguen abiertas. La activación será primero en `apptest`.
+
+Las Misiones sí existe como distribuidora de mayoreo inactiva para Fase 3; no es tienda del piloto. Los prompts vigentes son [PROMPT-MODULO-RETAIL.md](PROMPT-MODULO-RETAIL.md) y [PROMPT-FASE2-CODEX.md](PROMPT-FASE2-CODEX.md). Los de `references/` son versiones históricas.

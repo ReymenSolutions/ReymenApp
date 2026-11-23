@@ -34,6 +34,8 @@ export default auth(async (req) => {
   // Realty: landing pública de una propiedad (/p/<slug>), sus eventos y sus fotos publicadas
   // (la ruta de fotos revisa sola si la propiedad es pública o si la sesión es de la organización).
   const isPublicRealtyRoute = pathname.startsWith("/p/") || pathname.startsWith("/api/realty/public/") || pathname.startsWith("/api/realty/media/");
+  // Retail: web pública de ventas (/tienda/<slug>); la página sola revisa que el negocio tenga el módulo RETAIL.
+  const isPublicRetailRoute = pathname === "/tienda" || pathname.startsWith("/tienda/");
   // Wallet: Apple llama al servicio web del pase (se autentica con el token del pase) y Google descarga el logo del programa.
   const isWalletRoute = pathname.startsWith("/api/wallet/");
 
@@ -44,7 +46,7 @@ export default auth(async (req) => {
   // route) so n8n's pull requests must not be redirected to /login here, and
   // the health check must be reachable by load balancers/uptime monitors
   // without a session
-  if (isAuthPage || isWebhookRoute || isApiV1Route || isAuthApiRoute || isCronRoute || isHealthRoute || isFeedbackRoute || isPublicLoyaltyRoute || isPublicRealtyRoute || isPublicApiRoute || isPrivateChatVisitor || isWalletRoute) {
+  if (isAuthPage || isWebhookRoute || isApiV1Route || isAuthApiRoute || isCronRoute || isHealthRoute || isFeedbackRoute || isPublicLoyaltyRoute || isPublicRealtyRoute || isPublicApiRoute || isPrivateChatVisitor || isWalletRoute || isPublicRetailRoute) {
     return NextResponse.next();
   }
 
