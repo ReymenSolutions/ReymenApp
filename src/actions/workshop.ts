@@ -92,8 +92,9 @@ export async function createWorkshopVehicle(input: z.input<typeof vehicleInput>)
 }
 
 /** Convierte los datos de una solicitud pública en cliente y vehículo, solicitando solo el VIN faltante. */
-export async function createWorkshopVehicleFromRequest(requestId: string, rawVin: string) {
+export async function createWorkshopVehicleFromRequest(requestId: string, rawVin: string, confirmedIdentity: boolean) {
   const { orgId, userId } = await requireWorkshopOwner();
+  if (confirmedIdentity !== true) throw new UserError("Verifica la identidad del cliente antes de vincular la solicitud");
   const vinResult = z.string().trim().min(11).max(17).safeParse(rawVin);
   if (!vinResult.success) throw new UserError("Captura un VIN válido para crear el vehículo");
   const vin = vinResult.data.toUpperCase().replace(/\s+/g, "");
@@ -122,7 +123,7 @@ export async function createWorkshopVehicleFromRequest(requestId: string, rawVin
     await tx.workshopLeadRequest.update({ where: { id: request.id }, data: { vehicleId: vehicle.id } });
     return { id: vehicle.id, created: true };
   });
-  if (result.created) await logAudit({ organizationId: orgId, userId, action: "workshop.vehicle.from_request", resource: "WorkshopVehicle", resourceId: result.id, metadata: { requestId } });
+  if (result.created) await logAudit({ organizationId: orgId, userId, action: "workshop.vehicle.from_request", resource: "WorkshopVehicle", resourceId: result.id, metadata: { requestId, identityConfirmed: true } });
   revalidatePath("/portal/workshop");
   return { id: result.id, servicioFalla: request.servicioFalla };
 }

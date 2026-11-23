@@ -5,6 +5,28 @@ import sharp from "sharp";
 
 export const runtime = "nodejs";
 const MAX_BYTES = 5 * 1024 * 1024;
+const MAX_REQUEST_BYTES = MAX_BYTES + 16 * 1024;
+
+async function boundedFormData(request: Request): Promise<FormData | null> {
+  const contentType = request.headers.get("content-type");
+  if (!contentType?.startsWith("multipart/form-data")) return null;
+  const reader = request.body?.getReader();
+  if (!reader) return null;
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_REQUEST_BYTES) { await reader.cancel(); return null; }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  try { return await new Request(request.url, { method: "POST", headers: { "content-type": contentType }, body: bytes }).formData(); }
+  catch { return null; }
+}
 
 function imageMime(bytes: Uint8Array): string | null {
   if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
@@ -21,7 +43,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!orgId) return new Response(null, { status: 401 });
   if (!["OWNER", "ADMIN", "SUPER_ADMIN", "AGENT"].includes(session.user.role) || !(await hasModule(orgId, "WORKSHOP"))) return new Response(null, { status: 403 });
   const { id } = await params;
-  const body = await request.formData();
+  const body = await boundedFormData(request);
+  if (!body) return new Response("Invalid image", { status: 400 });
   const phase = body.get("phase");
   const file = body.get("file");
   if (!["RECEPCION", "PROCESO", "ENTREGA"].includes(String(phase)) || !(file instanceof File) || file.size === 0 || file.size > MAX_BYTES) return new Response("Invalid image", { status: 400 });

@@ -7,7 +7,6 @@ import { hasModule } from "@/lib/modules";
 import { normalizeWhatsapp } from "@/lib/public-api";
 import { phoneKey } from "@/lib/phone";
 import { withPlanCapacity } from "@/lib/plan-limits";
-import { linkOrphanConversations, linkOrphanCustomers } from "@/lib/crm-link";
 import { logAudit } from "@/lib/audit";
 import { recordMetric, METRIC_KEYS } from "@/lib/metrics";
 
@@ -57,7 +56,7 @@ export async function submitWolfInquiry(orgId: string, input: WolfInquiry) {
         organizationId: orgId, leadId: lead.id, requestKey: input.requestKey, marca: input.marca, modelo: input.modelo,
         anio: input.anio, placas: plates, kilometraje: input.kilometraje, servicioFalla: input.servicioFalla,
       }, select: { id: true } });
-      return { id: request.id, leadId: lead.id };
+      return { id: request.id };
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -66,8 +65,6 @@ export async function submitWolfInquiry(orgId: string, input: WolfInquiry) {
     }
     throw error;
   }
-  await linkOrphanConversations(orgId, result.leadId, phone);
-  await linkOrphanCustomers(orgId, result.leadId, phone);
   await logAudit({ organizationId: orgId, userId: null, action: "workshop.inquiry.create", resource: "WorkshopLeadRequest", resourceId: result.id });
   await recordMetric(orgId, METRIC_KEYS.LEADS_CAPTURED);
   return { id: result.id, created: true };

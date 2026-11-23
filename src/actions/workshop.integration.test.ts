@@ -104,15 +104,18 @@ describe("workshop tenant integration", () => {
     expect(request.placas).toBe("WOLF9");
     expect(request.lead.source).toBe("landing");
     auth.mockResolvedValue({ user: { id: ownerId, role: "OWNER", organizationId: orgB.id } });
-    await expect(createWorkshopVehicleFromRequest(request.id, "3N1CN7AP9ML812345")).rejects.toThrow();
+    await expect(createWorkshopVehicleFromRequest(request.id, "3N1CN7AP9ML812345", true)).rejects.toThrow();
     auth.mockResolvedValue({ user: { id: ownerId, role: "OWNER", organizationId: orgA.id } });
-    const vehicle = await createWorkshopVehicleFromRequest(request.id, "3N1CN7AP9ML812345");
+    await expect(createWorkshopVehicleFromRequest(request.id, "3N1CN7AP9ML812345", false)).rejects.toThrow(/identidad/i);
+    const vehicle = await createWorkshopVehicleFromRequest(request.id, "3N1CN7AP9ML812345", true);
     expect(vehicle.servicioFalla).toBe("Revisar frenos");
     const saved = await prisma.workshopVehicle.findUniqueOrThrow({ where: { id: vehicle.id }, include: { customer: true } });
     expect(saved.kilometrajeActual).toBe(42000);
     expect(saved.customer.leadId).toBe(request.leadId);
     expect(saved.customer.consentAccepted).toBe(false);
     expect((await prisma.workshopLeadRequest.findUniqueOrThrow({ where: { id: request.id } })).vehicleId).toBe(vehicle.id);
+    await submitWolfInquiry(orgA.id, { ...input, requestKey: crypto.randomUUID(), phone: "8110000001" });
+    expect((await prisma.customer.findUniqueOrThrow({ where: { id: customerA.id } })).leadId).toBeNull();
   });
 
   it("creates a CRM-linked vehicle and a net-priced quote only in the session organization", async () => {
@@ -220,6 +223,8 @@ describe("workshop tenant integration", () => {
       const form = new FormData(); form.set("phase", phase); form.set("file", new File([png], "photo.png", { type: "image/png" }));
       return uploadPhoto(new Request(`http://localhost/api/workshop/orders/${order.id}/photos`, { method: "POST", headers: { origin: "http://localhost" }, body: form }), { params: Promise.resolve({ id: order.id }) });
     }
+    const oversized = new Request(`http://localhost/api/workshop/orders/${order.id}/photos`, { method: "POST", headers: { origin: "http://localhost", "content-type": "multipart/form-data; boundary=test" }, body: new Uint8Array(5 * 1024 * 1024 + 16 * 1024 + 1) });
+    expect((await uploadPhoto(oversized, { params: Promise.resolve({ id: order.id }) })).status).toBe(400);
     expect((await addPhoto("RECEPCION")).status).toBe(201);
     await advanceWorkshopOrder(order.id, "DIAGNOSTICO");
     await saveWorkshopReception(order.id, { kilometrajeIngreso: 30000, nivelCombustible: "medio", fallaReportada: "Cambio de filtro", diagnostico: "Filtro requiere reemplazo", danosPrevios: "ninguno", testigos: "ninguno", pertenencias: "ninguna" });
