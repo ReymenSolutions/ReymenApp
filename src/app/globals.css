@@ -591,3 +591,27 @@ summary:active {
   --rl-danger-bg: #3a1614;
   --rl-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
 }
+
+/* ── Web pública de Retail (/tienda/<slug>) ───────────────────────
+   Colores Reymen: azul marino profundo, azul rey y blanco. Tokens propios
+   y fijos en claro (el cliente final no tiene sesión ni tema oscuro); así
+   el remapeo global de .dark no cambia la tienda si la abre alguien del
+   equipo con su tema oscuro.
+   ──────────────────────────────────────────────────────────────── */
+.rt, .dark .rt {
+  --rt-navy: #0a1a3f;
+  --rt-navy-2: #12285e;
+  --rt-royal: #1a3ef5;
+  --rt-royal-dark: #152de0;
+  --rt-bg: #f4f6fb;
+  --rt-surface: #ffffff;
+  --rt-ink: #0a1428;
+  --rt-muted: #56637a;
+  --rt-line: #dde3ee;
+  --rt-ok: #15803d;
+  --rt-danger: #b42318;
+  --rt-shadow: 0 6px 22px rgba(10, 26, 63, 0.08);
+  color: var(--rt-ink);
+  background: var(--rt-bg);
+  color-scheme: light;
+}

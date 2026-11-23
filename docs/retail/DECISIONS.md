@@ -54,6 +54,14 @@ Las 5 se confirmaron tal como se recomendaron. Se dejan el contexto y las opcion
 - **Recomendación:** **B**. Además, el límite del plan (10 usuarios) cuenta usuarios del sistema, no vendedores.
 - **Estado:** ✅ CONFIRMADA (B) — 23 nov 2026. Siguen pendientes los nombres y roles reales de los vendedores (datos del cliente).
 
+## Web pública (23 nov 2026)
+
+| ID | Decisión |
+|---|---|
+| W-01 | **Opción A:** la web muestra todo lo DISPONIBLE de canal TIENDA o EN_LINEA (con foto, en tienda activa). MAYOREO nunca sale suelto |
+| W-02 | Logo: el **RM** que ya está en el repo (`src/app/icon.png`); no hay otro archivo del logo de Reymen |
+| W-03 | WhatsApp por tienda (Labash y Outlet del Norte): **pendiente**, lo pasa Reynol. Sin número no se muestra el botón de apartar |
+
 ## Reparto de trabajo (23 nov 2026)
 
 | Quién | Qué | Carpetas que le pertenecen |

@@ -16,3 +16,9 @@ sigue**, para que cualquier agente (Claude Code o Codex) retome sin rehacer nada
 - Reparto: **Codex** hace la Fase 1 del módulo; **Claude Code** hace la web pública. Contrato entre ambos: `WEB-CONTRACT.md`.
 - Queda abierta **W-01**: ¿las prendas con canal TIENDA también salen en la web?
 - **Sigue (Codex):** tarea 1 de Fase 1. **Sigue (Claude Code):** estructura de la web sobre el contrato; se conecta a datos reales cuando existan `RetailItem` y `createHold`.
+
+## 2026-11-23 · Web pública: estructura (Claude Code)
+- W-01 resuelta (opción A). Logo: RM del repo. WhatsApp de las tiendas: pendiente (W-03).
+- Construida la web en `/tienda/<slug>`: inicio con tiendas (Casa Carballo «Próximamente»), catálogo con filtros por URL, detalle de pieza única y «Apartar por WhatsApp» (acción con límite de intentos). Ruta pública en `src/proxy.ts`. Pruebas: `src/lib/retail/public/catalog.test.ts` y `src/proxy.test.ts`.
+- **Todavía no muestra nada en producción:** `source.ts` devuelve `null` hasta que exista el núcleo de Codex (ver WEB-CONTRACT § 4).
+- **Sigue:** revisión visual y, cuando Codex entregue el núcleo, conectar `source.ts` y probar en `apptest.reymen.mx` con prendas reales.

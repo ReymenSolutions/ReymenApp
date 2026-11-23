@@ -58,4 +58,13 @@ describe("middleware", () => {
       expect(res.status).toBe(307);
     }
   });
+
+  it("lets the public Retail store through without a session, but not look-alike paths", async () => {
+    for (const path of ["/tienda/grupo-carvallo", "/tienda/grupo-carvallo/catalogo", "/tienda/grupo-carvallo/prenda/LAB-001"]) {
+      const res = (await middleware(makeReq(path), {} as never)) as Response;
+      expect(res.status).not.toBe(307);
+    }
+    const res = (await middleware(makeReq("/tiendax/algo"), {} as never)) as Response;
+    expect(res.status).toBe(307);
+  });
 });
