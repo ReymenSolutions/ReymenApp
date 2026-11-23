@@ -5,7 +5,9 @@ Orden de trabajo según [`SPEC.md`](SPEC.md) (§ Fases y § Lista de trabajo). M
 
 ## Fase 0 — Auditoría
 - [x] Auditar el repo contra el spec → [`AUDIT-FASE0.md`](AUDIT-FASE0.md)
-- [ ] Cerrar decisiones DEC-01 a DEC-05 → [`DECISIONS.md`](DECISIONS.md)
+- [x] Cerrar decisiones DEC-01 a DEC-05 → [`DECISIONS.md`](DECISIONS.md) (confirmadas 23 nov 2026)
+
+> **Reparto:** Fase 1 completa → **Codex**. Web pública (tarea 11) → **Claude Code**, según [`WEB-CONTRACT.md`](WEB-CONTRACT.md).
 
 ## Requisitos del cliente antes de Fase 1 (Emi)
 - [ ] Piezas totales por tienda y cuántas llevarán QR individual
@@ -27,7 +29,7 @@ Orden de trabajo según [`SPEC.md`](SPEC.md) (§ Fases y § Lista de trabajo). M
 10. [ ] Pruebas de aceptación de Fase 1 (lista completa en el spec)
 
 ## Fase 2 — Venta (después de aceptar Fase 1)
-11. [ ] Web pública conectada al inventario → [`PROMPT-WEB-VENTAS.md`](PROMPT-WEB-VENTAS.md)
+11. [ ] **(Claude Code)** Web pública conectada al inventario → [`PROMPT-WEB-VENTAS.md`](PROMPT-WEB-VENTAS.md) + [`WEB-CONTRACT.md`](WEB-CONTRACT.md). Necesita de Codex: enum RETAIL, ubicaciones, `RetailItem` y `createHold`
 12. [ ] WhatsApp con agente IA (consulta, apartado, venta sin doble venta)
 13. [ ] Lealtad (frecuencia, ticket, beneficios)
 14. [ ] Indicadores completos (m², días, rotación, excedentes, reabastecimiento)

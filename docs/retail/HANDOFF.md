@@ -5,7 +5,8 @@ Si retomas este trabajo, lee en este orden:
 1. [`SPEC.md`](SPEC.md) — **fuente de verdad**. Manda sobre todo lo demás.
 2. [`AUDIT-FASE0.md`](AUDIT-FASE0.md) — qué del spec se confirmó en el repo y qué no.
 3. [`DECISIONS.md`](DECISIONS.md) — lo cerrado y lo abierto. No implementes algo que dependa de una decisión ABIERTA.
-4. [`TASKS.md`](TASKS.md) — qué sigue. [`PROGRESS.md`](PROGRESS.md) — qué se hizo y dónde quedó.
+4. [`WEB-CONTRACT.md`](WEB-CONTRACT.md) y `DECISIONS.md` § Reparto — quién es dueño de qué carpeta (Codex: módulo; Claude Code: web pública).
+5. [`TASKS.md`](TASKS.md) — qué sigue. [`PROGRESS.md`](PROGRESS.md) — qué se hizo y dónde quedó.
 
 ## Reglas de trabajo
 - **No inventar datos:** precios, costos, piezas, vendedores, direcciones, fotos ni resultados. Lo pendiente se queda como TBD.

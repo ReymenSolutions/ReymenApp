@@ -12,6 +12,7 @@ tablero, para Labash y Outlet del Norte (Casa Carballo inactiva). Piloto: Grupo 
 | [TASKS.md](TASKS.md) | Lista de trabajo por fase |
 | [PROGRESS.md](PROGRESS.md) | Bitácora de avance |
 | [HANDOFF.md](HANDOFF.md) | Cómo retomar (Claude Code o Codex) |
+| [WEB-CONTRACT.md](WEB-CONTRACT.md) | Qué necesita la web pública del módulo (reparto Codex / Claude Code) |
 | [PRD.md](PRD.md) · [ARCHITECTURE.md](ARCHITECTURE.md) · [DATABASE.md](DATABASE.md) · [API.md](API.md) · [SECURITY.md](SECURITY.md) | Producto, arquitectura, datos, acciones y seguridad |
 
-**Estado:** Fase 0 terminada. Fase 1 sin empezar: espera DEC-01 a DEC-05 y los datos del cliente.
+**Estado:** Fase 0 terminada y decisiones DEC-01 a DEC-05 confirmadas. Fase 1 → Codex; web pública → Claude Code.
