@@ -2,7 +2,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { cleanupOrg, createTestOrg, createTestUser } from "@/test/helpers";
-import { cancelRetailTransfer, configureRetailLocation, dispatchRetailTransfer, markRetailWaste, receiveRetailTransfer, registerRetailItem, requestRetailTransfer } from "./inventory";
+import { cancelRetailTransfer, configureRetailLocation, createRetailLocation, dispatchRetailTransfer, markRetailWaste, receiveRetailTransfer, registerRetailItem, requestRetailTransfer } from "./inventory";
 
 describe("Retail inventory boundaries and transfers", () => {
   let a: Awaited<ReturnType<typeof createTestOrg>>;
@@ -44,11 +44,20 @@ describe("Retail inventory boundaries and transfers", () => {
   const add = (code: string) => registerRetailItem(a.id, agentA.id, { code, locationId: warehouseA, salePrice: "199.00", cost: null });
 
   it("requires the entitlement, role and tenant for locations and item intake", async () => {
+    await expect(createRetailLocation(a.id, viewerA.id, { name: "No autorizada", type: "TIENDA", format: "OUTLET" })).rejects.toThrow(/permiso/i);
+    const newLocation = await createRetailLocation(a.id, ownerA.id, { name: "Nueva tienda", type: "TIENDA", format: "OUTLET" });
+    expect(await prisma.retailLocationSettings.findUnique({ where: { branchId: newLocation.id } })).toMatchObject({ organizationId: a.id, type: "TIENDA" });
+    const inactive = await createRetailLocation(a.id, ownerA.id, { name: "Tienda por abrir", type: "TIENDA", format: "HOGAR", isActive: false });
+    expect(inactive.isActive).toBe(false);
+    const wholesale = await createRetailLocation(a.id, ownerA.id, { name: "Mayoreo por retomar", type: "MAYOREO", format: "MAYOREO", isActive: true });
+    expect(wholesale.isActive).toBe(false);
+    await expect(createRetailLocation(a.id, ownerA.id, { name: "Nueva tienda", type: "TIENDA", format: "OUTLET" })).rejects.toThrow(/ya existe/i);
     await expect(configureRetailLocation(a.id, viewerA.id, { branchId: storeA, type: "TIENDA", format: "PREMIUM" })).rejects.toThrow(/permiso/i);
     await expect(configureRetailLocation(a.id, ownerA.id, { branchId: storeB, type: "TIENDA", format: "PREMIUM" })).rejects.toThrow(/organización/i);
     await expect(configureRetailLocation(a.id, ownerA.id, { branchId: warehouseA, type: "TIENDA", format: "PREMIUM" })).rejects.toThrow(/tipo/i);
     await expect(registerRetailItem(a.id, ownerB.id, { code: "X-1", locationId: warehouseA, salePrice: "100" })).rejects.toThrow(/permiso/i);
     await expect(registerRetailItem(a.id, viewerA.id, { code: "X-2", locationId: warehouseA, salePrice: "100" })).rejects.toThrow(/permiso/i);
+    await expect(registerRetailItem(a.id, agentA.id, { code: "X-COST", locationId: warehouseA, salePrice: "100", cost: "50" })).rejects.toThrow(/costos/i);
     await expect(registerRetailItem(a.id, agentA.id, { code: "X-3", locationId: storeB, salePrice: "100" })).rejects.toThrow(/bodega/i);
     await expect(prisma.retailItem.create({ data: { organizationId: a.id, code: "X-DB", locationId: storeB, salePrice: "100", createdById: agentA.id } })).rejects.toThrow();
     await prisma.organizationModule.update({ where: { organizationId_module: { organizationId: a.id, module: "RETAIL" } }, data: { status: "SUSPENDED" } });

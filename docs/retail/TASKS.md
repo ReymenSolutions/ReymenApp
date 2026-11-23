@@ -22,8 +22,8 @@ Orden de trabajo según [`SPEC.md`](SPEC.md) (§ Fases y § Lista de trabajo). M
 
 ## Fase 1 — Base (MVP)
 1. [ ] Enum `RETAIL`, registro en `modules.ts`, permisos, guards, entrada en el menú, `/portal/retail` (código y pruebas locales terminados en corte 1; falta validación con y sin entitlement en `apptest` para cerrar el criterio)
-2. [ ] Ubicaciones (según DEC-01): Labash, Outlet del Norte, Casa Carballo **inactiva**, Las Misiones **inactiva y solo mayoreo en Fase 3**, Bodega. Esquema y servicio de configuración terminados localmente; faltan UI, datos confirmados y prueba en `apptest`.
-3. [ ] `RetailItem`: alta con foto, costo y precio, código único + QR, etiqueta imprimible. Esquema y alta interna con código único terminados; faltan foto, QR, etiqueta y UI.
+2. [ ] Ubicaciones (según DEC-01): Labash, Outlet del Norte, Casa Carballo **inactiva**, Las Misiones **inactiva y solo mayoreo en Fase 3**, Bodega. Esquema, servicio y formulario terminados localmente; faltan datos confirmados y prueba en `apptest`.
+3. [ ] `RetailItem`: alta con foto, costo y precio, código único + QR, etiqueta imprimible. Esquema, servicio y formulario de código/precio terminados localmente; faltan foto, QR, etiqueta y prueba en `apptest`.
 4. [ ] `RetailMovement`: alta, traslado con EN_TRASLADO hasta recepción, ajuste/merma con motivo, quién/cuándo. Solicitud/salida/recepción, cancelación y merma internas probadas; falta UI/QR y ajuste genérico.
 5. [ ] POS: escanear QR, vendedor obligatorio, solo descuento aprobado, venta atómica (pieza VENDIDA + movimiento + caja), rechazo y conteo de intento de doble venta, cancelación con movimiento, corte diario
 6. [ ] Apartados con vencimiento y auto-liberación
