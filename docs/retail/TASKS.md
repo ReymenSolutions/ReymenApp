@@ -6,6 +6,8 @@ Orden de trabajo según [`SPEC.md`](SPEC.md) (§ Fases y § Lista de trabajo). M
 ## Fase 0 — Auditoría
 - [x] Auditar el repo contra el spec → [`AUDIT-FASE0.md`](AUDIT-FASE0.md)
 - [x] Cerrar decisiones DEC-01 a DEC-05 → [`DECISIONS.md`](DECISIONS.md) (confirmadas 23 nov 2026)
+- [x] Cotejar adjuntos y actualizar auditoría de `main@6703eb6` → [`AUDIT-2026-11-23.md`](AUDIT-2026-11-23.md)
+- [x] Publicar plan, referencias y contrato de integración revisado → [`PLAN-IMPLEMENTACION.md`](PLAN-IMPLEMENTACION.md), [`references/`](references/README.md), [`WEB-CONTRACT.md`](WEB-CONTRACT.md)
 
 > **Reparto:** Fase 1 completa → **Codex**. Web pública (tarea 11) → **Claude Code**, según [`WEB-CONTRACT.md`](WEB-CONTRACT.md).
 
@@ -15,6 +17,8 @@ Orden de trabajo según [`SPEC.md`](SPEC.md) (§ Fases y § Lista de trabajo). M
 - [ ] Archivo de muestra exportado de GESEM (catálogo, clientes, historial)
 - [ ] Vendedores por tienda (nombres y roles), m² por tienda, umbrales de excedente y reabastecimiento
 - [ ] Regla del código de prenda (el formato `LAB-TOM-CAM-H-M-AZUL-001` es solo un ejemplo; se valida antes de usarlo)
+- [ ] W-01 a W-04: catálogo web, precio final en etiqueta, comisión real y plazo de apartados → [`DECISIONS.md`](DECISIONS.md)
+- [ ] Confirmar número de WhatsApp por tienda antes de mostrar «Apartar por WhatsApp» en la web
 
 ## Fase 1 — Base (MVP)
 1. [ ] Enum `RETAIL`, registro en `modules.ts`, permisos, guards, entrada en el menú, `/portal/retail` (criterio: org sin RETAIL no lo ve; con RETAIL abre sin errores)

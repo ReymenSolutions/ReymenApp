@@ -64,3 +64,14 @@ Las 5 se confirmaron tal como se recomendaron. Se dejan el contexto y las opcion
 La web **no crea tablas ni reglas de inventario**: lee y llama a lo que construye Codex, según el contrato de
 [`WEB-CONTRACT.md`](WEB-CONTRACT.md). Si la web necesita algo del núcleo que no está en el contrato, se agrega primero al
 contrato y lo implementa el dueño de esa carpeta.
+
+## Pendientes detectados en la revisión del 23 nov 2026
+
+| ID | Decisión pendiente | Estado para trabajar con seguridad |
+|---|---|---|
+| W-01 | ¿Publicar en web solo `EN_LINEA` o también prendas asignadas a `TIENDA`? | Abierta. No publicar catálogo hasta confirmar. Siempre compartir una sola fila por pieza. |
+| W-02 | ¿El precio de etiqueta es el importe final al consumidor con impuestos incluidos? | Abierta. No inferir IVA ni timbrado. |
+| W-03 | ¿De dónde se obtiene la comisión real del medio de pago? | Abierta. Contribución operativa «pendiente» si falta el dato. |
+| W-04 | ¿Cuánto dura un apartado por canal y se permite prórroga? | Abierta. Configurable; no habilitar apartados públicos con un plazo inventado. |
+
+**Seguridad del contrato web:** el nombre y teléfono capturados en una solicitud pública son datos declarados, no identidad comprobada. `createHold` debe crear un Lead de solicitud y no adjuntar automáticamente un Customer ni su historial por teléfono. La vinculación se hace tras verificación o confirmación humana.
