@@ -164,6 +164,10 @@ model Organization {
   realtyClosings          RealtyClosing[]
   realtySettings          RealtySettings?
   loyaltyEventReceipts    LoyaltyEventReceipt[]
+  retailLocations         RetailLocationSettings[]
+  retailItems             RetailItem[]
+  retailMovements         RetailMovement[]
+  retailTransfers         RetailTransfer[]
 
   @@index([slug])
 }
@@ -1466,8 +1470,160 @@ model Branch {
   loyaltyLocation       LoyaltyLocation[]
   realtyProperties      RealtyProperty[]
   realtyProfiles        RealtyLeadProfile[]
+  retailLocation        RetailLocationSettings?
+  retailItems           RetailItem[]
+  retailTransfersFrom   RetailTransfer[] @relation("RetailTransferFrom")
+  retailTransfersTo     RetailTransfer[] @relation("RetailTransferTo")
 
   @@index([organizationId])
+  @@unique([id, organizationId])
+}
+
+// RETAIL: a Branch remains the shared platform location. These fields only
+// describe how that Branch participates in the retail operation.
+enum RetailLocationType {
+  TIENDA
+  BODEGA
+  MAYOREO
+}
+
+enum RetailLocationFormat {
+  PREMIUM
+  OUTLET
+  HOGAR
+  BODEGA
+  MAYOREO
+}
+
+model RetailLocationSettings {
+  branchId       String @id
+  organizationId String
+  type           RetailLocationType
+  format         RetailLocationFormat
+  areaM2         Decimal? @db.Decimal(10, 2)
+  address        String?
+  whatsappPhone  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  branch Branch @relation(fields: [branchId, organizationId], references: [id, organizationId])
+
+  @@unique([branchId, organizationId])
+  @@index([organizationId, type])
+}
+
+enum RetailChannel {
+  TIENDA
+  EN_LINEA
+  MAYOREO
+}
+
+enum RetailItemStatus {
+  DISPONIBLE
+  APARTADA
+  VENDIDA
+  EN_TRASLADO
+  MERMA
+}
+
+model RetailItem {
+  id             String @id @default(cuid())
+  organizationId String
+  code           String
+  locationId     String
+  channel        RetailChannel @default(TIENDA)
+  status         RetailItemStatus @default(DISPONIBLE)
+  brand          String?
+  category       String?
+  garmentType    String?
+  size           String?
+  color          String?
+  style          String?
+  cost           Decimal? @db.Decimal(12, 2)
+  salePrice      Decimal @db.Decimal(12, 2)
+  photoPath      String?
+  enteredAt      DateTime @default(now())
+  createdById    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  location Branch @relation(fields: [locationId, organizationId], references: [id, organizationId])
+  movements RetailMovement[]
+  transfers RetailTransfer[]
+
+  @@unique([organizationId, code])
+  @@unique([id, organizationId])
+  @@index([organizationId, locationId, status])
+  @@index([organizationId, channel, status])
+}
+
+enum RetailMovementType {
+  ALTA
+  TRASLADO_SOLICITUD
+  TRASLADO_SALIDA
+  TRASLADO_RECEPCION
+  TRASLADO_CANCELACION
+  AJUSTE
+  MERMA
+}
+
+model RetailMovement {
+  id             String @id @default(cuid())
+  organizationId String
+  itemId         String
+  type           RetailMovementType
+  fromLocationId String?
+  toLocationId   String?
+  fromChannel    RetailChannel?
+  toChannel      RetailChannel?
+  actorUserId    String
+  actorName      String
+  reason         String?
+  transferId     String?
+  occurredAt     DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  item RetailItem @relation(fields: [itemId, organizationId], references: [id, organizationId])
+  transfer RetailTransfer? @relation(fields: [transferId, organizationId], references: [id, organizationId])
+
+  @@index([organizationId, itemId, occurredAt])
+  @@index([organizationId, type, occurredAt])
+}
+
+enum RetailTransferStatus {
+  SOLICITADO
+  EN_TRASLADO
+  RECIBIDO
+  CANCELADO
+}
+
+model RetailTransfer {
+  id             String @id @default(cuid())
+  organizationId String
+  itemId         String
+  fromLocationId String
+  toLocationId   String
+  status         RetailTransferStatus @default(SOLICITADO)
+  requestedAt    DateTime @default(now())
+  departedAt     DateTime?
+  receivedAt     DateTime?
+  requestedById  String
+  departedById   String?
+  receivedById   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  item RetailItem @relation(fields: [itemId, organizationId], references: [id, organizationId])
+  fromLocation Branch @relation("RetailTransferFrom", fields: [fromLocationId, organizationId], references: [id, organizationId])
+  toLocation Branch @relation("RetailTransferTo", fields: [toLocationId, organizationId], references: [id, organizationId])
+  movements RetailMovement[]
+
+  @@unique([id, organizationId])
+  @@index([organizationId, status, requestedAt])
+  @@index([organizationId, itemId, status])
 }
 
 // Un platillo oculto en una sucursal (solo con menuPerBranch). Sin fila = disponible. La sucursal
