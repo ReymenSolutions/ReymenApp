@@ -22,3 +22,6 @@ sigue**, para que cualquier agente (Claude Code o Codex) retome sin rehacer nada
 - Construida la web en `/tienda/<slug>`: inicio con tiendas (Casa Carballo «Próximamente»), catálogo con filtros por URL, detalle de pieza única y «Apartar por WhatsApp» (acción con límite de intentos). Ruta pública en `src/proxy.ts`. Pruebas: `src/lib/retail/public/catalog.test.ts` y `src/proxy.test.ts`.
 - **Todavía no muestra nada en producción:** `source.ts` devuelve `null` hasta que exista el núcleo de Codex (ver WEB-CONTRACT § 4).
 - **Sigue:** revisión visual y, cuando Codex entregue el núcleo, conectar `source.ts` y probar en `apptest.reymen.mx` con prendas reales.
+
+## 2026-11-23 · WhatsApp de las tiendas (Claude Code)
+- W-03 resuelta: Labash 81 1420 6868 y Outlet del Norte 81 3384 7842, anotados en DECISIONS y WEB-CONTRACT para que Codex los cargue como dato de cada tienda. La web ya arma el enlace de wa.me con esos números (prueba en `catalog.test.ts`).
