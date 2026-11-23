@@ -1,3 +1,5 @@
+> **VERSIÓN ACTUALIZADA — 23 nov 2026.** Esta es la versión vigente del spec. Reemplaza cualquier versión anterior del spec en el repo y en archivos locales. Actualizaciones: Las Misiones SÍ existe (Distribuidora de ropa Las Misiones, mayoreo, por retomar — corrección de Reynol del 23 nov, su corrección del 18 nov estaba equivocada) y puntos de Lance del 23 nov (mermas, carencias, reserva de seguridad, vida de prenda 45 días, QR con fecha de solicitud/salida/recepción, personal con comida/comisión/logs, Meta Ads $5,000-$10,000 por tienda al mes y hasta 3 anuncios por tienda, etiquetas QR pequeñas).
+
 # Reymen Retail — Spec del módulo (Grupo Carvallo)
 
 **Decisión confirmada 23 nov 2026:** se construye dentro de Reymen App, como un módulo más. No es una aplicación aparte, no es un sistema aparte por tienda.
@@ -6,17 +8,18 @@
 **Estado:** Spec para desarrollo con Codex (módulo) y Claude Code (web pública). Sin código todavía.
 **Fecha del spec:** 23 nov 2026. Fuente: ideas-v2-BORRADOR.md + sesión con el cliente del 23 nov (9 puntos) + decisiones 23 nov.
 
-## El grupo — 3 negocios, no 4
+## El grupo — 4 negocios: 3 tiendas + 1 distribuidora de mayoreo
 
 | Negocio | Formato | Estado |
 |---|---|---|
 | Labash | Ropa premium: vestidos, camisas, tacones, tenis, joyería | Activa — piloto |
 | Outlet del Norte | Ropa casual, saldos / defectos leves, ej. $79 | Activa — piloto |
 | Casa Carballo | Hogar: colchas, electrodomésticos (estufas NO confirmadas, no afirmar) | INACTIVA, posible reapertura. Lista para activarse, fuera del piloto |
+| Las Misiones | Distribuidora de ropa, mayoreo | INACTIVA, por retomar. Canal de mayoreo por pallet, fuera del piloto. Se activa en Fase 3 con el módulo de mayoreo, sin POS ni página de venta al público |
 
-Corrección 18 nov 2026 (Reynol): **Las Misiones NO existe como tienda.** No es una 4ª tienda. El mayoreo por pallet es un módulo, no una tienda. No inventar una 4ª ubicación, ni una página de Facebook para ella.
+CORRECCIÓN 23 nov 2026 (Reynol): **Las Misiones SÍ existe. Es la Distribuidora de ropa Las Misiones, de mayoreo, por retomar.** La corrección del 18 nov 2026 (que decía que no existía) estaba equivocada, Reynol se equivocó él. Las Misiones NO es una tienda de menudeo: no lleva POS ni página de venta al público. Es el canal de mayoreo por pallet (Fase 3). No inventar dirección, ni página de Facebook para ella.
 
-Dueño: un solo dueño para los 3 negocios. Es vendedor, le gustan las propuestas, no está enfocado en el back-office. Contacto vía Emi / Enrique. No hay nombre del dueño ni WhatsApp directo registrado en este spec — no inventarlo.
+Dueño: un solo dueño para los 4 negocios. Es vendedor, le gustan las propuestas, no está enfocado en el back-office. Contacto vía Emi / Enrique. No hay nombre del dueño ni WhatsApp directo registrado en este spec — no inventarlo.
 
 ## Qué duele hoy (confirmado)
 
@@ -34,7 +37,7 @@ Dueño: un solo dueño para los 3 negocios. Es vendedor, le gustan las propuesta
 - Cada movimiento queda registrado: quién, cuándo, de dónde a dónde.
 - Cada venta registra **quién la hizo (vendedor)**.
 - El dueño ve en una pantalla venta del día, margen bruto comercial y contribución operativa por prenda (no utilidad neta) y margen bruto por descuentos, por tienda y consolidado.
-- Todo en una plataforma, empezando con los 3 negocios actuales, preparada para nuevas sucursales y negocios a futuro.
+- Todo en una plataforma, empezando con los 4 negocios actuales (3 tiendas + distribuidora de mayoreo), preparada para nuevas sucursales y negocios a futuro.
 
 ## Decisión POS — cerrada 23 nov 2026
 
@@ -59,7 +62,7 @@ Verificado en repo 23 nov 2026 (ReymenSolutions/ReymenApp, commit 780430b, Next.
 - Entitlement por organización vía `OrganizationModule`. Guardar todas las rutas y server actions con `requireModule(orgId, "RETAIL")`.
 - Entitlement por organización vía `OrganizationModule`. Guardar todas las rutas y server actions con `requireModule(orgId, "RETAIL")`.
 - Ruta: `/portal/retail` con pestañas: Panel, POS, Inventario, Movimientos, Mayoreo, Clientes/Lealtad, Personal, Tablero, Configuración.
-- **Ubicaciones son datos, no organizaciones separadas:** una sola organización (Grupo Carvallo) con varias `RetailLocation`: Labash, Outlet del Norte, Casa Carballo (inactiva), Bodega (nueva). Una prenda vive en una ubicación a la vez.
+- **Ubicaciones son datos, no organizaciones separadas:** una sola organización (Grupo Carvallo) con varias `RetailLocation`: Labash, Outlet del Norte, Casa Carballo (inactiva), Las Misiones (distribuidora de mayoreo, inactiva, tipo MAYOREO, sin POS), Bodega (nueva). Una prenda vive en una ubicación a la vez.
 - Todas las tablas nuevas multi-tenant por `organizationId`. Ninguna consulta devuelve datos de otra organización.
 - Seguir el diseño existente del portal (el mismo de Realty/Talleres). No rediseñar el portal.
 
@@ -147,7 +150,7 @@ Plan A, B o C por semana. `nombre`, `porcentaje`, `aplicaA` (tienda/canal/catego
 No crear tabla de personas nueva. Cliente = CRM `Customer` / `Lead`. Lealtad guarda solo: `clienteId`, `puntos` (si aplica — TBD, no inventar regla de puntos), `frecuenciaCompra`, `ticketPromedio`, `ultimaVisita`, `beneficios`. Fase 2/3, no MVP.
 
 ### Personal — `RetailEmployee` + `RetailAttendance`
-Fase 3 (evaluar, no MVP): `nombre`, `locationId`, `rol` (VENDEDOR / CAJERO / BODEGA / GERENTE), `activo`. `RetailAttendance`: `employeeId`, `entrada`, `salida`, `locationId`. Consultas por empleado y sucursal. El vendedor de una venta es un `RetailEmployee` (o usuario del sistema — definir en implementación, no duplicar usuarios).
+Fase 3 (evaluar, no MVP): `nombre`, `locationId`, `rol` (VENDEDOR / CAJERO / BODEGA / GERENTE), `activo`. `RetailAttendance`: `employeeId`, `entrada`, `inicioComida`, `finComida`, `salida`, `locationId`. Consultas por empleado y sucursal. Esquema de comisión por tienda y por colaborador (porcentaje o monto por venta, por definir con el dueño antes de activar; no inventar tasas). Logs de registro en el sistema: quién entró, cuándo y qué hizo (auditoría de accesos y movimientos). El vendedor de una venta es un `RetailEmployee` (o usuario del sistema — definir en implementación, no duplicar usuarios).
 
 ### Mayoreo / Pallet — `RetailPallet` + `RetailPalletItem`
 | Campo | Notas |
@@ -177,10 +180,13 @@ Escanear QR (o buscar código) → sistema valida DISPONIBLE → se registra ven
 Cliente pide pieza → agente/web verifica DISPONIBLE → apartado con límite → cliente confirma → venta (mismo flujo, canal WHATSAPP/WEB) o vencimiento → auto-liberación. Nunca vender una pieza APARTADA por otro cliente ni una VENDIDA.
 
 ### Traslado bodega → tienda
-Escanear QR en bodega (salida, EN_TRASLADO, quién/cuándo) → escanear en tienda al recibir (entrada, DISPONIBLE en Labash, quién/cuándo). Sin confirmación de recepción, la pieza sigue EN_TRASLADO y no se puede vender.
+Escanear QR en bodega (salida, EN_TRASLADO, quién/cuándo) → escanear en tienda al recibir (entrada, DISPONIBLE en Labash, quién/cuándo). El traslado registra fecha de solicitud, fecha de salida y fecha de recepción en tienda, para saber cuándo se pidió y cuándo llegó. Sin confirmación de recepción, la pieza sigue EN_TRASLADO y no se puede vender.
 
 ### Mayoreo
 Módulo sugiere piezas por rotación/días/excedente → se arma pallet (lote cerrado, precio) → se publica en web B2B → mayorista aparta con límite → se vende → piezas a VENDIDA + baja de menudeo. Si vence el apartado, se libera el pallet.
+
+### Mermas (Fase 1)
+Apartado de mermas: una pieza se marca MERMA solo con motivo obligatorio (defecto, daño, etc.) y movimiento auditado. Las mermas no se venden como menudeo normal. Venta de merma: evento operativo 2 veces al año, definido por el dueño (qué piezas, qué precio, qué tienda); el sistema genera el reporte de mermas para ese evento. No es un canal permanente.
 
 ### Descuentos
 Propuesta Plan A/B/C → dueño aprueba → se aplica en POS y web en la vigencia. El tablero muestra margen bruto comercial y contribución operativa por descuento.
@@ -192,19 +198,19 @@ Propuesta Plan A/B/C → dueño aprueba → se aplica en POS y web en la vigenci
 - Piezas por m² de tienda (requiere `m2` por ubicación).
 - Días de permanencia por pieza y por categoría.
 - Rotación (ventas / inventario promedio en el periodo).
-- Excedentes (piezas con muchos días sin vender, umbral configurable, no inventar un número).
-- Necesidades de reabastecimiento (por debajo de mínimo por categoría/talla — mínimo configurable).
+- Excedentes: piezas con más de 45 días sin vender (tiempo de vida de prenda: 45 días, dato de Lance 23 nov 2026). A los 45 días la pieza se marca para rotación / mayoreo / venta de merma, según decida el dueño.
+- Necesidades de reabastecimiento y carencias: reporte constante de carencias por color, categoría, tipo y talla (ej. faltan vestidos verdes), con semáforo falta / bien por tienda y categoría. Reserva de seguridad: nivel mínimo por categoría/talla; cuando el stock llega a ese nivel, el tablero alerta. La reserva es un nivel mínimo, no una bodega separada.
 - Ventas por vendedor, por canal y por tienda.
 - Dobles ventas intentadas (rechazadas por el sistema) — contador, para validar que el control funciona.
 - Ningún total se captura a mano: todo se calcula desde ventas, movimientos y costos.
 
 ## Meta Ads — asistente de IA (Fase 3, no MVP)
 
-Proponer un asistente que analice campañas, recomiende estrategias y sugiera redistribuir presupuestos hacia las campañas con mejores resultados. `MARKETING_ADS` no existe todavía en el repo (reservado, sin schema/UI) — hay que construirlo en Fase 3, no reutilizarlo. No está en el MVP. Gasto en anuncios aparte, pagado directo a Meta. No inventar métricas de campañas ni resultados.
+Proponer un asistente que analice campañas, recomiende estrategias y sugiera redistribuir presupuestos hacia las campañas con mejores resultados. Gestión de hasta 3 anuncios activos por tienda, con sugerencia de cuál quitar/pausar y cuál darle seguimiento. Presupuesto de pauta: $5,000-$10,000 MXN por tienda al mes (dato de Lance 23 nov 2026), pagado directo a Meta, aparte de la mensualidad. Motor de IA para recomendaciones de procesos, fotos, etc.: el dueño no está cerrado a meterlo; alcance abierto a definir en Fase 3, no incluido en Fase 1+2. `MARKETING_ADS` no existe todavía en el repo (reservado, sin schema/UI) — hay que construirlo en Fase 3, no reutilizarlo. No está en el MVP. Gasto en anuncios aparte, pagado directo a Meta. No inventar métricas de campañas ni resultados.
 
 ## Web pública de ventas (Claude Code, separada del módulo)
 
-- Una web centralizada para los 3 negocios, conectada al mismo inventario.
+- Una web centralizada para las tiendas, conectada al mismo inventario. Las Misiones no se muestra como tienda de menudeo; el mayoreo por pallet tiene su vista B2B en Fase 3.
 - Mismo precio, mismo stock: si la pieza se vende en tienda, desaparece de la web.
 - Mayoreo por pallet en web B2B, como lote cerrado (ver módulo Mayoreo).
 - Cada solicitud / compra en web crea un Lead / venta en Reymen, sin recaptura.
@@ -243,7 +249,7 @@ Hasta 3 ubicaciones activas, hasta 10 usuarios, hasta 2 terminales POS, hasta 5,
 Leer el repo, verificar que el patrón Realty sigue vigente (enum, `src/lib/modules.ts`, `OrganizationModule`, `requireModule`, rutas `/portal/*`), y reportar cualquier cambio antes de escribir código. No asumir que el repo está igual que el 11 nov.
 
 ### Requisitos operativos previos a Fase 1 (sin esto no se puede cerrar volumen ni tiempo)
-Antes de iniciar, el cliente debe confirmar por escrito: piezas totales por tienda, cuántas se etiquetarán individualmente con QR, quién toma las fotos, quién imprime las etiquetas QR, y si habrá artículos sin código (esos quedan fuera del inventario único hasta tener código; no se pueden seguir por pieza). La migración incluida en la propuesta cubre hasta 3,000 prendas en el lote inicial; por encima se cotiza aparte por lote. Cientos de prendas no es lo mismo que decenas de miles: el piloto en un rack de Labash mide el tiempo real por prenda antes de comprometer el volumen total.
+Antes de iniciar, el cliente debe confirmar por escrito: piezas totales por tienda, cuántas se etiquetarán individualmente con QR, quién toma las fotos, quién imprime las etiquetas QR (etiquetas pequeñas, no muy grandes; impresora por confirmar — Lance mencionó 'neflaca', verificar marca/modelo antes de comprar; hardware no incluido), y si habrá artículos sin código (esos quedan fuera del inventario único hasta tener código; no se pueden seguir por pieza). La migración incluida en la propuesta cubre hasta 3,000 prendas en el lote inicial; por encima se cotiza aparte por lote. Cientos de prendas no es lo mismo que decenas de miles: el piloto en un rack de Labash mide el tiempo real por prenda antes de comprometer el volumen total.
 
 ### Fase 1 — Base (MVP usable)
 1. Enum `RETAIL`, registro, entitlement, guard, ruta `/portal/retail`.
@@ -265,7 +271,7 @@ Antes de iniciar, el cliente debe confirmar por escrito: piezas totales por tien
 
 ### Fase 3 — Crecimiento
 14. Mayoreo por pallet con sugerencia por rotación + web B2B.
-15. Control de personal: entradas/salidas, consultas por empleado y sucursal.
+15. Control de personal: entradas/salidas + inicio/fin de comida, consultas por empleado y sucursal, esquema de comisión por tienda y por colaborador (por definir), logs de registro en el sistema.
 16. Asistente IA de Meta Ads (análisis, recomendación, redistribución de presupuesto).
 17. Facturación con proveedor externo de CFDI (cuando el dueño lo pida). No antes.
 
@@ -300,6 +306,10 @@ Antes de iniciar, el cliente debe confirmar por escrito: piezas totales por tien
 **Fase 3:**
 - Pallet vendido da de baja todas sus piezas de menudeo en una transacción.
 - Asistente Meta recomienda redistribución solo con datos reales de campañas, no con métricas inventadas.
+
+## Nota 23 nov — Las Misiones (corrección de Reynol)
+Lance mencionó 'Distribuidora de ropa Las Misiones (mayoreo)'. Reynol corrigió el 23 nov 2026: SÍ existe, es la distribuidora de mayoreo, por retomar. Su corrección del 18 nov (que no existía) estaba equivocada. Las Misiones es el canal de mayoreo por pallet, se activa en Fase 3 con ese módulo, sin cuota de activación separada.
+
 
 ## Datos pendientes — no inventar
 
