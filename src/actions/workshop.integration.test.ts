@@ -9,7 +9,8 @@ vi.mock("@/lib/auth", () => ({ auth }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
 
-const { createWorkshopVehicle, createWorkshopQuote, issueWorkshopQuote, markWorkshopQuoteSent, approveWorkshopQuote, convertWorkshopQuote, createWorkshopPart, createWorkshopPurchase, getWorkshopPartStock, saveWorkshopReception, advanceWorkshopOrder, addWorkshopAuthorizedLine, recordWorkshopOrderPayment, authorizeWorkshopCredit, deliverWorkshopOrder, setWorkshopInvoiceRequested, saveWorkshopSettings, setWorkshopNextService } = await import("./workshop");
+const { createWorkshopVehicle, createWorkshopQuote, issueWorkshopQuote, markWorkshopQuoteSent, approveWorkshopQuote, convertWorkshopQuote, createWorkshopPart, createWorkshopPurchase, getWorkshopPartStock, saveWorkshopReception, advanceWorkshopOrder, addWorkshopAuthorizedLine, recordWorkshopOrderPayment, authorizeWorkshopCredit, deliverWorkshopOrder, setWorkshopInvoiceRequested, saveWorkshopSettings, setWorkshopNextService, saveWorkshopService } = await import("./workshop");
+const { seedWorkshopServices } = await import("@/lib/workshop/services");
 const { GET: downloadQuotePdf } = await import("@/app/api/workshop/quotes/[id]/pdf/route");
 const { GET: downloadOrderPdf } = await import("@/app/api/workshop/orders/[id]/pdf/route");
 const { POST: uploadPhoto } = await import("@/app/api/workshop/orders/[id]/photos/route");
@@ -53,6 +54,7 @@ describe("workshop tenant integration", () => {
       await prisma.workshopPart.deleteMany({ where: { organizationId: orgA.id } });
       await prisma.workshopFolioCounter.deleteMany({ where: { organizationId: orgA.id } });
       await prisma.workshopSettings.deleteMany({ where: { organizationId: orgA.id } });
+      await prisma.workshopService.deleteMany({ where: { organizationId: orgA.id } });
       await prisma.organizationModule.deleteMany({ where: { organizationId: orgA.id, module: "WORKSHOP" } });
       await prisma.customer.deleteMany({ where: { organizationId: orgA.id } });
       await cleanupOrg(orgA.id);
@@ -60,6 +62,7 @@ describe("workshop tenant integration", () => {
     if (orgB) {
       await prisma.workshopVehicle.deleteMany({ where: { organizationId: orgB.id } });
       await prisma.workshopSettings.deleteMany({ where: { organizationId: orgB.id } });
+      await prisma.workshopService.deleteMany({ where: { organizationId: orgB.id } });
       await prisma.organizationModule.deleteMany({ where: { organizationId: orgB.id, module: "WORKSHOP" } });
       await prisma.customer.deleteMany({ where: { organizationId: orgB.id } });
       await cleanupOrg(orgB.id);
@@ -68,6 +71,23 @@ describe("workshop tenant integration", () => {
 
   it("rejects a customer from another organization", async () => {
     await expect(createWorkshopVehicle({ customerId: customerB.id, placas: "WRONG1", vin: "1HGCM82633A004352", marca: "Honda", modelo: "Accord", anio: "2020", kilometrajeActual: "10" })).rejects.toThrow(/organización/i);
+  });
+
+  it("seeds provisional services without prices and permits tenant-only edits", async () => {
+    await prisma.$transaction((tx) => seedWorkshopServices(tx, orgA.id));
+    expect(await prisma.workshopService.count({ where: { organizationId: orgA.id } })).toBe(9);
+    const item = await prisma.workshopService.findFirstOrThrow({ where: { organizationId: orgA.id } });
+    expect(item.precioVentaNeto).toBeNull();
+    expect(item.costoNeto).toBeNull();
+    await saveWorkshopService(item.id, { nameEs: item.nameEs, nameEn: item.nameEn, precioVentaNeto: "100.00", costoNeto: "40.00", active: true });
+    await prisma.$transaction((tx) => seedWorkshopServices(tx, orgA.id));
+    expect(await prisma.workshopService.count({ where: { organizationId: orgA.id } })).toBe(9);
+    expect((await prisma.workshopService.findUniqueOrThrow({ where: { id: item.id } })).precioVentaNeto?.toFixed(2)).toBe("100.00");
+    const other = await prisma.workshopService.create({ data: { organizationId: orgB.id, nameEs: "Servicio ajeno", nameEn: "Other service" } });
+    await expect(saveWorkshopService(other.id, { nameEs: "Cambio", nameEn: "Change", active: true })).rejects.toThrow(/no disponible/i);
+    auth.mockResolvedValue({ user: { id: ownerId, role: "AGENT", organizationId: orgA.id } });
+    try { await expect(saveWorkshopService(item.id, { nameEs: "Cambio", nameEn: "Change", active: true })).rejects.toThrow(/No autorizado/i); }
+    finally { auth.mockResolvedValue({ user: { id: ownerId, role: "OWNER", organizationId: orgA.id } }); }
   });
 
   it("keeps the Wolf landing closed by default and turns a submitted Lead into a CRM customer and vehicle", async () => {

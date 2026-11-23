@@ -11,6 +11,48 @@ import { calculateNetLines } from "@/lib/workshop/money";
 import { Prisma } from "@prisma/client";
 import { workshopStock } from "@/lib/workshop/inventory";
 
+const serviceInput = z.object({
+  nameEs: z.string().trim().min(2).max(120),
+  nameEn: z.string().trim().min(2).max(120),
+  costoNeto: z.string().optional(),
+  precioVentaNeto: z.string().optional(),
+  active: z.boolean(),
+});
+
+/** Configura conceptos del taller sin inferir precios ni costos. */
+export async function saveWorkshopService(id: string | null, input: z.input<typeof serviceInput>) {
+  const { orgId, userId } = await requireWorkshopOwner();
+  const parsed = serviceInput.safeParse(input);
+  if (!parsed.success) throw new UserError("Revisa el servicio");
+  const d = parsed.data;
+  const money = (value?: string) => {
+    if (!value?.trim()) return null;
+    try {
+      const amount = new Prisma.Decimal(value);
+      if (!amount.isFinite() || amount.lt(0) || amount.decimalPlaces() > 2 || amount.gt(9999999999.99)) throw new Error();
+      return amount;
+    } catch { throw new UserError("Revisa el costo y precio netos"); }
+  };
+  const data = { nameEs: d.nameEs, nameEn: d.nameEn, costoNeto: money(d.costoNeto), precioVentaNeto: money(d.precioVentaNeto), active: d.active, provisional: false };
+  let serviceId: string;
+  try {
+    if (id) {
+      const updated = await prisma.workshopService.updateMany({ where: { id, organizationId: orgId }, data });
+      if (!updated.count) throw new UserError("Servicio no disponible");
+      serviceId = id;
+    } else {
+      serviceId = (await prisma.workshopService.create({ data: { ...data, organizationId: orgId }, select: { id: true } })).id;
+    }
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") throw new UserError("Ya existe un servicio con ese nombre");
+    throw error;
+  }
+  await logAudit({ organizationId: orgId, userId, action: id ? "workshop.service.update" : "workshop.service.create", resource: "WorkshopService", resourceId: serviceId });
+  revalidatePath("/portal/workshop");
+  revalidatePath("/taller-wolf");
+  return { id: serviceId };
+}
+
 const vehicleInput = z.object({
   customerId: z.string().min(1),
   placas: z.string().trim().min(2).max(20),

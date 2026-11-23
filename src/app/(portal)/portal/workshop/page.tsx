@@ -14,6 +14,7 @@ import { OrderOperations } from "@/components/workshop/OrderOperations";
 import { AddAuthorizedLine } from "@/components/workshop/AddAuthorizedLine";
 import { WorkshopRequests } from "@/components/workshop/WorkshopRequests";
 import { WorkshopSettingsForm } from "@/components/workshop/WorkshopSettingsForm";
+import { WorkshopServices } from "@/components/workshop/WorkshopServices";
 
 type Tab = "panel" | "quotes" | "orders" | "vehicles" | "inventory" | "purchases" | "cash" | "settings";
 
@@ -75,11 +76,17 @@ export default async function WorkshopPage({ searchParams }: { searchParams: Pro
   const settings = tab.id === "settings" && ctx.canManageFinancials
     ? await prisma.workshopSettings.findUnique({ where: { organizationId: ctx.organizationId }, select: { vigenciaDias: true, garantiaDias: true, garantiaKm: true } })
     : null;
+  const services = tab.id === "settings" && ctx.canManageFinancials
+    ? await prisma.workshopService.findMany({ where: { organizationId: ctx.organizationId }, select: { id: true, nameEs: true, nameEn: true, costoNeto: true, precioVentaNeto: true, active: true, provisional: true }, orderBy: { nameEs: "asc" } })
+    : [];
   const quoteVehicles = tab.id === "quotes" && ctx.canManageFinancials
     ? await prisma.workshopVehicle.findMany({ where: { organizationId: ctx.organizationId }, select: { id: true, placas: true, vin: true, customer: { select: { name: true, phone: true } } }, take: 200, orderBy: { createdAt: "desc" } })
     : [];
   const quoteParts = tab.id === "quotes" && ctx.canManageFinancials
     ? await prisma.workshopPart.findMany({ where: { organizationId: ctx.organizationId }, select: { id: true, sku: true, nombre: true, unidad: true, precioVentaNeto: true, costoNeto: true }, orderBy: { nombre: "asc" }, take: 200 })
+    : [];
+  const quoteServices = tab.id === "quotes" && ctx.canManageFinancials
+    ? await prisma.workshopService.findMany({ where: { organizationId: ctx.organizationId, active: true }, select: { id: true, nameEs: true, nameEn: true, precioVentaNeto: true, costoNeto: true }, orderBy: { nameEs: "asc" } })
     : [];
   const quotes = tab.id === "quotes" && ctx.canManageFinancials
     ? await prisma.workshopQuote.findMany({ where: { organizationId: ctx.organizationId }, select: { id: true, folio: true, estado: true, servicioTitulo: true, subtotalNeto: true, iva: true, total: true }, take: 50, orderBy: { createdAt: "desc" } })
@@ -130,7 +137,8 @@ export default async function WorkshopPage({ searchParams }: { searchParams: Pro
       {tab.id === "vehicles" && ctx.canManageFinancials && <CreateVehicleForm lang={ctx.lang} customers={customers} />}
       {tab.id === "vehicles" && ctx.canManageFinancials && <WorkshopRequests lang={ctx.lang} requests={pendingRequests} />}
       {tab.id === "settings" && ctx.canManageFinancials && <WorkshopSettingsForm lang={ctx.lang} defaults={settings ?? { vigenciaDias: 15, garantiaDias: 90, garantiaKm: 5000 }} />}
-      {tab.id === "quotes" && ctx.canManageFinancials && <CreateQuoteForm key={query.requestId ?? "new"} lang={ctx.lang} vehicles={quoteVehicles} parts={quoteParts.map((part) => ({ ...part, precioVentaNeto: part.precioVentaNeto.toString(), costoNeto: part.costoNeto.toString() }))} initialVehicleId={quoteRequest?.vehicleId ?? undefined} initialService={quoteRequest?.servicioFalla} />}
+      {tab.id === "settings" && ctx.canManageFinancials && <WorkshopServices lang={ctx.lang} services={services.map((service) => ({ ...service, costoNeto: service.costoNeto?.toFixed(2) ?? "", precioVentaNeto: service.precioVentaNeto?.toFixed(2) ?? "" }))} />}
+      {tab.id === "quotes" && ctx.canManageFinancials && <CreateQuoteForm key={query.requestId ?? "new"} lang={ctx.lang} vehicles={quoteVehicles} parts={quoteParts.map((part) => ({ ...part, precioVentaNeto: part.precioVentaNeto.toString(), costoNeto: part.costoNeto.toString() }))} services={quoteServices.map((service) => ({ ...service, precioVentaNeto: service.precioVentaNeto?.toFixed(2) ?? "", costoNeto: service.costoNeto?.toFixed(2) ?? "" }))} initialVehicleId={quoteRequest?.vehicleId ?? undefined} initialService={quoteRequest?.servicioFalla} />}
       {tab.id === "inventory" && ctx.canManageFinancials && <CreatePartForm lang={ctx.lang} />}
       {tab.id === "inventory" && ctx.canManageFinancials && <section className="rounded-xl border border-slate-200 bg-white p-4"><h2 className="font-semibold">{es ? "Existencias" : "Stock"}</h2><ul className="mt-3 divide-y divide-slate-100">{inventoryParts.map((part) => { const qty = stock.get(part.id) ?? new Prisma.Decimal(0); return <li key={part.id} className="flex flex-wrap justify-between gap-2 py-2 text-sm"><span>{part.sku} · {part.nombre}</span><span className={qty.lt(part.stockMinimo) ? "font-semibold text-red-700" : "font-semibold"}>{qty.toString()} {part.unidad}</span></li>; })}</ul></section>}
       {tab.id === "purchases" && ctx.canManageFinancials && <CreatePurchaseForm lang={ctx.lang} parts={purchaseParts.map((part) => ({ ...part, costoNeto: part.costoNeto.toString() }))} />}

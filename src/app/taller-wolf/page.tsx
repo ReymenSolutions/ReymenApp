@@ -2,19 +2,17 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getWolfLandingOrg, WOLF_LOGO } from "@/lib/workshop/landing";
 import { WolfInquiryForm } from "@/components/workshop/WolfInquiryForm";
+import { prisma } from "@/lib/prisma";
+import { PROVISIONAL_WORKSHOP_SERVICES } from "@/lib/workshop/services";
 
 export const dynamic = "force-dynamic";
 
-const services = [
-  ["Afinación mayor", "Major tune-up"], ["Afinación menor", "Minor tune-up"],
-  ["Cambio de aceite y filtros", "Oil and filter change"], ["Frenos", "Brakes"],
-  ["Suspensión", "Suspension"], ["Diagnóstico electrónico / escaneo", "Electronic diagnostics / scan"],
-  ["Revisión de 20 puntos", "20-point inspection"], ["Cambio de batería", "Battery replacement"],
-  ["Rotación y balanceo", "Tire rotation and balancing"],
-];
-
 export default async function TallerWolfPage() {
-  if (!(await getWolfLandingOrg())) notFound();
+  const org = await getWolfLandingOrg();
+  if (!org) notFound();
+  const catalog = await prisma.workshopService.findMany({ where: { organizationId: org.id }, select: { nameEs: true, nameEn: true, active: true, provisional: true }, orderBy: { nameEs: "asc" } });
+  const services = catalog.length ? catalog.filter((service) => service.active).map((service) => [service.nameEs, service.nameEn]) : PROVISIONAL_WORKSHOP_SERVICES;
+  const provisional = !catalog.length || catalog.some((service) => service.active && service.provisional);
   return <main className="min-h-screen bg-[#090909] text-white">
     <div className="mx-auto max-w-6xl px-[clamp(1rem,4vw,3rem)] pb-16">
       <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/15 py-5">
@@ -32,7 +30,7 @@ export default async function TallerWolfPage() {
       </section>
       <section id="servicios" className="border-t border-white/15 py-10">
         <h2 className="text-2xl font-bold">Servicios / Services</h2>
-        <p className="mt-2 text-sm text-white/60">Lista general provisional; el alcance y precio se confirman en cada cotización. / General provisional list; scope and price are confirmed in each quote.</p>
+        <p className="mt-2 text-sm text-white/60">{provisional ? "Lista general provisional; el alcance y precio se confirman en cada cotización. / General provisional list; scope and price are confirmed in each quote." : "El alcance y precio se confirman en cada cotización. / Scope and price are confirmed in each quote."}</p>
         <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{services.map(([es, en]) => <li key={es} className="rounded-xl border border-white/15 bg-white/5 p-4"><span className="font-semibold">{es}</span><span className="mt-1 block text-sm text-white/55">{en}</span></li>)}</ul>
       </section>
       <section className="grid gap-6 border-t border-white/15 py-10 md:grid-cols-2">

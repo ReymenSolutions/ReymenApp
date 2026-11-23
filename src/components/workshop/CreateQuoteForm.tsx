@@ -9,7 +9,7 @@ import { getErrorMessage } from "@/lib/user-error";
 type Line = { tipo: "REFACCION" | "MANO_DE_OBRA" | "SERVICIO"; partId: string; concepto: string; cantidad: string; unidad: string; precioUnitarioNeto: string; costoUnitarioNeto: string };
 const blankLine = (): Line => ({ tipo: "SERVICIO", partId: "", concepto: "", cantidad: "1", unidad: "serv.", precioUnitarioNeto: "", costoUnitarioNeto: "" });
 
-export function CreateQuoteForm({ lang, vehicles, parts, initialVehicleId, initialService }: { lang: string; vehicles: { id: string; placas: string | null; vin: string | null; customer: { name: string | null; phone: string } }[]; parts: { id: string; nombre: string; sku: string; unidad: string; precioVentaNeto: string; costoNeto: string }[]; initialVehicleId?: string; initialService?: string }) {
+export function CreateQuoteForm({ lang, vehicles, parts, services, initialVehicleId, initialService }: { lang: string; vehicles: { id: string; placas: string | null; vin: string | null; customer: { name: string | null; phone: string } }[]; parts: { id: string; nombre: string; sku: string; unidad: string; precioVentaNeto: string; costoNeto: string }[]; services: { id: string; nameEs: string; nameEn: string; precioVentaNeto: string; costoNeto: string }[]; initialVehicleId?: string; initialService?: string }) {
   const [items, setItems] = useState<Line[]>([blankLine()]);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -54,6 +54,11 @@ export function CreateQuoteForm({ lang, vehicles, parts, initialVehicleId, initi
     </div>
     <div className="space-y-3">{items.map((item, index) => <div key={index} className="grid gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-4">
       <select aria-label={es ? "Tipo" : "Type"} className={field} value={item.tipo} onChange={(e) => change(index, "tipo", e.target.value)}><option value="SERVICIO">{es ? "Servicio" : "Service"}</option><option value="MANO_DE_OBRA">{es ? "Mano de obra" : "Labor"}</option><option value="REFACCION">{es ? "Refacción" : "Part"}</option></select>
+      {item.tipo === "SERVICIO" && <select aria-label={es ? "Servicio del catálogo" : "Catalog service"} className={field} defaultValue="" onChange={(event) => {
+        const service = services.find((row) => row.id === event.target.value);
+        if (!service) return;
+        setItems((current) => current.map((line, i) => i === index ? { ...line, concepto: es ? service.nameEs : service.nameEn, precioUnitarioNeto: service.precioVentaNeto, costoUnitarioNeto: service.costoNeto } : line));
+      }}><option value="">{es ? "Elegir concepto o escribirlo" : "Choose or enter a service"}</option>{services.map((service) => <option key={service.id} value={service.id}>{es ? service.nameEs : service.nameEn}</option>)}</select>}
       {item.tipo === "REFACCION" && <select aria-label={es ? "Refacción de inventario" : "Inventory part"} className={field} value={item.partId} required onChange={(e) => {
         const part = parts.find((p) => p.id === e.target.value);
         setItems((current) => current.map((line, i) => i === index ? { ...line, partId: part?.id ?? "", concepto: part?.nombre ?? line.concepto, unidad: part?.unidad ?? line.unidad, precioUnitarioNeto: part?.precioVentaNeto ?? line.precioUnitarioNeto, costoUnitarioNeto: part?.costoNeto ?? line.costoUnitarioNeto } : line));
