@@ -12,7 +12,7 @@ La web consulta directo con Prisma, siempre filtrando por `organizationId`, desd
 |---|---|---|
 | Módulo activo | `hasModule(orgId, "RETAIL")` | Sin RETAIL la web no publica (404) |
 | Organización | `Organization.slug` | URL: `/tienda/<slug>` |
-| Tiendas | `Branch` + `RetailLocationSettings` (DEC-01): nombre, `type` (TIENDA/BODEGA), `format` (PREMIUM/OUTLET/HOGAR/BODEGA), `isActive`, **`whatsappPhone`** (WhatsApp de la tienda para apartar; TBD hasta que lo dé el cliente) | Solo tiendas activas tipo TIENDA. Casa Carballo inactiva = «Próximamente», sin catálogo. La Bodega nunca aparece |
+| Tiendas | `Branch` + `RetailLocationSettings` (DEC-01): nombre, `type` (TIENDA/BODEGA), `format` (PREMIUM/OUTLET/HOGAR/BODEGA), `isActive`, **`whatsappPhone`** (WhatsApp de la tienda para apartar; ver § 3) | Solo tiendas activas tipo TIENDA. Casa Carballo inactiva = «Próximamente», sin catálogo. La Bodega nunca aparece |
 | Prenda | `RetailItem`: `id`, `code`, `brand`, `category`, `garmentType`, `size`, `color`, `style`, `salePrice`, `status`, `channel`, `locationId`, foto | Catálogo y detalle |
 | Foto | Ruta servida por la app (DEC-03), no `Bytes` | Imagen de la tarjeta y del detalle |
 | Descuento vigente | `RetailDiscountPlan` con `status = APLICADO`, vigente hoy, que aplique al canal web | Precio con descuento. Sin plan aprobado = precio normal |
@@ -51,7 +51,7 @@ Reglas que garantiza el núcleo, no la web:
 - Inicio: las tiendas activas (Labash, Outlet del Norte), Casa Carballo como «Próximamente» y acceso al catálogo.
 - Catálogo con filtros (tienda, categoría, talla, color, marca, precio). Mobile-first.
 - Detalle con foto grande, código y botón **«Apartar por WhatsApp»**. Llama a `createHold` y abre WhatsApp con el código y el vencimiento.
-- **El número de WhatsApp de cada tienda es TBD**: sin él, el botón no se muestra.
+- **WhatsApp de cada tienda (W-03, confirmados):** Labash **81 1420 6868**, Outlet del Norte **81 3384 7842**. Codex los carga en `RetailLocationSettings.whatsappPhone` al crear las tiendas (semilla o Configuración). Casa Carballo: sin número (inactiva). Una tienda sin número no muestra el botón.
 - Mayoreo (Fase 3): solo se deja la ruta preparada, sin publicar.
 
 ## 4. Estado de la implementación de la web (Claude Code)

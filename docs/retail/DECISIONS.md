@@ -60,7 +60,7 @@ Las 5 se confirmaron tal como se recomendaron. Se dejan el contexto y las opcion
 |---|---|
 | W-01 | **Opción A:** la web muestra todo lo DISPONIBLE de canal TIENDA o EN_LINEA (con foto, en tienda activa). MAYOREO nunca sale suelto |
 | W-02 | Logo: el **RM** que ya está en el repo (`src/app/icon.png`); no hay otro archivo del logo de Reymen |
-| W-03 | WhatsApp por tienda (Labash y Outlet del Norte): **pendiente**, lo pasa Reynol. Sin número no se muestra el botón de apartar |
+| W-03 | WhatsApp por tienda (confirmados por Reynol, 23 nov 2026): **Labash 81 1420 6868** · **Outlet del Norte 81 3384 7842**. Se guardan como dato de cada tienda (`RetailLocationSettings.whatsappPhone`), no en el código |
 
 ## Reparto de trabajo (23 nov 2026)
 
