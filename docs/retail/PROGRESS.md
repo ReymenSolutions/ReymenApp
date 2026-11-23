@@ -17,8 +17,20 @@ sigue**, para que cualquier agente (Claude Code o Codex) retome sin rehacer nada
 - Queda abierta **W-01**: ¿las prendas con canal TIENDA también salen en la web?
 - **Sigue (Codex):** tarea 1 de Fase 1. **Sigue (Claude Code):** estructura de la web sobre el contrato; se conecta a datos reales cuando existan `RetailItem` y `createHold`.
 
+## 2026-11-23 · Revisión y preparación de entrega (Codex)
+- Rama `codex/retail-carvallo-discovery`, creada desde `main@6703eb6` para mantener Retail separado del PR de Taller Wolf. Se cotejó el spec adjunto con `SPEC.md` y resultó idéntico byte por byte.
+- Se archivaron los cuatro adjuntos adicionales en `references/`, sin convertir los prompts de Fase 2 ni el borrador de pallets en trabajo aprobado. Se revisó el código actual y se registraron discrepancias en `AUDIT-2026-11-23.md`.
+- `PLAN-IMPLEMENTACION.md` establece cortes revisables y validación primero en base desechable y `apptest`. Se corrigió `WEB-CONTRACT.md` para no unir una solicitud pública al historial de Customer por un teléfono no verificado.
+- **Sin código Retail, migraciones ni despliegue en test o producción.** No se comprobó aún la instalación real de `apptest`. La web de Claude puede seguir en su rama con el contrato; no está en `main` en la base revisada.
+- **Sigue:** resolver I-01 a I-03 y datos operativos a medida que cada corte los requiera; comenzar Fase 1 por entitlement y esquema mínimo. Registrar pruebas y cambios aquí.
+- El PR #194 de Claude usa la firma previa de apartado en su stub; revisar la sección de integración de `WEB-CONTRACT.md` antes de conectarlo.
+
 ## 2026-11-23 · Web pública: estructura (Claude Code)
 - W-01 resuelta (opción A). Logo: RM del repo. WhatsApp de las tiendas: pendiente (W-03).
 - Construida la web en `/tienda/<slug>`: inicio con tiendas (Casa Carballo «Próximamente»), catálogo con filtros por URL, detalle de pieza única y «Apartar por WhatsApp» (acción con límite de intentos). Ruta pública en `src/proxy.ts`. Pruebas: `src/lib/retail/public/catalog.test.ts` y `src/proxy.test.ts`.
 - **Todavía no muestra nada en producción:** `source.ts` devuelve `null` hasta que exista el núcleo de Codex (ver WEB-CONTRACT § 4).
 - **Sigue:** revisión visual y, cuando Codex entregue el núcleo, conectar `source.ts` y probar en `apptest.reymen.mx` con prendas reales.
+
+## 2026-11-23 · Spec y prompts actualizados en main
+- `main@995f674` corrige que Las Misiones sí existe como distribuidora de mayoreo inactiva para Fase 3; incorpora mermas, reserva de seguridad, umbral de 45 días, tiempos de traslado, indicadores y temas de personal/Meta Ads para fases posteriores.
+- El prompt de Fase 1 y el de Fase 2 vigentes están ahora en `PROMPT-MODULO-RETAIL.md` y `PROMPT-FASE2-CODEX.md`. Las copias de `references/` son históricas.
