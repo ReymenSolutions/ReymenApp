@@ -12,7 +12,7 @@ La web consulta directo con Prisma, siempre filtrando por `organizationId`, desd
 |---|---|---|
 | Módulo activo | `hasModule(orgId, "RETAIL")` | Sin RETAIL la web no publica (404) |
 | Organización | `Organization.slug` | URL: `/tienda/<slug>` |
-| Tiendas | `Branch` + `RetailLocationSettings` (DEC-01): nombre, `type` (TIENDA/BODEGA), `format` (PREMIUM/OUTLET/HOGAR/BODEGA), `isActive`, **`whatsappPhone`** (WhatsApp de la tienda para apartar; TBD hasta que lo dé el cliente) | Solo tiendas activas tipo TIENDA. Casa Carballo inactiva = «Próximamente», sin catálogo. La Bodega nunca aparece |
+| Tiendas | `Branch` + `RetailLocationSettings` (DEC-01): nombre, `type` (TIENDA/BODEGA/MAYOREO), `format` (PREMIUM/OUTLET/HOGAR/BODEGA/MAYOREO), `isActive`, **`whatsappPhone`** (WhatsApp de la tienda para apartar; TBD hasta que lo dé el cliente) | Solo tiendas activas tipo TIENDA. Casa Carballo inactiva = «Próximamente», sin catálogo. Bodega y Las Misiones no aparecen |
 | Prenda | `RetailItem`: `id`, `code`, `brand`, `category`, `garmentType`, `size`, `color`, `style`, `salePrice`, `status`, `channel`, `locationId`, foto | Catálogo y detalle |
 | Foto | Ruta servida por la app (DEC-03), no `Bytes` | Imagen de la tarjeta y del detalle |
 | Descuento vigente | `RetailDiscountPlan` con `status = APLICADO`, vigente hoy, que aplique al canal web | Precio con descuento. Sin plan aprobado = precio normal |
