@@ -7,6 +7,11 @@
 
 const EN: Record<string, string> = {
   // ── Reymen Talleres ──
+  "Revisa el servicio": "Check the service details",
+  "Revisa el costo y precio netos": "Check the net cost and price",
+  "Servicio no disponible": "Service unavailable",
+  "Ya existe un servicio con ese nombre": "A service with that name already exists",
+  "Verifica la identidad del cliente antes de vincular la solicitud": "Verify the customer's identity before linking the request",
   "Revisa los datos del vehículo": "Check the vehicle details",
   "Cliente del CRM no encontrado en tu organización": "CRM customer not found in your organization",
   "Las placas o el VIN ya están registrados; reutiliza ese vehículo": "The license plate or VIN is already registered; use that vehicle",
