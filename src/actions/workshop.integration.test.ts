@@ -231,8 +231,8 @@ describe("workshop tenant integration", () => {
     const extraPart = { requestKey: crypto.randomUUID(), tipo: "REFACCION" as const, partId: part.id, concepto: "Filtro adicional", cantidad: "1", unidad: "pza", precioUnitarioNeto: "10.00", costoUnitarioNeto: "5.00", autorizadaVia: "WhatsApp" };
     await expect(addWorkshopAuthorizedLine(order.id, extraPart)).rejects.toThrow(/existencias/i);
     const extra = { requestKey: crypto.randomUUID(), tipo: "SERVICIO" as const, concepto: "Trabajo adicional", cantidad: "1", unidad: "serv.", precioUnitarioNeto: "10.00", costoUnitarioNeto: "5.00", autorizadaVia: "WhatsApp" };
-    const added = await addWorkshopAuthorizedLine(order.id, extra);
-    expect((await addWorkshopAuthorizedLine(order.id, extra)).id).toBe(added.id);
+    const [added, retried] = await Promise.all([addWorkshopAuthorizedLine(order.id, extra), addWorkshopAuthorizedLine(order.id, extra)]);
+    expect(retried.id).toBe(added.id);
     expect(await prisma.workshopOrderItem.count({ where: { organizationId: orgA.id, requestKey: extra.requestKey } })).toBe(1);
     await expect(addWorkshopAuthorizedLine(order.id, { ...extra, concepto: "Otro trabajo" })).rejects.toThrow(/clave de solicitud/i);
     expect((await addPhoto("PROCESO")).status).toBe(201);
@@ -273,6 +273,28 @@ describe("workshop tenant integration", () => {
       await expect(addWorkshopAuthorizedLine(order.id, { requestKey: crypto.randomUUID(), tipo: "SERVICIO", concepto: "Cambio extra", cantidad: "1", unidad: "serv.", precioUnitarioNeto: "1.00", autorizadaVia: "WhatsApp" })).rejects.toThrow(/estado/i);
       auth.mockResolvedValue({ user: { id: ownerId, role: "OWNER", organizationId: orgA.id } });
       expect((await readPhoto(new Request("http://localhost/photo"), { params: Promise.resolve({ id: "other-org-photo" }) })).status).toBe(404);
+    } finally {
+      auth.mockResolvedValue({ user: { id: ownerId, role: "OWNER", organizationId: orgA.id } });
+    }
+  });
+
+  it("keeps stock, purchases, payments and order updates inside the tenant and owner role", async () => {
+    const part = await prisma.workshopPart.findFirstOrThrow({ where: { organizationId: orgA.id } });
+    const order = await prisma.workshopWorkOrder.findFirstOrThrow({ where: { organizationId: orgA.id } });
+    const purchases = await prisma.workshopPurchase.count({ where: { organizationId: orgA.id } });
+    const cash = await prisma.workshopCashMovement.count({ where: { organizationId: orgA.id } });
+    const purchaseInput = { requestKey: crypto.randomUUID(), proveedor: "Proveedor externo", paid: true, method: "EFECTIVO" as const, lines: [{ partId: part.id, cantidad: "1", costoUnitarioNeto: "10.00" }] };
+    try {
+      auth.mockResolvedValue({ user: { id: ownerId, role: "AGENT", organizationId: orgA.id } });
+      await expect(createWorkshopPurchase(purchaseInput)).rejects.toThrow(/No autorizado/i);
+      await expect(recordWorkshopOrderPayment(order.id, { requestKey: crypto.randomUUID(), monto: "1.00", metodo: "EFECTIVO" })).rejects.toThrow(/No autorizado/i);
+      auth.mockResolvedValue({ user: { id: ownerId, role: "OWNER", organizationId: orgB.id } });
+      await expect(getWorkshopPartStock(part.id)).rejects.toThrow(/no encontrada/i);
+      await expect(createWorkshopPurchase(purchaseInput)).rejects.toThrow(/organización/i);
+      await expect(recordWorkshopOrderPayment(order.id, { requestKey: crypto.randomUUID(), monto: "1.00", metodo: "EFECTIVO" })).rejects.toThrow(/no disponible/i);
+      await expect(saveWorkshopReception(order.id, { kilometrajeIngreso: 30001, nivelCombustible: "medio", fallaReportada: "Editar", danosPrevios: "", testigos: "", pertenencias: "" })).rejects.toThrow(/no disponible/i);
+      expect(await prisma.workshopPurchase.count({ where: { organizationId: orgA.id } })).toBe(purchases);
+      expect(await prisma.workshopCashMovement.count({ where: { organizationId: orgA.id } })).toBe(cash);
     } finally {
       auth.mockResolvedValue({ user: { id: ownerId, role: "OWNER", organizationId: orgA.id } });
     }
