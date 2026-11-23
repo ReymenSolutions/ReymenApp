@@ -22,7 +22,7 @@ Las 5 se confirmaron tal como se recomendaron. Se dejan el contexto y las opcion
 - **Contexto:** el spec pide `RetailLocation`. El repo ya tiene `Branch` (sucursales de toda la plataforma: Food, Lealtad, Realty, filtros de sucursal en reportes).
 - **Opciones:**
   - A) `RetailLocation` independiente (como dice el spec).
-  - B) Usar `Branch` para la sucursal y agregar `RetailLocationSettings` 1:1 (`branchId`, `tipo`, `formato`, `m2`, `direccion`).
+  - B) Usar `Branch` para la sucursal y agregar `RetailLocationSettings` 1:1 (`branchId`, `tipo`, `formato`, `m2`, `direccion`). El spec actualizado requiere también `tipo = MAYOREO` para Las Misiones inactiva.
 - **Recomendación:** **B**. Evita dos listas de sucursales en el mismo negocio y reutiliza lealtad y filtros. La Bodega sería un `Branch` con `tipo = BODEGA`.
 - **Estado:** ✅ CONFIRMADA (B) — 23 nov 2026.
 

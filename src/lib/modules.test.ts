@@ -22,6 +22,27 @@ describe("modules", () => {
     org = await createTestOrg("Modules No Row Org");
     await expect(hasModule(org.id, "NFC_QR")).resolves.toBe(false);
     await expect(hasModule(org.id, "MARKETING_ADS")).resolves.toBe(false);
+    await expect(hasModule(org.id, "RETAIL")).resolves.toBe(false);
+  });
+
+  it("RETAIL access is scoped to the entitled organization", async () => {
+    org = await createTestOrg("Retail Entitled Org");
+    const other = await createTestOrg("Retail Other Org");
+    try {
+      await prisma.organizationModule.create({
+        data: { organizationId: org.id, module: "RETAIL", status: "ACTIVE", source: "ADMIN_GRANTED" },
+      });
+      await expect(hasModule(org.id, "RETAIL")).resolves.toBe(true);
+      await expect(hasModule(other.id, "RETAIL")).resolves.toBe(false);
+      await expect(assertModuleEnabled(other.id, "RETAIL")).rejects.toThrow(/Retail/i);
+      await prisma.organizationModule.update({
+        where: { organizationId_module: { organizationId: org.id, module: "RETAIL" } },
+        data: { status: "SUSPENDED" },
+      });
+      await expect(hasModule(org.id, "RETAIL")).resolves.toBe(false);
+    } finally {
+      await cleanupOrg(other.id);
+    }
   });
 
   it("a SUSPENDED module is not enabled", async () => {

@@ -30,4 +30,13 @@ describe("can", () => {
   it("returns false for a role with no permission table (defensive)", () => {
     expect(can("NOT_A_REAL_ROLE" as UserRole, "team:manage")).toBe(false);
   });
+
+  it("separates Retail management from store operation and read-only roles", () => {
+    expect(can("OWNER", "retail:manage")).toBe(true);
+    expect(can("MANAGER", "retail:manage")).toBe(false);
+    expect(can("MANAGER", "retail:operate")).toBe(true);
+    expect(can("AGENT", "retail:operate")).toBe(true);
+    expect(can("VIEWER", "retail:operate")).toBe(false);
+    expect(can("CLIENT", "retail:manage")).toBe(false);
+  });
 });

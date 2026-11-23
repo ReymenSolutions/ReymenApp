@@ -1362,6 +1362,8 @@ enum PlatformModule {
   // en Lead; Realty solo guarda lo inmobiliario (preferencias, propiedades,
   // matches, visitas ligadas a Appointment, cierres y campañas).
   REALTY
+  // Reymen Retail: inventario por pieza y POS web, separado del POS de Food.
+  RETAIL
 }
 
 enum ModuleStatus {

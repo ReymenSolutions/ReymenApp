@@ -21,7 +21,7 @@ Orden de trabajo según [`SPEC.md`](SPEC.md) (§ Fases y § Lista de trabajo). M
 - [ ] Confirmar número de WhatsApp por tienda antes de mostrar «Apartar por WhatsApp» en la web
 
 ## Fase 1 — Base (MVP)
-1. [ ] Enum `RETAIL`, registro en `modules.ts`, permisos, guards, entrada en el menú, `/portal/retail` (criterio: org sin RETAIL no lo ve; con RETAIL abre sin errores)
+1. [ ] Enum `RETAIL`, registro en `modules.ts`, permisos, guards, entrada en el menú, `/portal/retail` (código y pruebas locales terminados en corte 1; falta validación con y sin entitlement en `apptest` para cerrar el criterio)
 2. [ ] Ubicaciones (según DEC-01): Labash, Outlet del Norte, Casa Carballo **inactiva**, Las Misiones **inactiva y solo mayoreo en Fase 3**, Bodega
 3. [ ] `RetailItem`: alta con foto, costo y precio, código único + QR, etiqueta imprimible
 4. [ ] `RetailMovement`: alta, traslado con EN_TRASLADO hasta recepción, ajuste/merma con motivo, quién/cuándo

@@ -34,3 +34,9 @@ sigue**, para que cualquier agente (Claude Code o Codex) retome sin rehacer nada
 ## 2026-11-23 · Spec y prompts actualizados en main
 - `main@995f674` corrige que Las Misiones sí existe como distribuidora de mayoreo inactiva para Fase 3; incorpora mermas, reserva de seguridad, umbral de 45 días, tiempos de traslado, indicadores y temas de personal/Meta Ads para fases posteriores.
 - El prompt de Fase 1 y el de Fase 2 vigentes están ahora en `PROMPT-MODULO-RETAIL.md` y `PROMPT-FASE2-CODEX.md`. Las copias de `references/` son históricas.
+
+## 2026-11-23 · Fase 1, corte 1: derecho y ruta (Codex)
+- Rama `codex/retail-phase1-foundation`, basada en `codex/retail-carvallo-discovery` ya sincronizada con `main@995f674`. Primer corte: enum y migración `RETAIL`, etiquetas de módulo, menú condicionado al entitlement, permisos `retail:manage`/`retail:operate`, contexto de servidor y `/portal/retail` protegido. El panel muestra un estado vacío sin cifras simuladas; no existe todavía esquema de prendas ni ventas.
+- `npx prisma generate` y `prisma validate`: correctos. La migración se aplicó **solo** en `reymen_retail_test`, base desechable del contenedor local `reymen-workshop-disposable`, sin tocar bases reales. `npm run typecheck`: correcto tras regenerar tipos de rutas. ESLint: 0 errores; avisos preexistentes del sidebar. `vitest` dirigido: 4 archivos, 28 pruebas pasadas (módulos, RBAC, catálogo público existente y proxy).
+- **No hay despliegue ni migración en `apptest` o producción.** El criterio de aceptación de tarea 1 sigue abierto hasta recorrer la ruta con y sin entitlement en `apptest`.
+- **Sigue:** esquema multi-tenant `Branch` + `RetailLocationSettings`, prenda única y movimiento atómico; después alta/QR y primer recorrido en test. No conectar `source.ts` público hasta acordar I-03 y probar identidad, concurrencia e idempotencia.
