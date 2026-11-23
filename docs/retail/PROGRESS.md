@@ -40,3 +40,6 @@ sigue**, para que cualquier agente (Claude Code o Codex) retome sin rehacer nada
 - `npx prisma generate` y `prisma validate`: correctos. La migración se aplicó **solo** en `reymen_retail_test`, base desechable del contenedor local `reymen-workshop-disposable`, sin tocar bases reales. `npm run typecheck`: correcto tras regenerar tipos de rutas. ESLint: 0 errores; avisos preexistentes del sidebar. `vitest` dirigido: 4 archivos, 28 pruebas pasadas (módulos, RBAC, catálogo público existente y proxy).
 - **No hay despliegue ni migración en `apptest` o producción.** El criterio de aceptación de tarea 1 sigue abierto hasta recorrer la ruta con y sin entitlement en `apptest`.
 - **Sigue:** esquema multi-tenant `Branch` + `RetailLocationSettings`, prenda única y movimiento atómico; después alta/QR y primer recorrido en test. No conectar `source.ts` público hasta acordar I-03 y probar identidad, concurrencia e idempotencia.
+
+## 2026-11-23 · WhatsApp de las tiendas (Claude Code)
+- W-03 resuelta: Labash 81 1420 6868 y Outlet del Norte 81 3384 7842, anotados en DECISIONS y WEB-CONTRACT para que Codex los cargue como dato de cada tienda. La web ya arma el enlace de wa.me con esos números (prueba en `catalog.test.ts`).
