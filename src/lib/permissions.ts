@@ -32,6 +32,8 @@ export type Action =
   | "realty:manage"
   // Realty: asesores — propiedades, prospectos, visitas y cierres.
   | "realty:operate"
+  | "retail:manage"
+  | "retail:operate"
   // CRM: crear y trabajar tareas y pendientes. El Agente solo edita las suyas (asignadas o creadas por él).
   | "tasks:manage";
 
@@ -43,7 +45,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
     "conversations:view", "conversations:escalate", "conversations:resolve", "conversations:reply", "conversations:assign",
     "knowledge_base:manage", "team:manage",
     "requests:create", "reports:view", "settings:view", "settings:manage",
-    "food:manage", "loyalty:manage", "loyalty:operate", "realty:manage", "realty:operate",
+    "food:manage", "loyalty:manage", "loyalty:operate", "realty:manage", "realty:operate", "retail:manage", "retail:operate",
   ],
   ADMIN: [
     "leads:create", "leads:delete", "leads:update_status",
@@ -52,7 +54,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
     "conversations:view", "conversations:escalate", "conversations:resolve", "conversations:reply", "conversations:assign",
     "knowledge_base:manage", "team:manage",
     "requests:create", "reports:view", "settings:view", "settings:manage",
-    "food:manage", "loyalty:manage", "loyalty:operate", "realty:manage", "realty:operate",
+    "food:manage", "loyalty:manage", "loyalty:operate", "realty:manage", "realty:operate", "retail:manage", "retail:operate",
   ],
   OWNER: [
     "leads:create", "leads:delete", "leads:update_status",
@@ -61,7 +63,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
     "conversations:view", "conversations:escalate", "conversations:resolve", "conversations:reply", "conversations:assign",
     "knowledge_base:manage", "team:manage",
     "requests:create", "reports:view", "settings:view", "settings:manage",
-    "food:manage", "loyalty:manage", "loyalty:operate", "realty:manage", "realty:operate",
+    "food:manage", "loyalty:manage", "loyalty:operate", "realty:manage", "realty:operate", "retail:manage", "retail:operate",
   ],
   MANAGER: [
     "leads:create", "leads:update_status",
@@ -70,7 +72,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
     "conversations:view", "conversations:escalate", "conversations:resolve", "conversations:reply", "conversations:assign",
     "knowledge_base:manage",
     "requests:create", "reports:view", "settings:view",
-    "food:manage", "loyalty:manage", "loyalty:operate", "realty:manage", "realty:operate",
+    "food:manage", "loyalty:manage", "loyalty:operate", "realty:manage", "realty:operate", "retail:operate",
   ],
   AGENT: [
     "leads:create", "leads:update_status",
@@ -78,7 +80,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
     "automations:view",
     "conversations:view", "conversations:escalate", "conversations:resolve", "conversations:reply",
     "requests:create",
-    "loyalty:operate", "realty:operate",
+    "loyalty:operate", "realty:operate", "retail:operate",
   ],
   VIEWER: [
     "leads:update_status",
