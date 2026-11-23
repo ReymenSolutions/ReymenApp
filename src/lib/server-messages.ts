@@ -459,6 +459,30 @@ const EN: Record<string, string> = {
   "Revisa tu número de WhatsApp (10 dígitos).": "Check your WhatsApp number (10 digits).",
   "Revisa tus datos.": "Check your details.",
   "Solicitud inválida. Recarga la página.": "Invalid request. Reload the page.",
+  // Inventario Retail
+  "No tienes permiso para esta operación de Retail.": "You do not have permission for this Retail operation.",
+  "La ubicación no pertenece a esta organización.": "This location does not belong to this organization.",
+  "No se puede cambiar el tipo de una ubicación de Retail ya configurada.": "The type of a configured Retail location cannot be changed.",
+  "El tipo y formato de la ubicación no coinciden.": "The location type and format do not match.",
+  "El código solo admite letras, números, punto, guion y guion bajo.": "The code can only contain letters, numbers, periods, hyphens and underscores.",
+  "Se necesita un precio.": "A price is required.",
+  "El alta de piezas requiere una bodega activa de esta organización.": "Registering items requires an active warehouse in this organization.",
+  "El canal de mayoreo se habilitará en Fase 3.": "The wholesale channel will be enabled in Phase 3.",
+  "Ese código ya existe en la organización.": "That code already exists in this organization.",
+  "La pieza no está disponible en esta organización.": "The item is not available in this organization.",
+  "El destino debe ser distinto del origen.": "The destination must differ from the origin.",
+  "El destino debe ser una tienda activa de esta organización.": "The destination must be an active store in this organization.",
+  "La pieza ya tiene un traslado abierto. Actualiza la pantalla.": "The item already has an open transfer. Refresh the page.",
+  "El traslado no está pendiente de salida.": "The transfer is not awaiting departure.",
+  "La pieza ya no está disponible en el origen.": "The item is no longer available at the origin.",
+  "El traslado no está pendiente de recepción.": "The transfer is not awaiting receipt.",
+  "La tienda de destino no está activa.": "The destination store is not active.",
+  "La pieza no está en tránsito desde el origen esperado.": "The item is not in transit from the expected origin.",
+  "Solo se puede cancelar un traslado que aún no ha salido.": "Only a transfer that has not departed can be canceled.",
+  "El traslado ya cambió de estado.": "The transfer status has already changed.",
+  "La pieza no está disponible para registrar una merma.": "The item is not available to record waste.",
+  "Cancela o completa el traslado antes de registrar la merma.": "Cancel or complete the transfer before recording waste.",
+  "La pieza cambió de estado.": "The item status has changed.",
 };
 
 // Los pocos mensajes que se escribieron en inglés en el servidor.
@@ -478,6 +502,8 @@ const PLAN_RESOURCE_EN: Record<string, string> = {
 
 // Mensajes con partes variables: [patrón en español, versión en inglés].
 const EN_PATTERNS: [RegExp, (...groups: string[]) => string][] = [
+  [/^(El código|El motivo) debe tener entre 1 y (\d+) caracteres\.$/, (label, max) => `${label === "El código" ? "The code" : "The reason"} must be between 1 and ${max} characters.`],
+  [/^(El área|El precio|El costo) debe ser un importe no negativo con hasta dos decimales\.$/, (label) => `${({ "El área": "The area", "El precio": "The price", "El costo": "The cost" } as Record<string, string>)[label]} must be a non-negative amount with up to two decimal places.`],
   [
     /^Alcanzaste el límite de (.+) de tu plan \((\d+)\)\. Solicita más capacidad en Configuración\.$/,
     (resource, limit) => `You reached your plan's ${PLAN_RESOURCE_EN[resource] ?? resource} limit (${limit}). Request more capacity in Settings.`,

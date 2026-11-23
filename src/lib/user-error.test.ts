@@ -37,6 +37,10 @@ describe("UserError / getErrorMessage", () => {
     expect(translateServerMessage("Alcanzaste el límite de usuarios de tu plan (2). Solicita más capacidad en Configuración.", "en"))
       .toBe("You reached your plan's users limit (2). Request more capacity in Settings.");
     expect(translateServerMessage("Unauthorized", "es")).toBe("No autorizado");
+    expect(translateServerMessage("El código debe tener entre 1 y 80 caracteres.", "en"))
+      .toBe("The code must be between 1 and 80 characters.");
+    expect(translateServerMessage("El precio debe ser un importe no negativo con hasta dos decimales.", "en"))
+      .toBe("The price must be a non-negative amount with up to two decimal places.");
     setLang("en");
     expect(translateMessage("Mínimo 8 caracteres")).toBe("At least 8 characters");
   });

@@ -3,6 +3,7 @@
 Requisitos de [`SPEC.md`](SPEC.md) § Seguridad, datos y disponibilidad. **Pendientes de implementación y prueba**; esta lista no afirma que Retail ya cumpla estas propiedades.
 
 - **Aislamiento:** toda consulta filtra por `organizationId`; pruebas de que una organización no ve datos de otra.
+- **Corte 2 en rama:** `RetailItem`, `RetailTransfer` y `RetailMovement` tienen claves compuestas por organización; PostgreSQL rechaza referencias cruzadas. El servicio revalida actor activo, permiso y entitlement para cada operación. El índice parcial impide dos traslados abiertos de una misma pieza.
 - **Acceso:** guard de módulo `RETAIL` + permisos por rol (`src/lib/permissions.ts`). Aprobar descuentos y cancelar ventas: solo dueño o gerente.
 - **Costo interno:** nunca sale en la web pública, WhatsApp ni documentos de cliente; pruebas que lo verifican.
 - **Bitácora:** quién/cuándo en cada movimiento (`RetailMovement.realizadoPorId`) y acciones sensibles en `logAudit`.

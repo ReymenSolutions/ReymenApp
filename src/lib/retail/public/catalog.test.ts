@@ -60,6 +60,9 @@ describe("web pública Retail · tiendas y WhatsApp", () => {
   it("arma el número de wa.me de México y rechaza números incompletos", () => {
     expect(waNumber("81 1234 5678")).toBe("528112345678");
     expect(waNumber("+52 1 81 1234 5678")).toBe("528112345678");
+    // Números reales de las tiendas (W-03).
+    expect(waNumber("81 1420 6868")).toBe("528114206868");
+    expect(waNumber("81 3384 7842")).toBe("528133847842");
     expect(waNumber("12345")).toBeNull();
     expect(whatsappUrl(null, "hola")).toBeNull();
   });

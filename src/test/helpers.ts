@@ -118,6 +118,10 @@ export async function cleanupOrg(orgId: string) {
   await prisma.foodDish.deleteMany({ where: { organizationId: orgId } });
   await prisma.foodOperatingCost.deleteMany({ where: { organizationId: orgId } });
   await prisma.foodSale.deleteMany({ where: { organizationId: orgId } });
+  await prisma.retailMovement.deleteMany({ where: { organizationId: orgId } });
+  await prisma.retailTransfer.deleteMany({ where: { organizationId: orgId } });
+  await prisma.retailItem.deleteMany({ where: { organizationId: orgId } });
+  await prisma.retailLocationSettings.deleteMany({ where: { organizationId: orgId } });
   await prisma.customer.deleteMany({ where: { organizationId: orgId } });
   await prisma.foodKitchenTicket.deleteMany({ where: { organizationId: orgId } });
   await prisma.foodShiftClose.deleteMany({ where: { organizationId: orgId } });
