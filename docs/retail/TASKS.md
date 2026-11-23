@@ -29,7 +29,10 @@ Orden de trabajo según [`SPEC.md`](SPEC.md) (§ Fases y § Lista de trabajo). M
 10. [ ] Pruebas de aceptación de Fase 1 (lista completa en el spec)
 
 ## Fase 2 — Venta (después de aceptar Fase 1)
-11. [ ] **(Claude Code)** Web pública conectada al inventario → [`PROMPT-WEB-VENTAS.md`](PROMPT-WEB-VENTAS.md) + [`WEB-CONTRACT.md`](WEB-CONTRACT.md). Necesita de Codex: enum RETAIL, ubicaciones, `RetailItem` y `createHold`
+11. [ ] **(Claude Code)** Web pública conectada al inventario → [`PROMPT-WEB-VENTAS.md`](PROMPT-WEB-VENTAS.md) + [`WEB-CONTRACT.md`](WEB-CONTRACT.md). Necesita de Codex: enum RETAIL, ubicaciones (con `whatsappPhone`), `RetailItem` y `createHold`.
+    - [x] Estructura de la web, reglas y pruebas (sin datos reales)
+    - [ ] Conectar `src/lib/retail/public/source.ts` al núcleo
+    - [ ] Probar en apptest con prendas reales (criterios de aceptación del prompt)
 12. [ ] WhatsApp con agente IA (consulta, apartado, venta sin doble venta)
 13. [ ] Lealtad (frecuencia, ticket, beneficios)
 14. [ ] Indicadores completos (m², días, rotación, excedentes, reabastecimiento)

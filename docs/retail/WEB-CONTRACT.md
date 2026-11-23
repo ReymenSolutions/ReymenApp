@@ -12,7 +12,7 @@ La web consulta directo con Prisma, siempre filtrando por `organizationId`, desd
 |---|---|---|
 | Módulo activo | `hasModule(orgId, "RETAIL")` | Sin RETAIL la web no publica (404) |
 | Organización | `Organization.slug` | URL: `/tienda/<slug>` |
-| Tiendas | `Branch` + `RetailLocationSettings` (DEC-01): nombre, `type` (TIENDA/BODEGA), `format` (PREMIUM/OUTLET/HOGAR/BODEGA), `isActive` | Solo tiendas activas tipo TIENDA. Casa Carballo inactiva = «Próximamente», sin catálogo. La Bodega nunca aparece |
+| Tiendas | `Branch` + `RetailLocationSettings` (DEC-01): nombre, `type` (TIENDA/BODEGA), `format` (PREMIUM/OUTLET/HOGAR/BODEGA), `isActive`, **`whatsappPhone`** (WhatsApp de la tienda para apartar; TBD hasta que lo dé el cliente) | Solo tiendas activas tipo TIENDA. Casa Carballo inactiva = «Próximamente», sin catálogo. La Bodega nunca aparece |
 | Prenda | `RetailItem`: `id`, `code`, `brand`, `category`, `garmentType`, `size`, `color`, `style`, `salePrice`, `status`, `channel`, `locationId`, foto | Catálogo y detalle |
 | Foto | Ruta servida por la app (DEC-03), no `Bytes` | Imagen de la tarjeta y del detalle |
 | Descuento vigente | `RetailDiscountPlan` con `status = APLICADO`, vigente hoy, que aplique al canal web | Precio con descuento. Sin plan aprobado = precio normal |
@@ -22,7 +22,7 @@ La web consulta directo con Prisma, siempre filtrando por `organizationId`, desd
 ### Qué prendas se publican
 - `status = DISPONIBLE`, en una tienda **activa** tipo TIENDA.
 - `channel = MAYOREO` nunca sale en el catálogo de menudeo.
-- **Pendiente (W-01):** ¿las prendas con `channel = TIENDA` también salen en la web, o solo las `EN_LINEA`? El spec dice «mismo stock: si se vende en tienda, desaparece de la web», lo que sugiere que sí salen. Lo confirma Reynol o Emi.
+- **W-01 (resuelta 23 nov 2026, opción A):** salen las prendas DISPONIBLES de canal `TIENDA` **y** `EN_LINEA`, solo si tienen foto. Implementado en `isPublishable` (`src/lib/retail/public/catalog.ts`).
 
 ## 2. Lo que la web LLAMA (escritura, implementada por Codex en el núcleo)
 
@@ -53,3 +53,13 @@ Reglas que garantiza el núcleo, no la web:
 - Detalle con foto grande, código y botón **«Apartar por WhatsApp»**. Llama a `createHold` y abre WhatsApp con el código y el vencimiento.
 - **El número de WhatsApp de cada tienda es TBD**: sin él, el botón no se muestra.
 - Mayoreo (Fase 3): solo se deja la ruta preparada, sin publicar.
+
+## 4. Estado de la implementación de la web (Claude Code)
+- Hecho (sin datos reales todavía):
+  - rutas `src/app/tienda/[slug]/` (inicio, `catalogo`, `prenda/[code]`);
+  - reglas puras y pruebas en `src/lib/retail/public/catalog.ts`;
+  - acción pública de apartar en `src/lib/retail/public/actions.ts` (límite por IP y teléfono);
+  - componentes en `src/components/retail-public/`;
+  - ruta pública en `src/proxy.ts`.
+- Marca: logo **RM** del repo (`src/app/icon.png`, servido como `/icon.png`), azul marino y azul rey (tokens `.rt` en `globals.css`).
+- **Único punto por conectar:** `src/lib/retail/public/source.ts`. Hoy `getStorefront` devuelve `null` (la tienda da 404) y `requestHold` responde `NOT_READY`. Cuando Codex entregue `RetailItem`, `RetailLocationSettings` y `createHold`, se implementan ahí siguiendo las instrucciones del propio archivo.
