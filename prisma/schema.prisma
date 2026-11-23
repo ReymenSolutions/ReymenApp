@@ -1624,6 +1624,7 @@ model WorkshopOrderItem {
   id String @id @default(cuid())
   organizationId String
   workOrderId String
+  requestKey String?
   partId String?
   tipo WorkshopItemType
   concepto String
@@ -1642,6 +1643,7 @@ model WorkshopOrderItem {
   workOrder WorkshopWorkOrder @relation(fields: [workOrderId], references: [id])
   part WorkshopPart? @relation(fields: [partId], references: [id])
   @@index([organizationId, workOrderId])
+  @@unique([organizationId, requestKey])
 }
 
 model WorkshopPart {

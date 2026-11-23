@@ -8,7 +8,7 @@
 - [ ] Ampliar las pruebas de IDOR y concurrencia a órdenes, inventario, compras, caja y archivos.
 - [x] Recepción, diagnóstico, checklist y fotos privadas en flujo básico.
 - [x] Folios transaccionales, emisión, vigencia y PDF de cotización sin costos.
-- [ ] Aprobación y conversión única a orden implementadas; falta autorización de líneas adicionales.
+- [x] Aprobación y conversión única a orden; líneas adicionales con autorización, cargo e inventario transaccionales e idempotentes.
 - [x] Inventario derivado, compras y caja en transacciones, sin stock negativo en el flujo de orden.
 - [x] Pagos, crédito explícito, entrega inmutable e historial paginado de vehículo.
 - [x] Panel con balance e ingresos del día calculados de caja.

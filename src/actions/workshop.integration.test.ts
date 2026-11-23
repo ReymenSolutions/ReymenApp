@@ -9,7 +9,7 @@ vi.mock("@/lib/auth", () => ({ auth }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
 
-const { createWorkshopVehicle, createWorkshopQuote, issueWorkshopQuote, markWorkshopQuoteSent, approveWorkshopQuote, convertWorkshopQuote, createWorkshopPart, createWorkshopPurchase, getWorkshopPartStock, saveWorkshopReception, advanceWorkshopOrder, recordWorkshopOrderPayment, authorizeWorkshopCredit, deliverWorkshopOrder, setWorkshopInvoiceRequested, saveWorkshopSettings, setWorkshopNextService } = await import("./workshop");
+const { createWorkshopVehicle, createWorkshopQuote, issueWorkshopQuote, markWorkshopQuoteSent, approveWorkshopQuote, convertWorkshopQuote, createWorkshopPart, createWorkshopPurchase, getWorkshopPartStock, saveWorkshopReception, advanceWorkshopOrder, addWorkshopAuthorizedLine, recordWorkshopOrderPayment, authorizeWorkshopCredit, deliverWorkshopOrder, setWorkshopInvoiceRequested, saveWorkshopSettings, setWorkshopNextService } = await import("./workshop");
 const { GET: downloadQuotePdf } = await import("@/app/api/workshop/quotes/[id]/pdf/route");
 const { GET: downloadOrderPdf } = await import("@/app/api/workshop/orders/[id]/pdf/route");
 const { POST: uploadPhoto } = await import("@/app/api/workshop/orders/[id]/photos/route");
@@ -52,12 +52,14 @@ describe("workshop tenant integration", () => {
       await prisma.workshopVehicle.deleteMany({ where: { organizationId: orgA.id } });
       await prisma.workshopPart.deleteMany({ where: { organizationId: orgA.id } });
       await prisma.workshopFolioCounter.deleteMany({ where: { organizationId: orgA.id } });
+      await prisma.workshopSettings.deleteMany({ where: { organizationId: orgA.id } });
       await prisma.organizationModule.deleteMany({ where: { organizationId: orgA.id, module: "WORKSHOP" } });
       await prisma.customer.deleteMany({ where: { organizationId: orgA.id } });
       await cleanupOrg(orgA.id);
     }
     if (orgB) {
       await prisma.workshopVehicle.deleteMany({ where: { organizationId: orgB.id } });
+      await prisma.workshopSettings.deleteMany({ where: { organizationId: orgB.id } });
       await prisma.organizationModule.deleteMany({ where: { organizationId: orgB.id, module: "WORKSHOP" } });
       await prisma.customer.deleteMany({ where: { organizationId: orgB.id } });
       await cleanupOrg(orgB.id);
@@ -206,6 +208,13 @@ describe("workshop tenant integration", () => {
     await advanceWorkshopOrder(order.id, "EN_REPARACION");
     expect(await getWorkshopPartStock(part.id)).toBe("0");
     await expect(advanceWorkshopOrder(order.id, "EN_REPARACION")).rejects.toThrow(/Transición/i);
+    const extraPart = { requestKey: crypto.randomUUID(), tipo: "REFACCION" as const, partId: part.id, concepto: "Filtro adicional", cantidad: "1", unidad: "pza", precioUnitarioNeto: "10.00", costoUnitarioNeto: "5.00", autorizadaVia: "WhatsApp" };
+    await expect(addWorkshopAuthorizedLine(order.id, extraPart)).rejects.toThrow(/existencias/i);
+    const extra = { requestKey: crypto.randomUUID(), tipo: "SERVICIO" as const, concepto: "Trabajo adicional", cantidad: "1", unidad: "serv.", precioUnitarioNeto: "10.00", costoUnitarioNeto: "5.00", autorizadaVia: "WhatsApp" };
+    const added = await addWorkshopAuthorizedLine(order.id, extra);
+    expect((await addWorkshopAuthorizedLine(order.id, extra)).id).toBe(added.id);
+    expect(await prisma.workshopOrderItem.count({ where: { organizationId: orgA.id, requestKey: extra.requestKey } })).toBe(1);
+    await expect(addWorkshopAuthorizedLine(order.id, { ...extra, concepto: "Otro trabajo" })).rejects.toThrow(/clave de solicitud/i);
     expect((await addPhoto("PROCESO")).status).toBe(201);
     await advanceWorkshopOrder(order.id, "LISTA_PARA_ENTREGA");
     expect((await addPhoto("ENTREGA")).status).toBe(201);
@@ -213,12 +222,12 @@ describe("workshop tenant integration", () => {
     const paymentKey = crypto.randomUUID();
     const payment = await recordWorkshopOrderPayment(order.id, { requestKey: paymentKey, monto: "400.00", metodo: "EFECTIVO" });
     expect((await recordWorkshopOrderPayment(order.id, { requestKey: paymentKey, monto: "400.00", metodo: "EFECTIVO" })).id).toBe(payment.id);
-    expect((await prisma.workshopWorkOrder.findUniqueOrThrow({ where: { id: order.id } })).saldo.toFixed(2)).toBe("64.00");
+    expect((await prisma.workshopWorkOrder.findUniqueOrThrow({ where: { id: order.id } })).saldo.toFixed(2)).toBe("75.60");
     await authorizeWorkshopCredit(order.id, "Pago restante en siete días");
     await deliverWorkshopOrder(order.id, 30001, true);
     expect((await prisma.workshopWorkOrder.findUniqueOrThrow({ where: { id: order.id } })).estado).toBe("ENTREGADA");
     await expect(setWorkshopInvoiceRequested(order.id, false)).rejects.toThrow(/no disponible/i);
-    await recordWorkshopOrderPayment(order.id, { requestKey: crypto.randomUUID(), monto: "64.00", metodo: "TARJETA" });
+    await recordWorkshopOrderPayment(order.id, { requestKey: crypto.randomUUID(), monto: "75.60", metodo: "TARJETA" });
     expect((await prisma.workshopWorkOrder.findUniqueOrThrow({ where: { id: order.id } })).saldo.toFixed(2)).toBe("0.00");
     await expect(saveWorkshopReception(order.id, { kilometrajeIngreso: 30001, nivelCombustible: "medio", fallaReportada: "Editar", danosPrevios: "", testigos: "", pertenencias: "" })).rejects.toThrow(/no disponible/i);
     const photo = await prisma.workshopPhoto.findFirstOrThrow({ where: { organizationId: orgA.id, workOrderId: order.id } });
@@ -236,10 +245,12 @@ describe("workshop tenant integration", () => {
       expect((await downloadQuotePdf(new Request("http://localhost/quote"), { params: Promise.resolve({ id: quote.id }) })).status).toBe(403);
       expect((await downloadOrderPdf(new Request("http://localhost/order"), { params: Promise.resolve({ id: order.id }) })).status).toBe(403);
       await expect(setWorkshopInvoiceRequested(order.id, false)).rejects.toThrow(/No autorizado/i);
+      await expect(addWorkshopAuthorizedLine(order.id, { requestKey: crypto.randomUUID(), tipo: "SERVICIO", concepto: "Cambio extra", cantidad: "1", unidad: "serv.", precioUnitarioNeto: "1.00", autorizadaVia: "WhatsApp" })).rejects.toThrow(/No autorizado/i);
       auth.mockResolvedValue({ user: { id: ownerId, role: "OWNER", organizationId: orgB.id } });
       expect((await downloadQuotePdf(new Request("http://localhost/quote"), { params: Promise.resolve({ id: quote.id }) })).status).toBe(404);
       expect((await downloadOrderPdf(new Request("http://localhost/order"), { params: Promise.resolve({ id: order.id }) })).status).toBe(404);
       expect((await readPhoto(new Request("http://localhost/photo"), { params: Promise.resolve({ id: photo.id }) })).status).toBe(404);
+      await expect(addWorkshopAuthorizedLine(order.id, { requestKey: crypto.randomUUID(), tipo: "SERVICIO", concepto: "Cambio extra", cantidad: "1", unidad: "serv.", precioUnitarioNeto: "1.00", autorizadaVia: "WhatsApp" })).rejects.toThrow(/estado/i);
       auth.mockResolvedValue({ user: { id: ownerId, role: "OWNER", organizationId: orgA.id } });
       expect((await readPhoto(new Request("http://localhost/photo"), { params: Promise.resolve({ id: "other-org-photo" }) })).status).toBe(404);
     } finally {

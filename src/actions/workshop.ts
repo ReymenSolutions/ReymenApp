@@ -435,6 +435,77 @@ export async function advanceWorkshopOrder(orderId: string, next: "DIAGNOSTICO" 
   revalidatePath("/portal/workshop");
 }
 
+const extraLineInput = z.object({
+  requestKey: z.string().uuid(),
+  tipo: z.enum(["REFACCION", "MANO_DE_OBRA", "SERVICIO"]),
+  partId: z.string().optional(),
+  concepto: z.string().trim().min(2).max(160),
+  detalle: z.string().trim().max(1000).optional(),
+  cantidad: z.string(),
+  unidad: z.string().trim().min(1).max(24),
+  precioUnitarioNeto: z.string(),
+  costoUnitarioNeto: z.string().optional(),
+  autorizadaVia: z.string().trim().min(2).max(80),
+});
+
+/** Registra la autorización del cliente antes de agregar trabajo o consumir una refacción. */
+export async function addWorkshopAuthorizedLine(orderId: string, input: z.input<typeof extraLineInput>) {
+  const { orgId, userId } = await requireWorkshopOwner();
+  const parsed = extraLineInput.safeParse(input);
+  if (!parsed.success) throw new UserError("Revisa la línea adicional y cómo la autorizó el cliente");
+  const d = parsed.data;
+  if (d.tipo === "REFACCION" && !d.partId) throw new UserError("Selecciona una refacción del inventario para cada línea de refacción");
+  let totals;
+  try { totals = calculateNetLines([{ cantidad: d.cantidad, precioUnitarioNeto: d.precioUnitarioNeto, costoUnitarioNeto: d.costoUnitarioNeto || null }]); }
+  catch { throw new UserError("Revisa cantidades, costos y precios netos"); }
+  const line = totals.lines[0];
+  const checkExisting = async () => {
+    const existing = await prisma.workshopOrderItem.findUnique({ where: { organizationId_requestKey: { organizationId: orgId, requestKey: d.requestKey } }, select: { id: true, workOrderId: true, tipo: true, partId: true, concepto: true, cantidad: true, precioUnitarioNeto: true, costoUnitarioNeto: true, autorizadaVia: true } });
+    if (!existing) return null;
+    if (existing.workOrderId !== orderId || existing.tipo !== d.tipo || (existing.partId ?? null) !== (d.tipo === "REFACCION" ? d.partId : null) || existing.concepto !== d.concepto || !existing.cantidad.eq(d.cantidad) || !existing.precioUnitarioNeto.eq(d.precioUnitarioNeto) || (existing.costoUnitarioNeto === null ? !!d.costoUnitarioNeto : !d.costoUnitarioNeto || !existing.costoUnitarioNeto.eq(d.costoUnitarioNeto)) || existing.autorizadaVia !== d.autorizadaVia) throw new UserError("La clave de solicitud ya se usó con otra línea");
+    return { id: existing.id, created: false };
+  };
+  const previous = await checkExisting();
+  if (previous) return previous;
+  let result;
+  try {
+    result = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "WorkshopWorkOrder" WHERE id = ${orderId} AND "organizationId" = ${orgId} FOR UPDATE`;
+      const order = await tx.workshopWorkOrder.findFirst({ where: { id: orderId, organizationId: orgId }, select: { id: true, estado: true } });
+      if (!order || !["DIAGNOSTICO", "EN_REPARACION"].includes(order.estado)) throw new UserError("La orden no admite trabajo adicional en este estado");
+      let inventoryCost: Prisma.Decimal | null = null;
+      if (d.tipo === "REFACCION" && d.partId) {
+        await tx.$queryRaw`SELECT id FROM "WorkshopPart" WHERE id = ${d.partId} AND "organizationId" = ${orgId} FOR UPDATE`;
+        const part = await tx.workshopPart.findFirst({ where: { id: d.partId, organizationId: orgId }, select: { id: true, costoNeto: true } });
+        if (!part) throw new UserError("Una refacción no pertenece a tu organización");
+        inventoryCost = part.costoNeto;
+        if (order.estado === "EN_REPARACION" && (await workshopStock(tx, orgId, part.id)).lt(d.cantidad)) throw new UserError("No hay existencias suficientes; registra primero una compra");
+      }
+      const item = await tx.workshopOrderItem.create({ data: {
+        organizationId: orgId, workOrderId: orderId, requestKey: d.requestKey, tipo: d.tipo, partId: d.tipo === "REFACCION" ? d.partId : null,
+        concepto: d.concepto, detalle: d.detalle || null, cantidad: d.cantidad, unidad: d.unidad,
+        precioUnitarioNeto: d.precioUnitarioNeto, costoUnitarioNeto: d.costoUnitarioNeto || null,
+        importeNeto: line.importeNeto, ivaImporte: line.ivaImporte, importeConIva: line.importeConIva,
+        autorizadaEn: new Date(), autorizadaVia: d.autorizadaVia,
+      }, select: { id: true } });
+      if (d.tipo === "REFACCION" && d.partId && order.estado === "EN_REPARACION") {
+        await tx.workshopInventoryMovement.create({ data: { organizationId: orgId, partId: d.partId, workOrderId: orderId, tipo: "SALIDA_ORDEN", cantidad: d.cantidad, costoUnitarioNeto: d.costoUnitarioNeto || inventoryCost! } });
+      }
+      await tx.workshopWorkOrder.update({ where: { id: orderId }, data: { saldo: { increment: line.importeConIva } } });
+      return { id: item.id, created: true };
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const duplicate = await checkExisting();
+      if (duplicate) return duplicate;
+    }
+    throw error;
+  }
+  await logAudit({ organizationId: orgId, userId, action: "workshop.order.line.authorized", resource: "WorkshopOrderItem", resourceId: result.id, metadata: { orderId, via: d.autorizadaVia } });
+  revalidatePath("/portal/workshop");
+  return result;
+}
+
 const paymentInput = z.object({ requestKey: z.string().uuid(), monto: z.string(), metodo: z.enum(["EFECTIVO", "TRANSFERENCIA", "TARJETA"]) });
 
 export async function recordWorkshopOrderPayment(orderId: string, input: z.input<typeof paymentInput>) {
