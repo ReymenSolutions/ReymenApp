@@ -50,6 +50,7 @@ describe("Retail inventory boundaries and transfers", () => {
     await expect(registerRetailItem(a.id, ownerB.id, { code: "X-1", locationId: warehouseA, salePrice: "100" })).rejects.toThrow(/permiso/i);
     await expect(registerRetailItem(a.id, viewerA.id, { code: "X-2", locationId: warehouseA, salePrice: "100" })).rejects.toThrow(/permiso/i);
     await expect(registerRetailItem(a.id, agentA.id, { code: "X-3", locationId: storeB, salePrice: "100" })).rejects.toThrow(/bodega/i);
+    await expect(prisma.retailItem.create({ data: { organizationId: a.id, code: "X-DB", locationId: storeB, salePrice: "100", createdById: agentA.id } })).rejects.toThrow();
     await prisma.organizationModule.update({ where: { organizationId_module: { organizationId: a.id, module: "RETAIL" } }, data: { status: "SUSPENDED" } });
     await expect(registerRetailItem(a.id, agentA.id, { code: "X-4", locationId: warehouseA, salePrice: "100" })).rejects.toThrow(/módulo/i);
     await prisma.organizationModule.update({ where: { organizationId_module: { organizationId: a.id, module: "RETAIL" } }, data: { status: "ACTIVE" } });

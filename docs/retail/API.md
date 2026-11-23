@@ -3,6 +3,8 @@
 Server actions (`src/actions/retail/*`), todas con `assertModuleEnabled(orgId, "RETAIL")` + permiso. Nombres
 tentativos; se ajustan al implementar.
 
+**Servicio ya implementado en corte 2:** `src/lib/retail/inventory.ts` expone `configureRetailLocation`, `registerRetailItem`, `requestRetailTransfer`, `dispatchRetailTransfer`, `receiveRetailTransfer`, `cancelRetailTransfer` y `markRetailWaste`. Todos revalidan en servidor el entitlement, usuario activo, organización y rol. No hay server actions ni formulario público para llamarlos todavía. `registerRetailItem` acepta código explícito; QR, foto y etiqueta están pendientes.
+
 | Acción | Qué hace | Fase |
 |---|---|---|
 | `createItem` | Alta de prenda con foto, costo y precio; genera código y QR; movimiento ALTA | 1 |

@@ -1,6 +1,6 @@
 # Arquitectura — Reymen Retail
 
-Propuesta sobre el patrón verificado en [`AUDIT-2026-11-23.md`](AUDIT-2026-11-23.md). DEC-01 a DEC-05 y W-01 ya están confirmadas; I-01 a I-03 siguen abiertas. La web pública existe con fuente inactiva; `/portal/retail` y su entitlement están en el primer corte, sin tablas de prendas ni ventas.
+Propuesta sobre el patrón verificado en [`AUDIT-2026-11-23.md`](AUDIT-2026-11-23.md). DEC-01 a DEC-05 y W-01 ya están confirmadas; I-01 a I-03 siguen abiertas. La web pública existe con fuente inactiva; `/portal/retail` y su entitlement están en el primer corte. Prendas y traslados están en el segundo corte, sin UI ni ventas.
 
 ## Dónde vive
 - Módulo `RETAIL` en `PlatformModule`, registrado en `src/lib/modules.ts`, con entitlement por `OrganizationModule`.

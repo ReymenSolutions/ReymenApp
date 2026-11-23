@@ -1,6 +1,6 @@
 # Plan de implementación y prueba — Grupo Carvallo
 
-**Estado:** planificación, sin código Retail ni despliegue. Revisado contra `main@995f674`. Las decisiones confirmadas DEC-01 a DEC-05 de [`DECISIONS.md`](DECISIONS.md) resuelven las discrepancias del spec descritas en [`AUDIT-2026-11-23.md`](AUDIT-2026-11-23.md). Los prompts recibidos quedan archivados en [`references/`](references/README.md) para consulta, sin iniciar Fase 2 o 3.
+**Estado:** ejecución por cortes en ramas, sin despliegue. Revisado contra el spec vigente en `main`. Las decisiones confirmadas DEC-01 a DEC-05 de [`DECISIONS.md`](DECISIONS.md) resuelven las discrepancias del spec descritas en [`AUDIT-2026-11-23.md`](AUDIT-2026-11-23.md). Los prompts recibidos quedan archivados en [`references/`](references/README.md) para consulta, sin iniciar Fase 2 o 3.
 
 ## Límite de responsabilidades
 
