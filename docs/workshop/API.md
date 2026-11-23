@@ -2,6 +2,8 @@
 
 No existe API pública de Talleres. Las acciones de servidor en `src/actions/workshop.ts` cubren vehículo, cotización, emisión, envío, aprobación, conversión, refacciones, compras, recepción, avance de orden, pago, crédito y entrega. Exigen sesión, módulo activo, rol adecuado y objetos dentro de la organización. La cotización se crea como `BORRADOR` sin folio. Los precios/costos se reciben netos y se recalculan en el servidor.
 
-Rutas privadas: `GET /api/workshop/quotes/:id/pdf` devuelve la cotización numerada sin costos; `POST /api/workshop/orders/:id/photos` guarda una foto normalizada de recepción, proceso o entrega; `GET /api/workshop/photos/:id` la devuelve solo a miembros autorizados de la misma organización. No son contratos externos estables.
+Rutas privadas: `GET /api/workshop/quotes/:id/pdf` devuelve la cotización numerada sin costos; `GET /api/workshop/orders/:id/pdf` devuelve la orden sin costos; `POST /api/workshop/orders/:id/photos` guarda una foto normalizada de recepción, proceso o entrega; `GET /api/workshop/photos/:id` la devuelve solo a miembros autorizados de la misma organización. No son contratos externos estables. La acción `setWorkshopInvoiceRequested` registra el pedido del cliente; no genera CFDI.
 
-Pendientes: PDF de orden, líneas adicionales autorizadas y recepción de solicitudes desde landing. Ninguna integración externa debe consumir la estructura actual como contrato estable todavía.
+Pendientes: líneas adicionales autorizadas y validación de la landing en navegador con el activo limpio. Ninguna integración externa debe consumir la estructura actual como contrato estable todavía.
+
+La landing, aún desactivada, usa `POST /api/workshop/public/inquiries`. Exige mismo origen, límite por IP, cuerpo de hasta 8 KiB, campo trampa y clave de idempotencia. Crea un `Lead` con `source=landing` y una `WorkshopLeadRequest` en una transacción. La acción privada `createWorkshopVehicleFromRequest` pide el VIN faltante y vincula o crea el `Customer` y `WorkshopVehicle` de esa misma organización. Se conserva el texto de la solicitud para precargar la cotización; los precios no se inventan.

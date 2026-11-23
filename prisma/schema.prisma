@@ -173,6 +173,7 @@ model Organization {
   workshopPurchases       WorkshopPurchase[]
   workshopCashMovements   WorkshopCashMovement[]
   workshopPhotos          WorkshopPhoto[]
+  workshopLeadRequests    WorkshopLeadRequest[]
   loyaltyEventReceipts    LoyaltyEventReceipt[]
 
   @@index([slug])
@@ -322,6 +323,7 @@ model Lead {
   followUpLogs  FollowUpLog[]
   conversations Conversation[]
   realtyProfiles RealtyLeadProfile[]
+  workshopRequests WorkshopLeadRequest[]
 
   @@unique([organizationId, externalId])
   @@index([organizationId])
@@ -1467,9 +1469,33 @@ model WorkshopVehicle {
   customer Customer @relation(fields: [customerId], references: [id])
   quotes WorkshopQuote[]
   orders WorkshopWorkOrder[]
+  leadRequests WorkshopLeadRequest[]
   @@unique([organizationId, placas])
   @@unique([organizationId, vin])
   @@index([organizationId, customerId])
+}
+
+/** Cada envío de la landing conserva sus datos del vehículo aunque el Lead ya exista. */
+model WorkshopLeadRequest {
+  id String @id @default(cuid())
+  organizationId String
+  leadId String
+  vehicleId String?
+  requestKey String
+  marca String
+  modelo String
+  anio Int
+  placas String
+  kilometraje Int
+  servicioFalla String @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id])
+  lead Lead @relation(fields: [leadId], references: [id])
+  vehicle WorkshopVehicle? @relation(fields: [vehicleId], references: [id])
+  @@unique([organizationId, requestKey])
+  @@index([organizationId, leadId, createdAt])
+  @@index([organizationId, vehicleId])
 }
 
 model WorkshopQuote {

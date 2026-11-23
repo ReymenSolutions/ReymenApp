@@ -9,7 +9,7 @@ import { getErrorMessage } from "@/lib/user-error";
 type Line = { tipo: "REFACCION" | "MANO_DE_OBRA" | "SERVICIO"; partId: string; concepto: string; cantidad: string; unidad: string; precioUnitarioNeto: string; costoUnitarioNeto: string };
 const blankLine = (): Line => ({ tipo: "SERVICIO", partId: "", concepto: "", cantidad: "1", unidad: "serv.", precioUnitarioNeto: "", costoUnitarioNeto: "" });
 
-export function CreateQuoteForm({ lang, vehicles, parts }: { lang: string; vehicles: { id: string; placas: string | null; vin: string | null; customer: { name: string | null; phone: string } }[]; parts: { id: string; nombre: string; sku: string; unidad: string; precioVentaNeto: string; costoNeto: string }[] }) {
+export function CreateQuoteForm({ lang, vehicles, parts, initialVehicleId, initialService }: { lang: string; vehicles: { id: string; placas: string | null; vin: string | null; customer: { name: string | null; phone: string } }[]; parts: { id: string; nombre: string; sku: string; unidad: string; precioVentaNeto: string; costoNeto: string }[]; initialVehicleId?: string; initialService?: string }) {
   const [items, setItems] = useState<Line[]>([blankLine()]);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -30,6 +30,7 @@ export function CreateQuoteForm({ lang, vehicles, parts }: { lang: string; vehic
         vehicleId: String(data.get("vehicleId") ?? ""),
         servicioTitulo: String(data.get("servicioTitulo") ?? ""),
         tiempoEstimado: String(data.get("tiempoEstimado") ?? ""),
+        notas: String(data.get("notas") ?? ""),
         items: items.map((item) => ({ ...item, partId: item.partId || undefined, costoUnitarioNeto: item.costoUnitarioNeto || undefined })),
       });
       toast.success(es ? "Borrador de cotización guardado" : "Quote draft saved");
@@ -46,9 +47,10 @@ export function CreateQuoteForm({ lang, vehicles, parts }: { lang: string; vehic
   return <form onSubmit={submit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
     <div><h2 className="font-semibold text-slate-900">{es ? "Nueva cotización" : "New quote"}</h2><p className="text-xs text-slate-500">{es ? "Se guarda como borrador sin folio. Captura precios y costos sin IVA." : "Saved as a draft without a reference number. Enter prices and costs before tax."}</p></div>
     <div className="grid gap-3 sm:grid-cols-2">
-      <label className="text-sm">{es ? "Vehículo" : "Vehicle"}<select className={field} name="vehicleId" required defaultValue=""><option value="">{es ? "Seleccionar" : "Select"}</option>{vehicles.map((v) => <option key={v.id} value={v.id}>{v.placas ?? v.vin ?? "—"} · {v.customer.name ?? v.customer.phone}</option>)}</select></label>
-      <label className="text-sm">{es ? "Servicio" : "Service"}<input className={field} name="servicioTitulo" required maxLength={160} /></label>
+      <label className="text-sm">{es ? "Vehículo" : "Vehicle"}<select className={field} name="vehicleId" required defaultValue={initialVehicleId ?? ""}><option value="">{es ? "Seleccionar" : "Select"}</option>{vehicles.map((v) => <option key={v.id} value={v.id}>{v.placas ?? v.vin ?? "—"} · {v.customer.name ?? v.customer.phone}</option>)}</select></label>
+      <label className="text-sm">{es ? "Servicio" : "Service"}<input className={field} name="servicioTitulo" required maxLength={160} defaultValue={initialService?.slice(0, 160)} /></label>
       <label className="text-sm">{es ? "Tiempo estimado" : "Estimated time"}<input className={field} name="tiempoEstimado" maxLength={100} /></label>
+      <label className="text-sm sm:col-span-2">{es ? "Falla reportada / notas" : "Reported issue / notes"}<textarea className={field} name="notas" maxLength={2000} rows={2} defaultValue={initialService} /></label>
     </div>
     <div className="space-y-3">{items.map((item, index) => <div key={index} className="grid gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-4">
       <select aria-label={es ? "Tipo" : "Type"} className={field} value={item.tipo} onChange={(e) => change(index, "tipo", e.target.value)}><option value="SERVICIO">{es ? "Servicio" : "Service"}</option><option value="MANO_DE_OBRA">{es ? "Mano de obra" : "Labor"}</option><option value="REFACCION">{es ? "Refacción" : "Part"}</option></select>

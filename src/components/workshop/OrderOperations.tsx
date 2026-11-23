@@ -3,12 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { advanceWorkshopOrder, authorizeWorkshopCredit, deliverWorkshopOrder, recordWorkshopOrderPayment, saveWorkshopReception } from "@/actions/workshop";
+import { advanceWorkshopOrder, authorizeWorkshopCredit, deliverWorkshopOrder, recordWorkshopOrderPayment, saveWorkshopReception, setWorkshopInvoiceRequested } from "@/actions/workshop";
 import { getErrorMessage } from "@/lib/user-error";
 
 type Phase = "RECEPCION" | "PROCESO" | "ENTREGA";
 
-export function OrderOperations({ id, estado, kilometrajeIngreso, nivelCombustible, fallaReportada, diagnostico, checklist, saldo, canManageFinancials, lang }: { id: string; estado: string; kilometrajeIngreso: number; nivelCombustible: string | null; fallaReportada: string | null; diagnostico: string | null; checklist: { danosPrevios?: string; testigos?: string; pertenencias?: string }; saldo?: string; canManageFinancials: boolean; lang: string }) {
+export function OrderOperations({ id, estado, kilometrajeIngreso, nivelCombustible, fallaReportada, diagnostico, checklist, saldo, facturaSolicitada, canManageFinancials, lang }: { id: string; estado: string; kilometrajeIngreso: number; nivelCombustible: string | null; fallaReportada: string | null; diagnostico: string | null; checklist: { danosPrevios?: string; testigos?: string; pertenencias?: string }; saldo?: string; facturaSolicitada?: boolean; canManageFinancials: boolean; lang: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [payment, setPayment] = useState("");
@@ -50,6 +50,7 @@ export function OrderOperations({ id, estado, kilometrajeIngreso, nivelCombustib
   }
 
   return <div className="space-y-3 border-t border-slate-100 pt-3">
+    {canManageFinancials && <a href={`/api/workshop/orders/${id}/pdf`} className="inline-block rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold">{es ? "Descargar orden PDF" : "Download work order PDF"}</a>}
     {["RECEPCION", "DIAGNOSTICO"].includes(estado) && <form onSubmit={saveReception} className="grid gap-2 sm:grid-cols-2">
       <input aria-label={es ? "Kilometraje de ingreso" : "Arrival mileage"} className={field} type="number" name="kilometrajeIngreso" min="0" defaultValue={kilometrajeIngreso} required />
       <input aria-label={es ? "Nivel de combustible" : "Fuel level"} className={field} name="nivelCombustible" defaultValue={nivelCombustible ?? ""} placeholder={es ? "Nivel de combustible" : "Fuel level"} required />
@@ -65,6 +66,7 @@ export function OrderOperations({ id, estado, kilometrajeIngreso, nivelCombustib
     {estado === "DIAGNOSTICO" && <button className={button} disabled={busy} onClick={() => run(() => advanceWorkshopOrder(id, "EN_REPARACION"), es ? "Trabajo iniciado" : "Work started")}>{es ? "Iniciar reparación" : "Start repair"}</button>}
     {estado === "EN_REPARACION" && <button className={button} disabled={busy} onClick={() => run(() => advanceWorkshopOrder(id, "LISTA_PARA_ENTREGA"), es ? "Lista para entregar" : "Ready for delivery")}>{es ? "Lista para entregar" : "Ready for delivery"}</button>}
     {canManageFinancials && saldo !== undefined && <div className="text-xs font-semibold text-slate-700">{es ? "Saldo pendiente" : "Outstanding balance"}: ${saldo} MXN</div>}
+    {canManageFinancials && facturaSolicitada !== undefined && <label className="flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" checked={facturaSolicitada} disabled={busy || ["ENTREGADA", "CANCELADA"].includes(estado)} onChange={(event) => run(() => setWorkshopInvoiceRequested(id, event.target.checked), es ? "Solicitud de factura actualizada" : "Invoice request updated")} />{es ? "El cliente solicitó factura (se emite fuera de Reymen)" : "Customer requested an invoice (issued outside Reymen)"}</label>}
     {canManageFinancials && saldo !== undefined && Number(saldo) > 0 && !["ENTREGADA", "CANCELADA"].includes(estado) && <div className="flex flex-wrap gap-2"><input aria-label={es ? "Monto del pago" : "Payment amount"} className={`${field} max-w-40`} type="number" min="0.01" step="0.01" max={saldo} value={payment} onChange={(event) => setPayment(event.target.value)} /><select aria-label={es ? "Método de pago" : "Payment method"} className={field} value={method} onChange={(event) => setMethod(event.target.value as typeof method)}><option value="EFECTIVO">{es ? "Efectivo" : "Cash"}</option><option value="TRANSFERENCIA">{es ? "Transferencia" : "Bank transfer"}</option><option value="TARJETA">{es ? "Tarjeta" : "Card"}</option></select><button className={button} disabled={busy || !(Number(payment) > 0)} onClick={() => run(() => recordWorkshopOrderPayment(id, { requestKey: crypto.randomUUID(), monto: payment, metodo: method }), es ? "Pago registrado" : "Payment recorded")}>{es ? "Registrar pago" : "Record payment"}</button></div>}
     {estado === "LISTA_PARA_ENTREGA" && <div className="space-y-2">
       {canManageFinancials && saldo !== undefined && Number(saldo) > 0 && <div className="flex flex-wrap gap-2"><input aria-label={es ? "Condiciones del crédito" : "Credit terms"} className={field} value={creditNote} onChange={(event) => setCreditNote(event.target.value)} placeholder={es ? "Motivo y condiciones del crédito" : "Reason and credit terms"} /><button className={button} disabled={busy || creditNote.trim().length < 10} onClick={() => run(() => authorizeWorkshopCredit(id, creditNote), es ? "Crédito registrado" : "Credit recorded")}>{es ? "Autorizar crédito" : "Authorize credit"}</button></div>}

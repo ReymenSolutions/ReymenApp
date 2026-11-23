@@ -10,8 +10,8 @@
 - [x] Folios transaccionales, emisión, vigencia y PDF de cotización sin costos.
 - [ ] Aprobación y conversión única a orden implementadas; falta autorización de líneas adicionales.
 - [x] Inventario derivado, compras y caja en transacciones, sin stock negativo en el flujo de orden.
-- [ ] Pagos, crédito explícito y entrega inmutable implementados; falta historial de vehículo.
+- [x] Pagos, crédito explícito, entrega inmutable e historial paginado de vehículo.
 - [x] Panel con balance e ingresos del día calculados de caja.
-- [ ] PDF de orden, solicitud de factura, recordatorios y configuración de servicios.
-- [ ] Landing bilingüe de Taller Wolf conectada al CRM; usar solo el logotipo limpio verificable.
+- [ ] PDF de orden, solicitud de factura, vigencia/garantía y datos de próximo servicio implementados; falta catálogo editable de servicios. Los recordatorios automáticos son de la fase siguiente.
+- [ ] Landing bilingüe y conexión a CRM implementadas con compuerta cerrada; falta el logotipo limpio verificable y la validación del flujo real en navegador antes de publicarla.
 - [ ] Pruebas de aceptación y revisión de seguridad antes de activar `WORKSHOP` en producción.

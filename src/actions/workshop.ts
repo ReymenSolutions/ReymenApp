@@ -49,10 +49,47 @@ export async function createWorkshopVehicle(input: z.input<typeof vehicleInput>)
   return { id: vehicle.id };
 }
 
+/** Convierte los datos de una solicitud pública en cliente y vehículo, solicitando solo el VIN faltante. */
+export async function createWorkshopVehicleFromRequest(requestId: string, rawVin: string) {
+  const { orgId, userId } = await requireWorkshopOwner();
+  const vinResult = z.string().trim().min(11).max(17).safeParse(rawVin);
+  if (!vinResult.success) throw new UserError("Captura un VIN válido para crear el vehículo");
+  const vin = vinResult.data.toUpperCase().replace(/\s+/g, "");
+  const request = await prisma.workshopLeadRequest.findFirst({
+    where: { id: requestId, organizationId: orgId },
+    select: { id: true, placas: true, marca: true, modelo: true, anio: true, kilometraje: true, servicioFalla: true, lead: { select: { id: true, name: true, phone: true, phoneKey: true, deletedAt: true } } },
+  });
+  if (!request || request.lead.deletedAt || !request.lead.phone || !request.lead.phoneKey) throw new UserError("Solicitud del taller no disponible");
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "WorkshopLeadRequest" WHERE id = ${requestId} AND "organizationId" = ${orgId} FOR UPDATE`;
+    const customer = await tx.customer.upsert({
+      where: { organizationId_phoneKey: { organizationId: orgId, phoneKey: request.lead.phoneKey! } },
+      create: { organizationId: orgId, phone: request.lead.phone!, phoneKey: request.lead.phoneKey!, name: request.lead.name, leadId: request.lead.id, consentAccepted: false },
+      update: {}, select: { id: true },
+    });
+    const existing = await tx.workshopVehicle.findFirst({ where: { organizationId: orgId, OR: [{ placas: request.placas }, { vin }] }, select: { id: true, customerId: true } });
+    if (existing) {
+      if (existing.customerId !== customer.id) throw new UserError("Las placas o el VIN pertenecen a otro cliente; revisa el vehículo existente");
+      await tx.workshopLeadRequest.update({ where: { id: request.id }, data: { vehicleId: existing.id } });
+      return { id: existing.id, created: false };
+    }
+    const vehicle = await tx.workshopVehicle.create({ data: {
+      organizationId: orgId, customerId: customer.id, placas: request.placas, vin,
+      marca: request.marca, modelo: request.modelo, anio: request.anio, kilometrajeActual: request.kilometraje,
+    }, select: { id: true } });
+    await tx.workshopLeadRequest.update({ where: { id: request.id }, data: { vehicleId: vehicle.id } });
+    return { id: vehicle.id, created: true };
+  });
+  if (result.created) await logAudit({ organizationId: orgId, userId, action: "workshop.vehicle.from_request", resource: "WorkshopVehicle", resourceId: result.id, metadata: { requestId } });
+  revalidatePath("/portal/workshop");
+  return { id: result.id, servicioFalla: request.servicioFalla };
+}
+
 const quoteInput = z.object({
   vehicleId: z.string().min(1),
   servicioTitulo: z.string().trim().min(2).max(160),
   tiempoEstimado: z.string().trim().max(100).optional(),
+  notas: z.string().trim().max(2000).optional(),
   items: z.array(z.object({
     tipo: z.enum(["REFACCION", "MANO_DE_OBRA", "SERVICIO"]),
     partId: z.string().optional(),
@@ -93,6 +130,7 @@ export async function createWorkshopQuote(input: z.input<typeof quoteInput>) {
       vehicleId: vehicle.id,
       servicioTitulo: data.servicioTitulo,
       tiempoEstimado: data.tiempoEstimado || null,
+      notas: data.notas || null,
       vigenciaDias: settings?.vigenciaDias ?? 15,
       garantiaDias: settings?.garantiaDias ?? 90,
       garantiaKm: settings?.garantiaKm ?? 5000,
@@ -415,8 +453,8 @@ export async function recordWorkshopOrderPayment(orderId: string, input: z.input
   try {
     result = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "WorkshopWorkOrder" WHERE id = ${orderId} AND "organizationId" = ${orgId} FOR UPDATE`;
-      const order = await tx.workshopWorkOrder.findFirst({ where: { id: orderId, organizationId: orgId }, select: { id: true, estado: true, saldo: true } });
-      if (!order || ["ENTREGADA", "CANCELADA"].includes(order.estado)) throw new UserError("Orden no disponible para cobro");
+      const order = await tx.workshopWorkOrder.findFirst({ where: { id: orderId, organizationId: orgId }, select: { id: true, estado: true, saldo: true, creditoAutorizadoEn: true } });
+      if (!order || order.estado === "CANCELADA" || (order.estado === "ENTREGADA" && !order.creditoAutorizadoEn)) throw new UserError("Orden no disponible para cobro");
       if (amount.gt(order.saldo)) throw new UserError("El pago supera el saldo pendiente");
       const cash = await tx.workshopCashMovement.create({ data: { organizationId: orgId, requestKey: d.requestKey, tipo: "INGRESO", concepto: "Pago de orden", monto: amount, metodo: d.metodo, workOrderId: orderId, registradoPorId: userId }, select: { id: true } });
       await tx.workshopWorkOrder.update({ where: { id: orderId }, data: { anticipo: { increment: amount }, saldo: { decrement: amount } } });
@@ -441,6 +479,51 @@ export async function authorizeWorkshopCredit(orderId: string, note: string) {
   const result = await prisma.workshopWorkOrder.updateMany({ where: { id: orderId, organizationId: orgId, estado: "LISTA_PARA_ENTREGA", saldo: { gt: 0 } }, data: { creditoAutorizadoEn: new Date(), creditoAutorizadoNota: parsed.data } });
   if (!result.count) throw new UserError("No hay saldo pendiente en una orden lista para entrega");
   await logAudit({ organizationId: orgId, userId, action: "workshop.order.credit", resource: "WorkshopWorkOrder", resourceId: orderId });
+  revalidatePath("/portal/workshop");
+}
+
+/** Solo registra la solicitud: el CFDI se emite fuera de Reymen en este MVP. */
+export async function setWorkshopInvoiceRequested(orderId: string, requested: boolean) {
+  const { orgId, userId } = await requireWorkshopOwner();
+  if (typeof requested !== "boolean") throw new UserError("Indica si el cliente solicitó factura");
+  const updated = await prisma.workshopWorkOrder.updateMany({
+    where: { id: orderId, organizationId: orgId, estado: { notIn: ["ENTREGADA", "CANCELADA"] } },
+    data: { facturaSolicitada: requested },
+  });
+  if (!updated.count) throw new UserError("Orden no disponible para registrar factura");
+  await logAudit({ organizationId: orgId, userId, action: "workshop.order.invoice.request", resource: "WorkshopWorkOrder", resourceId: orderId, metadata: { requested } });
+  revalidatePath("/portal/workshop");
+}
+
+const settingsInput = z.object({
+  vigenciaDias: z.coerce.number().int().min(1).max(365),
+  garantiaDias: z.coerce.number().int().min(0).max(3650),
+  garantiaKm: z.coerce.number().int().min(0).max(100_000),
+});
+
+export async function saveWorkshopSettings(input: z.input<typeof settingsInput>) {
+  const { orgId, userId } = await requireWorkshopOwner();
+  const parsed = settingsInput.safeParse(input);
+  if (!parsed.success) throw new UserError("Revisa la vigencia y garantía del taller");
+  await prisma.workshopSettings.upsert({
+    where: { organizationId: orgId },
+    create: { organizationId: orgId, ...parsed.data },
+    update: parsed.data,
+  });
+  await logAudit({ organizationId: orgId, userId, action: "workshop.settings.update", resource: "WorkshopSettings", metadata: parsed.data });
+  revalidatePath("/portal/workshop");
+}
+
+export async function setWorkshopNextService(vehicleId: string, rawKm: number | null, rawDate: string | null) {
+  const { orgId, userId } = await requireWorkshopOwner();
+  const parsedKm = rawKm === null ? { success: true as const, data: null } : z.number().int().min(0).max(10_000_000).safeParse(rawKm);
+  if (!parsedKm.success) throw new UserError("Kilometraje de próximo servicio inválido");
+  const km = parsedKm.data;
+  const date = rawDate === null || rawDate === "" ? null : /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? new Date(`${rawDate}T00:00:00.000Z`) : null;
+  if (rawDate && (!date || Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== rawDate)) throw new UserError("Fecha de próximo servicio inválida");
+  const updated = await prisma.workshopVehicle.updateMany({ where: { id: vehicleId, organizationId: orgId }, data: { proximoServicioKm: km, proximoServicioFecha: date } });
+  if (!updated.count) throw new UserError("Vehículo no encontrado en tu organización");
+  await logAudit({ organizationId: orgId, userId, action: "workshop.vehicle.next_service", resource: "WorkshopVehicle", resourceId: vehicleId });
   revalidatePath("/portal/workshop");
 }
 
