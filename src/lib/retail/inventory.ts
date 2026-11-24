@@ -36,8 +36,9 @@ export async function configureRetailLocation(
   input: { branchId: string; type: RetailLocationType; format: RetailLocationFormat; areaM2?: string | null; address?: string | null; whatsappPhone?: string | null },
 ) {
   await requireActor(organizationId, actorUserId, "retail:manage");
-  const branch = await prisma.branch.findFirst({ where: { id: input.branchId, organizationId }, select: { id: true } });
+  const branch = await prisma.branch.findFirst({ where: { id: input.branchId, organizationId }, select: { id: true, isActive: true } });
   if (!branch) throw new UserError("La ubicación no pertenece a esta organización.");
+  if (input.type === "MAYOREO" && branch.isActive) throw new UserError("Desactiva la sucursal antes de habilitarla para mayoreo.");
   const current = await prisma.retailLocationSettings.findUnique({ where: { branchId: branch.id }, select: { type: true } });
   if (current && current.type !== input.type) throw new UserError("No se puede cambiar el tipo de una ubicación de Retail ya configurada.");
   if ((input.type === "BODEGA") !== (input.format === "BODEGA") || (input.type === "MAYOREO") !== (input.format === "MAYOREO")) {
