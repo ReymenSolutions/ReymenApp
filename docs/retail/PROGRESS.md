@@ -55,3 +55,7 @@ sigue**, para que cualquier agente (Claude Code o Codex) retome sin rehacer nada
 - El costo se muestra únicamente a administradores y el backend rechaza que un operador lo envíe por su cuenta. El contexto de pantalla consulta el rol activo en base de datos para que un cambio de rol no deje visible el costo por una sesión antigua. Mayoreo se crea inactivo; una tienda también puede marcarse inactiva, para representar Casa Carballo sin publicarla.
 - Todavía no hay carga de foto, QR, movimientos desde pantalla, POS ni ventas. La pantalla declara estas limitaciones y no ofrece cifras de ventas simuladas. La validación real en `apptest` está pendiente; no se tocó producción.
 - TypeScript, ESLint dirigido y pruebas dirigidas de inventario/traducciones pasaron en la base local desechable. El PR y CI se registrarán al publicarlos.
+
+## 2026-11-24 · Fase 1, corte 4: etiqueta QR inicial (Codex)
+- Rama `codex/retail-phase1-qr-label`, dependiente del corte 3. Cada pieza tiene una página privada de etiqueta que genera un QR con el código único, ofrece PNG y permite imprimir desde el navegador. La búsqueda de pieza exige organización y módulo Retail. La etiqueta no muestra costo ni un precio final aún no confirmado (I-01).
+- Falta validar el tamaño y la impresión con el modelo real de impresora y probar el escaneo en `apptest`. No se añadieron datos de cliente ni despliegue.
