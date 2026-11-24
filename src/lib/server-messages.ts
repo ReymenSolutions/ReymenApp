@@ -483,6 +483,9 @@ const EN: Record<string, string> = {
   "La pieza no está disponible para registrar una merma.": "The item is not available to record waste.",
   "Cancela o completa el traslado antes de registrar la merma.": "Cancel or complete the transfer before recording waste.",
   "La pieza cambió de estado.": "The item status has changed.",
+  "Ya existe una ubicación con ese nombre en la organización.": "A location with that name already exists in this organization.",
+  "Solo un administrador puede registrar costos de Retail.": "Only an administrator can record Retail costs.",
+  "Desactiva la sucursal antes de habilitarla para mayoreo.": "Deactivate the branch before enabling it for wholesale.",
 };
 
 // Los pocos mensajes que se escribieron en inglés en el servidor.
@@ -502,7 +505,7 @@ const PLAN_RESOURCE_EN: Record<string, string> = {
 
 // Mensajes con partes variables: [patrón en español, versión en inglés].
 const EN_PATTERNS: [RegExp, (...groups: string[]) => string][] = [
-  [/^(El código|El motivo) debe tener entre 1 y (\d+) caracteres\.$/, (label, max) => `${label === "El código" ? "The code" : "The reason"} must be between 1 and ${max} characters.`],
+  [/^(El código|El motivo|El nombre) debe tener entre 1 y (\d+) caracteres\.$/, (label, max) => `${({ "El código": "The code", "El motivo": "The reason", "El nombre": "The name" } as Record<string, string>)[label]} must be between 1 and ${max} characters.`],
   [/^(El área|El precio|El costo) debe ser un importe no negativo con hasta dos decimales\.$/, (label) => `${({ "El área": "The area", "El precio": "The price", "El costo": "The cost" } as Record<string, string>)[label]} must be a non-negative amount with up to two decimal places.`],
   [
     /^Alcanzaste el límite de (.+) de tu plan \((\d+)\)\. Solicita más capacidad en Configuración\.$/,

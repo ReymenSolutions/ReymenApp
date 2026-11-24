@@ -13,7 +13,7 @@ async function requireActor(organizationId: string, userId: string, permission: 
     select: { id: true, name: true, email: true, role: true },
   });
   if (!actor || !can(actor.role, permission)) throw new UserError("No tienes permiso para esta operación de Retail.");
-  return { id: actor.id, name: actor.name?.trim() || actor.email };
+  return { id: actor.id, name: actor.name?.trim() || actor.email, role: actor.role };
 }
 
 function requiredText(value: string, label: string, max = 120): string {
@@ -36,8 +36,9 @@ export async function configureRetailLocation(
   input: { branchId: string; type: RetailLocationType; format: RetailLocationFormat; areaM2?: string | null; address?: string | null; whatsappPhone?: string | null },
 ) {
   await requireActor(organizationId, actorUserId, "retail:manage");
-  const branch = await prisma.branch.findFirst({ where: { id: input.branchId, organizationId }, select: { id: true } });
+  const branch = await prisma.branch.findFirst({ where: { id: input.branchId, organizationId }, select: { id: true, isActive: true } });
   if (!branch) throw new UserError("La ubicación no pertenece a esta organización.");
+  if (input.type === "MAYOREO" && branch.isActive) throw new UserError("Desactiva la sucursal antes de habilitarla para mayoreo.");
   const current = await prisma.retailLocationSettings.findUnique({ where: { branchId: branch.id }, select: { type: true } });
   if (current && current.type !== input.type) throw new UserError("No se puede cambiar el tipo de una ubicación de Retail ya configurada.");
   if ((input.type === "BODEGA") !== (input.format === "BODEGA") || (input.type === "MAYOREO") !== (input.format === "MAYOREO")) {
@@ -51,12 +52,36 @@ export async function configureRetailLocation(
   });
 }
 
+/** Creates a shared Branch and its Retail settings together; no location is seeded implicitly. */
+export async function createRetailLocation(
+  organizationId: string,
+  actorUserId: string,
+  input: { name: string; type: RetailLocationType; format: RetailLocationFormat; isActive?: boolean; areaM2?: string | null; address?: string | null; whatsappPhone?: string | null },
+) {
+  await requireActor(organizationId, actorUserId, "retail:manage");
+  const name = requiredText(input.name, "El nombre", 120);
+  if ((input.type === "BODEGA") !== (input.format === "BODEGA") || (input.type === "MAYOREO") !== (input.format === "MAYOREO")) {
+    throw new UserError("El tipo y formato de la ubicación no coinciden.");
+  }
+  const area = input.areaM2 == null || input.areaM2 === "" ? null : money(input.areaM2, "El área");
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.branch.findFirst({ where: { organizationId, name: { equals: name, mode: "insensitive" } }, select: { id: true } });
+    if (existing) throw new UserError("Ya existe una ubicación con ese nombre en la organización.");
+    const branch = await tx.branch.create({ data: { organizationId, name, isActive: input.type !== "MAYOREO" && input.isActive !== false } });
+    await tx.retailLocationSettings.create({
+      data: { organizationId, branchId: branch.id, type: input.type, format: input.format, areaM2: area, address: input.address?.trim() || null, whatsappPhone: input.whatsappPhone?.trim() || null },
+    });
+    return branch;
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+}
+
 export async function registerRetailItem(
   organizationId: string,
   actorUserId: string,
   input: { code: string; locationId: string; channel?: RetailChannel; salePrice: string; cost?: string | null; brand?: string | null; category?: string | null; garmentType?: string | null; size?: string | null; color?: string | null; style?: string | null },
 ) {
   const actor = await requireActor(organizationId, actorUserId, "retail:operate");
+  if (input.cost != null && !can(actor.role, "retail:manage")) throw new UserError("Solo un administrador puede registrar costos de Retail.");
   const code = requiredText(input.code, "El código", 80).toUpperCase();
   if (!/^[A-Z0-9][A-Z0-9._-]*$/.test(code)) throw new UserError("El código solo admite letras, números, punto, guion y guion bajo.");
   const price = money(input.salePrice, "El precio");

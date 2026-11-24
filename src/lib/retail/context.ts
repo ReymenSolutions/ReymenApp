@@ -1,6 +1,5 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
-import type { UserRole } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { getServerLang } from "@/lib/i18n-server";
 import { requireModule } from "@/lib/modules";
@@ -10,17 +9,19 @@ import { prisma } from "@/lib/prisma";
 /** Tenant and entitlement are resolved on the server for every Retail page. */
 export const getRetailContext = cache(async () => {
   const session = await auth();
-  if (!session?.user.organizationId) redirect("/login");
+  if (!session?.user.organizationId || !session.user.id) redirect("/login");
   const organizationId = session.user.organizationId;
   await requireModule(organizationId, "RETAIL");
-  const [org, lang] = await Promise.all([
+  const [org, lang, actor] = await Promise.all([
     prisma.organization.findUniqueOrThrow({
       where: { id: organizationId },
       select: { id: true, name: true, timezone: true },
     }),
     getServerLang(),
+    prisma.user.findFirst({ where: { id: session.user.id, organizationId, isActive: true }, select: { role: true } }),
   ]);
-  const role = session.user.role as UserRole;
+  if (!actor) redirect("/login");
+  const role = actor.role;
   return {
     organizationId,
     org,
