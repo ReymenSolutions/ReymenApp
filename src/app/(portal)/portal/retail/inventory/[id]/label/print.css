@@ -1,0 +1,5 @@
+@media print {
+  body * { visibility: hidden !important; }
+  #retail-print-label, #retail-print-label * { visibility: visible !important; }
+  #retail-print-label { position: fixed; left: 0; top: 0; margin: 0; }
+}
