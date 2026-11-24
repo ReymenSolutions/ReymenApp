@@ -52,6 +52,6 @@ sigue**, para que cualquier agente (Claude Code o Codex) retome sin rehacer nada
 
 ## 2026-11-23 · Fase 1, corte 3: primer panel y alta por formulario (Codex)
 - Rama `codex/retail-phase1-inventory-ui`, sobre el corte 2. Se añadió navegación Retail, Panel con conteos reales, inventario con búsqueda y paginación, alta de ubicaciones sobre `Branch` compartida y alta de prendas en bodega. Los formularios están en español e inglés; las acciones de servidor toman la identidad de la sesión y el servicio vuelve a comprobar organización, módulo y rol.
-- El costo se muestra únicamente a administradores y el backend rechaza que un operador lo envíe por su cuenta. Mayoreo se crea inactivo; una tienda también puede marcarse inactiva, para representar Casa Carballo sin publicarla.
+- El costo se muestra únicamente a administradores y el backend rechaza que un operador lo envíe por su cuenta. El contexto de pantalla consulta el rol activo en base de datos para que un cambio de rol no deje visible el costo por una sesión antigua. Mayoreo se crea inactivo; una tienda también puede marcarse inactiva, para representar Casa Carballo sin publicarla.
 - Todavía no hay carga de foto, QR, movimientos desde pantalla, POS ni ventas. La pantalla declara estas limitaciones y no ofrece cifras de ventas simuladas. La validación real en `apptest` está pendiente; no se tocó producción.
 - TypeScript, ESLint dirigido y pruebas dirigidas de inventario/traducciones pasaron en la base local desechable. El PR y CI se registrarán al publicarlos.
