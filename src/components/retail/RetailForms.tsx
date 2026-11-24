@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { createRetailLocationAction, registerRetailItemAction } from "@/app/(portal)/portal/retail/actions";
+import { attachRetailLocationAction, createRetailLocationAction, registerRetailItemAction } from "@/app/(portal)/portal/retail/actions";
 import { translateMessage } from "@/lib/user-error";
 
 const input = "min-w-0 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white";
@@ -27,6 +27,18 @@ export function LocationForm({ lang }: { lang: "es" | "en" }) {
     <label className={label}>WhatsApp ({lang === "en" ? "optional" : "opcional"})<input className={input} name="whatsappPhone" inputMode="tel" /></label>
     <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200"><input type="checkbox" name="isActive" defaultChecked />{lang === "en" ? "Active location (wholesale always stays inactive)" : "Ubicación activa (mayoreo siempre queda inactiva)"}</label>
     <div className="flex flex-wrap items-center gap-3 sm:col-span-2"><button className={button} disabled={pending}>{lang === "en" ? "Add location" : "Agregar ubicación"}</button><Feedback {...state} lang={lang} pending={pending} /></div>
+  </form>;
+}
+
+export function AttachLocationForm({ lang, branches }: { lang: "es" | "en"; branches: { id: string; name: string; isActive: boolean }[] }) {
+  const [state, action, pending] = useActionState(attachRetailLocationAction, {});
+  const [type, setType] = useState("TIENDA");
+  const formats = type === "TIENDA" ? ["PREMIUM", "OUTLET", "HOGAR"] : [type];
+  return <form action={action} className="grid gap-3 sm:grid-cols-3">
+    <label className={label}>{lang === "en" ? "Existing branch" : "Sucursal existente"}<select className={input} name="branchId" required><option value="">{lang === "en" ? "Choose a branch" : "Elige una sucursal"}</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}{branch.isActive ? "" : ` (${lang === "en" ? "inactive" : "inactiva"})`}</option>)}</select></label>
+    <label className={label}>{lang === "en" ? "Type" : "Tipo"}<select className={input} name="type" value={type} onChange={(event) => setType(event.target.value)}><option value="TIENDA">{lang === "en" ? "Store" : "Tienda"}</option><option value="BODEGA">{lang === "en" ? "Warehouse" : "Bodega"}</option><option value="MAYOREO">{lang === "en" ? "Wholesale" : "Mayoreo"}</option></select></label>
+    <label className={label}>{lang === "en" ? "Format" : "Formato"}<select key={type} className={input} name="format" defaultValue={formats[0]}>{formats.map((format) => <option key={format} value={format}>{format}</option>)}</select></label>
+    <div className="flex flex-wrap items-center gap-3 sm:col-span-3"><button className={button} disabled={pending}>{lang === "en" ? "Enable for Retail" : "Habilitar para Retail"}</button><Feedback {...state} lang={lang} pending={pending} /></div>
   </form>;
 }
 

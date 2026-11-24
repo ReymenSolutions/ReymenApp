@@ -54,6 +54,7 @@ describe("Retail inventory boundaries and transfers", () => {
     await expect(createRetailLocation(a.id, ownerA.id, { name: "Nueva tienda", type: "TIENDA", format: "OUTLET" })).rejects.toThrow(/ya existe/i);
     await expect(configureRetailLocation(a.id, viewerA.id, { branchId: storeA, type: "TIENDA", format: "PREMIUM" })).rejects.toThrow(/permiso/i);
     await expect(configureRetailLocation(a.id, ownerA.id, { branchId: storeB, type: "TIENDA", format: "PREMIUM" })).rejects.toThrow(/organización/i);
+    await expect(configureRetailLocation(a.id, ownerA.id, { branchId: storeA, type: "MAYOREO", format: "MAYOREO" })).rejects.toThrow(/desactiva/i);
     await expect(configureRetailLocation(a.id, ownerA.id, { branchId: warehouseA, type: "TIENDA", format: "PREMIUM" })).rejects.toThrow(/tipo/i);
     await expect(registerRetailItem(a.id, ownerB.id, { code: "X-1", locationId: warehouseA, salePrice: "100" })).rejects.toThrow(/permiso/i);
     await expect(registerRetailItem(a.id, viewerA.id, { code: "X-2", locationId: warehouseA, salePrice: "100" })).rejects.toThrow(/permiso/i);

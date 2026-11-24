@@ -485,6 +485,7 @@ const EN: Record<string, string> = {
   "La pieza cambió de estado.": "The item status has changed.",
   "Ya existe una ubicación con ese nombre en la organización.": "A location with that name already exists in this organization.",
   "Solo un administrador puede registrar costos de Retail.": "Only an administrator can record Retail costs.",
+  "Desactiva la sucursal antes de habilitarla para mayoreo.": "Deactivate the branch before enabling it for wholesale.",
 };
 
 // Los pocos mensajes que se escribieron en inglés en el servidor.

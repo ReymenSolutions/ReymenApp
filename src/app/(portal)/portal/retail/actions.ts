@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { RetailLocationFormat, RetailLocationType } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { UserError } from "@/lib/user-error";
-import { createRetailLocation, registerRetailItem } from "@/lib/retail/inventory";
+import { configureRetailLocation, createRetailLocation, registerRetailItem } from "@/lib/retail/inventory";
 
 type FormResult = { error?: string; success?: boolean };
 
@@ -28,6 +28,23 @@ export async function createRetailLocationAction(_: FormResult, data: FormData):
     await createRetailLocation(organizationId, userId, {
       name: value(data, "name"), type: type as RetailLocationType, format: format as RetailLocationFormat, isActive: data.get("isActive") === "on",
       areaM2: value(data, "areaM2") || null, address: value(data, "address") || null, whatsappPhone: value(data, "whatsappPhone") || null,
+    });
+    revalidatePath("/portal/retail");
+    return { success: true };
+  } catch (error) {
+    if (error instanceof UserError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function attachRetailLocationAction(_: FormResult, data: FormData): Promise<FormResult> {
+  try {
+    const { organizationId, userId } = await actor();
+    const type = value(data, "type");
+    const format = value(data, "format");
+    if (!(type in RetailLocationType) || !(format in RetailLocationFormat)) throw new UserError("El tipo y formato de la ubicación no coinciden.");
+    await configureRetailLocation(organizationId, userId, {
+      branchId: value(data, "branchId"), type: type as RetailLocationType, format: format as RetailLocationFormat,
     });
     revalidatePath("/portal/retail");
     return { success: true };
