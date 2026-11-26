@@ -25,7 +25,12 @@ async function smallJson(request: Request): Promise<unknown> {
 }
 
 export async function POST(request: Request) {
-  if (request.headers.get("origin") !== new URL(request.url).origin) return NextResponse.json({ error: "origin" }, { status: 403 });
+  const allowedOrigins = [new URL(request.url).origin];
+  if (process.env.WORKSHOP_WOLF_SITE_ORIGIN) {
+    try { allowedOrigins.push(new URL(process.env.WORKSHOP_WOLF_SITE_ORIGIN).origin); }
+    catch { console.error("[workshop/inquiry] WORKSHOP_WOLF_SITE_ORIGIN inválido"); }
+  }
+  if (!allowedOrigins.includes(request.headers.get("origin") ?? "")) return NextResponse.json({ error: "origin" }, { status: 403 });
   const org = await getWolfLandingOrg();
   if (!org) return NextResponse.json({ error: "unavailable" }, { status: 404 });
   const ip = clientIp(request) ?? "unknown";

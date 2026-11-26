@@ -32,6 +32,7 @@ export const wolfInquirySchema = z.object({
   kilometraje: z.coerce.number().int().min(0).max(10_000_000),
   servicioFalla: z.string().trim().min(5).max(2000),
   consent: z.literal(true),
+  maintenanceConsent: z.boolean().optional(),
   website: z.string().max(200).optional(),
 });
 
@@ -50,7 +51,7 @@ export async function submitWolfInquiry(orgId: string, input: WolfInquiry) {
       const lead = await tx.lead.create({ data: {
         organizationId: orgId, name: input.name, phone, phoneKey: phoneKey(phone), source: "landing", externalId: `workshop:${input.requestKey}`,
         tags: ["workshop"], doNotContact: true,
-        metadata: { channel: "web", landing: "taller-wolf", vehicle: { marca: input.marca, modelo: input.modelo, anio: input.anio, placas: plates, kilometraje: input.kilometraje }, servicioFalla: input.servicioFalla, consent: { contactForRequest: true, at: new Date().toISOString() } },
+        metadata: { channel: "web", landing: "taller-wolf", vehicle: { marca: input.marca, modelo: input.modelo, anio: input.anio, placas: plates, kilometraje: input.kilometraje }, servicioFalla: input.servicioFalla, consent: { contactForRequest: true, maintenanceReminders: input.maintenanceConsent === true, at: new Date().toISOString() } },
       }, select: { id: true } });
       const request = await tx.workshopLeadRequest.create({ data: {
         organizationId: orgId, leadId: lead.id, requestKey: input.requestKey, marca: input.marca, modelo: input.modelo,

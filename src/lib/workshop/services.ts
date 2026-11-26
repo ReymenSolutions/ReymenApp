@@ -6,6 +6,8 @@ export const PROVISIONAL_WORKSHOP_SERVICES = [
   ["Afinación menor", "Minor tune-up"],
   ["Cambio de aceite y filtros", "Oil and filter change"],
   ["Frenos", "Brakes"],
+  ["Reparación de motor", "Engine repair"],
+  ["Reparación de transmisión", "Transmission repair"],
   ["Suspensión", "Suspension"],
   ["Diagnóstico electrónico / escaneo", "Electronic diagnostics / scanning"],
   ["Revisión de 20 puntos", "20-point inspection"],

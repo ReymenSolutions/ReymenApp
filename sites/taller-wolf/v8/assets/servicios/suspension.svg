@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" role="img">
+<defs>
+  <linearGradient id="chrome" x1="0" x2="1">
+    <stop offset="0" stop-color="#6c7078"/><stop offset=".22" stop-color="#e6e8ec"/><stop offset=".36" stop-color="#ffffff"/>
+    <stop offset=".56" stop-color="#b5b9c1"/><stop offset=".8" stop-color="#83878f"/><stop offset="1" stop-color="#d2d5da"/>
+  </linearGradient>
+  <linearGradient id="chromeV" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#c9ccd2"/><stop offset="1" stop-color="#7d8189"/>
+  </linearGradient>
+  <linearGradient id="chromeD" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#ffffff"/><stop offset=".3" stop-color="#d9dce1"/><stop offset=".55" stop-color="#9a9ea6"/>
+    <stop offset=".75" stop-color="#e3e5e9"/><stop offset="1" stop-color="#80848c"/>
+  </linearGradient>
+  <linearGradient id="graphite" x1="0" x2="1">
+    <stop offset="0" stop-color="#1b1c20"/><stop offset=".25" stop-color="#565a63"/><stop offset=".45" stop-color="#383b41"/>
+    <stop offset=".8" stop-color="#17181b"/><stop offset="1" stop-color="#2e3036"/>
+  </linearGradient>
+  <linearGradient id="graphiteV" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#43464e"/><stop offset="1" stop-color="#131417"/>
+  </linearGradient>
+  <linearGradient id="red" x1="0" x2="1">
+    <stop offset="0" stop-color="#7d0f13"/><stop offset=".3" stop-color="#d9333a"/><stop offset=".42" stop-color="#ff6b70"/>
+    <stop offset=".66" stop-color="#c4232a"/><stop offset="1" stop-color="#6f0c10"/>
+  </linearGradient>
+  <linearGradient id="redV" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ff5c61"/><stop offset=".55" stop-color="#d6272e"/><stop offset="1" stop-color="#8f1418"/>
+  </linearGradient>
+  <linearGradient id="ceramic" x1="0" x2="1">
+    <stop offset="0" stop-color="#bfc3ca"/><stop offset=".35" stop-color="#ffffff"/><stop offset=".62" stop-color="#eceef1"/><stop offset="1" stop-color="#aeb2b9"/>
+  </linearGradient>
+  <radialGradient id="shadow"><stop offset="0" stop-color="#000" stop-opacity=".38"/><stop offset=".6" stop-color="#000" stop-opacity=".12"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+  <radialGradient id="glow"><stop offset="0" stop-color="#ffffff"/><stop offset=".18" stop-color="#ff8a8d"/><stop offset=".45" stop-color="#ff3b42" stop-opacity=".55"/><stop offset="1" stop-color="#ff3b42" stop-opacity="0"/></radialGradient>
+  <filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3"/></filter></defs>
+
+  <ellipse cx="250" cy="318" rx="110" ry="12" fill="url(#shadow)"/>
+  <g transform="rotate(14 240 180)">
+    <rect x="202" y="36" width="76" height="14" rx="7" fill="url(#chrome)"/>
+    <rect x="233" y="46" width="14" height="74" fill="url(#chrome)"/>
+    <ellipse cx="240" cy="100" rx="56" ry="11" fill="url(#graphite)"/>
+    <path d="M188 108 A52 11 0 0 1 292 119" fill="none" stroke="#7a0e12" stroke-width="12" stroke-linecap="round"/><path d="M188 131 A52 11 0 0 1 292 142" fill="none" stroke="#7a0e12" stroke-width="12" stroke-linecap="round"/><path d="M188 154 A52 11 0 0 1 292 165" fill="none" stroke="#7a0e12" stroke-width="12" stroke-linecap="round"/><path d="M188 177 A52 11 0 0 1 292 188" fill="none" stroke="#7a0e12" stroke-width="12" stroke-linecap="round"/><path d="M188 200 A52 11 0 0 1 292 211" fill="none" stroke="#7a0e12" stroke-width="12" stroke-linecap="round"/><path d="M188 223 A52 11 0 0 1 292 234" fill="none" stroke="#7a0e12" stroke-width="12" stroke-linecap="round"/>
+    <rect x="214" y="112" width="52" height="150" rx="10" fill="url(#graphite)"/>
+    <rect x="222" y="118" width="6" height="138" rx="3" fill="#fff" fill-opacity=".12"/>
+    <ellipse cx="240" cy="248" rx="56" ry="11" fill="url(#graphite)"/>
+    <path d="M292 119 A52 11 0 0 1 188 131" fill="none" stroke="url(#red)" stroke-width="12" stroke-linecap="round"/><path d="M292 142 A52 11 0 0 1 188 154" fill="none" stroke="url(#red)" stroke-width="12" stroke-linecap="round"/><path d="M292 165 A52 11 0 0 1 188 177" fill="none" stroke="url(#red)" stroke-width="12" stroke-linecap="round"/><path d="M292 188 A52 11 0 0 1 188 200" fill="none" stroke="url(#red)" stroke-width="12" stroke-linecap="round"/><path d="M292 211 A52 11 0 0 1 188 223" fill="none" stroke="url(#red)" stroke-width="12" stroke-linecap="round"/><path d="M292 234 A52 11 0 0 1 188 246" fill="none" stroke="url(#red)" stroke-width="12" stroke-linecap="round"/><path d="M270 126 A52 11 0 0 1 214 130" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2.5" stroke-linecap="round"/><path d="M270 149 A52 11 0 0 1 214 153" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2.5" stroke-linecap="round"/><path d="M270 172 A52 11 0 0 1 214 176" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2.5" stroke-linecap="round"/><path d="M270 195 A52 11 0 0 1 214 199" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2.5" stroke-linecap="round"/><path d="M270 218 A52 11 0 0 1 214 222" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2.5" stroke-linecap="round"/><path d="M270 241 A52 11 0 0 1 214 245" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2.5" stroke-linecap="round"/>
+    <rect x="222" y="258" width="36" height="34" rx="9" fill="url(#graphite)"/>
+    <circle cx="240" cy="282" r="11" fill="url(#chromeD)"/><circle cx="240" cy="282" r="5" fill="#0d0e10"/>
+  </g>
+</svg>

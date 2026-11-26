@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getWorkshopContext } from "@/lib/workshop/context";
 import { WorkshopNextServiceForm } from "@/components/workshop/WorkshopNextServiceForm";
+import { vehicleRecommendations } from "@/lib/workshop/recommendations";
 
 type HistoryRow = { id: string; kind: "quote" | "order"; folio: string | null; estado: string; title: string; createdAt: Date };
 
@@ -17,6 +18,11 @@ export default async function WorkshopVehicleHistory({ params, searchParams }: {
     select: { id: true, placas: true, vin: true, marca: true, modelo: true, anio: true, kilometrajeActual: true, proximoServicioKm: true, proximoServicioFecha: true, customer: { select: { name: true } } },
   });
   if (!vehicle) notFound();
+  const lastDelivery = await prisma.workshopWorkOrder.findFirst({
+    where: { organizationId: ctx.organizationId, vehicleId: id, estado: "ENTREGADA", entregadaEn: { not: null } },
+    select: { entregadaEn: true }, orderBy: { entregadaEn: "desc" },
+  });
+  const recommendations = vehicleRecommendations({ lastDeliveredAt: lastDelivery?.entregadaEn ?? null, nextServiceDate: vehicle.proximoServicioFecha, nextServiceKm: vehicle.proximoServicioKm, currentKm: vehicle.kilometrajeActual, now: new Date() });
   const history = await prisma.$queryRaw<HistoryRow[]>`
     SELECT id, 'quote' AS kind, folio, estado::text AS estado, "servicioTitulo" AS title, "createdAt"
     FROM "WorkshopQuote" WHERE "organizationId" = ${ctx.organizationId} AND "vehicleId" = ${id}
@@ -43,6 +49,14 @@ export default async function WorkshopVehicleHistory({ params, searchParams }: {
       {(vehicle.proximoServicioKm !== null || vehicle.proximoServicioFecha) && <p>{es ? "Próximo servicio" : "Next service"}: {vehicle.proximoServicioKm !== null ? `${vehicle.proximoServicioKm} km` : ""}{vehicle.proximoServicioFecha ? ` · ${vehicle.proximoServicioFecha.toLocaleDateString(es ? "es-MX" : "en-US")}` : ""}</p>}
     </section>
     {ctx.canManageFinancials && <WorkshopNextServiceForm vehicleId={vehicle.id} km={vehicle.proximoServicioKm} date={vehicle.proximoServicioFecha?.toISOString().slice(0, 10) ?? null} lang={ctx.lang} />}
+    <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <h2 className="font-semibold text-slate-900">{es ? "Qué conviene revisar" : "Suggested checks"}</h2>
+      <p className="mt-1 text-xs text-slate-500">{es ? "Sugerencias basadas en el historial registrado; confirma el estado del vehículo con el cliente." : "Suggestions based on recorded history; confirm the vehicle condition with the customer."}</p>
+      {recommendations.length ? <ul className="mt-3 space-y-2">{recommendations.map((item) => <li key={item.kind} className="rounded-lg border border-slate-200 p-3 text-sm">
+        <span className="font-semibold">{item.kind === "general_review" ? (es ? "Revisión general a los 6 meses" : "Six-month general review") : item.kind === "next_service_date" ? (es ? "Próximo servicio por fecha" : "Next service by date") : (es ? "Próximo servicio por kilometraje" : "Next service by mileage")}</span>
+        <span className="ml-2 text-slate-600">{item.date ? item.date.toLocaleDateString(es ? "es-MX" : "en-US", { timeZone: "UTC" }) : `${item.km} km`} · {item.due ? (es ? "Revisar ahora" : "Check now") : (es ? "Programado" : "Scheduled")}</span>
+      </li>)}</ul> : <p className="mt-3 text-sm text-slate-600">{es ? "Todavía no hay servicios entregados ni próximos servicios registrados." : "No delivered services or upcoming services have been recorded yet."}</p>}
+    </section>
     <section className="rounded-xl border border-slate-200 bg-white p-4">
       <h2 className="font-semibold text-slate-900">{es ? "Cotizaciones y órdenes" : "Quotes and orders"}</h2>
       {rows.length ? <ol className="mt-3 divide-y divide-slate-100">{rows.map((row) => <li key={`${row.kind}-${row.id}`} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"><div><p className="font-semibold text-slate-900">{row.kind === "quote" ? (es ? "Cotización" : "Quote") : (es ? "Orden" : "Order")} · {row.folio ?? (es ? "Sin folio" : "No number")}</p><p className="text-slate-600">{row.title} · {row.estado} · {row.createdAt.toLocaleDateString(es ? "es-MX" : "en-US")}</p></div>{row.kind === "quote" && row.folio && ctx.canManageFinancials && <a href={`/api/workshop/quotes/${row.id}/pdf`} className="rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold">PDF</a>}</li>)}</ol> : <p className="mt-3 text-sm text-slate-600">{es ? "Aún no hay cotizaciones ni órdenes para este vehículo." : "No quotes or orders for this vehicle yet."}</p>}
