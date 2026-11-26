@@ -52,6 +52,7 @@ services:
     volumes:
       - ../sites/taller-wolf/v8:/usr/share/nginx/html:ro
       - ./nginx.wolf-site.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../.wolf-site.htpasswd:/etc/nginx/wolf.htpasswd:ro
     networks: [test, proxy-net]
     depends_on: [app]
     restart: unless-stopped
