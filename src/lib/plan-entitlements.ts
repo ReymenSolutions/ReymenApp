@@ -1,4 +1,5 @@
 import type { Prisma, PlatformModule } from "@prisma/client";
+import { seedWorkshopServices } from "@/lib/workshop/services";
 
 /** Reconcile subscribed products atomically with the plan change. Explicit admin grants/suspensions remain authoritative. */
 export async function reconcilePlanEntitlements(tx: Prisma.TransactionClient, organizationId: string, modules: PlatformModule[]) {
@@ -19,5 +20,6 @@ export async function reconcilePlanEntitlements(tx: Prisma.TransactionClient, or
       create: { organizationId, module: product, source: "SUBSCRIBED", status: "ACTIVE" },
       update: { status: "ACTIVE", suspendedAt: null, cancelledAt: null },
     });
+    if (product === "WORKSHOP") await seedWorkshopServices(tx, organizationId);
   }
 }

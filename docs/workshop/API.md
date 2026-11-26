@@ -1,0 +1,12 @@
+# Operaciones disponibles
+
+No existe API pública de Talleres. Las acciones de servidor en `src/actions/workshop.ts` cubren vehículo, cotización, emisión, envío, aprobación, conversión, refacciones, compras, recepción, avance de orden, pago, crédito y entrega. Exigen sesión, módulo activo, rol adecuado y objetos dentro de la organización. La cotización se crea como `BORRADOR` sin folio. Los precios/costos se reciben netos y se recalculan en el servidor.
+
+Rutas privadas: `GET /api/workshop/quotes/:id/pdf` devuelve la cotización numerada sin costos; `GET /api/workshop/orders/:id/pdf` devuelve la orden sin costos; `POST /api/workshop/orders/:id/photos` guarda una foto normalizada de recepción, proceso o entrega; `GET /api/workshop/photos/:id` la devuelve solo a miembros autorizados de la misma organización. No son contratos externos estables. La acción `setWorkshopInvoiceRequested` registra el pedido del cliente; no genera CFDI.
+
+`addWorkshopAuthorizedLine` exige propietario, orden en diagnóstico o reparación, medio de autorización y clave de idempotencia. Suma el total con IVA al saldo; una refacción sin existencias suficientes durante reparación requiere una compra previa. Pendiente: validación de la landing en navegador con el activo limpio. Ninguna integración externa debe consumir la estructura actual como contrato estable todavía.
+
+`saveWorkshopService` crea o edita servicios de la organización con rol propietario. El costo y precio son opcionales, netos y validados en servidor. El catálogo provisional se carga una vez cuando se activa el módulo desde administración o un plan; reactivar no sobrescribe conceptos editados.
+En Cotizaciones se puede elegir un concepto activo para precargar nombre y, si existen, precio y costo. El servidor sigue recalculando todas las líneas; el catálogo no sustituye la validación de importes.
+
+La landing, aún desactivada, usa `POST /api/workshop/public/inquiries`. Exige mismo origen, límite por IP, cuerpo de hasta 8 KiB, campo trampa y clave de idempotencia. Crea un `Lead` con `source=landing` y una `WorkshopLeadRequest` en una transacción. La acción privada `createWorkshopVehicleFromRequest` pide el VIN faltante y vincula o crea el `Customer` y `WorkshopVehicle` de esa misma organización. Se conserva el texto de la solicitud para precargar la cotización; los precios no se inventan.

@@ -9,6 +9,7 @@ import type { ModuleSource, ModuleStatus, PlatformModule } from "@prisma/client"
 import { requireAdmin } from "@/lib/guards";
 import { ALL_MODULES, hasModule } from "@/lib/modules";
 import { UserError } from "@/lib/user-error";
+import { seedWorkshopServices } from "@/lib/workshop/services";
 
 const setModuleSchema = z.object({
   orgId: z.string(),
@@ -55,10 +56,14 @@ export async function setOrganizationModule(
     timestamps.cancelledAt = null;
   }
 
-  const entitlement = await prisma.organizationModule.upsert({
-    where: { organizationId_module: { organizationId: orgId, module } },
-    create: { organizationId: orgId, module, status, source, notes, ...timestamps },
-    update: { status, source, notes, ...timestamps },
+  const entitlement = await prisma.$transaction(async (tx) => {
+    const row = await tx.organizationModule.upsert({
+      where: { organizationId_module: { organizationId: orgId, module } },
+      create: { organizationId: orgId, module, status, source, notes, ...timestamps },
+      update: { status, source, notes, ...timestamps },
+    });
+    if (module === "WORKSHOP" && status === "ACTIVE") await seedWorkshopServices(tx, orgId);
+    return row;
   });
 
   await logAudit({
@@ -94,10 +99,14 @@ export async function syncModulesToPlan(orgId: string) {
   const toActivate = planModules.filter((m) => !activeSet.has(m));
 
   for (const platformModule of toActivate) {
-    const entitlement = await prisma.organizationModule.upsert({
-      where: { organizationId_module: { organizationId: orgId, module: platformModule } },
-      create: { organizationId: orgId, module: platformModule, status: "ACTIVE", source: "SUBSCRIBED" },
-      update: { status: "ACTIVE", source: "SUBSCRIBED", suspendedAt: null, cancelledAt: null },
+    const entitlement = await prisma.$transaction(async (tx) => {
+      const row = await tx.organizationModule.upsert({
+        where: { organizationId_module: { organizationId: orgId, module: platformModule } },
+        create: { organizationId: orgId, module: platformModule, status: "ACTIVE", source: "SUBSCRIBED" },
+        update: { status: "ACTIVE", source: "SUBSCRIBED", suspendedAt: null, cancelledAt: null },
+      });
+      if (platformModule === "WORKSHOP") await seedWorkshopServices(tx, orgId);
+      return row;
     });
     await logAudit({
       userId: session.user.id,

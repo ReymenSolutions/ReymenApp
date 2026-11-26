@@ -3,6 +3,7 @@
 import { syncCustomSubscription } from "@/lib/stripe-contracts";
 
 import { reconcilePlanEntitlements } from "@/lib/plan-entitlements";
+import { seedWorkshopServices } from "@/lib/workshop/services";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { PlatformModule, type Prisma } from "@prisma/client";
@@ -263,6 +264,7 @@ export async function saveCustomPlan(input: CustomPlanInput) {
           create: { organizationId: d.orgId, module: m, status: "ACTIVE", source: "SUBSCRIBED", notes: "Plan A la medida" },
           update: { status: "ACTIVE", source: "SUBSCRIBED", notes: "Plan A la medida", suspendedAt: null, cancelledAt: null },
         });
+        if (m === "WORKSHOP") await seedWorkshopServices(tx, d.orgId);
         if (row?.status !== "ACTIVE") changes.push({ module: m, status: "ACTIVE" });
       } else if (!modules.has(m) && row?.status === "ACTIVE") {
         await tx.organizationModule.update({ where: { id: row.id }, data: { status: "CANCELLED", cancelledAt: new Date() } });

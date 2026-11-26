@@ -27,9 +27,25 @@ describe("syncModulesToPlan", () => {
   let org: { id: string };
 
   afterEach(async () => {
+    if (org) await prisma.workshopService.deleteMany({ where: { organizationId: org.id } });
     if (org) await cleanupOrg(org.id);
     await prisma.plan.deleteMany({ where: { key: "sync-test" } });
     invalidatePlanCache();
+  });
+
+  it("seeds workshop services on admin activation and preserves edited values on reactivation", async () => {
+    authMock.mockResolvedValue(fakeSession({ id: "admin1", role: "SUPER_ADMIN", organizationId: null }));
+    org = await createTestOrg("Workshop Catalog Org");
+    const change = { orgId: org.id, module: "WORKSHOP" as const, status: "ACTIVE" as const, source: "ADMIN_GRANTED" as const };
+    await setOrganizationModule(change);
+    expect(await prisma.workshopService.count({ where: { organizationId: org.id } })).toBe(9);
+    const item = await prisma.workshopService.findFirstOrThrow({ where: { organizationId: org.id } });
+    expect(item.precioVentaNeto).toBeNull();
+    await prisma.workshopService.update({ where: { id: item.id }, data: { precioVentaNeto: "90.00", provisional: false } });
+    await setOrganizationModule({ ...change, status: "SUSPENDED" });
+    await setOrganizationModule(change);
+    expect(await prisma.workshopService.count({ where: { organizationId: org.id } })).toBe(9);
+    expect((await prisma.workshopService.findUniqueOrThrow({ where: { id: item.id } })).precioVentaNeto?.toFixed(2)).toBe("90.00");
   });
 
   it("denies a non-admin session", async () => {
