@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getWolfLandingOrg, WOLF_LOGO } from "@/lib/workshop/landing";
 import { WolfInquiryForm } from "@/components/workshop/WolfInquiryForm";
 import { prisma } from "@/lib/prisma";
@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function TallerWolfPage() {
   const org = await getWolfLandingOrg();
   if (!org) notFound();
+  if (process.env.WORKSHOP_WOLF_SITE_ORIGIN) redirect(process.env.WORKSHOP_WOLF_SITE_ORIGIN);
   const catalog = await prisma.workshopService.findMany({ where: { organizationId: org.id }, select: { nameEs: true, nameEn: true, active: true, provisional: true }, orderBy: { nameEs: "asc" } });
   const services = catalog.length ? catalog.filter((service) => service.active).map((service) => [service.nameEs, service.nameEn]) : PROVISIONAL_WORKSHOP_SERVICES;
   const provisional = !catalog.length || catalog.some((service) => service.active && service.provisional);
