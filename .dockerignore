@@ -6,3 +6,6 @@ smartcard-public/
 
 # Llaves del ambiente de prueba (deploy/test/init.sh): nunca entran a la imagen.
 .env.test
+
+# Sitios estáticos de clientes: se publican aparte, no son parte de la app.
+sites/

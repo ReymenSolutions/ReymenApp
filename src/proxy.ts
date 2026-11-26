@@ -36,6 +36,8 @@ export default auth(async (req) => {
   const isPublicRealtyRoute = pathname.startsWith("/p/") || pathname.startsWith("/api/realty/public/") || pathname.startsWith("/api/realty/media/");
   // Taller Wolf: la página y el POST comprueban módulo, organización explícita y logotipo limpio.
   const isPublicWorkshopRoute = pathname === "/taller-wolf" || pathname.startsWith("/api/workshop/public/");
+  // Retail: web pública de ventas (/tienda/<slug>); la página sola revisa que el negocio tenga el módulo RETAIL.
+  const isPublicRetailRoute = pathname === "/tienda" || pathname.startsWith("/tienda/");
   // Wallet: Apple llama al servicio web del pase (se autentica con el token del pase) y Google descarga el logo del programa.
   const isWalletRoute = pathname.startsWith("/api/wallet/");
 
@@ -46,7 +48,7 @@ export default auth(async (req) => {
   // route) so n8n's pull requests must not be redirected to /login here, and
   // the health check must be reachable by load balancers/uptime monitors
   // without a session
-  if (isAuthPage || isWebhookRoute || isApiV1Route || isAuthApiRoute || isCronRoute || isHealthRoute || isFeedbackRoute || isPublicLoyaltyRoute || isPublicRealtyRoute || isPublicWorkshopRoute || isPublicApiRoute || isPrivateChatVisitor || isWalletRoute) {
+  if (isAuthPage || isWebhookRoute || isApiV1Route || isAuthApiRoute || isCronRoute || isHealthRoute || isFeedbackRoute || isPublicLoyaltyRoute || isPublicRealtyRoute || isPublicWorkshopRoute || isPublicRetailRoute || isPublicApiRoute || isPrivateChatVisitor || isWalletRoute) {
     return NextResponse.next();
   }
 

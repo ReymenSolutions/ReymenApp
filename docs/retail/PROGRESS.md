@@ -1,0 +1,27 @@
+# Avance — Reymen Retail
+
+Bitácora en orden cronológico (lo más nuevo abajo). Cada entrada dice **qué se hizo, dónde quedó (PR/commit) y qué
+sigue**, para que cualquier agente (Claude Code o Codex) retome sin rehacer nada.
+
+## 2026-11-23 · Fase 0 (Claude Code)
+- Se guardó el spec (`SPEC.md`) y el prompt de la web (`PROMPT-WEB-VENTAS.md`) en el repo, tal como llegaron.
+- Auditoría del repo en `main@780430b` → `AUDIT-FASE0.md`. El patrón Realty sigue vigente. Se encontraron 8 diferencias con el spec (Next 16 en lugar de 15, no existen Contractors ni Talleres, `Branch` ya existe, ReymenPOS existe aparte, fotos en Postgres, sin librería de Excel, vendedor usuario o PIN, línea duplicada).
+- Se abrieron 5 decisiones (`DECISIONS.md`, DEC-01 a DEC-05) que cambian el modelo de datos.
+- Se armaron `TASKS.md`, `HANDOFF.md` y los documentos base (PRD, ARCHITECTURE, DATABASE, API, SECURITY).
+- **No se escribió código de la aplicación.**
+- **Sigue:** cerrar DEC-01 a DEC-05 y luego la tarea 1 de Fase 1 (registro del módulo `RETAIL`).
+
+## 2026-11-23 · Decisiones y reparto (Claude Code)
+- Reynol confirmó DEC-01 a DEC-05 como se recomendaron: sucursales con `Branch` + ajustes de Retail; POS como pantalla web en Reymen App; fotos en disco del servidor; GESEM primero con archivo real (CSV siempre aceptado); vendedor como empleado con PIN.
+- Reparto: **Codex** hace la Fase 1 del módulo; **Claude Code** hace la web pública. Contrato entre ambos: `WEB-CONTRACT.md`.
+- Queda abierta **W-01**: ¿las prendas con canal TIENDA también salen en la web?
+- **Sigue (Codex):** tarea 1 de Fase 1. **Sigue (Claude Code):** estructura de la web sobre el contrato; se conecta a datos reales cuando existan `RetailItem` y `createHold`.
+
+## 2026-11-23 · Web pública: estructura (Claude Code)
+- W-01 resuelta (opción A). Logo: RM del repo. WhatsApp de las tiendas: pendiente (W-03).
+- Construida la web en `/tienda/<slug>`: inicio con tiendas (Casa Carballo «Próximamente»), catálogo con filtros por URL, detalle de pieza única y «Apartar por WhatsApp» (acción con límite de intentos). Ruta pública en `src/proxy.ts`. Pruebas: `src/lib/retail/public/catalog.test.ts` y `src/proxy.test.ts`.
+- **Todavía no muestra nada en producción:** `source.ts` devuelve `null` hasta que exista el núcleo de Codex (ver WEB-CONTRACT § 4).
+- **Sigue:** revisión visual y, cuando Codex entregue el núcleo, conectar `source.ts` y probar en `apptest.reymen.mx` con prendas reales.
+
+## 2026-11-23 · WhatsApp de las tiendas (Claude Code)
+- W-03 resuelta: Labash 81 1420 6868 y Outlet del Norte 81 3384 7842, anotados en DECISIONS y WEB-CONTRACT para que Codex los cargue como dato de cada tienda. La web ya arma el enlace de wa.me con esos números (prueba en `catalog.test.ts`).
