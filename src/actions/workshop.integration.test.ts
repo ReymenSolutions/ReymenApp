@@ -300,16 +300,19 @@ describe("workshop tenant integration", () => {
     expect(response.headers.get("cache-control")).toBe("private, no-store");
   });
 
-  it("blocks other organizations and unauthorized roles from PDFs and photos", async () => {
+  it("lets mechanics open customer quote PDFs without granting financial actions or cross-org access", async () => {
     const quote = await prisma.workshopQuote.findUniqueOrThrow({ where: { id: quoteId } });
     const order = await prisma.workshopWorkOrder.findUniqueOrThrow({ where: { quoteId } });
     const photo = await prisma.workshopPhoto.findFirstOrThrow({ where: { organizationId: orgA.id } });
     try {
       auth.mockResolvedValue({ user: { id: ownerId, role: "AGENT", organizationId: orgA.id } });
-      expect((await downloadQuotePdf(new Request("http://localhost/quote"), { params: Promise.resolve({ id: quote.id }) })).status).toBe(403);
+      expect((await downloadQuotePdf(new Request("http://localhost/quote"), { params: Promise.resolve({ id: quote.id }) })).status).toBe(200);
       expect((await downloadOrderPdf(new Request("http://localhost/order"), { params: Promise.resolve({ id: order.id }) })).status).toBe(403);
+      await expect(issueWorkshopQuote(quote.id)).rejects.toThrow(/No autorizado/i);
       await expect(setWorkshopInvoiceRequested(order.id, false)).rejects.toThrow(/No autorizado/i);
       await expect(addWorkshopAuthorizedLine(order.id, { requestKey: crypto.randomUUID(), tipo: "SERVICIO", concepto: "Cambio extra", cantidad: "1", unidad: "serv.", precioUnitarioNeto: "1.00", autorizadaVia: "WhatsApp" })).rejects.toThrow(/No autorizado/i);
+      auth.mockResolvedValue({ user: { id: ownerId, role: "VIEWER", organizationId: orgA.id } });
+      expect((await downloadQuotePdf(new Request("http://localhost/quote"), { params: Promise.resolve({ id: quote.id }) })).status).toBe(403);
       auth.mockResolvedValue({ user: { id: ownerId, role: "OWNER", organizationId: orgB.id } });
       expect((await downloadQuotePdf(new Request("http://localhost/quote"), { params: Promise.resolve({ id: quote.id }) })).status).toBe(404);
       expect((await downloadOrderPdf(new Request("http://localhost/order"), { params: Promise.resolve({ id: order.id }) })).status).toBe(404);

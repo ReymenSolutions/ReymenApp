@@ -21,5 +21,6 @@ export const getWorkshopContext = cache(async () => {
     timezone: org.timezone,
     lang,
     canManageFinancials: ["OWNER", "ADMIN", "SUPER_ADMIN"].includes(session.user.role),
+    canPrintQuotes: ["OWNER", "ADMIN", "SUPER_ADMIN", "MANAGER", "AGENT"].includes(session.user.role),
   };
 });

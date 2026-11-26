@@ -9,7 +9,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const session = await auth();
   const orgId = session?.user.organizationId;
   if (!orgId) return new Response(null, { status: 401 });
-  if (!["OWNER", "ADMIN", "SUPER_ADMIN"].includes(session.user.role) || !(await hasModule(orgId, "WORKSHOP"))) return new Response(null, { status: 403 });
+  if (!["OWNER", "ADMIN", "SUPER_ADMIN", "MANAGER", "AGENT"].includes(session.user.role) || !(await hasModule(orgId, "WORKSHOP"))) return new Response(null, { status: 403 });
   const { id } = await params;
   const quote = await prisma.workshopQuote.findFirst({
     where: { id, organizationId: orgId, folio: { not: null } },
