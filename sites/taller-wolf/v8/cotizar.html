@@ -38,6 +38,7 @@
     <symbol id="i-up" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m-6 6 6-6 6 6"/></symbol>
     <symbol id="i-menu" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4 7h16M4 12h16M4 17h16"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
   </svg>
 
   <header class="header" id="header">
@@ -109,13 +110,14 @@
           <div class="fields">
             <div class="field"><label data-i18n="q.name" for="f-nombre">Nombre</label><input id="f-nombre" name="nombre" type="text" autocomplete="name" required maxlength="80"><span class="error" id="e-nombre" role="alert"></span></div>
             <div class="field"><label data-i18n="q.phone" for="f-telefono">Teléfono / WhatsApp</label><input id="f-telefono" name="telefono" type="tel" inputmode="tel" autocomplete="tel" required maxlength="20" placeholder="10 dígitos" data-i18n-ph="q.phonePh"><span class="error" id="e-telefono" role="alert"></span></div>
-            <div class="field"><label data-i18n="q.make" for="f-marca">Marca</label><input id="f-marca" name="marca" type="text" required maxlength="40" placeholder="Nissan"><span class="error" id="e-marca" role="alert"></span></div>
-            <div class="field"><label data-i18n="q.model" for="f-modelo">Modelo</label><input id="f-modelo" name="modelo" type="text" required maxlength="40" placeholder="Versa"><span class="error" id="e-modelo" role="alert"></span></div>
+            <div class="field"><label for="f-marca" data-i18n="q.make">Marca</label><div class="search-input"><svg aria-hidden="true"><use href="#i-search"/></svg><input id="f-marca" name="marca" type="text" required maxlength="40" list="vehicle-makes" placeholder="Busca o escribe la marca" data-i18n-ph="q.searchMake" autocomplete="off"></div><span class="error" id="e-marca" role="alert"></span></div>
+            <div class="field"><label for="f-modelo" data-i18n="q.model">Modelo</label><div class="search-input"><svg aria-hidden="true"><use href="#i-search"/></svg><input id="f-modelo" name="modelo" type="text" required maxlength="40" list="vehicle-models" placeholder="Busca o escribe el modelo" data-i18n-ph="q.searchModel" autocomplete="off"></div><span class="error" id="e-modelo" role="alert"></span></div>
             <div class="field"><label data-i18n="q.year" for="f-anio">Año</label><input id="f-anio" name="anio" type="text" inputmode="numeric" required maxlength="4" placeholder="2018"><span class="error" id="e-anio" role="alert"></span></div>
-            <div class="field"><label data-i18n="q.plates" for="f-placas">Placas</label><input id="f-placas" name="placas" type="text" required maxlength="12" autocapitalize="characters"><span class="error" id="e-placas" role="alert"></span></div>
-            <div class="field full"><label data-i18n="q.km" for="f-km">Kilometraje</label><input id="f-km" name="kilometraje" type="text" inputmode="numeric" required maxlength="9" placeholder="85000"><span class="error" id="e-km" role="alert"></span></div>
+            <div class="field"><label data-i18n="q.plates" for="f-placas">Placas (opcional)</label><input id="f-placas" name="placas" type="text" maxlength="12" autocapitalize="characters"><span class="error" id="e-placas" role="alert"></span></div>
+            <div class="field full"><label data-i18n="q.km" for="f-km">Kilometraje (opcional)</label><input id="f-km" name="kilometraje" type="text" inputmode="numeric" maxlength="9" placeholder="85000"><span class="error" id="e-km" role="alert"></span></div>
             <div class="field full"><label data-i18n="q.issue" for="f-falla">Servicio o falla que reporta</label><textarea id="f-falla" name="falla" required maxlength="600" placeholder="Afinación mayor, o: rechinan los frenos al frenar" data-i18n-ph="q.issuePh"></textarea><span class="error" id="e-falla" role="alert"></span></div>
           </div>
+          <datalist id="vehicle-makes"></datalist><datalist id="vehicle-models"></datalist>
           <div class="hp" aria-hidden="true"><label for="f-web">No llenar</label><input id="f-web" name="web" type="text" tabindex="-1" autocomplete="off"></div>
           <label class="consent"><input type="checkbox" id="f-consent" required><span data-i18n="q.consent">Leí y acepto el <a href="privacidad.html">aviso de privacidad</a> y los <a href="terminos.html">términos y condiciones</a>.</span></label>
            <label class="consent"><input type="checkbox" id="f-maintenance-consent"><span data-i18n="q.maintenance">Acepto recibir recordatorios de mantenimiento de mi vehículo. Es opcional y podré dejar de recibirlos.</span></label>
@@ -228,6 +230,7 @@
   </div>
   <div class="toasts" id="toasts" aria-live="polite"></div>
   <script src="assets/i18n-en.js"></script>
+  <script src="assets/vehicle-catalog.js"></script>
   <script src="assets/app.js"></script>
 </body>
 </html>

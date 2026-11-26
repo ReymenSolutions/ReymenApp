@@ -91,8 +91,8 @@ export async function createWorkshopVehicle(input: z.input<typeof vehicleInput>)
   return { id: vehicle.id };
 }
 
-/** Convierte los datos de una solicitud pública en cliente y vehículo, solicitando solo el VIN faltante. */
-export async function createWorkshopVehicleFromRequest(requestId: string, rawVin: string, confirmedIdentity: boolean) {
+/** Convierte una solicitud pública tras verificar los datos que exige una ficha completa. */
+export async function createWorkshopVehicleFromRequest(requestId: string, rawVin: string, confirmedIdentity: boolean, rawPlacas?: string, rawKilometraje?: string) {
   const { orgId, userId } = await requireWorkshopOwner();
   if (confirmedIdentity !== true) throw new UserError("Verifica la identidad del cliente antes de vincular la solicitud");
   const vinResult = z.string().trim().min(11).max(17).safeParse(rawVin);
@@ -103,6 +103,13 @@ export async function createWorkshopVehicleFromRequest(requestId: string, rawVin
     select: { id: true, placas: true, marca: true, modelo: true, anio: true, kilometraje: true, servicioFalla: true, lead: { select: { id: true, name: true, phone: true, phoneKey: true, deletedAt: true } } },
   });
   if (!request || request.lead.deletedAt || !request.lead.phone || !request.lead.phoneKey) throw new UserError("Solicitud del taller no disponible");
+  const platesResult = z.string().trim().min(4).max(12).regex(/^[A-Za-z0-9 -]+$/).safeParse(rawPlacas ?? request.placas ?? "");
+  if (!platesResult.success) throw new UserError("Captura las placas antes de crear el vehículo");
+  const plates = platesResult.data.toUpperCase().replace(/\s+/g, "");
+  const mileageText = rawKilometraje == null ? String(request.kilometraje ?? "") : rawKilometraje.trim().replace(/[,.\s]/g, "");
+  const mileageResult = z.coerce.number().int().min(0).max(10_000_000).safeParse(mileageText);
+  if (!mileageText || !mileageResult.success) throw new UserError("Captura el kilometraje antes de crear el vehículo");
+  const mileage = mileageResult.data;
   const result = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM "WorkshopLeadRequest" WHERE id = ${requestId} AND "organizationId" = ${orgId} FOR UPDATE`;
     const customer = await tx.customer.upsert({
@@ -110,15 +117,15 @@ export async function createWorkshopVehicleFromRequest(requestId: string, rawVin
       create: { organizationId: orgId, phone: request.lead.phone!, phoneKey: request.lead.phoneKey!, name: request.lead.name, leadId: request.lead.id, consentAccepted: false },
       update: {}, select: { id: true },
     });
-    const existing = await tx.workshopVehicle.findFirst({ where: { organizationId: orgId, OR: [{ placas: request.placas }, { vin }] }, select: { id: true, customerId: true } });
+    const existing = await tx.workshopVehicle.findFirst({ where: { organizationId: orgId, OR: [{ placas: plates }, { vin }] }, select: { id: true, customerId: true } });
     if (existing) {
       if (existing.customerId !== customer.id) throw new UserError("Las placas o el VIN pertenecen a otro cliente; revisa el vehículo existente");
       await tx.workshopLeadRequest.update({ where: { id: request.id }, data: { vehicleId: existing.id } });
       return { id: existing.id, created: false };
     }
     const vehicle = await tx.workshopVehicle.create({ data: {
-      organizationId: orgId, customerId: customer.id, placas: request.placas, vin,
-      marca: request.marca, modelo: request.modelo, anio: request.anio, kilometrajeActual: request.kilometraje,
+      organizationId: orgId, customerId: customer.id, placas: plates, vin,
+      marca: request.marca, modelo: request.modelo, anio: request.anio, kilometrajeActual: mileage,
     }, select: { id: true } });
     await tx.workshopLeadRequest.update({ where: { id: request.id }, data: { vehicleId: vehicle.id } });
     return { id: vehicle.id, created: true };

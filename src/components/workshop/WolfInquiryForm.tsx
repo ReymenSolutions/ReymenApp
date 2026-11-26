@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import vehicleCatalog from "@/lib/workshop/vehicle-catalog.json";
 
 const field = "mt-1 w-full min-w-0 rounded-md border border-white/25 bg-[#171717] px-3 py-2.5 text-sm text-white outline-none focus:border-red-400";
 
@@ -8,6 +9,7 @@ export function WolfInquiryForm() {
   const formRef = useRef<HTMLFormElement>(null);
   const requestKey = useRef<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [make, setMake] = useState("");
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
 
   function whatsappUrl() {
@@ -27,28 +29,38 @@ export function WolfInquiryForm() {
     requestKey.current ??= crypto.randomUUID();
     setBusy(true); setStatus("idle");
     try {
+      const payload: Record<string, unknown> = Object.fromEntries(data.entries());
+      payload.requestKey = requestKey.current;
+      payload.consent = data.get("consent") === "on";
+      payload.anio = Number(data.get("anio"));
+      payload.placas = String(data.get("placas") ?? "").trim() || null;
+      payload.kilometraje = data.get("kilometraje") === "" ? null : Number(data.get("kilometraje"));
       const response = await fetch("/api/workshop/public/inquiries", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(Object.fromEntries([...data.entries(), ["requestKey", requestKey.current], ["consent", data.get("consent") === "on"]])),
+        body: JSON.stringify(payload),
       });
-      if (!response.ok) throw new Error("Request failed");
+      if (!response.ok || (await response.json()).success !== true) throw new Error("Request failed");
       requestKey.current = null;
       form.reset();
+      setMake("");
       setStatus("success");
     } catch {
       setStatus("error");
     } finally { setBusy(false); }
   }
 
+  const models = Object.entries(vehicleCatalog).find(([name]) => name.toLocaleLowerCase() === make.trim().toLocaleLowerCase())?.[1] ?? [];
   return <form ref={formRef} onSubmit={submit} className="rounded-xl border border-white/15 bg-white/5 p-5" aria-label="Solicitud de cotización / Quote request">
     <div className="grid gap-4 sm:grid-cols-2">
       <label className="text-xs font-semibold">Nombre / Name<input className={field} name="name" autoComplete="name" required minLength={2} maxLength={120} /></label>
       <label className="text-xs font-semibold">Teléfono o WhatsApp / Phone<input className={field} name="phone" autoComplete="tel" type="tel" required minLength={10} maxLength={30} /></label>
-      <label className="text-xs font-semibold">Marca / Make<input className={field} name="marca" required maxLength={80} /></label>
-      <label className="text-xs font-semibold">Modelo / Model<input className={field} name="modelo" required maxLength={80} /></label>
+      <label className="text-xs font-semibold">Marca / Make<input className={field} name="marca" list="wolf-makes" placeholder="Buscar o escribir / Search or type" required maxLength={80} value={make} onChange={(event) => { setMake(event.target.value); const model = event.currentTarget.form?.elements.namedItem("modelo"); if (model instanceof HTMLInputElement) model.value = ""; }} /></label>
+      <label className="text-xs font-semibold">Modelo / Model<input className={field} name="modelo" list="wolf-models" placeholder="Buscar o escribir / Search or type" required maxLength={80} /></label>
+      <datalist id="wolf-makes">{Object.keys(vehicleCatalog).map((name) => <option key={name} value={name} />)}</datalist>
+      <datalist id="wolf-models">{models.map((name) => <option key={name} value={name} />)}</datalist>
       <label className="text-xs font-semibold">Año / Year<input className={field} name="anio" type="number" min={1900} max={2100} required /></label>
-      <label className="text-xs font-semibold">Placas / License plate<input className={field} name="placas" required minLength={2} maxLength={20} /></label>
-      <label className="text-xs font-semibold">Kilometraje / Mileage<input className={field} name="kilometraje" type="number" min={0} max={10000000} required /></label>
+      <label className="text-xs font-semibold">Placas (opcional) / License plate (optional)<input className={field} name="placas" minLength={2} maxLength={20} /></label>
+      <label className="text-xs font-semibold">Kilometraje (opcional) / Mileage (optional)<input className={field} name="kilometraje" type="number" min={0} max={10000000} /></label>
       <label className="text-xs font-semibold sm:col-span-2">Servicio o falla / Service or issue<textarea className={field} name="servicioFalla" required minLength={5} maxLength={2000} rows={3} /></label>
     </div>
     <div aria-hidden="true" className="absolute -left-[10000px]"><label>Website<input name="website" tabIndex={-1} autoComplete="off" /></label></div>

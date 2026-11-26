@@ -48,6 +48,7 @@
     <symbol id="i-up" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m-6 6 6-6 6 6"/></symbol>
     <symbol id="i-menu" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4 7h16M4 12h16M4 17h16"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
   </svg>
 
   <header class="header" id="header">
@@ -142,8 +143,10 @@
             <span class="status reveal" id="status"><span class="dot"></span><span id="status-text">&nbsp;</span></span>
             <h1 data-i18n="h.title" class="display reveal" style="--delay:.08s">Mecánica que te <span class="red">respalda.</span></h1>
             <p data-i18n="h.sub" class="hero-sub reveal" style="--delay:.16s">Servicio automotriz en Monterrey con garantía de 90 días o 5,000 km en mano de obra.</p>
+            <div class="hero-service-links reveal" style="--delay:.2s"><a href="servicios.html#servicio-afinacion-mayor" data-i18n="h.service.0">Afinación mayor</a><a href="servicios.html#servicio-aceite-filtros" data-i18n="h.service.2">Cambio de aceite y filtros</a><a href="servicios.html#servicio-frenos" data-i18n="h.service.3">Frenos</a><a href="servicios.html#servicio-diagnostico" data-i18n="h.service.7">Diagnóstico electrónico</a></div>
             <div class="hero-cta reveal" style="--delay:.24s">
               <a class="btn btn-wa sheen js-wa" href="https://wa.me/528711079931" data-msg="Hola Taller Wolf, quiero cotizar un servicio para mi vehículo." target="_blank" rel="noopener noreferrer"><svg aria-hidden="true"><use href="#i-wa"/></svg><span data-i18n="h.cta">Cotizar por WhatsApp</span></a>
+              <a class="btn btn-red sheen" href="cotizar.html"><span data-i18n="h.quoteNow">Cotizar Ahora</span></a>
             </div>
             <div class="hero-meta reveal" style="--delay:.32s">
               <span data-i18n="h.wk"><strong>Lunes a viernes</strong> 9:00 am a 7:00 pm</span>
@@ -162,6 +165,16 @@
             <p class="car-credit">Modelo 3D <a href="https://skfb.ly/oJJKq" target="_blank" rel="noopener noreferrer">“Airtsel Valor Proiettile”</a> · Yudha Mfr · <a href="http://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a></p>
           </div>
         </div>
+      </div>
+    </section>
+    <section class="home-services" aria-labelledby="home-services-title">
+      <div class="container">
+        <div class="section-head">
+          <h2 data-i18n="h.servicesTitle" id="home-services-title" class="display">Servicios para tu vehículo</h2>
+          <p data-i18n="h.servicesIntro">Mantenimiento, diagnóstico y reparación. Cuéntanos qué necesita tu auto.</p>
+        </div>
+        <div class="home-services-grid"><a class="card home-service" href="servicios.html#servicio-afinacion-mayor"><span class="svc-img"><img src="assets/servicios/afinacion-mayor.webp" alt="" width="720" height="720" loading="lazy"></span><span class="svc-body"><strong class="svc-title" data-i18n="s.0.t">Afinación mayor</strong><span class="svc-short" data-i18n="s.0.s">Recupera potencia y rendimiento de combustible.</span></span></a><a class="card home-service" href="servicios.html#servicio-aceite-filtros"><span class="svc-img"><img src="assets/servicios/aceite-filtros.webp" alt="" width="720" height="720" loading="lazy"></span><span class="svc-body"><strong class="svc-title" data-i18n="s.2.t">Cambio de aceite y filtros</strong><span class="svc-short" data-i18n="s.2.s">Según las especificaciones de tu vehículo.</span></span></a><a class="card home-service" href="servicios.html#servicio-frenos"><span class="svc-img"><img src="assets/servicios/frenos.webp" alt="" width="720" height="720" loading="lazy"></span><span class="svc-body"><strong class="svc-title" data-i18n="s.3.t">Frenos</strong><span class="svc-short" data-i18n="s.3.s">Frena seguro y sin ruidos.</span></span></a><a class="card home-service" href="servicios.html#servicio-motor"><span class="svc-img"><img src="assets/servicios/motor.webp" alt="" width="720" height="720" loading="lazy"></span><span class="svc-body"><strong class="svc-title" data-i18n="s.4.t">Reparación de motor</strong><span class="svc-short" data-i18n="s.4.s">Diagnóstico y reparación a fondo del motor.</span></span></a><a class="card home-service" href="servicios.html#servicio-transmision"><span class="svc-img"><img src="assets/servicios/transmision.webp" alt="" width="720" height="720" loading="lazy"></span><span class="svc-body"><strong class="svc-title" data-i18n="s.5.t">Reparación de transmisión</strong><span class="svc-short" data-i18n="s.5.s">Cambios suaves, sin tirones ni patinaje.</span></span></a><a class="card home-service" href="servicios.html#servicio-diagnostico"><span class="svc-img"><img src="assets/servicios/diagnostico.webp" alt="" width="720" height="720" loading="lazy"></span><span class="svc-body"><strong class="svc-title" data-i18n="s.7.t">Diagnóstico electrónico</strong><span class="svc-short" data-i18n="s.7.s">Escaneo para fallas y testigos encendidos.</span></span></a></div>
+        <a class="btn btn-ghost home-services-all" href="servicios.html" data-i18n="h.allServices">Ver todos los servicios</a>
       </div>
     </section>
   </main>
@@ -264,6 +277,7 @@
   </div>
   <div class="toasts" id="toasts" aria-live="polite"></div>
   <script src="assets/i18n-en.js"></script>
+
   <script src="assets/app.js"></script>
 </body>
 </html>

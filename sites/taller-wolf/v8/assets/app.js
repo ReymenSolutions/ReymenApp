@@ -19,9 +19,9 @@
       days: ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"],
       copied: "Dirección copiada", saved: "Preferencia guardada", savedMap: "Preferencia guardada: mapa permitido", cleared: "Preferencias borradas",
       req: "Este dato es necesario.", name: "Escribe tu nombre.", phone: "Escribe un teléfono de 10 dígitos.", year: "Escribe el año con 4 dígitos (2018).",
-      km: "Escribe solo números (85000).", plates: "Escribe las placas sin símbolos.", consent: "Necesitas aceptar el aviso de privacidad para continuar.",
+      km: "Escribe solo números (85000).", plates: "Escribe las placas sin símbolos.", issue: "Describe el servicio o la falla con al menos 5 caracteres.", consent: "Necesitas aceptar el aviso de privacidad para continuar.",
       chatSoon: "¡Gracias por escribir! Muy pronto podré responderte aquí. Mientras tanto, escríbenos por WhatsApp y te atendemos en minutos.",
-      bot: "Intenta de nuevo en unos segundos.", wait: "Espera {s} s para enviar otra cotización.", sending: "Enviando solicitud…", sent: "Solicitud recibida. Taller Wolf se pondrá en contacto contigo.", sendError: "No pudimos guardar tu solicitud. Intenta de nuevo o escríbenos por WhatsApp.",
+      bot: "Intenta de nuevo en unos segundos.", wait: "Espera {s} s para enviar otra cotización.", sending: "Enviando solicitud…", sent: "Solicitud recibida. Taller Wolf se pondrá en contacto contigo.", sendError: "No pudimos recibir tu solicitud. Revisa los datos o escríbenos por WhatsApp.", sendUnconfirmed: "No pudimos confirmar el envío. Es posible que ya haya llegado; antes de intentarlo otra vez, escríbenos por WhatsApp.",
       mapTitle: "Mapa: Burocratas 515, Colonia Burócratas del Estado, 64380 Monterrey, N.L."
     },
     en: {
@@ -30,9 +30,9 @@
       days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
       copied: "Address copied", saved: "Preference saved", savedMap: "Preference saved: map allowed", cleared: "Preferences cleared",
       req: "This field is required.", name: "Enter your name.", phone: "Enter a 10-digit phone number.", year: "Enter the year with 4 digits (2018).",
-      km: "Numbers only (85000).", plates: "Enter the plate without symbols.", consent: "You need to accept the privacy notice to continue.",
+      km: "Numbers only (85000).", plates: "Enter the plate without symbols.", issue: "Describe the service or issue using at least 5 characters.", consent: "You need to accept the privacy notice to continue.",
       chatSoon: "Thanks for writing! I’ll be able to answer here very soon. In the meantime, message us on WhatsApp and we’ll help you in minutes.",
-      bot: "Please try again in a few seconds.", wait: "Wait {s} s before sending another quote.", sending: "Sending request…", sent: "Request received. Taller Wolf will contact you.", sendError: "We could not save your request. Please try again or message us on WhatsApp.",
+      bot: "Please try again in a few seconds.", wait: "Wait {s} s before sending another quote.", sending: "Sending request…", sent: "Request received. Taller Wolf will contact you.", sendError: "We could not receive your request. Check the details or message us on WhatsApp.", sendUnconfirmed: "We could not confirm delivery. Your request may have arrived; please message us on WhatsApp before trying again.",
       mapTitle: "Map: Burocratas 515, Colonia Burócratas del Estado, 64380 Monterrey, N.L."
     }
   };
@@ -473,18 +473,32 @@
   var form = $("#quote-form");
   if (form) {
     var fields = { nombre: "nombre", telefono: "telefono", marca: "marca", modelo: "modelo", anio: "anio", placas: "placas", kilometraje: "km", falla: "falla" };
+    var vehicleCatalog = window.TW_VEHICLES || {}, makeList = $("#vehicle-makes"), modelList = $("#vehicle-models");
+    var addOption = function (list, value) { var option = document.createElement("option"); option.value = value; list.appendChild(option); };
+    Object.keys(vehicleCatalog).forEach(function (make) { addOption(makeList, make); });
+    var selectedMake = $("#f-marca").value.trim();
+    var updateModels = function () {
+      var current = $("#f-marca").value.trim();
+      var match = Object.keys(vehicleCatalog).find(function (make) { return make.toLowerCase() === current.toLowerCase(); }) || "";
+      if (selectedMake !== current) { $("#f-modelo").value = ""; selectedMake = current; }
+      modelList.replaceChildren();
+      if (match) vehicleCatalog[match].forEach(function (model) { addOption(modelList, model); });
+    };
+    $("#f-marca").addEventListener("input", updateModels);
+    updateModels();
     var maxYear = new Date().getFullYear() + 1, LIMIT_MS = 30000, MIN_FILL_MS = 3000, openedAt = Date.now();
     var fieldInput = function (k) { return document.getElementById("f-" + fields[k]); };
     var clean = function (s) { return s.replace(/[\u0000-\u001f\u007f<>{}]/g, "").trim().replace(/\s+/g, " "); };
     var value = function (k) { return clean(fieldInput(k).value); };
     var check = function (k) {
       var v = value(k), msg = "";
-      if (!v) msg = t("req");
+      if (!v) { if (k !== "placas" && k !== "kilometraje") msg = t("req"); }
       else if (k === "nombre" && v.length < 2) msg = t("name");
-      else if (k === "telefono" && v.replace(/\D/g, "").length < 10) msg = t("phone");
+      else if (k === "telefono" && (v.replace(/\D/g, "").length < 10 || v.replace(/\D/g, "").length > 15)) msg = t("phone");
       else if (k === "anio" && (!/^\d{4}$/.test(v) || +v < 1950 || +v > maxYear)) msg = t("year");
       else if (k === "kilometraje" && !/^\d[\d.,]*$/.test(v)) msg = t("km");
       else if (k === "placas" && !/^[A-Za-z0-9 -]{4,12}$/.test(v)) msg = t("plates");
+      else if (k === "falla" && v.length < 5) msg = t("issue");
       var el = fieldInput(k), err = document.getElementById("e-" + fields[k]);
       el.setAttribute("aria-invalid", msg ? "true" : "false");
       if (msg) el.setAttribute("aria-describedby", err.id); else el.removeAttribute("aria-describedby");
@@ -512,7 +526,7 @@
       var last = +(store.get("tw-last-send") || 0), wait = LIMIT_MS - (Date.now() - last);
       if (wait > 0) { toast(t("wait").replace("{s}", Math.ceil(wait / 1000))); return; }
       if (!window.crypto || !window.crypto.randomUUID) { status.hidden = false; status.textContent = t("sendError"); return; }
-      var payload = { name: value("nombre"), phone: value("telefono"), marca: value("marca"), modelo: value("modelo"), anio: Number(value("anio")), placas: value("placas"), kilometraje: Number(value("kilometraje").replace(/[^\d]/g, "")), servicioFalla: value("falla"), consent: true, maintenanceConsent: $("#f-maintenance-consent").checked, website: $("#f-web").value };
+      var payload = { name: value("nombre"), phone: value("telefono"), marca: value("marca"), modelo: value("modelo"), anio: Number(value("anio")), placas: value("placas") || null, kilometraje: value("kilometraje") ? Number(value("kilometraje").replace(/[^\d]/g, "")) : null, servicioFalla: value("falla"), consent: true, maintenanceConsent: $("#f-maintenance-consent").checked, website: $("#f-web").value };
       var signature = JSON.stringify(payload);
       if (signature !== requestSignature) { requestKey = window.crypto.randomUUID(); requestSignature = signature; }
       pending = true;
@@ -520,18 +534,27 @@
       status.hidden = false;
       status.textContent = t("sending");
       try {
-        var response = await fetch("/api/workshop/public/inquiries", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(Object.assign({ requestKey: requestKey }, payload))
-        });
-        if (!response.ok) throw new Error("request failed");
+        var body = JSON.stringify(Object.assign({ requestKey: requestKey }, payload));
+        var confirmed = false, rejected = false;
+        // El mismo requestKey permite repetir una petición cuya respuesta se perdió sin crear otro lead.
+        for (var attempt = 0; attempt < 2 && !confirmed && !rejected; attempt++) {
+          try {
+            var response = await fetch("/api/workshop/public/inquiries", {
+              method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: body
+            });
+            var result = await response.json().catch(function () { return null; });
+            confirmed = response.ok && result && result.success === true;
+            rejected = response.status >= 400 && response.status < 500;
+          } catch (error) { /* Es posible que el servidor haya guardado la solicitud antes de perder la respuesta. */ }
+        }
+        if (!confirmed) { status.textContent = t(rejected ? "sendError" : "sendUnconfirmed"); return; }
         store.set("tw-last-send", String(Date.now()));
         requestKey = null;
         requestSignature = null;
         form.reset();
         status.textContent = t("sent");
       } catch (error) {
-        status.textContent = t("sendError");
+        status.textContent = t("sendUnconfirmed");
       } finally {
         pending = false;
         submitButton.disabled = false;

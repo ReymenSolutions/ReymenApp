@@ -1502,8 +1502,8 @@ model WorkshopLeadRequest {
   marca String
   modelo String
   anio Int
-  placas String
-  kilometraje Int
+  placas String?
+  kilometraje Int?
   servicioFalla String @db.Text
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

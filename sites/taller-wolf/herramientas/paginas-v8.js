@@ -5,6 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const out = process.argv[2];
 if (!out) { console.error("Falta la carpeta de salida"); process.exit(1); }
+const vehicleCatalog = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../../src/lib/workshop/vehicle-catalog.json"), "utf8"));
 
 /* ---------- Textos: cada uno se escribe una vez en español y en inglés ---------- */
 const EN = {};
@@ -73,6 +74,7 @@ const SPRITE = `<svg class="sprite" width="0" height="0" aria-hidden="true" focu
     <symbol id="i-up" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m-6 6 6-6 6 6"/></symbol>
     <symbol id="i-menu" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4 7h16M4 12h16M4 17h16"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
   </svg>`;
 
 /* ---------- Páginas del sitio (para el menú) ---------- */
@@ -159,7 +161,7 @@ function footer() {
   </footer>`;
 }
 
-function tail({ waFloat }) {
+function tail({ waFloat, vehicleCatalogEnabled }) {
   return `${waFloat ? `<a class="wa-float js-wa" id="wa-float" href="https://wa.me/528711079931" data-msg="Hola Taller Wolf, quiero pedir una cotización." target="_blank" rel="noopener noreferrer" ${aria("a.waFloat", "Escríbenos por WhatsApp", "Message us on WhatsApp")}>${WA_ICON}</a>` : ""}
   <div class="chat" id="chat">
     <section class="chat-panel" id="chat-panel" role="dialog" aria-labelledby="chat-title" hidden>
@@ -202,6 +204,7 @@ function tail({ waFloat }) {
   </div>
   <div class="toasts" id="toasts" aria-live="polite"></div>
   <script src="assets/i18n-en.js"></script>
+  ${vehicleCatalogEnabled ? '<script src="assets/vehicle-catalog.js"></script>' : ""}
   <script src="assets/app.js"></script>`;
 }
 
@@ -233,7 +236,7 @@ ${main}
 
   ${footer()}
 
-  ${tail({ waFloat })}
+  ${tail({ waFloat, vehicleCatalogEnabled: file === "cotizar.html" })}
 </body>
 </html>
 `;
@@ -256,7 +259,7 @@ const OG = `
   <meta name="twitter:card" content="summary_large_image">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"AutoRepair","name":"Taller Wolf","slogan":"Mecánica que te respalda","image":"taller-wolf-logo-limpio.png","telephone":"+528711079931","address":{"@type":"PostalAddress","streetAddress":"Burocratas 515, Colonia Burócratas del Estado","addressLocality":"Monterrey","addressRegion":"N.L.","postalCode":"64380","addressCountry":"MX"},"geo":{"@type":"GeoCoordinates","latitude":25.7094361,"longitude":-100.3697586},"openingHoursSpecification":[{"@type":"OpeningHoursSpecification","dayOfWeek":["Monday","Tuesday","Wednesday","Thursday","Friday"],"opens":"09:00","closes":"19:00"},{"@type":"OpeningHoursSpecification","dayOfWeek":"Saturday","opens":"09:00","closes":"15:00"}]}</script>`;
 
-page({
+function renderHome() { page({
   file: "index.html", titleKey: "t.home", titleEs: "Taller Wolf | Servicio Automotriz en Monterrey, N.L.", titleEn: "Taller Wolf | Auto Service in Monterrey, N.L.",
   desc: "Taller Wolf, servicio automotriz en Monterrey, N.L. Garantía de 90 días o 5,000 km en mano de obra. Cotiza por WhatsApp al 871 107 9931.",
   bodyClass: "is-home", extraHead: OG + `
@@ -274,8 +277,10 @@ page({
             <span class="status reveal" id="status"><span class="dot"></span><span id="status-text">&nbsp;</span></span>
             ${tag("h1", "h.title", 'Mecánica que te <span class="red">respalda.</span>', 'Mechanics that <span class="red">back you up.</span>', 'class="display reveal" style="--delay:.08s"')}
             ${tag("p", "h.sub", "Servicio automotriz en Monterrey con garantía de 90 días o 5,000 km en mano de obra.", "Auto service in Monterrey with a 90-day or 5,000 km warranty on labor.", 'class="hero-sub reveal" style="--delay:.16s"')}
+            <div class="hero-service-links reveal" style="--delay:.2s">${[0, 2, 3, 7].map((i) => `<a href="servicios.html#servicio-${SERVICES[i][0]}" data-i18n="h.service.${i}">${tr(`h.service.${i}`, SERVICES[i][1], SERVICES[i][2])}</a>`).join("")}</div>
             <div class="hero-cta reveal" style="--delay:.24s">
               <a class="btn btn-wa sheen js-wa" href="https://wa.me/528711079931" data-msg="Hola Taller Wolf, quiero cotizar un servicio para mi vehículo." target="_blank" rel="noopener noreferrer">${WA_ICON}<span data-i18n="h.cta">${tr("h.cta", "Cotizar por WhatsApp", "Get a quote on WhatsApp")}</span></a>
+              <a class="btn btn-red sheen" href="cotizar.html"><span data-i18n="h.quoteNow">${tr("h.quoteNow", "Cotizar Ahora", "Get a Quote Now")}</span></a>
             </div>
             <div class="hero-meta reveal" style="--delay:.32s">
               ${tag("span", "h.wk", "<strong>Lunes a viernes</strong> 9:00 am a 7:00 pm", "<strong>Monday to Friday</strong> 9:00 am to 7:00 pm")}
@@ -294,8 +299,18 @@ page({
         </div>
       </div>
     </section>
+    <section class="home-services" aria-labelledby="home-services-title">
+      <div class="container">
+        <div class="section-head">
+          ${tag("h2", "h.servicesTitle", "Servicios para tu vehículo", "Services for your vehicle", 'id="home-services-title" class="display"')}
+          ${tag("p", "h.servicesIntro", "Mantenimiento, diagnóstico y reparación. Cuéntanos qué necesita tu auto.", "Maintenance, diagnostics and repairs. Tell us what your car needs.")}
+        </div>
+        <div class="home-services-grid">${[0, 2, 3, 4, 5, 7].map((i) => `<a class="card home-service" href="servicios.html#servicio-${SERVICES[i][0]}"><span class="svc-img"><img src="assets/servicios/${SERVICES[i][0]}.webp" alt="" width="720" height="720" loading="lazy"></span><span class="svc-body"><strong class="svc-title" data-i18n="s.${i}.t">${tr(`s.${i}.t`, SERVICES[i][1], SERVICES[i][2])}</strong><span class="svc-short" data-i18n="s.${i}.s">${tr(`s.${i}.s`, SERVICES[i][3], SERVICES[i][4])}</span></span></a>`).join("")}</div>
+        <a class="btn btn-ghost home-services-all" href="servicios.html" data-i18n="h.allServices">${tr("h.allServices", "Ver todos los servicios", "View all services")}</a>
+      </div>
+    </section>
   </main>`
-});
+}); }
 
 tr("ch.ph", "Escribe tu mensaje…", "Type your message…");
 
@@ -313,7 +328,8 @@ const SERVICES = [
   ["bateria", "Cambio de batería", "Battery replacement", "Con revisión del sistema de carga.", "With a charging system check.", "Revisión del sistema de carga y cambio de batería cuando hace falta.", "Charging system check and battery replacement when needed."],
   ["rotacion-balanceo", "Rotación y balanceo", "Rotation and balancing", "Desgaste parejo y sin vibraciones.", "Even wear, no vibrations.", "Rotación y balanceo de llantas para un desgaste parejo y un manejo sin vibraciones.", "Tire rotation and balancing for even wear and a vibration-free ride."]
 ];
-const cards = SERVICES.map(([id, tes, ten, ses, sen, des, den], i) => `<button class="card service reveal" type="button" data-wa="${tes}" data-img="assets/servicios/${id}.webp" style="--delay:${(i % 3) * 0.06 + Math.floor(i / 3) * 0.08}s">
+renderHome();
+const cards = SERVICES.map(([id, tes, ten, ses, sen, des, den], i) => `<button class="card service reveal" id="servicio-${id}" type="button" data-wa="${tes}" data-img="assets/servicios/${id}.webp" style="--delay:${(i % 3) * 0.06 + Math.floor(i / 3) * 0.08}s">
             <span class="svc-img"><img src="assets/servicios/${id}.webp" alt="" width="720" height="720" loading="lazy"></span>
             <span class="svc-body">
               <span class="svc-title" data-i18n="s.${i}.t">${tr(`s.${i}.t`, tes, ten)}</span>
@@ -401,13 +417,14 @@ page({
           <div class="fields">
             ${field("nombre", "nombre", "q.name", "Nombre", "Name", 'type="text" autocomplete="name" required maxlength="80"')}
             ${field("telefono", "telefono", "q.phone", "Teléfono / WhatsApp", "Phone / WhatsApp", 'type="tel" inputmode="tel" autocomplete="tel" required maxlength="20"', false, ["q.phonePh", "10 dígitos", "10 digits"])}
-            ${field("marca", "marca", "q.make", "Marca", "Make", 'type="text" required maxlength="40" placeholder="Nissan"')}
-            ${field("modelo", "modelo", "q.model", "Modelo", "Model", 'type="text" required maxlength="40" placeholder="Versa"')}
+            <div class="field"><label for="f-marca" data-i18n="q.make">${tr("q.make", "Marca", "Make")}</label><div class="search-input"><svg aria-hidden="true"><use href="#i-search"/></svg><input id="f-marca" name="marca" type="text" required maxlength="40" list="vehicle-makes" ${ph("q.searchMake", "Busca o escribe la marca", "Search or type a make")} autocomplete="off"></div><span class="error" id="e-marca" role="alert"></span></div>
+            <div class="field"><label for="f-modelo" data-i18n="q.model">${tr("q.model", "Modelo", "Model")}</label><div class="search-input"><svg aria-hidden="true"><use href="#i-search"/></svg><input id="f-modelo" name="modelo" type="text" required maxlength="40" list="vehicle-models" ${ph("q.searchModel", "Busca o escribe el modelo", "Search or type a model")} autocomplete="off"></div><span class="error" id="e-modelo" role="alert"></span></div>
             ${field("anio", "anio", "q.year", "Año", "Year", 'type="text" inputmode="numeric" required maxlength="4" placeholder="2018"')}
-            ${field("placas", "placas", "q.plates", "Placas", "License plate", 'type="text" required maxlength="12" autocapitalize="characters"')}
-            ${field("km", "kilometraje", "q.km", "Kilometraje", "Mileage (km)", 'type="text" inputmode="numeric" required maxlength="9" placeholder="85000"', true)}
+            ${field("placas", "placas", "q.plates", "Placas (opcional)", "License plate (optional)", 'type="text" maxlength="12" autocapitalize="characters"')}
+            ${field("km", "kilometraje", "q.km", "Kilometraje (opcional)", "Mileage (optional)", 'type="text" inputmode="numeric" maxlength="9" placeholder="85000"', true)}
             ${field("falla", "falla", "q.issue", "Servicio o falla que reporta", "Service needed or issue", 'required maxlength="600"', true, ["q.issuePh", "Afinación mayor, o: rechinan los frenos al frenar", "Major tune-up, or: the brakes squeak"])}
           </div>
+          <datalist id="vehicle-makes"></datalist><datalist id="vehicle-models"></datalist>
           <div class="hp" aria-hidden="true"><label for="f-web">No llenar</label><input id="f-web" name="web" type="text" tabindex="-1" autocomplete="off"></div>
           <label class="consent"><input type="checkbox" id="f-consent" required>${tag("span", "q.consent", 'Leí y acepto el <a href="privacidad.html">aviso de privacidad</a> y los <a href="terminos.html">términos y condiciones</a>.', 'I have read and accept the <a href="privacidad.html">privacy notice</a> and the <a href="terminos.html">terms and conditions</a>.')}</label>
            <label class="consent"><input type="checkbox" id="f-maintenance-consent">${tag("span", "q.maintenance", "Acepto recibir recordatorios de mantenimiento de mi vehículo. Es opcional y podré dejar de recibirlos.", "I agree to receive vehicle maintenance reminders. This is optional and I can opt out.")}</label>
@@ -578,4 +595,6 @@ legal("cookies.html", "t.cookies", "Política de cookies", "Cookie policy", "Qu�
 /* ---------- Diccionario en inglés ---------- */
 fs.writeFileSync(path.join(out, "assets", "i18n-en.js"),
   "/* Textos en inglés. Generado por herramientas/paginas-v8.js: edita los textos ahí, no aquí. */\nwindow.TW_EN = " + JSON.stringify(EN, null, 1) + ";\n");
+fs.writeFileSync(path.join(out, "assets", "vehicle-catalog.js"),
+  "/* Sugerencias de marcas y modelos; la captura permite otros vehículos. Generado desde src/lib/workshop/vehicle-catalog.json. */\nwindow.TW_VEHICLES = " + JSON.stringify(vehicleCatalog) + ";\n");
 console.log("ok: páginas y", Object.keys(EN).length, "textos en inglés");

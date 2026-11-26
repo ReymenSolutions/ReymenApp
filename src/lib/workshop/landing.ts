@@ -28,8 +28,8 @@ export const wolfInquirySchema = z.object({
   marca: z.string().trim().min(1).max(80),
   modelo: z.string().trim().min(1).max(80),
   anio: z.coerce.number().int().min(1900).max(2100),
-  placas: z.string().trim().min(2).max(20),
-  kilometraje: z.coerce.number().int().min(0).max(10_000_000),
+  placas: z.string().trim().min(2).max(20).nullish(),
+  kilometraje: z.number().int().min(0).max(10_000_000).nullish(),
   servicioFalla: z.string().trim().min(5).max(2000),
   consent: z.literal(true),
   maintenanceConsent: z.boolean().optional(),
@@ -44,7 +44,7 @@ export async function submitWolfInquiry(orgId: string, input: WolfInquiry) {
   if (!phone) return { error: "phone" as const };
   const existing = await prisma.workshopLeadRequest.findUnique({ where: { organizationId_requestKey: { organizationId: orgId, requestKey: input.requestKey } }, select: { id: true } });
   if (existing) return { id: existing.id, created: false };
-  const plates = input.placas.toUpperCase().replace(/\s+/g, "");
+  const plates = input.placas?.toUpperCase().replace(/\s+/g, "") ?? null;
   let result;
   try {
     result = await withPlanCapacity(orgId, "leads", async (tx) => {

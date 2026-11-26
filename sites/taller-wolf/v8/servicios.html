@@ -38,6 +38,7 @@
     <symbol id="i-up" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m-6 6 6-6 6 6"/></symbol>
     <symbol id="i-menu" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4 7h16M4 12h16M4 17h16"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
   </svg>
 
   <header class="header" id="header">
@@ -106,7 +107,7 @@
           <p data-i18n="s.p">Toca un servicio para ver de qué se trata y cotizarlo directo por WhatsApp.</p>
         </div>
         <div class="services-grid">
-          <button class="card service reveal" type="button" data-wa="Afinación mayor" data-img="assets/servicios/afinacion-mayor.webp" style="--delay:0s">
+          <button class="card service reveal" id="servicio-afinacion-mayor" type="button" data-wa="Afinación mayor" data-img="assets/servicios/afinacion-mayor.webp" style="--delay:0s">
             <span class="svc-img"><img src="assets/servicios/afinacion-mayor.webp" alt="" width="720" height="720" loading="lazy"></span>
             <span class="svc-body">
               <span class="svc-title" data-i18n="s.0.t">Afinación mayor</span>
@@ -114,7 +115,7 @@
             </span>
             <span class="svc-desc" hidden data-i18n="s.0.d">Servicio completo de afinación para que tu motor recupere potencia, arranque bien y gaste menos combustible.</span>
           </button>
-          <button class="card service reveal" type="button" data-wa="Afinación menor" data-img="assets/servicios/afinacion-menor.webp" style="--delay:0.06s">
+          <button class="card service reveal" id="servicio-afinacion-menor" type="button" data-wa="Afinación menor" data-img="assets/servicios/afinacion-menor.webp" style="--delay:0.06s">
             <span class="svc-img"><img src="assets/servicios/afinacion-menor.webp" alt="" width="720" height="720" loading="lazy"></span>
             <span class="svc-body">
               <span class="svc-title" data-i18n="s.1.t">Afinación menor</span>
@@ -122,7 +123,7 @@
             </span>
             <span class="svc-desc" hidden data-i18n="s.1.d">Mantenimiento preventivo para mantener tu motor en buen estado entre una afinación mayor y otra.</span>
           </button>
-          <button class="card service reveal" type="button" data-wa="Cambio de aceite y filtros" data-img="assets/servicios/aceite-filtros.webp" style="--delay:0.12s">
+          <button class="card service reveal" id="servicio-aceite-filtros" type="button" data-wa="Cambio de aceite y filtros" data-img="assets/servicios/aceite-filtros.webp" style="--delay:0.12s">
             <span class="svc-img"><img src="assets/servicios/aceite-filtros.webp" alt="" width="720" height="720" loading="lazy"></span>
             <span class="svc-body">
               <span class="svc-title" data-i18n="s.2.t">Cambio de aceite y filtros</span>
@@ -130,7 +131,7 @@
             </span>
             <span class="svc-desc" hidden data-i18n="s.2.d">Aceite y filtros de acuerdo con lo que pide el fabricante de tu vehículo.</span>
           </button>
-          <button class="card service reveal" type="button" data-wa="Frenos" data-img="assets/servicios/frenos.webp" style="--delay:0.08s">
+          <button class="card service reveal" id="servicio-frenos" type="button" data-wa="Frenos" data-img="assets/servicios/frenos.webp" style="--delay:0.08s">
             <span class="svc-img"><img src="assets/servicios/frenos.webp" alt="" width="720" height="720" loading="lazy"></span>
             <span class="svc-body">
               <span class="svc-title" data-i18n="s.3.t">Frenos</span>
@@ -138,7 +139,7 @@
             </span>
             <span class="svc-desc" hidden data-i18n="s.3.d">Revisión y servicio del sistema de frenos para que frenes seguro y sin ruidos.</span>
           </button>
-          <button class="card service reveal" type="button" data-wa="Reparación de motor" data-img="assets/servicios/motor.webp" style="--delay:0.14s">
+          <button class="card service reveal" id="servicio-motor" type="button" data-wa="Reparación de motor" data-img="assets/servicios/motor.webp" style="--delay:0.14s">
             <span class="svc-img"><img src="assets/servicios/motor.webp" alt="" width="720" height="720" loading="lazy"></span>
             <span class="svc-body">
               <span class="svc-title" data-i18n="s.4.t">Reparación de motor</span>
@@ -146,7 +147,7 @@
             </span>
             <span class="svc-desc" hidden data-i18n="s.4.d">Diagnóstico y reparación del motor: fugas, ruidos, pérdida de potencia, sobrecalentamiento y ajuste o reparación general.</span>
           </button>
-          <button class="card service reveal" type="button" data-wa="Reparación de transmisión" data-img="assets/servicios/transmision.webp" style="--delay:0.2s">
+          <button class="card service reveal" id="servicio-transmision" type="button" data-wa="Reparación de transmisión" data-img="assets/servicios/transmision.webp" style="--delay:0.2s">
             <span class="svc-img"><img src="assets/servicios/transmision.webp" alt="" width="720" height="720" loading="lazy"></span>
             <span class="svc-body">
               <span class="svc-title" data-i18n="s.5.t">Reparación de transmisión</span>
@@ -154,7 +155,7 @@
             </span>
             <span class="svc-desc" hidden data-i18n="s.5.d">Diagnóstico y reparación de transmisión automática y estándar: cambios bruscos, patinaje, fugas o ruidos.</span>
           </button>
-          <button class="card service reveal" type="button" data-wa="Suspensión" data-img="assets/servicios/suspension.webp" style="--delay:0.16s">
+          <button class="card service reveal" id="servicio-suspension" type="button" data-wa="Suspensión" data-img="assets/servicios/suspension.webp" style="--delay:0.16s">
             <span class="svc-img"><img src="assets/servicios/suspension.webp" alt="" width="720" height="720" loading="lazy"></span>
             <span class="svc-body">
               <span class="svc-title" data-i18n="s.6.t">Suspensión</span>
@@ -162,7 +163,7 @@
             </span>
             <span class="svc-desc" hidden data-i18n="s.6.d">Diagnóstico y reparación de la suspensión para un manejo estable y cómodo.</span>
           </button>
-          <button class="card service reveal" type="button" data-wa="Diagnóstico electrónico" data-img="assets/servicios/diagnostico.webp" style="--delay:0.22s">
+          <button class="card service reveal" id="servicio-diagnostico" type="button" data-wa="Diagnóstico electrónico" data-img="assets/servicios/diagnostico.webp" style="--delay:0.22s">
             <span class="svc-img"><img src="assets/servicios/diagnostico.webp" alt="" width="720" height="720" loading="lazy"></span>
             <span class="svc-body">
               <span class="svc-title" data-i18n="s.7.t">Diagnóstico electrónico</span>
@@ -170,7 +171,7 @@
             </span>
             <span class="svc-desc" hidden data-i18n="s.7.d">Escaneo computarizado para encontrar la causa de fallas y testigos encendidos en el tablero.</span>
           </button>
-          <button class="card service reveal" type="button" data-wa="Revisión de 20 puntos" data-img="assets/servicios/revision-20-puntos.webp" style="--delay:0.28s">
+          <button class="card service reveal" id="servicio-revision-20-puntos" type="button" data-wa="Revisión de 20 puntos" data-img="assets/servicios/revision-20-puntos.webp" style="--delay:0.28s">
             <span class="svc-img"><img src="assets/servicios/revision-20-puntos.webp" alt="" width="720" height="720" loading="lazy"></span>
             <span class="svc-body">
               <span class="svc-title" data-i18n="s.8.t">Revisión de 20 puntos</span>
@@ -178,7 +179,7 @@
             </span>
             <span class="svc-desc" hidden data-i18n="s.8.d">Inspección general de tu vehículo para detectar a tiempo lo que necesita atención.</span>
           </button>
-          <button class="card service reveal" type="button" data-wa="Cambio de batería" data-img="assets/servicios/bateria.webp" style="--delay:0.24s">
+          <button class="card service reveal" id="servicio-bateria" type="button" data-wa="Cambio de batería" data-img="assets/servicios/bateria.webp" style="--delay:0.24s">
             <span class="svc-img"><img src="assets/servicios/bateria.webp" alt="" width="720" height="720" loading="lazy"></span>
             <span class="svc-body">
               <span class="svc-title" data-i18n="s.9.t">Cambio de batería</span>
@@ -186,7 +187,7 @@
             </span>
             <span class="svc-desc" hidden data-i18n="s.9.d">Revisión del sistema de carga y cambio de batería cuando hace falta.</span>
           </button>
-          <button class="card service reveal" type="button" data-wa="Rotación y balanceo" data-img="assets/servicios/rotacion-balanceo.webp" style="--delay:0.3s">
+          <button class="card service reveal" id="servicio-rotacion-balanceo" type="button" data-wa="Rotación y balanceo" data-img="assets/servicios/rotacion-balanceo.webp" style="--delay:0.3s">
             <span class="svc-img"><img src="assets/servicios/rotacion-balanceo.webp" alt="" width="720" height="720" loading="lazy"></span>
             <span class="svc-body">
               <span class="svc-title" data-i18n="s.10.t">Rotación y balanceo</span>
@@ -306,6 +307,7 @@
   </div>
   <div class="toasts" id="toasts" aria-live="polite"></div>
   <script src="assets/i18n-en.js"></script>
+
   <script src="assets/app.js"></script>
 </body>
 </html>

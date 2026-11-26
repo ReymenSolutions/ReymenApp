@@ -123,6 +123,7 @@ describe("workshop tenant integration", () => {
     await submitWolfInquiry(orgA.id, { ...input, requestKey: crypto.randomUUID(), phone: "8110000001" });
     expect((await prisma.customer.findUniqueOrThrow({ where: { id: customerA.id } })).leadId).toBeNull();
     const publicInput = { ...input, requestKey: crypto.randomUUID(), phone: "8110000002", maintenanceConsent: false };
+    const optionalInput = { ...publicInput, requestKey: crypto.randomUUID(), phone: "8110000003", placas: null, kilometraje: null };
     process.env.WORKSHOP_WOLF_SITE_ORIGIN = "https://wolftest.example";
     process.env.WORKSHOP_WOLF_LANDING_ENABLED = "true";
     process.env.WORKSHOP_WOLF_ORG_ID = orgA.id;
@@ -131,6 +132,17 @@ describe("workshop tenant integration", () => {
       expect((await submitPublicInquiry(requestFromSite())).status).toBe(200);
       expect((await submitPublicInquiry(requestFromSite())).status).toBe(200);
       expect(await prisma.lead.count({ where: { organizationId: orgA.id, externalId: `workshop:${publicInput.requestKey}` } })).toBe(1);
+      const optionalResponse = await submitPublicInquiry(new Request("http://localhost/api/workshop/public/inquiries", { method: "POST", headers: { origin: "https://wolftest.example", "content-type": "application/json" }, body: JSON.stringify(optionalInput) }));
+      expect(optionalResponse.status).toBe(200);
+      const optionalRequest = await prisma.workshopLeadRequest.findUniqueOrThrow({ where: { organizationId_requestKey: { organizationId: orgA.id, requestKey: optionalInput.requestKey } } });
+      expect(optionalRequest.placas).toBeNull();
+      expect(optionalRequest.kilometraje).toBeNull();
+      await expect(createWorkshopVehicleFromRequest(optionalRequest.id, "3N1CN7AP9ML812346", true)).rejects.toThrow(/placas/i);
+      await expect(createWorkshopVehicleFromRequest(optionalRequest.id, "3N1CN7AP9ML812346", true, "WOLF 8")).rejects.toThrow(/kilometraje/i);
+      const completed = await createWorkshopVehicleFromRequest(optionalRequest.id, "3N1CN7AP9ML812346", true, "WOLF 8", "50,000");
+      const completedVehicle = await prisma.workshopVehicle.findUniqueOrThrow({ where: { id: completed.id } });
+      expect(completedVehicle.placas).toBe("WOLF8");
+      expect(completedVehicle.kilometrajeActual).toBe(50000);
       expect((await submitPublicInquiry(new Request("http://localhost/api/workshop/public/inquiries", { method: "POST", headers: { origin: "https://otro.example" }, body: JSON.stringify(publicInput) }))).status).toBe(403);
     } finally {
       delete process.env.WORKSHOP_WOLF_SITE_ORIGIN;
