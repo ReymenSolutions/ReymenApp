@@ -483,6 +483,18 @@ h1, h2, h3 { margin: 0; line-height: 1.05; letter-spacing: -.01em; }
 .search-input { position: relative; }
 .search-input svg { position: absolute; left: 13px; top: 50%; width: 19px; height: 19px; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 .field .search-input input { padding-left: 42px; }
+.vehicle-picker input { padding-right: 47px; }
+.vehicle-picker-toggle { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 42px; height: 42px; border: 0; background: transparent; color: var(--fg); font-size: 1.6rem; cursor: pointer; }
+.vehicle-picker-options { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; right: 0; max-height: 230px; overflow-y: auto; padding: 6px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--bg); box-shadow: 0 12px 30px #0003; }
+.vehicle-picker-option { display: block; width: 100%; padding: 10px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--fg); text-align: left; font: inherit; cursor: pointer; }
+.vehicle-picker-option:hover, .vehicle-picker-option:focus-visible { background: var(--line); }
+.vehicle-picker-empty { display: block; padding: 10px 12px; color: var(--muted); font-size: .85rem; }
+.vehicle-picker-options[hidden], #quote-form[hidden], #quote-success[hidden] { display: none; }
+.quote-success { margin-top: 22px; padding: clamp(30px, 7vw, 58px); text-align: center; }
+.quote-success-icon { display: grid; place-items: center; width: 72px; height: 72px; margin: 0 auto 20px; border-radius: 50%; background: #16a34a; color: white; font-size: 2.4rem; font-weight: 800; }
+.quote-success h2 { margin: 0 0 12px; font-size: clamp(1.8rem, 5vw, 2.6rem); }
+.quote-success p { max-width: 44ch; margin: 0 auto 24px; color: var(--muted); }
+.quote-success .btn { margin: 0 auto; }
 .field input, .field textarea {
   width: 100%; font: inherit; color: var(--fg); background: var(--bg);
   border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding: 13px 15px; min-height: 50px;

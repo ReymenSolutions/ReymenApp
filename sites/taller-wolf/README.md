@@ -2,6 +2,8 @@
 
 La fuente del sitio es el ZIP v8 entregado por el cliente. `v8/` es el sitio estático completo; `herramientas/paginas-v8.js` genera los nueve HTML, `v8/assets/i18n-en.js` y `v8/assets/vehicle-catalog.js`. Las sugerencias de marca y modelo se editan en `src/lib/workshop/vehicle-catalog.json`, compartido con el formulario de Workshop; se permite escribir marcas y modelos fuera de la lista. `v0`–`v7` no se importaron. No edites los archivos generados directamente.
 
+Marca y modelo usan una lista visible con búsqueda en vez de `datalist` por compatibilidad con Safari móvil. La confirmación de recepción reemplaza el formulario con una tarjeta y un botón para volver a cotizar. Las solicitudes recibidas se consultan en Workshop → Cotizaciones; los datos de servicio/vehículo permanecen en `WorkshopLeadRequest` y no son aún una cotización con precio.
+
 Desde esta carpeta:
 
 ```bash

@@ -92,6 +92,19 @@ export async function createWorkshopVehicle(input: z.input<typeof vehicleInput>)
 }
 
 /** Convierte una solicitud pública tras verificar los datos que exige una ficha completa. */
+export async function markWorkshopRequestViewed(requestId: string) {
+  const { orgId, userId } = await requireWorkshopOwner();
+  const result = await prisma.workshopLeadRequest.updateMany({
+    where: { id: requestId, organizationId: orgId, viewedAt: null },
+    data: { viewedAt: new Date(), viewedById: userId },
+  });
+  if (result.count) {
+    await logAudit({ organizationId: orgId, userId, action: "workshop.inquiry.view", resource: "WorkshopLeadRequest", resourceId: requestId });
+  }
+  revalidatePath("/portal/workshop");
+  return { updated: result.count > 0 };
+}
+
 export async function createWorkshopVehicleFromRequest(requestId: string, rawVin: string, confirmedIdentity: boolean, rawPlacas?: string, rawKilometraje?: string) {
   const { orgId, userId } = await requireWorkshopOwner();
   if (confirmedIdentity !== true) throw new UserError("Verifica la identidad del cliente antes de vincular la solicitud");

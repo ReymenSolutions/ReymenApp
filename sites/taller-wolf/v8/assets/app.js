@@ -474,17 +474,37 @@
   if (form) {
     var fields = { nombre: "nombre", telefono: "telefono", marca: "marca", modelo: "modelo", anio: "anio", placas: "placas", kilometraje: "km", falla: "falla" };
     var vehicleCatalog = window.TW_VEHICLES || {}, makeList = $("#vehicle-makes"), modelList = $("#vehicle-models");
-    var addOption = function (list, value) { var option = document.createElement("option"); option.value = value; list.appendChild(option); };
-    Object.keys(vehicleCatalog).forEach(function (make) { addOption(makeList, make); });
+    function closePicker(input, list) { list.hidden = true; input.setAttribute("aria-expanded", "false"); }
+    function showPicker(input, list, options, choose) {
+      var term = input.value.trim().toLocaleLowerCase();
+      list.replaceChildren();
+      options.filter(function (option) { return option.toLocaleLowerCase().includes(term); }).slice(0, 40).forEach(function (option) {
+        var button = document.createElement("button"); button.type = "button"; button.className = "vehicle-picker-option"; button.setAttribute("role", "option"); button.textContent = option;
+        button.addEventListener("mousedown", function (event) { event.preventDefault(); });
+        button.addEventListener("click", function () { input.value = option; choose(); closePicker(input, list); input.focus(); });
+        list.appendChild(button);
+      });
+      if (!list.children.length) { var note = document.createElement("span"); note.className = "vehicle-picker-empty"; note.textContent = options.length ? (lang === "es" ? "Puedes escribir una opción nueva" : "You can type a new option") : (lang === "es" ? "Selecciona primero la marca" : "Choose a make first"); list.appendChild(note); }
+      list.hidden = false; input.setAttribute("aria-expanded", "true");
+    }
     var selectedMake = $("#f-marca").value.trim();
     var updateModels = function () {
       var current = $("#f-marca").value.trim();
       var match = Object.keys(vehicleCatalog).find(function (make) { return make.toLowerCase() === current.toLowerCase(); }) || "";
       if (selectedMake !== current) { $("#f-modelo").value = ""; selectedMake = current; }
-      modelList.replaceChildren();
-      if (match) vehicleCatalog[match].forEach(function (model) { addOption(modelList, model); });
+      closePicker($("#f-modelo"), modelList);
+      return match ? vehicleCatalog[match] : [];
     };
-    $("#f-marca").addEventListener("input", updateModels);
+    var makeInput = $("#f-marca"), modelInput = $("#f-modelo");
+    makeInput.addEventListener("input", function () { updateModels(); showPicker(makeInput, makeList, Object.keys(vehicleCatalog), updateModels); });
+    modelInput.addEventListener("input", function () { showPicker(modelInput, modelList, updateModels(), function () {}); });
+    [[makeInput, makeList, function () { return Object.keys(vehicleCatalog); }, updateModels], [modelInput, modelList, updateModels, function () {}]].forEach(function (picker) {
+      var input = picker[0], list = picker[1], options = picker[2], choose = picker[3];
+      input.addEventListener("focus", function () { showPicker(input, list, options(), choose); });
+      input.addEventListener("keydown", function (event) { if (event.key === "Escape") closePicker(input, list); });
+      input.addEventListener("blur", function () { setTimeout(function () { closePicker(input, list); }, 180); });
+      input.parentNode.querySelector(".vehicle-picker-toggle").addEventListener("click", function () { if (list.hidden) { showPicker(input, list, options(), choose); input.focus(); } else closePicker(input, list); });
+    });
     updateModels();
     var maxYear = new Date().getFullYear() + 1, LIMIT_MS = 30000, MIN_FILL_MS = 3000, openedAt = Date.now();
     var fieldInput = function (k) { return document.getElementById("f-" + fields[k]); };
@@ -512,7 +532,8 @@
     // al cambiar de idioma, los errores visibles se vuelven a escribir en el idioma nuevo
     langListeners.push(function () { Object.keys(fields).forEach(function (k) { if (fieldInput(k).getAttribute("aria-invalid") === "true") check(k); }); });
     var consentBox = $("#f-consent"), consentErr = $("#e-consent");
-    var submitButton = form.querySelector('button[type="submit"]'), status = $("#quote-status");
+    var submitButton = form.querySelector('button[type="submit"]'), status = $("#quote-status"), successPanel = $("#quote-success");
+    $("#quote-again").addEventListener("click", function () { successPanel.hidden = true; form.hidden = false; status.hidden = true; form.scrollIntoView({ behavior: reduceMotion ? "instant" : "smooth", block: "start" }); $("#f-nombre").focus({ preventScroll: true }); });
     var requestKey = null, requestSignature = null, pending = false;
     form.addEventListener("submit", async function (e) {
       e.preventDefault();
@@ -552,7 +573,11 @@
         requestKey = null;
         requestSignature = null;
         form.reset();
-        status.textContent = t("sent");
+        updateModels();
+        form.hidden = true;
+        successPanel.hidden = false;
+        successPanel.scrollIntoView({ behavior: reduceMotion ? "instant" : "smooth", block: "center" });
+        successPanel.querySelector("h2").focus({ preventScroll: true });
       } catch (error) {
         status.textContent = t("sendUnconfirmed");
       } finally {

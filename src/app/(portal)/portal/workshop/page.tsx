@@ -16,13 +16,14 @@ import { WorkshopRequests } from "@/components/workshop/WorkshopRequests";
 import { WorkshopSettingsForm } from "@/components/workshop/WorkshopSettingsForm";
 import { WorkshopServices } from "@/components/workshop/WorkshopServices";
 
-type Tab = "panel" | "quotes" | "orders" | "vehicles" | "inventory" | "purchases" | "cash" | "settings";
+type Tab = "panel" | "quotes" | "orders" | "vehicles" | "contacts" | "inventory" | "purchases" | "cash" | "settings";
 
 const TABS: { id: Tab; es: string; en: string; financial?: boolean }[] = [
   { id: "panel", es: "Panel", en: "Overview", financial: true },
-  { id: "quotes", es: "Cotizaciones", en: "Quotes", financial: true },
+  { id: "quotes", es: "Cotizaciones", en: "Quotes" },
   { id: "orders", es: "Órdenes", en: "Orders" },
   { id: "vehicles", es: "Vehículos", en: "Vehicles" },
+  { id: "contacts", es: "Contactos", en: "Contacts" },
   { id: "inventory", es: "Inventario", en: "Inventory", financial: true },
   { id: "purchases", es: "Compras", en: "Purchases", financial: true },
   { id: "cash", es: "Caja", en: "Cash", financial: true },
@@ -35,7 +36,7 @@ function checklistField(value: Prisma.JsonValue | null, key: string): string {
   return typeof field === "string" ? field : "";
 }
 
-export default async function WorkshopPage({ searchParams }: { searchParams: Promise<{ tab?: string; requestId?: string }> }) {
+export default async function WorkshopPage({ searchParams }: { searchParams: Promise<{ tab?: string; requestId?: string; q?: string }> }) {
   const ctx = await getWorkshopContext();
   const es = ctx.lang === "es";
   const query = await searchParams;
@@ -43,6 +44,12 @@ export default async function WorkshopPage({ searchParams }: { searchParams: Pro
   const tab = TABS.find((item) => item.id === selected) ?? TABS[0];
   if (tab.financial && !ctx.canManageFinancials) redirect("/portal/workshop?tab=orders");
   const tabs = TABS.filter((item) => ctx.canManageFinancials || !item.financial);
+  const contactSearch = (query.q ?? "").trim().slice(0, 60);
+  const contactFilter = contactSearch ? { OR: [{ name: { contains: contactSearch, mode: "insensitive" as const } }, { phone: { contains: contactSearch } }] } : {};
+  const [contactCustomers, contactLeads] = tab.id === "contacts" ? await Promise.all([
+    prisma.customer.findMany({ where: { organizationId: ctx.organizationId, ...contactFilter }, select: { id: true, name: true, phone: true, workshopVehicles: { select: { id: true, marca: true, modelo: true, anio: true, placas: true }, take: 5, orderBy: { createdAt: "desc" } } }, take: 50, orderBy: { createdAt: "desc" } }),
+    prisma.lead.findMany({ where: { organizationId: ctx.organizationId, deletedAt: null, ...contactFilter }, select: { id: true, name: true, phone: true, source: true }, take: 50, orderBy: { createdAt: "desc" } }),
+  ]) : [[], []];
 
   const counts = tab.id === "panel" ? await Promise.all([
     prisma.workshopWorkOrder.count({ where: { organizationId: ctx.organizationId, estado: { notIn: ["ENTREGADA", "CANCELADA"] } } }),
@@ -67,8 +74,8 @@ export default async function WorkshopPage({ searchParams }: { searchParams: Pro
   const customers = tab.id === "vehicles" && ctx.canManageFinancials
     ? await prisma.customer.findMany({ where: { organizationId: ctx.organizationId }, select: { id: true, name: true, phone: true }, orderBy: { createdAt: "desc" }, take: 200 })
     : [];
-  const pendingRequests = tab.id === "vehicles" && ctx.canManageFinancials
-    ? await prisma.workshopLeadRequest.findMany({ where: { organizationId: ctx.organizationId, vehicleId: null }, select: { id: true, placas: true, marca: true, modelo: true, anio: true, kilometraje: true, servicioFalla: true, lead: { select: { name: true, phone: true } } }, orderBy: { createdAt: "desc" }, take: 50 })
+  const workshopRequests = tab.id === "quotes"
+    ? await prisma.workshopLeadRequest.findMany({ where: { organizationId: ctx.organizationId }, select: { id: true, vehicleId: true, viewedAt: true, createdAt: true, placas: true, marca: true, modelo: true, anio: true, kilometraje: true, servicioFalla: true, lead: { select: { id: true, name: true, phone: true } } }, orderBy: { createdAt: "desc" }, take: 50 })
     : [];
   const quoteRequest = tab.id === "quotes" && ctx.canManageFinancials && query.requestId
     ? await prisma.workshopLeadRequest.findFirst({ where: { id: query.requestId, organizationId: ctx.organizationId, vehicleId: { not: null } }, select: { vehicleId: true, servicioFalla: true } })
@@ -135,7 +142,8 @@ export default async function WorkshopPage({ searchParams }: { searchParams: Pro
       ].map(([label, value], index) => <div key={String(label)} className={`rounded-xl border border-slate-200 bg-white p-4 ${index === 4 ? "col-span-2 lg:col-span-1" : ""}`}><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold text-slate-900">{value}</p></div>)}</div>}
       {balance !== null && <div className="grid grid-cols-2 gap-3"><div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">{es ? "Balance de caja" : "Cash balance"}</p><p className="text-xl font-bold">${balance.toFixed(2)} MXN</p></div><div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">{es ? "Ingresos de hoy" : "Today's income"}</p><p className="text-xl font-bold">${(cashTotals?.[2]._sum.monto ?? new Prisma.Decimal(0)).toFixed(2)} MXN</p></div></div>}
       {tab.id === "vehicles" && ctx.canManageFinancials && <CreateVehicleForm lang={ctx.lang} customers={customers} />}
-      {tab.id === "vehicles" && ctx.canManageFinancials && <WorkshopRequests lang={ctx.lang} requests={pendingRequests} />}
+      {tab.id === "quotes" && <WorkshopRequests lang={ctx.lang} requests={workshopRequests} canManage={ctx.canManageFinancials} />}
+      {tab.id === "contacts" && <section className="rounded-xl border border-slate-200 bg-white p-4"><h2 className="font-semibold text-slate-900">{es ? "Contactos del taller" : "Workshop contacts"}</h2><p className="mt-1 text-xs text-slate-600">{es ? "Clientes y prospectos del CRM de este negocio. La ficha del vehículo y las solicitudes se mantienen dentro de Workshop." : "Customers and leads from this business's CRM. Vehicle records and requests stay inside Workshop."}</p><form method="get" className="mt-3 flex gap-2"><input type="hidden" name="tab" value="contacts" /><input name="q" defaultValue={contactSearch} aria-label={es ? "Buscar contacto" : "Search contact"} placeholder={es ? "Nombre o teléfono" : "Name or phone"} className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm" /><button className="rounded-md bg-[#063C82] px-4 py-2 text-sm font-semibold text-white">{es ? "Buscar" : "Search"}</button></form><div className="mt-4 grid gap-4 lg:grid-cols-2"><div><h3 className="font-semibold">{es ? "Clientes registrados" : "Registered customers"}</h3><ul className="mt-2 divide-y divide-slate-100">{contactCustomers.map((person) => <li key={person.id} className="py-3 text-sm"><p className="font-medium text-slate-900">{person.name || (es ? "Sin nombre" : "No name")}</p><a href={`tel:${person.phone}`} className="text-blue-800 underline">{person.phone}</a>{person.workshopVehicles.map((vehicle) => <p key={vehicle.id} className="mt-1"><Link href={`/portal/workshop/vehicles/${vehicle.id}`} className="text-blue-800 underline">{vehicle.marca} {vehicle.modelo} {vehicle.anio} · {vehicle.placas || "—"}</Link></p>)}</li>)}</ul>{!contactCustomers.length && <p className="mt-2 text-sm text-slate-500">{es ? "Sin clientes para esta búsqueda" : "No customers found"}</p>}</div><div><h3 className="font-semibold">{es ? "Prospectos" : "Leads"}</h3><ul className="mt-2 divide-y divide-slate-100">{contactLeads.map((person) => <li key={person.id} className="py-3 text-sm"><p className="font-medium text-slate-900">{person.name}</p><p className="text-slate-600">{person.phone || "—"}{person.source === "landing" ? (es ? " · Solicitud web" : " · Website request") : ""}</p></li>)}</ul>{!contactLeads.length && <p className="mt-2 text-sm text-slate-500">{es ? "Sin prospectos para esta búsqueda" : "No leads found"}</p>}</div></div></section>}
       {tab.id === "settings" && ctx.canManageFinancials && <WorkshopSettingsForm lang={ctx.lang} defaults={settings ?? { vigenciaDias: 15, garantiaDias: 90, garantiaKm: 5000 }} />}
       {tab.id === "settings" && ctx.canManageFinancials && <WorkshopServices lang={ctx.lang} services={services.map((service) => ({ ...service, costoNeto: service.costoNeto?.toFixed(2) ?? "", precioVentaNeto: service.precioVentaNeto?.toFixed(2) ?? "" }))} />}
       {tab.id === "quotes" && ctx.canManageFinancials && <CreateQuoteForm key={query.requestId ?? "new"} lang={ctx.lang} vehicles={quoteVehicles} parts={quoteParts.map((part) => ({ ...part, precioVentaNeto: part.precioVentaNeto.toString(), costoNeto: part.costoNeto.toString() }))} services={quoteServices.map((service) => ({ ...service, precioVentaNeto: service.precioVentaNeto?.toFixed(2) ?? "", costoNeto: service.costoNeto?.toFixed(2) ?? "" }))} initialVehicleId={quoteRequest?.vehicleId ?? undefined} initialService={quoteRequest?.servicioFalla} />}

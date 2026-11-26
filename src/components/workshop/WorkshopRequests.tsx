@@ -2,17 +2,25 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
-import { createWorkshopVehicleFromRequest } from "@/actions/workshop";
+import { createWorkshopVehicleFromRequest, markWorkshopRequestViewed } from "@/actions/workshop";
 import { getErrorMessage } from "@/lib/user-error";
 
-type RequestRow = { id: string; placas: string | null; marca: string; modelo: string; anio: number; kilometraje: number | null; servicioFalla: string; lead: { name: string; phone: string | null } };
+type RequestRow = { id: string; vehicleId: string | null; viewedAt: Date | null; createdAt: Date; placas: string | null; marca: string; modelo: string; anio: number; kilometraje: number | null; servicioFalla: string; lead: { id: string; name: string; phone: string | null } };
 
-export function WorkshopRequests({ lang, requests }: { lang: string; requests: RequestRow[] }) {
+export function WorkshopRequests({ lang, requests, canManage }: { lang: string; requests: RequestRow[]; canManage: boolean }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const es = lang === "es";
-  if (!requests.length) return null;
+  async function markViewed(requestId: string) {
+    setBusyId(requestId);
+    try {
+      await markWorkshopRequestViewed(requestId);
+      router.refresh();
+    } catch (error) { toast.error(getErrorMessage(error, es ? "No se pudo marcar como vista" : "Could not mark as viewed")); }
+    finally { setBusyId(null); }
+  }
 
   async function convert(event: React.FormEvent<HTMLFormElement>, requestId: string) {
     event.preventDefault();
@@ -29,15 +37,18 @@ export function WorkshopRequests({ lang, requests }: { lang: string; requests: R
   }
 
   return <section className="rounded-xl border border-slate-200 bg-white p-4">
-    <h2 className="font-semibold text-slate-900">{es ? "Solicitudes de la landing" : "Landing requests"}</h2>
-    <p className="mt-1 text-xs text-slate-600">{es ? "Verifica la identidad y confirma el VIN. El teléfono enviado desde la landing no está verificado." : "Verify identity and confirm the VIN. The phone number submitted on the landing page is unverified."}</p>
-    <ul className="mt-3 divide-y divide-slate-100">{requests.map((request) => <li key={request.id} className="py-3 text-sm">
-      <p className="font-semibold text-slate-900">{request.lead.name} · {request.placas ?? (es ? "Placas pendientes" : "Plates pending")} · {request.marca} {request.modelo} {request.anio}</p>
-      <p className="text-slate-600">{request.lead.phone ?? "—"} · {request.kilometraje == null ? (es ? "Kilometraje pendiente" : "Mileage pending") : `${request.kilometraje} km`} · {request.servicioFalla}</p>
-      <form onSubmit={(event) => convert(event, request.id)} className="mt-2 flex flex-wrap gap-2"><input name="vin" aria-label="VIN" required minLength={11} maxLength={17} placeholder="VIN" className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm" />
+    <h2 className="font-semibold text-slate-900">{es ? "Solicitudes recibidas desde la web" : "Requests received from the website"}</h2>
+    <p className="mt-1 text-xs text-slate-600">{canManage ? (es ? "Estas solicitudes aún no son cotizaciones con precio. Revisa los datos, verifica la identidad y crea el vehículo antes de cotizar." : "These requests are not priced quotes yet. Review the details, verify identity, and create the vehicle before quoting.") : (es ? "Solicitudes de clientes para revisar. El administrador prepara la cotización y sus precios." : "Customer requests to review. An administrator prepares the priced quote.")}</p>
+    {!requests.length && <p className="mt-3 text-sm text-slate-600">{es ? "Todavía no hay solicitudes de la web." : "There are no website requests yet."}</p>}
+    <ul className="mt-3 divide-y divide-slate-100">{requests.map((request) => <li key={request.id} className="py-4 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold text-slate-900">{request.lead.name} · {request.marca} {request.modelo} {request.anio}</p><span className={`rounded-full px-2 py-1 text-xs font-semibold ${request.vehicleId ? "bg-blue-100 text-blue-800" : request.viewedAt ? "bg-slate-100 text-slate-700" : "bg-emerald-100 text-emerald-800"}`}>{request.vehicleId ? (es ? "Vehículo creado" : "Vehicle created") : request.viewedAt ? (es ? "Vista" : "Viewed") : (es ? "Nueva" : "New")}</span></div>
+      <p className="mt-1 text-slate-600">{request.createdAt.toLocaleDateString(es ? "es-MX" : "en-US")} · {request.lead.phone ?? "—"} · {request.placas ?? (es ? "Placas pendientes" : "Plates pending")} · {request.kilometraje == null ? (es ? "Kilometraje pendiente" : "Mileage pending") : `${request.kilometraje} km`}</p>
+      <p className="mt-2 rounded-md bg-slate-50 p-2 text-slate-800"><span className="font-medium">{es ? "Servicio o falla: " : "Service or issue: "}</span>{request.servicioFalla}</p>
+      {canManage && <div className="mt-2 flex flex-wrap items-center gap-3"><Link href={`/portal/leads/${request.lead.id}`} className="text-xs font-semibold text-blue-800 underline">{es ? "Ver contacto en CRM" : "View CRM contact"}</Link>{!request.viewedAt && !request.vehicleId && <button type="button" disabled={busyId !== null} onClick={() => markViewed(request.id)} className="text-xs font-semibold text-blue-800 underline disabled:opacity-50">{es ? "Marcar como vista" : "Mark as viewed"}</button>}{request.vehicleId && <Link href={`/portal/workshop?tab=quotes&requestId=${encodeURIComponent(request.id)}`} className="text-xs font-semibold text-blue-800 underline">{es ? "Crear cotización" : "Create quote"}</Link>}</div>}
+      {canManage && !request.vehicleId && <><p className="mt-3 text-xs text-slate-600">{es ? "Para crear el vehículo, confirma VIN, placas, kilometraje e identidad. El teléfono de la web no está verificado." : "To create the vehicle, confirm VIN, plate, mileage, and identity. The website phone is unverified."}</p><form onSubmit={(event) => convert(event, request.id)} className="mt-2 flex flex-wrap gap-2"><input name="vin" aria-label="VIN" required minLength={11} maxLength={17} placeholder="VIN" className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm" />
         {!request.placas && <input name="placas" aria-label={es ? "Placas" : "License plate"} required minLength={4} maxLength={12} placeholder={es ? "Placas" : "License plate"} className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm" />}
         {request.kilometraje == null && <input name="kilometraje" aria-label={es ? "Kilometraje" : "Mileage"} required inputMode="numeric" pattern="[0-9,. ]+" placeholder={es ? "Kilometraje" : "Mileage"} className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm" />}
-        <label className="flex w-full items-center gap-2 text-xs"><input name="confirmedIdentity" type="checkbox" required />{es ? "Verifiqué la identidad y que este vehículo pertenece al cliente" : "I verified the identity and that this vehicle belongs to the customer"}</label><button disabled={busyId !== null} className="rounded-md bg-[#063C82] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{es ? "Crear cliente y vehículo" : "Create customer and vehicle"}</button></form>
+        <label className="flex w-full items-center gap-2 text-xs"><input name="confirmedIdentity" type="checkbox" required />{es ? "Verifiqué la identidad y que este vehículo pertenece al cliente" : "I verified the identity and that this vehicle belongs to the customer"}</label><button disabled={busyId !== null} className="rounded-md bg-[#063C82] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{es ? "Crear cliente y vehículo" : "Create customer and vehicle"}</button></form></>}
     </li>)}</ul>
   </section>;
 }
