@@ -13,6 +13,8 @@ const EN: Record<string, string> = {
   "Ya existe un servicio con ese nombre": "A service with that name already exists",
   "Verifica la identidad del cliente antes de vincular la solicitud": "Verify the customer's identity before linking the request",
   "Revisa los datos del vehículo": "Check the vehicle details",
+  "Captura las placas antes de crear el vehículo": "Enter the license plate before creating the vehicle",
+  "Captura el kilometraje antes de crear el vehículo": "Enter the mileage before creating the vehicle",
   "Cliente del CRM no encontrado en tu organización": "CRM customer not found in your organization",
   "Las placas o el VIN ya están registrados; reutiliza ese vehículo": "The license plate or VIN is already registered; use that vehicle",
   "Revisa los datos de la cotización": "Check the quote details",
