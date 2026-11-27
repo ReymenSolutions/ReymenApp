@@ -10,8 +10,8 @@ export function WorkshopTabs({ tabs, selected, lang, pending }: { tabs: Tab[]; s
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const es = lang === "es";
-  const primary = tabs.slice(0, 4);
-  const more = tabs.slice(4);
+  const primary = tabs.slice(0, 3);
+  const more = tabs.slice(3);
   const activeMore = more.find((tab) => tab.id === selected);
   useEffect(() => {
     if (!open) return;
