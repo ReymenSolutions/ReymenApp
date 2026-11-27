@@ -59,6 +59,8 @@ const EN: Record<string, string> = {
   "Captura un VIN válido para crear el vehículo": "Enter a valid VIN to create the vehicle",
   "Solicitud del taller no disponible": "Workshop request unavailable",
   "Solicitud del taller no disponible para cotizar": "Workshop request unavailable for a quote",
+  "Revisa la opción de IVA": "Check the VAT option",
+  "Solo puedes cambiar el IVA antes de emitir el folio": "You can change VAT only before issuing the quote number",
   "El VIN debe tener 17 caracteres válidos o quedar vacío": "The VIN must have 17 valid characters or be left blank",
   "Revisa el kilometraje": "Check the mileage",
   "Revisa las placas o déjalas vacías": "Check the plates or leave them blank",

@@ -10,7 +10,7 @@ vi.mock("@/lib/auth", () => ({ auth }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
 
-const { createWorkshopVehicle, createWorkshopQuote, issueWorkshopQuote, markWorkshopQuoteSent, approveWorkshopQuote, convertWorkshopQuote, createWorkshopPart, createWorkshopPurchase, getWorkshopPartStock, saveWorkshopReception, advanceWorkshopOrder, addWorkshopAuthorizedLine, recordWorkshopOrderPayment, authorizeWorkshopCredit, deliverWorkshopOrder, setWorkshopInvoiceRequested, saveWorkshopSettings, setWorkshopNextService, saveWorkshopService } = await import("./workshop");
+const { createWorkshopVehicle, createWorkshopQuote, setWorkshopQuoteIva, issueWorkshopQuote, markWorkshopQuoteSent, approveWorkshopQuote, convertWorkshopQuote, createWorkshopPart, createWorkshopPurchase, getWorkshopPartStock, saveWorkshopReception, advanceWorkshopOrder, addWorkshopAuthorizedLine, recordWorkshopOrderPayment, authorizeWorkshopCredit, deliverWorkshopOrder, setWorkshopInvoiceRequested, saveWorkshopSettings, setWorkshopNextService, saveWorkshopService } = await import("./workshop");
 const { seedWorkshopServices } = await import("@/lib/workshop/services");
 const { GET: downloadQuotePdf } = await import("@/app/api/workshop/quotes/[id]/pdf/route");
 const { GET: downloadOrderPdf } = await import("@/app/api/workshop/orders/[id]/pdf/route");
@@ -201,7 +201,17 @@ describe("workshop tenant integration", () => {
     expect(saved.total.toFixed(2)).toBe("100.00");
     expect(saved.utilidadNeta?.toFixed(2)).toBe("60.00");
     expect(saved.items[0].ivaImporte.toFixed(2)).toBe("0.00");
+    await setWorkshopQuoteIva(quote.id, true);
+    expect((await prisma.workshopQuote.findUniqueOrThrow({ where: { id: quote.id } })).total.toFixed(2)).toBe("116.00");
+    await setWorkshopQuoteIva(quote.id, false);
+    expect((await prisma.workshopQuote.findUniqueOrThrow({ where: { id: quote.id } })).total.toFixed(2)).toBe("100.00");
+    auth.mockResolvedValue({ user: { id: ownerId, role: "AGENT", organizationId: orgA.id } });
+    await expect(setWorkshopQuoteIva(quote.id, true)).rejects.toThrow(/No autorizado/i);
+    auth.mockResolvedValue({ user: { id: ownerId, role: "OWNER", organizationId: orgB.id } });
+    await expect(setWorkshopQuoteIva(quote.id, true)).rejects.toThrow(/folio/i);
+    auth.mockResolvedValue({ user: { id: ownerId, role: "OWNER", organizationId: orgA.id } });
     await issueWorkshopQuote(quote.id);
+    await expect(setWorkshopQuoteIva(quote.id, true)).rejects.toThrow(/folio/i);
     await markWorkshopQuoteSent(quote.id);
     await approveWorkshopQuote(quote.id, "WhatsApp");
     const order = await convertWorkshopQuote(quote.id);

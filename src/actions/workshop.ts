@@ -268,6 +268,27 @@ export async function createWorkshopQuote(input: z.input<typeof quoteInput>) {
   return { id: quote.id };
 }
 
+/** Permite corregir el tratamiento de IVA solo mientras la oferta sigue en borrador sin folio. */
+export async function setWorkshopQuoteIva(quoteId: string, incluyeIva: boolean) {
+  const { orgId, userId } = await requireWorkshopOwner();
+  if (typeof incluyeIva !== "boolean") throw new UserError("Revisa la opción de IVA");
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "WorkshopQuote" WHERE id = ${quoteId} AND "organizationId" = ${orgId} FOR UPDATE`;
+    const quote = await tx.workshopQuote.findFirst({ where: { id: quoteId, organizationId: orgId }, include: { items: { orderBy: { createdAt: "asc" } } } });
+    if (!quote || quote.estado !== "BORRADOR" || quote.folio) throw new UserError("Solo puedes cambiar el IVA antes de emitir el folio");
+    if (quote.incluyeIva === incluyeIva) return false;
+    const totals = calculateNetLines(quote.items.map((item) => ({ cantidad: item.cantidad.toString(), precioUnitarioNeto: item.precioUnitarioNeto.toFixed(2), costoUnitarioNeto: item.costoUnitarioNeto?.toFixed(2) ?? null })), incluyeIva);
+    for (const [index, item] of quote.items.entries()) {
+      await tx.workshopQuoteItem.update({ where: { id: item.id }, data: { importeNeto: totals.lines[index].importeNeto, ivaImporte: totals.lines[index].ivaImporte, importeConIva: totals.lines[index].importeConIva } });
+    }
+    await tx.workshopQuote.update({ where: { id: quoteId }, data: { incluyeIva, subtotalNeto: totals.subtotalNeto, iva: totals.iva, total: totals.total, costoTotalNeto: totals.costoTotalNeto, utilidadNeta: totals.utilidadNeta } });
+    return true;
+  });
+  if (updated) await logAudit({ organizationId: orgId, userId, action: "workshop.quote.iva.update", resource: "WorkshopQuote", resourceId: quoteId, metadata: { incluyeIva } });
+  revalidatePath("/portal/workshop");
+  return { updated };
+}
+
 async function requireWorkshopOwner() {
   const session = await auth();
   const orgId = session?.user.organizationId;
