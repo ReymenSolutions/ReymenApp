@@ -193,7 +193,7 @@ describe("workshop tenant integration", () => {
   });
 
   it("keeps IVA disabled through quote, order, and authorized extra work", async () => {
-    const vehicle = await createWorkshopVehicle({ customerId: customerA.id, placas: "WOLFIVA0", vin: "3N1CN7AP9ML812345", marca: "Nissan", modelo: "Versa", anio: "2021", kilometrajeActual: "50000" });
+    const vehicle = await createWorkshopVehicle({ customerId: customerA.id, placas: "WOLFIVA0", vin: "3N1CN7AP9ML812347", marca: "Nissan", modelo: "Versa", anio: "2021", kilometrajeActual: "50000" });
     const quote = await createWorkshopQuote({ vehicleId: vehicle.id, incluyeIva: false, servicioTitulo: "Revisión", items: [{ tipo: "SERVICIO", concepto: "Revisión", cantidad: "1", unidad: "serv.", precioUnitarioNeto: "100.00", costoUnitarioNeto: "40.00" }] });
     const saved = await prisma.workshopQuote.findUniqueOrThrow({ where: { id: quote.id }, include: { items: true } });
     expect(saved.incluyeIva).toBe(false);
