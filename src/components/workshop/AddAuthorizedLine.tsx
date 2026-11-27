@@ -51,7 +51,7 @@ export function AddAuthorizedLine({ orderId, parts, lang }: { orderId: string; p
       <label>{es ? "Precio unitario neto" : "Net unit price"}<input key={`${selectedPart?.id ?? "none"}-price`} className={field} name="precioUnitarioNeto" type="number" min="0" step="0.01" required defaultValue={selectedPart?.precioVentaNeto ?? ""} /></label>
       <label>{es ? "Costo unitario neto (interno)" : "Net unit cost (internal)"}<input key={`${selectedPart?.id ?? "none"}-cost`} className={field} name="costoUnitarioNeto" type="number" min="0" step="0.01" defaultValue={selectedPart?.costoNeto ?? ""} /></label>
       <label>{es ? "Autorizado por" : "Approved via"}<select className={field} name="autorizadaVia" required><option value="WhatsApp">WhatsApp</option><option value="En persona">{es ? "En persona" : "In person"}</option><option value="Llamada">{es ? "Llamada" : "Call"}</option></select></label>
-      <button disabled={busy} className="rounded-md bg-[#B91C1C] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50 sm:col-span-2">{es ? "Registrar línea autorizada" : "Record authorized item"}</button>
+      <button disabled={busy} className="rounded-md bg-[#245A9F] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50 sm:col-span-2">{es ? "Registrar línea autorizada" : "Record authorized item"}</button>
     </form>
   </details>;
 }

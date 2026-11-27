@@ -17,3 +17,7 @@
 ## 27 nov 2026: vínculo entre solicitud y cotización
 
 Para distinguir de forma durable las solicitudes pendientes de las cotizadas, se permite una relación opcional y única `WorkshopQuote.requestId`. Para Descartar se conservan la solicitud y el Lead y se marca `discardedAt`/`discardedById`. Es una excepción aditiva y mínima al pedido de no modificar el modelo: sin estos campos no era posible cumplir el contador, la persistencia del descarte y el vínculo con el Lead tras reintentos. No se agregan estados de cotización. El requisito de VIN y kilometraje aplica al PDF con folio, no al alta del vehículo ni al borrador. Un Lead fusionado se re-vincula solo si hay exactamente un candidato activo por teléfono dentro de la organización.
+
+## 27 nov 2026: IVA opcional por cotización
+
+El nuevo booleano `incluyeIva` está en `WorkshopQuote` y tiene default `true` a nivel de base y Prisma, de modo que las cotizaciones anteriores mantienen su cálculo. No se almacena precio bruto como neto. La orden deriva la opción de su cotización original; las líneas autorizadas después de convertir respetan esa misma opción. Una solicitud de factura con IVA apagado genera advertencia visual y permite continuar, según instrucción del cliente. El PDF sin IVA omite el renglón de impuesto y etiqueta explícitamente el total.

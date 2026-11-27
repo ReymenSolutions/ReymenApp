@@ -15,6 +15,6 @@ export function WorkshopFilters({ lang, tab, view, values, statusFilter = false 
       <label className="text-xs font-semibold text-slate-700">{es ? "Desde" : "From"}<input type="date" name="from" defaultValue={values.from} className={field} /></label>
       <label className="text-xs font-semibold text-slate-700">{es ? "Hasta" : "To"}<input type="date" name="to" defaultValue={values.to} className={field} /></label>
     </div>
-    <div className="mt-3 flex flex-wrap gap-2"><button className="rounded-md bg-[#B4232D] px-4 py-2 text-sm font-semibold text-white hover:bg-[#981C25]">{es ? "Filtrar" : "Filter"}</button><a href={`/portal/workshop?tab=${tab}${view ? `&view=${view}` : ""}`} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">{es ? "Limpiar" : "Clear"}</a></div>
+    <div className="mt-3 flex flex-wrap gap-2"><button className="rounded-md bg-[#245A9F] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1C4A84]">{es ? "Filtrar" : "Filter"}</button><a href={`/portal/workshop?tab=${tab}${view ? `&view=${view}` : ""}`} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">{es ? "Limpiar" : "Clear"}</a></div>
   </form>;
 }

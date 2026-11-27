@@ -39,6 +39,6 @@ export function CreatePurchaseForm({ lang, parts }: { lang: string; parts: { id:
     <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => setLines((current) => [...current, blank()])}>{es ? "Agregar línea" : "Add line"}</button>
     <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={paid} onChange={(event) => setPaid(event.target.checked)} />{es ? "Pagada ahora (registrar egreso de caja)" : "Paid now (record cash egress)"}</label>
     {paid && <select className={field} name="method" aria-label={es ? "Método de pago" : "Payment method"}><option value="EFECTIVO">{es ? "Efectivo" : "Cash"}</option><option value="TRANSFERENCIA">{es ? "Transferencia" : "Bank transfer"}</option><option value="TARJETA">{es ? "Tarjeta" : "Card"}</option></select>}
-    <div><button disabled={busy || parts.length === 0} className="rounded-md bg-[#B91C1C] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? (es ? "Guardando…" : "Saving…") : (es ? "Guardar compra" : "Save purchase")}</button></div>
+    <div><button disabled={busy || parts.length === 0} className="rounded-md bg-[#245A9F] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? (es ? "Guardando…" : "Saving…") : (es ? "Guardar compra" : "Save purchase")}</button></div>
   </form>;
 }

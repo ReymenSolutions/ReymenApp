@@ -13,7 +13,7 @@ export default async function NewWorkshopQuotePage({ searchParams }: { searchPar
   const request = requestId ? await prisma.workshopLeadRequest.findFirst({ where: { id: requestId, organizationId: ctx.organizationId }, select: { id: true, vehicleId: true, discardedAt: true, quote: { select: { id: true } }, marca: true, modelo: true, anio: true, servicioFalla: true, lead: { select: { name: true, phone: true } } } }) : null;
   if (requestId && (!request || request.discardedAt || request.quote)) redirect("/portal/workshop?tab=quotes&view=pending");
   const [vehicles, parts, services] = await Promise.all([
-    prisma.workshopVehicle.findMany({ where: { organizationId: ctx.organizationId, ...(request?.vehicleId ? { id: request.vehicleId } : {}) }, select: { id: true, placas: true, vin: true, customer: { select: { name: true, phone: true } } }, orderBy: { createdAt: "desc" }, take: 200 }),
+    prisma.workshopVehicle.findMany({ where: { organizationId: ctx.organizationId, ...(request?.vehicleId ? { id: request.vehicleId } : {}) }, select: { id: true, placas: true, vin: true, kilometrajeActual: true, marca: true, modelo: true, anio: true, customer: { select: { name: true, phone: true } } }, orderBy: { createdAt: "desc" }, take: 200 }),
     prisma.workshopPart.findMany({ where: { organizationId: ctx.organizationId }, select: { id: true, sku: true, nombre: true, unidad: true, precioVentaNeto: true, costoNeto: true }, orderBy: { nombre: "asc" }, take: 200 }),
     prisma.workshopService.findMany({ where: { organizationId: ctx.organizationId, active: true }, select: { id: true, nameEs: true, nameEn: true, precioVentaNeto: true, costoNeto: true }, orderBy: { nameEs: "asc" } }),
   ]);
