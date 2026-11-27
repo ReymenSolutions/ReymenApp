@@ -29,6 +29,6 @@ export function WorkshopSettingsForm({ lang, defaults }: { lang: string; default
       <label className="text-sm">{es ? "Garantía (días)" : "Warranty (days)"}<input className={field} name="garantiaDias" type="number" min={0} max={3650} required defaultValue={defaults.garantiaDias} /></label>
       <label className="text-sm">{es ? "Garantía (km)" : "Warranty (km)"}<input className={field} name="garantiaKm" type="number" min={0} max={100000} required defaultValue={defaults.garantiaKm} /></label>
     </div>
-    <button disabled={busy} className="mt-4 rounded-md bg-[#063C82] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{es ? "Guardar configuración" : "Save settings"}</button>
+    <button disabled={busy} className="mt-4 rounded-md bg-[#245A9F] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{es ? "Guardar configuración" : "Save settings"}</button>
   </form>;
 }

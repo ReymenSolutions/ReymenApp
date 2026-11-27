@@ -18,4 +18,12 @@ describe("workshop net money", () => {
     expect(result.lines.reduce((sum, line) => sum + Number(line.net), 0).toFixed(2)).toBe("3793.10");
     expect(result.lines.at(-1)?.net.toFixed(2)).toBe("0.00");
   });
+  it("keeps net prices and utility but charges no IVA when disabled", () => {
+    const result = calculateNetLines([{ cantidad: "1", precioUnitarioNeto: "3793.10", costoUnitarioNeto: "2500.00" }], false);
+    expect(result.subtotalNeto.toFixed(2)).toBe("3793.10");
+    expect(result.iva.toFixed(2)).toBe("0.00");
+    expect(result.total.toFixed(2)).toBe("3793.10");
+    expect(result.lines[0].ivaImporte.toFixed(2)).toBe("0.00");
+    expect(result.utilidadNeta?.toFixed(2)).toBe("1293.10");
+  });
 });

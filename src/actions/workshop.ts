@@ -55,12 +55,12 @@ export async function saveWorkshopService(id: string | null, input: z.input<type
 
 const vehicleInput = z.object({
   customerId: z.string().min(1),
-  placas: z.string().trim().min(2).max(20),
-  vin: z.string().trim().min(11).max(17),
+  placas: z.string().trim().max(20).optional(),
+  vin: z.string().trim().max(17).optional(),
   marca: z.string().trim().min(1).max(80),
   modelo: z.string().trim().min(1).max(80),
   anio: z.coerce.number().int().min(1900).max(2100),
-  kilometrajeActual: z.coerce.number().int().min(0).max(10_000_000),
+  kilometrajeActual: z.string().optional(),
 });
 
 export async function createWorkshopVehicle(input: z.input<typeof vehicleInput>) {
@@ -74,16 +74,20 @@ export async function createWorkshopVehicle(input: z.input<typeof vehicleInput>)
   const customer = await prisma.customer.findFirst({ where: { id: data.customerId, organizationId: orgId }, select: { id: true } });
   if (!customer) throw new UserError("Cliente del CRM no encontrado en tu organización");
 
-  const plates = data.placas.toUpperCase().replace(/\s+/g, "");
-  const vin = data.vin.toUpperCase().replace(/\s+/g, "");
-  const existing = await prisma.workshopVehicle.findFirst({
-    where: { organizationId: orgId, OR: [{ placas: plates }, { vin }] },
+  const plates = data.placas?.toUpperCase().replace(/\s+/g, "") || null;
+  const vin = data.vin?.toUpperCase().replace(/\s+/g, "") || null;
+  if (vin && !/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) throw new UserError("El VIN debe tener 17 caracteres válidos o quedar vacío");
+  const mileage = data.kilometrajeActual?.trim() ? z.coerce.number().int().min(0).max(10_000_000).safeParse(data.kilometrajeActual.trim()) : null;
+  if (mileage && !mileage.success) throw new UserError("Revisa el kilometraje");
+  const identifiers = [...(plates ? [{ placas: plates }] : []), ...(vin ? [{ vin }] : [])];
+  const existing = identifiers.length ? await prisma.workshopVehicle.findFirst({
+    where: { organizationId: orgId, OR: identifiers },
     select: { id: true },
-  });
+  }) : null;
   if (existing) throw new UserError("Las placas o el VIN ya están registrados; reutiliza ese vehículo");
 
   const vehicle = await prisma.workshopVehicle.create({
-    data: { organizationId: orgId, customerId: customer.id, placas: plates, vin, marca: data.marca, modelo: data.modelo, anio: data.anio, kilometrajeActual: data.kilometrajeActual },
+    data: { organizationId: orgId, customerId: customer.id, placas: plates, vin, marca: data.marca, modelo: data.modelo, anio: data.anio, kilometrajeActual: mileage?.data ?? null },
     select: { id: true },
   });
   await logAudit({ organizationId: orgId, userId: session.user.id, action: "workshop.vehicle.create", resource: "WorkshopVehicle", resourceId: vehicle.id });
@@ -91,34 +95,80 @@ export async function createWorkshopVehicle(input: z.input<typeof vehicleInput>)
   return { id: vehicle.id };
 }
 
-/** Convierte los datos de una solicitud pública en cliente y vehículo, solicitando solo el VIN faltante. */
-export async function createWorkshopVehicleFromRequest(requestId: string, rawVin: string, confirmedIdentity: boolean) {
+/** Convierte una solicitud pública tras verificar los datos que exige una ficha completa. */
+export async function markWorkshopRequestViewed(requestId: string) {
+  const session = await auth();
+  const orgId = session?.user.organizationId;
+  if (!orgId || !["OWNER", "ADMIN", "SUPER_ADMIN", "MANAGER", "AGENT"].includes(session.user.role)) throw new UserError("No autorizado");
+  await assertModuleEnabled(orgId, "WORKSHOP");
+  const userId = session.user.id;
+  const result = await prisma.workshopLeadRequest.updateMany({
+    where: { id: requestId, organizationId: orgId, viewedAt: null },
+    data: { viewedAt: new Date(), viewedById: userId },
+  });
+  if (result.count) {
+    await logAudit({ organizationId: orgId, userId, action: "workshop.inquiry.view", resource: "WorkshopLeadRequest", resourceId: requestId });
+  }
+  revalidatePath("/portal/workshop");
+  return { updated: result.count > 0 };
+}
+
+export async function discardWorkshopRequest(requestId: string) {
+  const { orgId, userId } = await requireWorkshopOwner();
+  const result = await prisma.workshopLeadRequest.updateMany({
+    where: { id: requestId, organizationId: orgId, discardedAt: null, quote: { is: null } },
+    data: { discardedAt: new Date(), discardedById: userId, viewedAt: new Date(), viewedById: userId },
+  });
+  if (result.count) await logAudit({ organizationId: orgId, userId, action: "workshop.inquiry.discard", resource: "WorkshopLeadRequest", resourceId: requestId });
+  revalidatePath("/portal/workshop");
+  return { updated: result.count > 0 };
+}
+
+export async function createWorkshopVehicleFromRequest(requestId: string, rawVin: string, confirmedIdentity: boolean, rawPlacas?: string, rawKilometraje?: string) {
   const { orgId, userId } = await requireWorkshopOwner();
   if (confirmedIdentity !== true) throw new UserError("Verifica la identidad del cliente antes de vincular la solicitud");
-  const vinResult = z.string().trim().min(11).max(17).safeParse(rawVin);
-  if (!vinResult.success) throw new UserError("Captura un VIN válido para crear el vehículo");
-  const vin = vinResult.data.toUpperCase().replace(/\s+/g, "");
+  const vinText = rawVin.trim().toUpperCase().replace(/\s+/g, "");
+  const vinResult = vinText ? z.string().length(17).regex(/^[A-HJ-NPR-Z0-9]+$/).safeParse(vinText) : null;
+  if (vinResult && !vinResult.success) throw new UserError("El VIN debe tener 17 caracteres válidos o quedar vacío");
+  const vin = vinResult?.data ?? null;
   const request = await prisma.workshopLeadRequest.findFirst({
     where: { id: requestId, organizationId: orgId },
-    select: { id: true, placas: true, marca: true, modelo: true, anio: true, kilometraje: true, servicioFalla: true, lead: { select: { id: true, name: true, phone: true, phoneKey: true, deletedAt: true } } },
+    select: { id: true, leadId: true, placas: true, marca: true, modelo: true, anio: true, kilometraje: true, servicioFalla: true, lead: { select: { id: true, name: true, phone: true, phoneKey: true, deletedAt: true } } },
   });
-  if (!request || request.lead.deletedAt || !request.lead.phone || !request.lead.phoneKey) throw new UserError("Solicitud del taller no disponible");
+  if (!request || !request.lead.phone || !request.lead.phoneKey) throw new UserError("Solicitud del taller no disponible");
+  const platesText = rawPlacas?.trim() || request.placas?.trim() || "";
+  const platesResult = platesText ? z.string().min(4).max(12).regex(/^[A-Za-z0-9 -]+$/).safeParse(platesText) : null;
+  if (platesResult && !platesResult.success) throw new UserError("Revisa las placas o déjalas vacías");
+  const plates = platesResult?.data.toUpperCase().replace(/\s+/g, "") ?? null;
+  const mileageText = (rawKilometraje?.trim() || String(request.kilometraje ?? "")).replace(/[,.\s]/g, "");
+  const mileageResult = mileageText ? z.coerce.number().int().min(0).max(10_000_000).safeParse(mileageText) : null;
+  if (mileageResult && !mileageResult.success) throw new UserError("Revisa el kilometraje o déjalo vacío");
+  const mileage = mileageResult?.data ?? null;
+  const activeLeads = request.lead.deletedAt ? await prisma.lead.findMany({ where: { organizationId: orgId, phoneKey: request.lead.phoneKey, deletedAt: null }, select: { id: true }, take: 2 }) : [];
+  if (request.lead.deletedAt && activeLeads.length !== 1) throw new UserError("El contacto fue fusionado. Revisa su ficha del CRM antes de vincular esta solicitud");
+  const leadId = request.lead.deletedAt ? activeLeads[0].id : request.lead.id;
   const result = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM "WorkshopLeadRequest" WHERE id = ${requestId} AND "organizationId" = ${orgId} FOR UPDATE`;
+    const locked = await tx.workshopLeadRequest.findFirst({ where: { id: requestId, organizationId: orgId }, select: { vehicleId: true, discardedAt: true } });
+    if (!locked || locked.discardedAt) throw new UserError("Solicitud del taller no disponible");
+    if (locked.vehicleId) return { id: locked.vehicleId, created: false };
     const customer = await tx.customer.upsert({
       where: { organizationId_phoneKey: { organizationId: orgId, phoneKey: request.lead.phoneKey! } },
-      create: { organizationId: orgId, phone: request.lead.phone!, phoneKey: request.lead.phoneKey!, name: request.lead.name, leadId: request.lead.id, consentAccepted: false },
+      create: { organizationId: orgId, phone: request.lead.phone!, phoneKey: request.lead.phoneKey!, name: request.lead.name, leadId, consentAccepted: false },
       update: {}, select: { id: true },
     });
-    const existing = await tx.workshopVehicle.findFirst({ where: { organizationId: orgId, OR: [{ placas: request.placas }, { vin }] }, select: { id: true, customerId: true } });
+    await tx.customer.updateMany({ where: { id: customer.id, organizationId: orgId, leadId: null }, data: { leadId } });
+    if (request.leadId !== leadId) await tx.workshopLeadRequest.update({ where: { id: requestId }, data: { leadId } });
+    const identifiers = [...(plates ? [{ placas: plates }] : []), ...(vin ? [{ vin }] : [])];
+    const existing = identifiers.length ? await tx.workshopVehicle.findFirst({ where: { organizationId: orgId, OR: identifiers }, select: { id: true, customerId: true } }) : null;
     if (existing) {
       if (existing.customerId !== customer.id) throw new UserError("Las placas o el VIN pertenecen a otro cliente; revisa el vehículo existente");
       await tx.workshopLeadRequest.update({ where: { id: request.id }, data: { vehicleId: existing.id } });
       return { id: existing.id, created: false };
     }
     const vehicle = await tx.workshopVehicle.create({ data: {
-      organizationId: orgId, customerId: customer.id, placas: request.placas, vin,
-      marca: request.marca, modelo: request.modelo, anio: request.anio, kilometrajeActual: request.kilometraje,
+      organizationId: orgId, customerId: customer.id, placas: plates, vin,
+      marca: request.marca, modelo: request.modelo, anio: request.anio, kilometrajeActual: mileage,
     }, select: { id: true } });
     await tx.workshopLeadRequest.update({ where: { id: request.id }, data: { vehicleId: vehicle.id } });
     return { id: vehicle.id, created: true };
@@ -130,6 +180,8 @@ export async function createWorkshopVehicleFromRequest(requestId: string, rawVin
 
 const quoteInput = z.object({
   vehicleId: z.string().min(1),
+  incluyeIva: z.boolean().default(true),
+  requestId: z.string().optional(),
   servicioTitulo: z.string().trim().min(2).max(160),
   tiempoEstimado: z.string().trim().max(100).optional(),
   notas: z.string().trim().max(2000).optional(),
@@ -161,16 +213,25 @@ export async function createWorkshopQuote(input: z.input<typeof quoteInput>) {
   if (parts.length !== partIds.length) throw new UserError("Una refacción no pertenece a tu organización");
   let totals;
   try {
-    totals = calculateNetLines(data.items.map((item) => ({ cantidad: item.cantidad, precioUnitarioNeto: item.precioUnitarioNeto, costoUnitarioNeto: item.costoUnitarioNeto || null })));
+    totals = calculateNetLines(data.items.map((item) => ({ cantidad: item.cantidad, precioUnitarioNeto: item.precioUnitarioNeto, costoUnitarioNeto: item.costoUnitarioNeto || null })), data.incluyeIva);
   } catch {
     throw new UserError("Revisa cantidades, costos y precios netos");
   }
   const settings = await prisma.workshopSettings.findUnique({ where: { organizationId: orgId } });
-  const quote = await prisma.workshopQuote.create({
+  const quote = await prisma.$transaction(async (tx) => {
+    if (data.requestId) {
+      await tx.$queryRaw`SELECT id FROM "WorkshopLeadRequest" WHERE id = ${data.requestId} AND "organizationId" = ${orgId} FOR UPDATE`;
+      const request = await tx.workshopLeadRequest.findFirst({ where: { id: data.requestId, organizationId: orgId }, select: { vehicleId: true, discardedAt: true, quote: { select: { id: true } } } });
+      if (!request || request.discardedAt || request.vehicleId !== vehicle.id) throw new UserError("Solicitud del taller no disponible para cotizar");
+      if (request.quote) return { id: request.quote.id, created: false };
+    }
+    const saved = await tx.workshopQuote.create({
     data: {
       organizationId: orgId,
       customerId: vehicle.customerId,
       vehicleId: vehicle.id,
+      requestId: data.requestId || null,
+      incluyeIva: data.incluyeIva,
       servicioTitulo: data.servicioTitulo,
       tiempoEstimado: data.tiempoEstimado || null,
       notas: data.notas || null,
@@ -199,9 +260,33 @@ export async function createWorkshopQuote(input: z.input<typeof quoteInput>) {
     },
     select: { id: true },
   });
-  await logAudit({ organizationId: orgId, userId: session.user.id, action: "workshop.quote.create", resource: "WorkshopQuote", resourceId: quote.id });
+    if (data.requestId) await tx.workshopLeadRequest.update({ where: { id: data.requestId }, data: { viewedAt: new Date(), viewedById: session.user.id } });
+    return { id: saved.id, created: true };
+  });
+  if (quote.created) await logAudit({ organizationId: orgId, userId: session.user.id, action: "workshop.quote.create", resource: "WorkshopQuote", resourceId: quote.id });
   revalidatePath("/portal/workshop");
   return { id: quote.id };
+}
+
+/** Permite corregir el tratamiento de IVA solo mientras la oferta sigue en borrador sin folio. */
+export async function setWorkshopQuoteIva(quoteId: string, incluyeIva: boolean) {
+  const { orgId, userId } = await requireWorkshopOwner();
+  if (typeof incluyeIva !== "boolean") throw new UserError("Revisa la opción de IVA");
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "WorkshopQuote" WHERE id = ${quoteId} AND "organizationId" = ${orgId} FOR UPDATE`;
+    const quote = await tx.workshopQuote.findFirst({ where: { id: quoteId, organizationId: orgId }, include: { items: { orderBy: { createdAt: "asc" } } } });
+    if (!quote || quote.estado !== "BORRADOR" || quote.folio) throw new UserError("Solo puedes cambiar el IVA antes de emitir el folio");
+    if (quote.incluyeIva === incluyeIva) return false;
+    const totals = calculateNetLines(quote.items.map((item) => ({ cantidad: item.cantidad.toString(), precioUnitarioNeto: item.precioUnitarioNeto.toFixed(2), costoUnitarioNeto: item.costoUnitarioNeto?.toFixed(2) ?? null })), incluyeIva);
+    for (const [index, item] of quote.items.entries()) {
+      await tx.workshopQuoteItem.update({ where: { id: item.id }, data: { importeNeto: totals.lines[index].importeNeto, ivaImporte: totals.lines[index].ivaImporte, importeConIva: totals.lines[index].importeConIva } });
+    }
+    await tx.workshopQuote.update({ where: { id: quoteId }, data: { incluyeIva, subtotalNeto: totals.subtotalNeto, iva: totals.iva, total: totals.total, costoTotalNeto: totals.costoTotalNeto, utilidadNeta: totals.utilidadNeta } });
+    return true;
+  });
+  if (updated) await logAudit({ organizationId: orgId, userId, action: "workshop.quote.iva.update", resource: "WorkshopQuote", resourceId: quoteId, metadata: { incluyeIva } });
+  revalidatePath("/portal/workshop");
+  return { updated };
 }
 
 async function requireWorkshopOwner() {
@@ -498,10 +583,6 @@ export async function addWorkshopAuthorizedLine(orderId: string, input: z.input<
   if (!parsed.success) throw new UserError("Revisa la línea adicional y cómo la autorizó el cliente");
   const d = parsed.data;
   if (d.tipo === "REFACCION" && !d.partId) throw new UserError("Selecciona una refacción del inventario para cada línea de refacción");
-  let totals;
-  try { totals = calculateNetLines([{ cantidad: d.cantidad, precioUnitarioNeto: d.precioUnitarioNeto, costoUnitarioNeto: d.costoUnitarioNeto || null }]); }
-  catch { throw new UserError("Revisa cantidades, costos y precios netos"); }
-  const line = totals.lines[0];
   const checkExisting = async () => {
     const existing = await prisma.workshopOrderItem.findUnique({ where: { organizationId_requestKey: { organizationId: orgId, requestKey: d.requestKey } }, select: { id: true, workOrderId: true, tipo: true, partId: true, concepto: true, cantidad: true, precioUnitarioNeto: true, costoUnitarioNeto: true, autorizadaVia: true } });
     if (!existing) return null;
@@ -514,8 +595,11 @@ export async function addWorkshopAuthorizedLine(orderId: string, input: z.input<
   try {
     result = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "WorkshopWorkOrder" WHERE id = ${orderId} AND "organizationId" = ${orgId} FOR UPDATE`;
-      const order = await tx.workshopWorkOrder.findFirst({ where: { id: orderId, organizationId: orgId }, select: { id: true, estado: true } });
+      const order = await tx.workshopWorkOrder.findFirst({ where: { id: orderId, organizationId: orgId }, select: { id: true, estado: true, quote: { select: { incluyeIva: true } } } });
       if (!order || !["DIAGNOSTICO", "EN_REPARACION"].includes(order.estado)) throw new UserError("La orden no admite trabajo adicional en este estado");
+      let line;
+      try { line = calculateNetLines([{ cantidad: d.cantidad, precioUnitarioNeto: d.precioUnitarioNeto, costoUnitarioNeto: d.costoUnitarioNeto || null }], order.quote.incluyeIva).lines[0]; }
+      catch { throw new UserError("Revisa cantidades, costos y precios netos"); }
       let inventoryCost: Prisma.Decimal | null = null;
       if (d.tipo === "REFACCION" && d.partId) {
         await tx.$queryRaw`SELECT id FROM "WorkshopPart" WHERE id = ${d.partId} AND "organizationId" = ${orgId} FOR UPDATE`;

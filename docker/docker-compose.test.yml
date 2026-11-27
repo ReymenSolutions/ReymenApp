@@ -41,6 +41,22 @@ services:
     mem_limit: 1536m
     restart: unless-stopped
 
+  wolf-site:
+    profiles: [workshop-wolf]
+    image: nginx:alpine
+    container_name: reymen-test-wolf-site
+    environment:
+      VIRTUAL_HOST: ${TEST_WOLF_DOMAIN:-wolftest.reymen.mx}
+      VIRTUAL_PORT: "80"
+      LETSENCRYPT_HOST: ${TEST_WOLF_DOMAIN:-wolftest.reymen.mx}
+    volumes:
+      - ../sites/taller-wolf/v8:/usr/share/nginx/html:ro
+      - ./nginx.wolf-site.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../.wolf-site.htpasswd:/etc/nginx/wolf.htpasswd:ro
+    networks: [test, proxy-net]
+    depends_on: [app]
+    restart: unless-stopped
+
 networks:
   test:
   proxy-net:

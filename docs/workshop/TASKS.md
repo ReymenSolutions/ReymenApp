@@ -1,5 +1,10 @@
 # Trabajo pendiente
 
+- [ ] Validar la web v8 y su formulario CRM en navegador contra el dominio de test; confirmar aviso legal, DNS y TLS antes de publicar `tallerwolf.com`.
+- [ ] Implementar reglas e historial de mantenimiento estructurados, vista de recomendaciones para mecánicos y salida idempotente a n8n con consentimiento verificado.
+- [ ] Conciliar costo real de refacciones consumidas con compras/inventario y mostrar utilidad final por orden separada de la estimada en cotización.
+- [ ] Simplificar captura operativa para personal con poca experiencia digital: pasos guiados de recepción, diagnóstico, trabajo y entrega; probarlos con mecánicos.
+
 - [x] Copiar y auditar la especificación.
 - [x] Crear esquema inicial, migración y registro del módulo.
 - [x] Crear ruta protegida y etiquetas español/inglés.

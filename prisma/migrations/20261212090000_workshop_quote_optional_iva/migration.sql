@@ -1,0 +1,1 @@
+ALTER TABLE "WorkshopQuote" ADD COLUMN "incluyeIva" BOOLEAN NOT NULL DEFAULT true;

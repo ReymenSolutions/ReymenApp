@@ -33,5 +33,5 @@ export function CreatePartForm({ lang }: { lang: string }) {
     <label className="text-sm">{es ? "Costo neto" : "Net cost"}<input className={field} name="costoNeto" type="number" min="0" step="0.01" required /></label>
     <label className="text-sm">{es ? "Precio de venta neto" : "Net sale price"}<input className={field} name="precioVentaNeto" type="number" min="0" step="0.01" required /></label>
     <label className="text-sm">{es ? "Stock mínimo" : "Minimum stock"}<input className={field} name="stockMinimo" type="number" min="0" step="0.001" defaultValue="0" required /></label>
-  </div><button className="mt-4 rounded-md bg-[#063C82] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={busy}>{busy ? (es ? "Guardando…" : "Saving…") : (es ? "Guardar refacción" : "Save part")}</button></form>;
+  </div><button className="mt-4 rounded-md bg-[#245A9F] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={busy}>{busy ? (es ? "Guardando…" : "Saving…") : (es ? "Guardar refacción" : "Save part")}</button></form>;
 }

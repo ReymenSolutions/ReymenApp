@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { stageOptionsFor } from "@/lib/pipelines";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, GitBranch, StickyNote, ArrowRightLeft, Home, Contact, ListTodo } from "lucide-react";
+import { ArrowLeft, GitBranch, StickyNote, ArrowRightLeft, Home, Contact, ListTodo, CarFront } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { getServerT, getServerLang } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
-import { requireModule } from "@/lib/modules";
+import { hasModule, requireModule } from "@/lib/modules";
 import { getLeadAiActions } from "@/lib/lead-ai-actions";
 import { findPotentialDuplicateLeads } from "@/lib/duplicate-detection";
 import { can } from "@/lib/permissions";
@@ -46,7 +46,7 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
   const lead = await prisma.lead.findFirst({ where: { id, organizationId: orgId, deletedAt: null } });
   if (!lead) return notFound();
 
-  const [t, lang, opportunities, notes, stages, users, duplicates, timeline, customFields, aiActions, tasks, org] = await Promise.all([
+  const [t, lang, opportunities, notes, stages, users, duplicates, timeline, customFields, aiActions, tasks, org, workshopRequests] = await Promise.all([
     getServerT(),
     getServerLang(),
     prisma.opportunity.findMany({
@@ -67,6 +67,14 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
     getLeadAiActions(orgId, lead.id),
     getLeadTasks(orgId, lead.id),
     prisma.organization.findUnique({ where: { id: orgId }, select: { timezone: true } }),
+    hasModule(orgId, "WORKSHOP").then((enabled) => enabled
+      ? prisma.workshopLeadRequest.findMany({
+          where: { organizationId: orgId, leadId: lead.id },
+          select: { id: true, createdAt: true, marca: true, modelo: true, anio: true, placas: true, kilometraje: true, servicioFalla: true, vehicleId: true },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        })
+      : []),
   ]);
 
   const searchViews = await getLeadSearchViews(orgId, lead.id, lang === "en" ? "en" : "es");
@@ -176,6 +184,18 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
         panels={{
           summary: (
             <div className="space-y-5">
+            {workshopRequests.length > 0 && <Section icon={CarFront} title={es ? "Solicitudes del taller" : "Workshop requests"} hint={es ? "Datos enviados desde la web de Taller Wolf; confirma el vehículo con el cliente antes de cotizar." : "Details sent from the Taller Wolf website; confirm the vehicle with the customer before quoting."}>
+              <ul className="divide-y divide-slate-100">
+                {workshopRequests.map((request) => <li key={request.id} className="py-3 first:pt-0 last:pb-0">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <p className="font-semibold text-slate-900">{request.marca} {request.modelo} {request.anio} · {request.placas ?? (es ? "Placas pendientes" : "Plates pending")}</p>
+                    <span className="text-xs text-slate-500">{formatDate(request.createdAt, lang)}</span>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-600">{request.kilometraje == null ? (es ? "Kilometraje pendiente" : "Mileage pending") : `${request.kilometraje.toLocaleString(es ? "es-MX" : "en-US")} km`} · {request.servicioFalla}</p>
+                  <Link href={request.vehicleId ? `/portal/workshop/vehicles/${request.vehicleId}` : "/portal/workshop?tab=vehicles"} className="mt-1 inline-block text-xs font-semibold text-blue-700 underline">{request.vehicleId ? (es ? "Ver vehículo" : "View vehicle") : (es ? "Preparar en Workshop" : "Prepare in Workshop")}</Link>
+                </li>)}
+              </ul>
+            </Section>}
             <Section
               icon={ListTodo}
               title={es ? "Tareas" : "Tasks"}

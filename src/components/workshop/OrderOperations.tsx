@@ -17,8 +17,17 @@ export function OrderOperations({ id, estado, kilometrajeIngreso, nivelCombustib
   const [deliveryKm, setDeliveryKm] = useState(String(kilometrajeIngreso));
   const [partsReturned, setPartsReturned] = useState(false);
   const es = lang === "es";
-  const button = "rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold disabled:opacity-50";
+  const button = "rounded-md bg-[#245A9F] px-3 py-2 text-xs font-semibold text-white hover:bg-[#1C4A84] disabled:opacity-50";
   const field = "w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm";
+  const steps: Record<string, [string, string, string, string]> = {
+    RECEPCION: ["1 · Recibir vehículo", "1 · Receive vehicle", "Anota la falla, revisa el vehículo y sube una foto de recepción.", "Record the issue, inspect the vehicle, and upload an arrival photo."],
+    DIAGNOSTICO: ["2 · Diagnosticar", "2 · Diagnose", "Escribe qué encontraste antes de iniciar la reparación.", "Record what you found before starting the repair."],
+    EN_REPARACION: ["3 · Reparar", "3 · Repair", "Sube fotos del trabajo. Al terminar, marca la orden lista para entregar.", "Upload work photos. When finished, mark the order ready for delivery."],
+    LISTA_PARA_ENTREGA: ["4 · Entregar", "4 · Deliver", "Sube una foto final, confirma el kilometraje y entrega el vehículo.", "Upload a final photo, confirm the mileage, and hand over the vehicle."],
+    ENTREGADA: ["Entregada", "Delivered", "Esta orden ya está cerrada.", "This order is closed."],
+    CANCELADA: ["Cancelada", "Canceled", "Esta orden está cancelada.", "This order is canceled."],
+  };
+  const step = steps[estado] ?? [estado, estado, "", ""];
 
   async function run(operation: () => Promise<unknown>, message: string) {
     setBusy(true);
@@ -49,17 +58,20 @@ export function OrderOperations({ id, estado, kilometrajeIngreso, nivelCombustib
     }), es ? "Recepción guardada" : "Reception saved");
   }
 
-  return <div className="space-y-3 border-t border-slate-100 pt-3">
+  return <div className="space-y-4 border-t border-slate-100 pt-4">
+    <div className="rounded-lg bg-slate-50 p-3"><p className="font-semibold text-slate-900">{es ? step[0] : step[1]}</p><p className="mt-1 text-xs text-slate-600">{es ? step[2] : step[3]}</p></div>
     {canManageFinancials && <a href={`/api/workshop/orders/${id}/pdf`} className="inline-block rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold">{es ? "Descargar orden PDF" : "Download work order PDF"}</a>}
-    {["RECEPCION", "DIAGNOSTICO"].includes(estado) && <form onSubmit={saveReception} className="grid gap-2 sm:grid-cols-2">
-      <input aria-label={es ? "Kilometraje de ingreso" : "Arrival mileage"} className={field} type="number" name="kilometrajeIngreso" min="0" defaultValue={kilometrajeIngreso} required />
-      <input aria-label={es ? "Nivel de combustible" : "Fuel level"} className={field} name="nivelCombustible" defaultValue={nivelCombustible ?? ""} placeholder={es ? "Nivel de combustible" : "Fuel level"} required />
-      <input aria-label={es ? "Falla reportada" : "Reported fault"} className={field} name="fallaReportada" defaultValue={fallaReportada ?? ""} placeholder={es ? "Falla reportada" : "Reported fault"} required />
-      <input aria-label={es ? "Diagnóstico" : "Diagnosis"} className={field} name="diagnostico" defaultValue={diagnostico ?? ""} placeholder={es ? "Diagnóstico" : "Diagnosis"} />
-      <input aria-label={es ? "Daños previos" : "Prior damage"} className={field} name="danosPrevios" defaultValue={checklist.danosPrevios ?? ""} placeholder={es ? "Daños previos" : "Prior damage"} />
-      <input aria-label={es ? "Testigos encendidos" : "Warning lights"} className={field} name="testigos" defaultValue={checklist.testigos ?? ""} placeholder={es ? "Testigos encendidos" : "Warning lights"} />
-      <input aria-label={es ? "Pertenencias" : "Belongings"} className={field} name="pertenencias" defaultValue={checklist.pertenencias ?? ""} placeholder={es ? "Pertenencias" : "Belongings"} />
-      <button disabled={busy} className={button}>{es ? "Guardar recepción y diagnóstico" : "Save reception and diagnosis"}</button>
+    {["RECEPCION", "DIAGNOSTICO"].includes(estado) && <form onSubmit={saveReception} className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-2">
+      <label className="text-xs font-medium">{es ? "Kilometraje de ingreso" : "Arrival mileage"}<input className={`${field} mt-1`} type="number" name="kilometrajeIngreso" min="0" defaultValue={kilometrajeIngreso} required /></label>
+      <label className="text-xs font-medium">{es ? "Nivel de combustible" : "Fuel level"}<input className={`${field} mt-1`} name="nivelCombustible" defaultValue={nivelCombustible ?? ""} required /></label>
+      <label className="text-xs font-medium sm:col-span-2">{es ? "¿Qué falla reporta el cliente?" : "What issue did the customer report?"}<input className={`${field} mt-1`} name="fallaReportada" defaultValue={fallaReportada ?? ""} required /></label>
+      <label className="text-xs font-medium sm:col-span-2">{es ? "¿Qué encontraste al revisar?" : "What did you find?"}<input className={`${field} mt-1`} name="diagnostico" defaultValue={diagnostico ?? ""} /></label>
+      <details className="sm:col-span-2"><summary className="cursor-pointer text-xs font-semibold text-blue-800">{es ? "Checklist del vehículo: daños, testigos y pertenencias" : "Vehicle checklist: damage, warning lights and belongings"}</summary><div className="mt-2 grid gap-2 sm:grid-cols-3">
+        <label className="text-xs">{es ? "Daños previos" : "Prior damage"}<input className={`${field} mt-1`} name="danosPrevios" defaultValue={checklist.danosPrevios ?? ""} /></label>
+        <label className="text-xs">{es ? "Testigos encendidos" : "Warning lights"}<input className={`${field} mt-1`} name="testigos" defaultValue={checklist.testigos ?? ""} /></label>
+        <label className="text-xs">{es ? "Pertenencias" : "Belongings"}<input className={`${field} mt-1`} name="pertenencias" defaultValue={checklist.pertenencias ?? ""} /></label>
+      </div></details>
+      <button disabled={busy} className={`${button} sm:col-span-2`}>{es ? "Guardar datos del vehículo" : "Save vehicle details"}</button>
     </form>}
     {["RECEPCION", "EN_REPARACION", "LISTA_PARA_ENTREGA"].includes(estado) && <label className="block text-xs text-slate-600">{es ? "Subir foto" : "Upload photo"} · {estado === "LISTA_PARA_ENTREGA" ? (es ? "entrega" : "delivery") : estado === "EN_REPARACION" ? (es ? "proceso" : "work") : (es ? "recepción" : "reception")}<input className="mt-1 block w-full text-xs" type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={(event) => upload(estado === "LISTA_PARA_ENTREGA" ? "ENTREGA" : estado === "EN_REPARACION" ? "PROCESO" : "RECEPCION", event.target.files?.[0] ?? null)} /></label>}
     {estado === "RECEPCION" && <button className={button} disabled={busy} onClick={() => run(() => advanceWorkshopOrder(id, "DIAGNOSTICO"), es ? "Orden en diagnóstico" : "Order in diagnosis")}>{es ? "Pasar a diagnóstico" : "Move to diagnosis"}</button>}

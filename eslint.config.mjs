@@ -3,9 +3,13 @@ import nextTypescript from "eslint-config-next/typescript";
 
 const eslintConfig = [
   // La tarjeta pública (otra app, con su propio package.json) no se valida con esta configuración.
-  { ignores: ["smartcard-public/**"] },
+  { ignores: ["smartcard-public/**", "sites/taller-wolf/v8/assets/vendor/**"] },
   ...coreWebVitals,
   ...nextTypescript,
+  {
+    files: ["sites/taller-wolf/herramientas/paginas-v8.js"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
   {
     rules: {
       // New in eslint-config-next 16 (react-compiler-era hook safety checks).

@@ -3,20 +3,21 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { createTestOrg, createTestUser, cleanupOrg } from "@/test/helpers";
 import sharp from "sharp";
+import { PDFDocument } from "pdf-lib";
 
 const auth = vi.fn();
 vi.mock("@/lib/auth", () => ({ auth }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
 
-const { createWorkshopVehicle, createWorkshopQuote, issueWorkshopQuote, markWorkshopQuoteSent, approveWorkshopQuote, convertWorkshopQuote, createWorkshopPart, createWorkshopPurchase, getWorkshopPartStock, saveWorkshopReception, advanceWorkshopOrder, addWorkshopAuthorizedLine, recordWorkshopOrderPayment, authorizeWorkshopCredit, deliverWorkshopOrder, setWorkshopInvoiceRequested, saveWorkshopSettings, setWorkshopNextService, saveWorkshopService } = await import("./workshop");
+const { createWorkshopVehicle, createWorkshopQuote, setWorkshopQuoteIva, issueWorkshopQuote, markWorkshopQuoteSent, approveWorkshopQuote, convertWorkshopQuote, createWorkshopPart, createWorkshopPurchase, getWorkshopPartStock, saveWorkshopReception, advanceWorkshopOrder, addWorkshopAuthorizedLine, recordWorkshopOrderPayment, authorizeWorkshopCredit, deliverWorkshopOrder, setWorkshopInvoiceRequested, saveWorkshopSettings, setWorkshopNextService, saveWorkshopService } = await import("./workshop");
 const { seedWorkshopServices } = await import("@/lib/workshop/services");
 const { GET: downloadQuotePdf } = await import("@/app/api/workshop/quotes/[id]/pdf/route");
 const { GET: downloadOrderPdf } = await import("@/app/api/workshop/orders/[id]/pdf/route");
 const { POST: uploadPhoto } = await import("@/app/api/workshop/orders/[id]/photos/route");
 const { GET: readPhoto } = await import("@/app/api/workshop/photos/[id]/route");
 const { submitWolfInquiry, wolfInquirySchema, getWolfLandingOrg } = await import("@/lib/workshop/landing");
-const { createWorkshopVehicleFromRequest } = await import("./workshop");
+const { createWorkshopVehicleFromRequest, markWorkshopRequestViewed, discardWorkshopRequest } = await import("./workshop");
 const { POST: submitPublicInquiry } = await import("@/app/api/workshop/public/inquiries/route");
 
 describe("workshop tenant integration", () => {
@@ -75,13 +76,13 @@ describe("workshop tenant integration", () => {
 
   it("seeds provisional services without prices and permits tenant-only edits", async () => {
     await prisma.$transaction((tx) => seedWorkshopServices(tx, orgA.id));
-    expect(await prisma.workshopService.count({ where: { organizationId: orgA.id } })).toBe(9);
+    expect(await prisma.workshopService.count({ where: { organizationId: orgA.id } })).toBe(11);
     const item = await prisma.workshopService.findFirstOrThrow({ where: { organizationId: orgA.id } });
     expect(item.precioVentaNeto).toBeNull();
     expect(item.costoNeto).toBeNull();
     await saveWorkshopService(item.id, { nameEs: item.nameEs, nameEn: item.nameEn, precioVentaNeto: "100.00", costoNeto: "40.00", active: true });
     await prisma.$transaction((tx) => seedWorkshopServices(tx, orgA.id));
-    expect(await prisma.workshopService.count({ where: { organizationId: orgA.id } })).toBe(9);
+    expect(await prisma.workshopService.count({ where: { organizationId: orgA.id } })).toBe(11);
     expect((await prisma.workshopService.findUniqueOrThrow({ where: { id: item.id } })).precioVentaNeto?.toFixed(2)).toBe("100.00");
     const other = await prisma.workshopService.create({ data: { organizationId: orgB.id, nameEs: "Servicio ajeno", nameEn: "Other service" } });
     await expect(saveWorkshopService(other.id, { nameEs: "Cambio", nameEn: "Change", active: true })).rejects.toThrow(/no disponible/i);
@@ -94,7 +95,12 @@ describe("workshop tenant integration", () => {
     expect(await getWolfLandingOrg()).toBeNull();
     expect((await submitPublicInquiry(new Request("http://localhost/api/workshop/public/inquiries", { method: "POST", body: "{}" }))).status).toBe(403);
     expect((await submitPublicInquiry(new Request("http://localhost/api/workshop/public/inquiries", { method: "POST", headers: { origin: "http://localhost" }, body: "{}" }))).status).toBe(404);
-    const input = wolfInquirySchema.parse({ requestKey: crypto.randomUUID(), name: "María Wolf", phone: "8711079912", marca: "Nissan", modelo: "Versa", anio: 2021, placas: " WOLF 9 ", kilometraje: 42000, servicioFalla: "Revisar frenos", consent: true });
+    process.env.WORKSHOP_WOLF_SITE_ORIGIN = "https://wolftest.example";
+    try {
+      expect((await submitPublicInquiry(new Request("http://localhost/api/workshop/public/inquiries", { method: "POST", headers: { origin: "https://otro.example" }, body: "{}" }))).status).toBe(403);
+      expect((await submitPublicInquiry(new Request("http://localhost/api/workshop/public/inquiries", { method: "POST", headers: { origin: "https://wolftest.example" }, body: "{}" }))).status).toBe(404);
+    } finally { delete process.env.WORKSHOP_WOLF_SITE_ORIGIN; }
+    const input = wolfInquirySchema.parse({ requestKey: crypto.randomUUID(), name: "María Wolf", phone: "8711079912", marca: "Nissan", modelo: "Versa", anio: 2021, placas: " WOLF 9 ", kilometraje: 42000, servicioFalla: "Revisar frenos", consent: true, maintenanceConsent: true });
     const first = await submitWolfInquiry(orgA.id, input);
     const retry = await submitWolfInquiry(orgA.id, input);
     expect("id" in first && "id" in retry && retry.id === first.id).toBe(true);
@@ -103,9 +109,17 @@ describe("workshop tenant integration", () => {
     const request = await prisma.workshopLeadRequest.findUniqueOrThrow({ where: { id: first.id }, include: { lead: true } });
     expect(request.placas).toBe("WOLF9");
     expect(request.lead.source).toBe("landing");
+    expect((request.lead.metadata as { consent?: { maintenanceReminders?: boolean } })?.consent?.maintenanceReminders).toBe(true);
+    auth.mockResolvedValue({ user: { id: ownerId, role: "VIEWER", organizationId: orgA.id } });
+    await expect(markWorkshopRequestViewed(request.id)).rejects.toThrow(/autorizado/i);
+    auth.mockResolvedValue({ user: { id: ownerId, role: "AGENT", organizationId: orgA.id } });
+    expect((await markWorkshopRequestViewed(request.id)).updated).toBe(true);
     auth.mockResolvedValue({ user: { id: ownerId, role: "OWNER", organizationId: orgB.id } });
+    expect((await markWorkshopRequestViewed(request.id)).updated).toBe(false);
     await expect(createWorkshopVehicleFromRequest(request.id, "3N1CN7AP9ML812345", true)).rejects.toThrow();
     auth.mockResolvedValue({ user: { id: ownerId, role: "OWNER", organizationId: orgA.id } });
+    expect((await markWorkshopRequestViewed(request.id)).updated).toBe(false);
+    expect((await prisma.workshopLeadRequest.findUniqueOrThrow({ where: { id: request.id } })).viewedById).toBe(ownerId);
     await expect(createWorkshopVehicleFromRequest(request.id, "3N1CN7AP9ML812345", false)).rejects.toThrow(/identidad/i);
     const vehicle = await createWorkshopVehicleFromRequest(request.id, "3N1CN7AP9ML812345", true);
     expect(vehicle.servicioFalla).toBe("Revisar frenos");
@@ -116,6 +130,46 @@ describe("workshop tenant integration", () => {
     expect((await prisma.workshopLeadRequest.findUniqueOrThrow({ where: { id: request.id } })).vehicleId).toBe(vehicle.id);
     await submitWolfInquiry(orgA.id, { ...input, requestKey: crypto.randomUUID(), phone: "8110000001" });
     expect((await prisma.customer.findUniqueOrThrow({ where: { id: customerA.id } })).leadId).toBeNull();
+    const publicInput = { ...input, requestKey: crypto.randomUUID(), phone: "8110000002", maintenanceConsent: false };
+    const optionalInput = { ...publicInput, requestKey: crypto.randomUUID(), phone: "8110000003", placas: null, kilometraje: null };
+    process.env.WORKSHOP_WOLF_SITE_ORIGIN = "https://wolftest.example";
+    process.env.WORKSHOP_WOLF_LANDING_ENABLED = "true";
+    process.env.WORKSHOP_WOLF_ORG_ID = orgA.id;
+    try {
+      const requestFromSite = () => new Request("http://localhost/api/workshop/public/inquiries", { method: "POST", headers: { origin: "https://wolftest.example", "content-type": "application/json" }, body: JSON.stringify(publicInput) });
+      expect((await submitPublicInquiry(requestFromSite())).status).toBe(200);
+      expect((await submitPublicInquiry(requestFromSite())).status).toBe(200);
+      expect(await prisma.lead.count({ where: { organizationId: orgA.id, externalId: `workshop:${publicInput.requestKey}` } })).toBe(1);
+      const optionalResponse = await submitPublicInquiry(new Request("http://localhost/api/workshop/public/inquiries", { method: "POST", headers: { origin: "https://wolftest.example", "content-type": "application/json" }, body: JSON.stringify(optionalInput) }));
+      expect(optionalResponse.status).toBe(200);
+      const optionalRequest = await prisma.workshopLeadRequest.findUniqueOrThrow({ where: { organizationId_requestKey: { organizationId: orgA.id, requestKey: optionalInput.requestKey } } });
+      expect(optionalRequest.placas).toBeNull();
+      expect(optionalRequest.kilometraje).toBeNull();
+      const completed = await createWorkshopVehicleFromRequest(optionalRequest.id, "", true);
+      const completedVehicle = await prisma.workshopVehicle.findUniqueOrThrow({ where: { id: completed.id } });
+      expect(completedVehicle.placas).toBeNull();
+      expect(completedVehicle.vin).toBeNull();
+      expect(completedVehicle.kilometrajeActual).toBeNull();
+      const linkedInput = { vehicleId: completed.id, requestId: optionalRequest.id, servicioTitulo: "Revisar frenos", items: [{ tipo: "SERVICIO" as const, concepto: "Revisión", cantidad: "1", unidad: "serv.", precioUnitarioNeto: "100.00" }] };
+      const linked = await createWorkshopQuote(linkedInput);
+      expect((await createWorkshopQuote(linkedInput)).id).toBe(linked.id);
+      expect((await prisma.workshopQuote.findUniqueOrThrow({ where: { id: linked.id } })).estado).toBe("BORRADOR");
+      expect(await prisma.workshopQuote.count({ where: { requestId: optionalRequest.id } })).toBe(1);
+      await expect(issueWorkshopQuote(linked.id)).rejects.toThrow(/Completa nombre/i);
+      expect((await discardWorkshopRequest(optionalRequest.id)).updated).toBe(false);
+      auth.mockResolvedValue({ user: { id: ownerId, role: "AGENT", organizationId: orgA.id } });
+      await expect(discardWorkshopRequest(request.id)).rejects.toThrow(/No autorizado/i);
+      auth.mockResolvedValue({ user: { id: ownerId, role: "OWNER", organizationId: orgB.id } });
+      expect((await discardWorkshopRequest(request.id)).updated).toBe(false);
+      auth.mockResolvedValue({ user: { id: ownerId, role: "OWNER", organizationId: orgA.id } });
+      expect((await discardWorkshopRequest(request.id)).updated).toBe(true);
+      expect((await discardWorkshopRequest(request.id)).updated).toBe(false);
+      expect((await submitPublicInquiry(new Request("http://localhost/api/workshop/public/inquiries", { method: "POST", headers: { origin: "https://otro.example" }, body: JSON.stringify(publicInput) }))).status).toBe(403);
+    } finally {
+      delete process.env.WORKSHOP_WOLF_SITE_ORIGIN;
+      delete process.env.WORKSHOP_WOLF_LANDING_ENABLED;
+      delete process.env.WORKSHOP_WOLF_ORG_ID;
+    }
   });
 
   it("creates a CRM-linked vehicle and a net-priced quote only in the session organization", async () => {
@@ -138,6 +192,37 @@ describe("workshop tenant integration", () => {
     expect(await prisma.workshopQuote.count({ where: { organizationId: orgA.id, vehicleId: otherVehicle.id } })).toBe(0);
   });
 
+  it("keeps IVA disabled through quote, order, and authorized extra work", async () => {
+    const vehicle = await createWorkshopVehicle({ customerId: customerA.id, placas: "WOLFIVA0", vin: "3N1CN7AP9ML812347", marca: "Nissan", modelo: "Versa", anio: "2021", kilometrajeActual: "50000" });
+    const quote = await createWorkshopQuote({ vehicleId: vehicle.id, incluyeIva: false, servicioTitulo: "Revisión", items: [{ tipo: "SERVICIO", concepto: "Revisión", cantidad: "1", unidad: "serv.", precioUnitarioNeto: "100.00", costoUnitarioNeto: "40.00" }] });
+    const saved = await prisma.workshopQuote.findUniqueOrThrow({ where: { id: quote.id }, include: { items: true } });
+    expect(saved.incluyeIva).toBe(false);
+    expect(saved.iva.toFixed(2)).toBe("0.00");
+    expect(saved.total.toFixed(2)).toBe("100.00");
+    expect(saved.utilidadNeta?.toFixed(2)).toBe("60.00");
+    expect(saved.items[0].ivaImporte.toFixed(2)).toBe("0.00");
+    await setWorkshopQuoteIva(quote.id, true);
+    expect((await prisma.workshopQuote.findUniqueOrThrow({ where: { id: quote.id } })).total.toFixed(2)).toBe("116.00");
+    await setWorkshopQuoteIva(quote.id, false);
+    expect((await prisma.workshopQuote.findUniqueOrThrow({ where: { id: quote.id } })).total.toFixed(2)).toBe("100.00");
+    auth.mockResolvedValue({ user: { id: ownerId, role: "AGENT", organizationId: orgA.id } });
+    await expect(setWorkshopQuoteIva(quote.id, true)).rejects.toThrow(/No autorizado/i);
+    auth.mockResolvedValue({ user: { id: ownerId, role: "OWNER", organizationId: orgB.id } });
+    await expect(setWorkshopQuoteIva(quote.id, true)).rejects.toThrow(/folio/i);
+    auth.mockResolvedValue({ user: { id: ownerId, role: "OWNER", organizationId: orgA.id } });
+    await issueWorkshopQuote(quote.id);
+    await expect(setWorkshopQuoteIva(quote.id, true)).rejects.toThrow(/folio/i);
+    await markWorkshopQuoteSent(quote.id);
+    await approveWorkshopQuote(quote.id, "WhatsApp");
+    const order = await convertWorkshopQuote(quote.id);
+    expect((await prisma.workshopWorkOrder.findUniqueOrThrow({ where: { id: order.id } })).saldo.toFixed(2)).toBe("100.00");
+    await prisma.workshopWorkOrder.update({ where: { id: order.id }, data: { estado: "DIAGNOSTICO" } });
+    await addWorkshopAuthorizedLine(order.id, { requestKey: crypto.randomUUID(), tipo: "SERVICIO", concepto: "Trabajo adicional", cantidad: "1", unidad: "serv.", precioUnitarioNeto: "50.00", autorizadaVia: "WhatsApp" });
+    const updated = await prisma.workshopWorkOrder.findUniqueOrThrow({ where: { id: order.id }, include: { items: true } });
+    expect(updated.saldo.toFixed(2)).toBe("150.00");
+    expect(updated.items.every((item) => item.ivaImporte.toFixed(2) === "0.00")).toBe(true);
+  });
+
   it("saves workshop defaults and next service only for the session organization", async () => {
     const vehicle = await prisma.workshopVehicle.findFirstOrThrow({ where: { organizationId: orgA.id, placas: "WOLF1" } });
     await saveWorkshopSettings({ vigenciaDias: 20, garantiaDias: 100, garantiaKm: 6000 });
@@ -157,11 +242,18 @@ describe("workshop tenant integration", () => {
     await prisma.customer.update({ where: { id: customerA.id }, data: { name: "Client A" } });
     const first = await issueWorkshopQuote(quoteId);
     const second = await issueWorkshopQuote(quoteId);
-    expect(first.folio).toMatch(/^TW-\d{4}-0001$/);
+    expect(first.folio).toMatch(/^TW-\d{4}-\d{4}$/);
     expect(second.folio).toBe(first.folio);
     const response = await downloadQuotePdf(new Request("http://localhost/api/workshop/quotes/x/pdf"), { params: Promise.resolve({ id: quoteId }) });
     expect(response.status).toBe(200);
     expect(Buffer.from(await response.arrayBuffer()).subarray(0, 4).toString()).toBe("%PDF");
+    process.env.WORKSHOP_WOLF_ORG_ID = orgA.id;
+    try {
+      const branded = await downloadQuotePdf(new Request("http://localhost/api/workshop/quotes/x/pdf"), { params: Promise.resolve({ id: quoteId }) });
+      expect(branded.status).toBe(200);
+      expect(branded.headers.get("content-disposition")).toContain("cotizacion-cambio-de-aceite-honda-accord-2020-tallerwolf.pdf");
+      expect((await PDFDocument.load(await branded.arrayBuffer())).getTitle()).toBe("cotizacion-cambio-de-aceite-honda-accord-2020-tallerwolf");
+    } finally { delete process.env.WORKSHOP_WOLF_ORG_ID; }
     const otherResponse = await downloadQuotePdf(new Request("http://localhost/api/workshop/quotes/x/pdf"), { params: Promise.resolve({ id: "does-not-belong-here" }) });
     expect(otherResponse.status).toBe(404);
   });
@@ -261,16 +353,20 @@ describe("workshop tenant integration", () => {
     expect(response.headers.get("cache-control")).toBe("private, no-store");
   });
 
-  it("blocks other organizations and unauthorized roles from PDFs and photos", async () => {
+  it("lets mechanics open customer quote PDFs without granting financial actions or cross-org access", async () => {
     const quote = await prisma.workshopQuote.findUniqueOrThrow({ where: { id: quoteId } });
     const order = await prisma.workshopWorkOrder.findUniqueOrThrow({ where: { quoteId } });
     const photo = await prisma.workshopPhoto.findFirstOrThrow({ where: { organizationId: orgA.id } });
     try {
       auth.mockResolvedValue({ user: { id: ownerId, role: "AGENT", organizationId: orgA.id } });
-      expect((await downloadQuotePdf(new Request("http://localhost/quote"), { params: Promise.resolve({ id: quote.id }) })).status).toBe(403);
+      expect((await downloadQuotePdf(new Request("http://localhost/quote"), { params: Promise.resolve({ id: quote.id }) })).status).toBe(200);
+      expect((await downloadQuotePdf(new Request("http://localhost/quote?print=1"), { params: Promise.resolve({ id: quote.id }) })).headers.get("content-disposition")).toMatch(/^inline;/);
       expect((await downloadOrderPdf(new Request("http://localhost/order"), { params: Promise.resolve({ id: order.id }) })).status).toBe(403);
+      await expect(issueWorkshopQuote(quote.id)).rejects.toThrow(/No autorizado/i);
       await expect(setWorkshopInvoiceRequested(order.id, false)).rejects.toThrow(/No autorizado/i);
       await expect(addWorkshopAuthorizedLine(order.id, { requestKey: crypto.randomUUID(), tipo: "SERVICIO", concepto: "Cambio extra", cantidad: "1", unidad: "serv.", precioUnitarioNeto: "1.00", autorizadaVia: "WhatsApp" })).rejects.toThrow(/No autorizado/i);
+      auth.mockResolvedValue({ user: { id: ownerId, role: "VIEWER", organizationId: orgA.id } });
+      expect((await downloadQuotePdf(new Request("http://localhost/quote"), { params: Promise.resolve({ id: quote.id }) })).status).toBe(403);
       auth.mockResolvedValue({ user: { id: ownerId, role: "OWNER", organizationId: orgB.id } });
       expect((await downloadQuotePdf(new Request("http://localhost/quote"), { params: Promise.resolve({ id: quote.id }) })).status).toBe(404);
       expect((await downloadOrderPdf(new Request("http://localhost/order"), { params: Promise.resolve({ id: order.id }) })).status).toBe(404);

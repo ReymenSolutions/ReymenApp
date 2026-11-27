@@ -22,7 +22,7 @@ function money(value: Prisma.Decimal): Prisma.Decimal {
 }
 
 /** El precio de entrada siempre es neto; distribuye el centavo residual del IVA en la última línea. */
-export function calculateNetLines(inputs: NetLineInput[]) {
+export function calculateNetLines(inputs: NetLineInput[], incluyeIva = true) {
   if (!inputs.length) throw new Error("La cotización necesita al menos una línea");
   const base = inputs.map(({ cantidad, precioUnitarioNeto, costoUnitarioNeto }) => {
     const qty = new D(cantidad);
@@ -33,11 +33,11 @@ export function calculateNetLines(inputs: NetLineInput[]) {
     return { importeNeto: money(qty.mul(price)), costoTotalNeto: cost ? money(qty.mul(cost)) : null };
   });
   const subtotalNeto = base.reduce((sum, line) => sum.plus(line.importeNeto), new D(0));
-  const iva = money(subtotalNeto.mul(IVA));
+  const iva = incluyeIva ? money(subtotalNeto.mul(IVA)) : new D(0);
   const adjustmentIndex = base.findLastIndex((line) => line.importeNeto.gt(0));
   let allocated = new D(0);
   const lines: CalculatedLine[] = base.map((line, index) => {
-    const ivaImporte = index === adjustmentIndex ? iva.minus(allocated) : money(line.importeNeto.mul(IVA));
+    const ivaImporte = !incluyeIva ? new D(0) : index === adjustmentIndex ? iva.minus(allocated) : money(line.importeNeto.mul(IVA));
     allocated = allocated.plus(ivaImporte);
     return { ...line, ivaImporte, importeConIva: line.importeNeto.plus(ivaImporte) };
   });

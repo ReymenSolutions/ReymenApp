@@ -1,28 +1,26 @@
-# Taller Wolf · Landing page
+# Taller Wolf — sitio v8
 
-Una sola página estática: `index.html` (HTML, CSS y JS en el mismo archivo, sin dependencias ni backend).
+La fuente del sitio es el ZIP v8 entregado por el cliente. `v8/` es el sitio estático completo; `herramientas/paginas-v8.js` genera los nueve HTML, `v8/assets/i18n-en.js` y `v8/assets/vehicle-catalog.js`. Las sugerencias de marca y modelo se editan en `src/lib/workshop/vehicle-catalog.json`, compartido con el formulario de Workshop; se permite escribir marcas y modelos fuera de la lista. `v0`–`v7` no se importaron. No edites los archivos generados directamente.
 
-## Archivos
-- `index.html` — la página completa.
-- `taller-wolf-logo-limpio.png` — el logo oficial, tal cual (800×825, fondo negro). La página es de fondo claro y
-  muestra el logo como placa negra con esquinas redondeadas en el encabezado, la portada y el pie; también es el
-  ícono de la pestaña y la vista previa al compartir (Open Graph).
+Marca y modelo usan una lista visible con búsqueda en vez de `datalist` por compatibilidad con Safari móvil. La confirmación de recepción reemplaza el formulario con una tarjeta y un botón para volver a cotizar. Las solicitudes recibidas se consultan en Workshop → Cotizaciones; los datos de servicio/vehículo permanecen en `WorkshopLeadRequest` y no son aún una cotización con precio.
 
-## Probar en tu computadora
+Desde esta carpeta:
+
 ```bash
-cd taller-wolf
-python3 -m http.server 8080
+node herramientas/paginas-v8.js v8
 ```
-Abre http://localhost:8080. También funciona abriendo `index.html` con doble clic, pero el mapa se ve mejor desde el
-servidor local.
 
-Para verla como celular: en Chrome, F12 → ícono de dispositivo (Ctrl+Shift+M).
+`v8/assets/app.js` contiene las interacciones y envía el formulario a `POST /api/workshop/public/inquiries` en el mismo origen. El endpoint crea una solicitud y un Lead CRM para la organización fijada por el servidor; no crea una cotización con precio ni identifica a un cliente por teléfono sin verificación. Placas y kilometraje son opcionales en la web, pero se exigen junto con el VIN al convertirla en vehículo para cotizar. Los datos enviados aparecen en Workshop → Vehículos y en el resumen del Lead CRM. WhatsApp queda disponible como contacto alternativo.
 
-## Al publicarla
-En `<head>`, cambia `og:image` (y la `image` del bloque JSON-LD) por la URL completa del logo, por ejemplo
-`https://tu-dominio.mx/taller-wolf-logo-limpio.png`, para que WhatsApp y Facebook muestren el logo al compartir.
+El servidor del sitio debe servir `v8/` como raíz y pasar únicamente `/api/workshop/public/inquiries` al ReymenApp correspondiente. El ejemplo de Nginx está en `docker/nginx.wolf-site.conf`. El servicio opcional `wolf-site` de `docker/docker-compose.test.yml` usa el perfil `workshop-wolf` y exige autenticación básica con un archivo privado `.wolf-site.htpasswd` en la raíz del repo de test; el script lo crea con permisos de lectura para el grupo del proceso Nginx y no debe subirse a Git. Configura en la app de **test** `WORKSHOP_WOLF_LANDING_ENABLED=true`, `WORKSHOP_WOLF_ORG_ID` con el ID real de la organización de prueba que tenga `WORKSHOP`, y `WORKSHOP_WOLF_SITE_ORIGIN=https://<dominio-test>`; configura `TEST_WOLF_DOMAIN` en el entorno de Compose. Requiere DNS y TLS del proxy externo. No actives esta compuerta en producción hasta completar las pruebas de aceptación.
 
-## Estado (23 nov 2026)
-- **En pausa** mientras se trabaja con Grupo Carvallo.
-- Lista: fondo claro, logo real (`taller-wolf-logo-limpio.png`, sin modificar), 9 servicios, horario lun–vie 9–19 y sáb 9–15, formulario que arma el mensaje de WhatsApp al 871 107 9931.
-- Pendiente: dominio y publicación (cambiar `og:image` a URL completa), confirmar el pin del mapa, y la propuesta de piezas de marca con Higgsfield (logo animado; sin fotos de IA presentadas como del taller).
+En el VPS de prueba, el script `deploy/test/configure-wolf-site.sh` verifica que el DNS del subdominio apunte a la misma IP que `apptest.reymen.mx`, lista las organizaciones Wolf de **test**, exige que `WORKSHOP` esté activo para el ID elegido, solicita una contraseña privada, guarda la configuración de forma atómica y arranca `wolf-site`. Ejemplo:
+
+```bash
+sudo /home/emilianorm/reymen-test/app/deploy/test/update.sh codex/workshop-wolf-site-crm
+sudo /home/emilianorm/reymen-test/app/deploy/test/configure-wolf-site.sh test.tallerwolf.com
+```
+
+El registro DNS `A` de `test.tallerwolf.com` apunta a la misma IP de `apptest.reymen.mx`. El script no modifica producción ni configura `tallerwolf.com`.
+
+Prueba desde el dominio de test: envío válido, resultado en CRM y solicitud del vehículo, reintento de la misma solicitud sin duplicado, error de red conservando el formulario, origen distinto rechazado, y vista en español/inglés y móvil. El consentimiento opcional de recordatorios solo queda registrado como evidencia de preferencia; **no habilita aún envíos automáticos**. La identidad del responsable y un correo de privacidad siguen pendientes de confirmación en el aviso legal.

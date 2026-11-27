@@ -9,12 +9,15 @@ import { getErrorMessage } from "@/lib/user-error";
 type Line = { tipo: "REFACCION" | "MANO_DE_OBRA" | "SERVICIO"; partId: string; concepto: string; cantidad: string; unidad: string; precioUnitarioNeto: string; costoUnitarioNeto: string };
 const blankLine = (): Line => ({ tipo: "SERVICIO", partId: "", concepto: "", cantidad: "1", unidad: "serv.", precioUnitarioNeto: "", costoUnitarioNeto: "" });
 
-export function CreateQuoteForm({ lang, vehicles, parts, services, initialVehicleId, initialService }: { lang: string; vehicles: { id: string; placas: string | null; vin: string | null; customer: { name: string | null; phone: string } }[]; parts: { id: string; nombre: string; sku: string; unidad: string; precioVentaNeto: string; costoNeto: string }[]; services: { id: string; nameEs: string; nameEn: string; precioVentaNeto: string; costoNeto: string }[]; initialVehicleId?: string; initialService?: string }) {
+export function CreateQuoteForm({ lang, vehicles, parts, services, initialVehicleId, initialService, requestId }: { lang: string; vehicles: { id: string; placas: string | null; vin: string | null; kilometrajeActual: number | null; marca: string | null; modelo: string | null; anio: number | null; customer: { name: string | null; phone: string } }[]; parts: { id: string; nombre: string; sku: string; unidad: string; precioVentaNeto: string; costoNeto: string }[]; services: { id: string; nameEs: string; nameEn: string; precioVentaNeto: string; costoNeto: string }[]; initialVehicleId?: string; initialService?: string; requestId?: string }) {
   const [items, setItems] = useState<Line[]>([blankLine()]);
   const [busy, setBusy] = useState(false);
+  const [incluyeIva, setIncluyeIva] = useState(true);
+  const [selectedVehicleId, setSelectedVehicleId] = useState(initialVehicleId ?? "");
   const router = useRouter();
   const es = lang === "es";
   const field = "w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900";
+  const selectedVehicle = vehicles.find((vehicle) => vehicle.id === selectedVehicleId);
 
   function change(index: number, key: keyof Line, value: string) {
     setItems((current) => current.map((item, i) => i === index ? { ...item, [key]: value } : item));
@@ -28,6 +31,8 @@ export function CreateQuoteForm({ lang, vehicles, parts, services, initialVehicl
     try {
       await createWorkshopQuote({
         vehicleId: String(data.get("vehicleId") ?? ""),
+        requestId,
+        incluyeIva,
         servicioTitulo: String(data.get("servicioTitulo") ?? ""),
         tiempoEstimado: String(data.get("tiempoEstimado") ?? ""),
         notas: String(data.get("notas") ?? ""),
@@ -36,6 +41,7 @@ export function CreateQuoteForm({ lang, vehicles, parts, services, initialVehicl
       toast.success(es ? "Borrador de cotización guardado" : "Quote draft saved");
       form.reset();
       setItems([blankLine()]);
+      router.push("/portal/workshop?tab=quotes&view=mine");
       router.refresh();
     } catch (error) {
       toast.error(getErrorMessage(error, es ? "No se pudo guardar" : "Could not save"));
@@ -45,13 +51,16 @@ export function CreateQuoteForm({ lang, vehicles, parts, services, initialVehicl
   }
 
   return <form onSubmit={submit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
-    <div><h2 className="font-semibold text-slate-900">{es ? "Nueva cotización" : "New quote"}</h2><p className="text-xs text-slate-500">{es ? "Se guarda como borrador sin folio. Captura precios y costos sin IVA." : "Saved as a draft without a reference number. Enter prices and costs before tax."}</p></div>
+    <div><p className="text-xs text-slate-600">{es ? "Se guarda como borrador sin folio. Captura precios y costos sin IVA." : "Saved as a draft without a reference number. Enter prices and costs before tax."}</p></div>
+    <label className="flex items-center gap-3 rounded-lg border border-slate-300 bg-slate-50 p-3 text-sm font-semibold text-slate-900"><input type="checkbox" checked={incluyeIva} onChange={(event) => setIncluyeIva(event.target.checked)} className="h-4 w-4 accent-[#245A9F]" />{es ? "Incluye IVA (16%)" : "Includes VAT (16%)"}</label>
+    {!incluyeIva && <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">{es ? "Total sin IVA. Si el cliente pidió factura, revisa esta elección antes de enviar la cotización." : "Total without VAT. If the customer requested an invoice, review this choice before sending the quote."}</p>}
     <div className="grid gap-3 sm:grid-cols-2">
-      <label className="text-sm">{es ? "Vehículo" : "Vehicle"}<select className={field} name="vehicleId" required defaultValue={initialVehicleId ?? ""}><option value="">{es ? "Seleccionar" : "Select"}</option>{vehicles.map((v) => <option key={v.id} value={v.id}>{v.placas ?? v.vin ?? "—"} · {v.customer.name ?? v.customer.phone}</option>)}</select></label>
+      <label className="text-sm">{es ? "Vehículo" : "Vehicle"}<select className={field} name="vehicleId" required value={selectedVehicleId} onChange={(event) => setSelectedVehicleId(event.target.value)}><option value="">{es ? "Seleccionar" : "Select"}</option>{vehicles.map((v) => <option key={v.id} value={v.id}>{v.marca} {v.modelo} {v.anio} · {v.placas ?? v.vin ?? "—"} · {v.customer.name ?? v.customer.phone}</option>)}</select></label>
       <label className="text-sm">{es ? "Servicio" : "Service"}<input className={field} name="servicioTitulo" required maxLength={160} defaultValue={initialService?.slice(0, 160)} /></label>
       <label className="text-sm">{es ? "Tiempo estimado" : "Estimated time"}<input className={field} name="tiempoEstimado" maxLength={100} /></label>
-      <label className="text-sm sm:col-span-2">{es ? "Falla reportada / notas" : "Reported issue / notes"}<textarea className={field} name="notas" maxLength={2000} rows={2} defaultValue={initialService} /></label>
+      <label className="text-sm sm:col-span-2">{es ? "Notas para el cliente (aparecen en el PDF)" : "Customer notes (shown in the PDF)"}<textarea className={field} name="notas" maxLength={2000} rows={2} defaultValue={initialService} /></label>
     </div>
+    {selectedVehicle && (!selectedVehicle.placas || !selectedVehicle.vin || selectedVehicle.kilometrajeActual === null) && <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">{es ? "Puedes guardar el borrador. Antes de emitir el PDF con folio, completa" : "You can save the draft. Before issuing the numbered PDF, complete"} {[!selectedVehicle.placas && (es ? "placas" : "plates"), !selectedVehicle.vin && "VIN", selectedVehicle.kilometrajeActual === null && (es ? "kilometraje" : "mileage")].filter(Boolean).join(", ")}.</p>}
     <div className="space-y-3">{items.map((item, index) => <div key={index} className="grid gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-4">
       <select aria-label={es ? "Tipo" : "Type"} className={field} value={item.tipo} onChange={(e) => change(index, "tipo", e.target.value)}><option value="SERVICIO">{es ? "Servicio" : "Service"}</option><option value="MANO_DE_OBRA">{es ? "Mano de obra" : "Labor"}</option><option value="REFACCION">{es ? "Refacción" : "Part"}</option></select>
       {item.tipo === "SERVICIO" && <select aria-label={es ? "Servicio del catálogo" : "Catalog service"} className={field} defaultValue="" onChange={(event) => {
@@ -68,8 +77,8 @@ export function CreateQuoteForm({ lang, vehicles, parts, services, initialVehicl
       <input aria-label={es ? "Unidad" : "Unit"} className={field} value={item.unidad} onChange={(e) => change(index, "unidad", e.target.value)} required />
       <input aria-label={es ? "Precio unitario neto" : "Net unit price"} className={field} type="number" min="0" step="0.01" placeholder={es ? "Precio neto" : "Net price"} value={item.precioUnitarioNeto} onChange={(e) => change(index, "precioUnitarioNeto", e.target.value)} required />
       <input aria-label={es ? "Costo unitario neto" : "Net unit cost"} className={field} type="number" min="0" step="0.01" placeholder={es ? "Costo neto interno" : "Internal net cost"} value={item.costoUnitarioNeto} onChange={(e) => change(index, "costoUnitarioNeto", e.target.value)} />
-      {items.length > 1 && <button type="button" className="text-left text-xs text-red-700" onClick={() => setItems((current) => current.filter((_, i) => i !== index))}>{es ? "Quitar línea" : "Remove line"}</button>}
+      {items.length > 1 && <button type="button" className="text-left text-xs text-blue-800" onClick={() => setItems((current) => current.filter((_, i) => i !== index))}>{es ? "Quitar línea" : "Remove line"}</button>}
     </div>)}</div>
-    <div className="flex flex-wrap gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => setItems((current) => [...current, blankLine()])}>{es ? "Agregar línea" : "Add line"}</button><button disabled={busy || vehicles.length === 0} className="rounded-md bg-[#063C82] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? (es ? "Guardando…" : "Saving…") : (es ? "Guardar borrador" : "Save draft")}</button></div>
+    <div className="flex flex-wrap gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => setItems((current) => [...current, blankLine()])}>{es ? "Agregar línea" : "Add line"}</button><button disabled={busy || vehicles.length === 0} className="rounded-md bg-[#245A9F] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? (es ? "Guardando…" : "Saving…") : (es ? "Guardar borrador" : "Save draft")}</button></div>
   </form>;
 }

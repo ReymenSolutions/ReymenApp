@@ -1502,14 +1502,19 @@ model WorkshopLeadRequest {
   marca String
   modelo String
   anio Int
-  placas String
-  kilometraje Int
+  placas String?
+  kilometraje Int?
   servicioFalla String @db.Text
+  viewedAt DateTime?
+  viewedById String?
+  discardedAt DateTime?
+  discardedById String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   organization Organization @relation(fields: [organizationId], references: [id])
   lead Lead @relation(fields: [leadId], references: [id])
   vehicle WorkshopVehicle? @relation(fields: [vehicleId], references: [id])
+  quote WorkshopQuote?
   @@unique([organizationId, requestKey])
   @@index([organizationId, leadId, createdAt])
   @@index([organizationId, vehicleId])
@@ -1521,6 +1526,8 @@ model WorkshopQuote {
   folio String?
   customerId String
   vehicleId String
+  requestId String? @unique
+  incluyeIva Boolean @default(true)
   estado WorkshopQuoteStatus @default(BORRADOR)
   servicioTitulo String
   tiempoEstimado String?
@@ -1541,6 +1548,7 @@ model WorkshopQuote {
   organization Organization @relation(fields: [organizationId], references: [id])
   customer Customer @relation(fields: [customerId], references: [id])
   vehicle WorkshopVehicle @relation(fields: [vehicleId], references: [id])
+  request WorkshopLeadRequest? @relation(fields: [requestId], references: [id])
   items WorkshopQuoteItem[]
   workOrder WorkshopWorkOrder?
   @@unique([organizationId, folio])
