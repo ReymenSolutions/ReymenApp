@@ -17,7 +17,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     where: { id, organizationId: orgId, folio: { not: null } },
     select: {
       folio: true, servicioTitulo: true, tiempoEstimado: true, vigenciaDias: true, garantiaDias: true, garantiaKm: true,
-      subtotalNeto: true, iva: true, total: true, notas: true,
+      subtotalNeto: true, iva: true, total: true, incluyeIva: true, notas: true,
       customer: { select: { name: true, phone: true } },
       vehicle: { select: { placas: true, vin: true, marca: true, modelo: true, anio: true, kilometrajeActual: true } },
       items: { select: { concepto: true, detalle: true, cantidad: true, unidad: true, precioUnitarioNeto: true, importeNeto: true, ivaImporte: true, importeConIva: true } },

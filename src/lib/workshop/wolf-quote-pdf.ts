@@ -129,10 +129,12 @@ export async function buildWolfQuotePdf(quote: ClientQuote): Promise<Uint8Array>
   if (y < 155) { page = doc.addPage([WIDTH, HEIGHT]); header(page, true); footer(page); y = 690; }
   draw(page, "Subtotal neto", 376, y - 3, 9, regular, BLACK, 106);
   draw(page, `$${quote.subtotalNeto.toFixed(2)}`, 494, y - 3, 9, bold, BLACK, 54);
-  draw(page, "IVA (16%)", 376, y - 20, 9, regular, BLACK, 106);
-  draw(page, `$${quote.iva.toFixed(2)}`, 494, y - 20, 9, bold, BLACK, 54);
+  if (quote.incluyeIva !== false) {
+    draw(page, "IVA (16%)", 376, y - 20, 9, regular, BLACK, 106);
+    draw(page, `$${quote.iva.toFixed(2)}`, 494, y - 20, 9, bold, BLACK, 54);
+  }
   page.drawRectangle({ x: 342, y: y - 62, width: 211, height: 28, color: RED });
-  draw(page, "TOTAL CON IVA", 350, y - 52, 9, bold, rgb(1, 1, 1), 112);
+  draw(page, quote.incluyeIva === false ? "TOTAL SIN IVA" : "TOTAL CON IVA", 350, y - 52, 9, bold, rgb(1, 1, 1), 112);
   draw(page, `$${quote.total.toFixed(2)}`, 476, y - 52, 10, bold, rgb(1, 1, 1), 68);
   y -= 83;
   if (y < 115) { page = doc.addPage([WIDTH, HEIGHT]); header(page, true); footer(page); y = 688; }

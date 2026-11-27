@@ -192,6 +192,27 @@ describe("workshop tenant integration", () => {
     expect(await prisma.workshopQuote.count({ where: { organizationId: orgA.id, vehicleId: otherVehicle.id } })).toBe(0);
   });
 
+  it("keeps IVA disabled through quote, order, and authorized extra work", async () => {
+    const vehicle = await createWorkshopVehicle({ customerId: customerA.id, placas: "WOLFIVA0", vin: "3N1CN7AP9ML812345", marca: "Nissan", modelo: "Versa", anio: "2021", kilometrajeActual: "50000" });
+    const quote = await createWorkshopQuote({ vehicleId: vehicle.id, incluyeIva: false, servicioTitulo: "Revisión", items: [{ tipo: "SERVICIO", concepto: "Revisión", cantidad: "1", unidad: "serv.", precioUnitarioNeto: "100.00", costoUnitarioNeto: "40.00" }] });
+    const saved = await prisma.workshopQuote.findUniqueOrThrow({ where: { id: quote.id }, include: { items: true } });
+    expect(saved.incluyeIva).toBe(false);
+    expect(saved.iva.toFixed(2)).toBe("0.00");
+    expect(saved.total.toFixed(2)).toBe("100.00");
+    expect(saved.utilidadNeta?.toFixed(2)).toBe("60.00");
+    expect(saved.items[0].ivaImporte.toFixed(2)).toBe("0.00");
+    await issueWorkshopQuote(quote.id);
+    await markWorkshopQuoteSent(quote.id);
+    await approveWorkshopQuote(quote.id, "WhatsApp");
+    const order = await convertWorkshopQuote(quote.id);
+    expect((await prisma.workshopWorkOrder.findUniqueOrThrow({ where: { id: order.id } })).saldo.toFixed(2)).toBe("100.00");
+    await prisma.workshopWorkOrder.update({ where: { id: order.id }, data: { estado: "DIAGNOSTICO" } });
+    await addWorkshopAuthorizedLine(order.id, { requestKey: crypto.randomUUID(), tipo: "SERVICIO", concepto: "Trabajo adicional", cantidad: "1", unidad: "serv.", precioUnitarioNeto: "50.00", autorizadaVia: "WhatsApp" });
+    const updated = await prisma.workshopWorkOrder.findUniqueOrThrow({ where: { id: order.id }, include: { items: true } });
+    expect(updated.saldo.toFixed(2)).toBe("150.00");
+    expect(updated.items.every((item) => item.ivaImporte.toFixed(2) === "0.00")).toBe(true);
+  });
+
   it("saves workshop defaults and next service only for the session organization", async () => {
     const vehicle = await prisma.workshopVehicle.findFirstOrThrow({ where: { organizationId: orgA.id, placas: "WOLF1" } });
     await saveWorkshopSettings({ vigenciaDias: 20, garantiaDias: 100, garantiaKm: 6000 });

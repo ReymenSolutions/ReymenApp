@@ -1527,6 +1527,7 @@ model WorkshopQuote {
   customerId String
   vehicleId String
   requestId String? @unique
+  incluyeIva Boolean @default(true)
   estado WorkshopQuoteStatus @default(BORRADOR)
   servicioTitulo String
   tiempoEstimado String?

@@ -16,7 +16,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     where: { id, organizationId: orgId },
     select: {
       folio: true, estado: true, kilometrajeIngreso: true, garantiaDias: true, garantiaKm: true, facturaSolicitada: true, entregadaEn: true,
-      quote: { select: { servicioTitulo: true, tiempoEstimado: true, vigenciaDias: true, notas: true } },
+      quote: { select: { servicioTitulo: true, tiempoEstimado: true, vigenciaDias: true, incluyeIva: true, notas: true } },
       customer: { select: { name: true, phone: true } },
       vehicle: { select: { placas: true, vin: true, marca: true, modelo: true, anio: true } },
       items: { select: { concepto: true, detalle: true, cantidad: true, unidad: true, precioUnitarioNeto: true, importeNeto: true, ivaImporte: true, importeConIva: true } },
@@ -29,7 +29,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const total = subtotalNeto.plus(iva);
   const org = await prisma.organization.findUniqueOrThrow({ where: { id: orgId }, select: { name: true } });
   const bytes = await buildWorkshopOrderPdf(org.name, {
-    folio: order.folio, servicioTitulo: order.quote.servicioTitulo, tiempoEstimado: order.quote.tiempoEstimado,
+    folio: order.folio, incluyeIva: order.quote.incluyeIva, servicioTitulo: order.quote.servicioTitulo, tiempoEstimado: order.quote.tiempoEstimado,
     vigenciaDias: order.quote.vigenciaDias, garantiaDias: order.garantiaDias, garantiaKm: order.garantiaKm,
     subtotalNeto, iva, total, notas: order.quote.notas, customer: order.customer,
     vehicle: { ...order.vehicle, kilometrajeActual: order.kilometrajeIngreso }, items: order.items,

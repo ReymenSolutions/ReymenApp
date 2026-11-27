@@ -2,6 +2,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 export type ClientQuote = {
   folio: string;
+  incluyeIva?: boolean;
   servicioTitulo: string;
   tiempoEstimado: string | null;
   vigenciaDias: number;
@@ -62,18 +63,18 @@ async function buildWorkshopDocumentPdf(orgName: string, quote: ClientQuote, tit
   line(`Servicio / Service: ${quote.servicioTitulo}`, 11, true);
   if (quote.tiempoEstimado) line(`Tiempo estimado / Estimated time: ${quote.tiempoEstimado}`);
   separator();
-  line("Concepto / Item                                    Cant.       Neto       IVA       Total", 9, true, muted);
+  line(quote.incluyeIva === false ? "Concepto / Item                                    Cant.       Neto       Total" : "Concepto / Item                                    Cant.       Neto       IVA       Total", 9, true, muted);
   separator();
   for (const item of quote.items) {
     line(`${item.concepto} (${item.cantidad.toString()} ${item.unidad})`, 10, true);
     if (item.detalle) line(item.detalle, 9, false, muted);
-    line(`Neto unit. ${mxn(item.precioUnitarioNeto)}   |   Neto ${mxn(item.importeNeto)}   |   IVA ${mxn(item.ivaImporte)}   |   Total ${mxn(item.importeConIva)}`, 8);
+    line(quote.incluyeIva === false ? `Neto unit. ${mxn(item.precioUnitarioNeto)}   |   Neto ${mxn(item.importeNeto)}   |   Total ${mxn(item.importeConIva)}` : `Neto unit. ${mxn(item.precioUnitarioNeto)}   |   Neto ${mxn(item.importeNeto)}   |   IVA ${mxn(item.ivaImporte)}   |   Total ${mxn(item.importeConIva)}`, 8);
     y -= 3;
   }
   separator();
   line(`Subtotal neto / Net subtotal: ${mxn(quote.subtotalNeto)}`, 11);
-  line(`IVA 16%: ${mxn(quote.iva)}`, 11);
-  line(`TOTAL CON IVA / TOTAL INCLUDING TAX: ${mxn(quote.total)}`, 14, true, blue);
+  if (quote.incluyeIva !== false) line(`IVA 16%: ${mxn(quote.iva)}`, 11);
+  line(`${quote.incluyeIva === false ? "TOTAL SIN IVA / TOTAL WITHOUT VAT" : "TOTAL CON IVA / TOTAL INCLUDING TAX"}: ${mxn(quote.total)}`, 14, true, blue);
   separator();
   line(`Vigencia / Validity: ${quote.vigenciaDias} dias naturales / calendar days`, 9);
   line(`Garantia en mano de obra / Labor warranty: ${quote.garantiaDias} dias o ${quote.garantiaKm} km, lo primero que ocurra.`, 9);

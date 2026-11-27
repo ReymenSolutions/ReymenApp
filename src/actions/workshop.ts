@@ -180,6 +180,7 @@ export async function createWorkshopVehicleFromRequest(requestId: string, rawVin
 
 const quoteInput = z.object({
   vehicleId: z.string().min(1),
+  incluyeIva: z.boolean().default(true),
   requestId: z.string().optional(),
   servicioTitulo: z.string().trim().min(2).max(160),
   tiempoEstimado: z.string().trim().max(100).optional(),
@@ -212,7 +213,7 @@ export async function createWorkshopQuote(input: z.input<typeof quoteInput>) {
   if (parts.length !== partIds.length) throw new UserError("Una refacción no pertenece a tu organización");
   let totals;
   try {
-    totals = calculateNetLines(data.items.map((item) => ({ cantidad: item.cantidad, precioUnitarioNeto: item.precioUnitarioNeto, costoUnitarioNeto: item.costoUnitarioNeto || null })));
+    totals = calculateNetLines(data.items.map((item) => ({ cantidad: item.cantidad, precioUnitarioNeto: item.precioUnitarioNeto, costoUnitarioNeto: item.costoUnitarioNeto || null })), data.incluyeIva);
   } catch {
     throw new UserError("Revisa cantidades, costos y precios netos");
   }
@@ -230,6 +231,7 @@ export async function createWorkshopQuote(input: z.input<typeof quoteInput>) {
       customerId: vehicle.customerId,
       vehicleId: vehicle.id,
       requestId: data.requestId || null,
+      incluyeIva: data.incluyeIva,
       servicioTitulo: data.servicioTitulo,
       tiempoEstimado: data.tiempoEstimado || null,
       notas: data.notas || null,
@@ -560,10 +562,6 @@ export async function addWorkshopAuthorizedLine(orderId: string, input: z.input<
   if (!parsed.success) throw new UserError("Revisa la línea adicional y cómo la autorizó el cliente");
   const d = parsed.data;
   if (d.tipo === "REFACCION" && !d.partId) throw new UserError("Selecciona una refacción del inventario para cada línea de refacción");
-  let totals;
-  try { totals = calculateNetLines([{ cantidad: d.cantidad, precioUnitarioNeto: d.precioUnitarioNeto, costoUnitarioNeto: d.costoUnitarioNeto || null }]); }
-  catch { throw new UserError("Revisa cantidades, costos y precios netos"); }
-  const line = totals.lines[0];
   const checkExisting = async () => {
     const existing = await prisma.workshopOrderItem.findUnique({ where: { organizationId_requestKey: { organizationId: orgId, requestKey: d.requestKey } }, select: { id: true, workOrderId: true, tipo: true, partId: true, concepto: true, cantidad: true, precioUnitarioNeto: true, costoUnitarioNeto: true, autorizadaVia: true } });
     if (!existing) return null;
@@ -576,8 +574,11 @@ export async function addWorkshopAuthorizedLine(orderId: string, input: z.input<
   try {
     result = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "WorkshopWorkOrder" WHERE id = ${orderId} AND "organizationId" = ${orgId} FOR UPDATE`;
-      const order = await tx.workshopWorkOrder.findFirst({ where: { id: orderId, organizationId: orgId }, select: { id: true, estado: true } });
+      const order = await tx.workshopWorkOrder.findFirst({ where: { id: orderId, organizationId: orgId }, select: { id: true, estado: true, quote: { select: { incluyeIva: true } } } });
       if (!order || !["DIAGNOSTICO", "EN_REPARACION"].includes(order.estado)) throw new UserError("La orden no admite trabajo adicional en este estado");
+      let line;
+      try { line = calculateNetLines([{ cantidad: d.cantidad, precioUnitarioNeto: d.precioUnitarioNeto, costoUnitarioNeto: d.costoUnitarioNeto || null }], order.quote.incluyeIva).lines[0]; }
+      catch { throw new UserError("Revisa cantidades, costos y precios netos"); }
       let inventoryCost: Prisma.Decimal | null = null;
       if (d.tipo === "REFACCION" && d.partId) {
         await tx.$queryRaw`SELECT id FROM "WorkshopPart" WHERE id = ${d.partId} AND "organizationId" = ${orgId} FOR UPDATE`;
