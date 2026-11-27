@@ -77,7 +77,7 @@ export function CreateQuoteForm({ lang, vehicles, parts, services, initialVehicl
       <input aria-label={es ? "Unidad" : "Unit"} className={field} value={item.unidad} onChange={(e) => change(index, "unidad", e.target.value)} required />
       <input aria-label={es ? "Precio unitario neto" : "Net unit price"} className={field} type="number" min="0" step="0.01" placeholder={es ? "Precio neto" : "Net price"} value={item.precioUnitarioNeto} onChange={(e) => change(index, "precioUnitarioNeto", e.target.value)} required />
       <input aria-label={es ? "Costo unitario neto" : "Net unit cost"} className={field} type="number" min="0" step="0.01" placeholder={es ? "Costo neto interno" : "Internal net cost"} value={item.costoUnitarioNeto} onChange={(e) => change(index, "costoUnitarioNeto", e.target.value)} />
-      {items.length > 1 && <button type="button" className="text-left text-xs text-red-700" onClick={() => setItems((current) => current.filter((_, i) => i !== index))}>{es ? "Quitar línea" : "Remove line"}</button>}
+      {items.length > 1 && <button type="button" className="text-left text-xs text-blue-800" onClick={() => setItems((current) => current.filter((_, i) => i !== index))}>{es ? "Quitar línea" : "Remove line"}</button>}
     </div>)}</div>
     <div className="flex flex-wrap gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => setItems((current) => [...current, blankLine()])}>{es ? "Agregar línea" : "Add line"}</button><button disabled={busy || vehicles.length === 0} className="rounded-md bg-[#245A9F] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? (es ? "Guardando…" : "Saving…") : (es ? "Guardar borrador" : "Save draft")}</button></div>
   </form>;

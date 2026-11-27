@@ -37,9 +37,9 @@ export default async function WorkshopVehicleHistory({ params, searchParams }: {
   const rows = history.slice(0, pageSize);
   const es = ctx.lang === "es";
   return <main className="space-y-5">
-    <Link href="/portal/workshop?tab=vehicles" className="text-sm font-medium text-red-700 underline">{es ? "Volver a vehículos" : "Back to vehicles"}</Link>
+    <Link href="/portal/workshop?tab=vehicles" className="text-sm font-medium text-blue-800 underline">{es ? "Volver a vehículos" : "Back to vehicles"}</Link>
     <header className="rounded-xl bg-gradient-to-br from-[#111111] via-[#2B1113] to-[#7F171C] p-6 text-white">
-      <p className="text-xs font-semibold uppercase tracking-wider text-[#FCA5A5]">{es ? "Historial del vehículo" : "Vehicle history"}</p>
+      <p className="text-xs font-semibold uppercase tracking-wider text-slate-200">{es ? "Historial del vehículo" : "Vehicle history"}</p>
       <h1 className="mt-2 text-2xl font-bold">{vehicle.placas ?? vehicle.vin ?? (es ? "Vehículo" : "Vehicle")}</h1>
       <p className="mt-2 text-sm text-white/80">{[vehicle.marca, vehicle.modelo, vehicle.anio].filter(Boolean).join(" ")} · VIN {vehicle.vin ?? "—"}</p>
     </header>
@@ -62,8 +62,8 @@ export default async function WorkshopVehicleHistory({ params, searchParams }: {
       {rows.length ? <ol className="mt-3 divide-y divide-slate-100">{rows.map((row) => <li key={`${row.kind}-${row.id}`} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"><div><p className="font-semibold text-slate-900">{row.kind === "quote" ? (es ? "Cotización" : "Quote") : (es ? "Orden" : "Order")} · {row.folio ?? (es ? "Sin folio" : "No number")}</p><p className="text-slate-600">{row.title} · {row.estado} · {row.createdAt.toLocaleDateString(es ? "es-MX" : "en-US")}</p></div>{row.kind === "quote" && row.folio && ctx.canManageFinancials && <a href={`/api/workshop/quotes/${row.id}/pdf`} className="rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold">PDF</a>}</li>)}</ol> : <p className="mt-3 text-sm text-slate-600">{es ? "Aún no hay cotizaciones ni órdenes para este vehículo." : "No quotes or orders for this vehicle yet."}</p>}
     </section>
     <nav aria-label={es ? "Páginas del historial" : "History pages"} className="flex justify-between text-sm">
-      {page > 1 ? <Link href={`/portal/workshop/vehicles/${id}?page=${page - 1}`} className="text-red-700 underline">{es ? "Anterior" : "Previous"}</Link> : <span />}
-      {hasNext && <Link href={`/portal/workshop/vehicles/${id}?page=${page + 1}`} className="text-red-700 underline">{es ? "Siguiente" : "Next"}</Link>}
+      {page > 1 ? <Link href={`/portal/workshop/vehicles/${id}?page=${page - 1}`} className="text-blue-800 underline">{es ? "Anterior" : "Previous"}</Link> : <span />}
+      {hasNext && <Link href={`/portal/workshop/vehicles/${id}?page=${page + 1}`} className="text-blue-800 underline">{es ? "Siguiente" : "Next"}</Link>}
     </nav>
   </main>;
 }

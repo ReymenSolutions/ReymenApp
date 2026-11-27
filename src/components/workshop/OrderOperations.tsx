@@ -17,7 +17,7 @@ export function OrderOperations({ id, estado, kilometrajeIngreso, nivelCombustib
   const [deliveryKm, setDeliveryKm] = useState(String(kilometrajeIngreso));
   const [partsReturned, setPartsReturned] = useState(false);
   const es = lang === "es";
-  const button = "rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold disabled:opacity-50";
+  const button = "rounded-md bg-[#245A9F] px-3 py-2 text-xs font-semibold text-white hover:bg-[#1C4A84] disabled:opacity-50";
   const field = "w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm";
   const steps: Record<string, [string, string, string, string]> = {
     RECEPCION: ["1 · Recibir vehículo", "1 · Receive vehicle", "Anota la falla, revisa el vehículo y sube una foto de recepción.", "Record the issue, inspect the vehicle, and upload an arrival photo."],
@@ -66,7 +66,7 @@ export function OrderOperations({ id, estado, kilometrajeIngreso, nivelCombustib
       <label className="text-xs font-medium">{es ? "Nivel de combustible" : "Fuel level"}<input className={`${field} mt-1`} name="nivelCombustible" defaultValue={nivelCombustible ?? ""} required /></label>
       <label className="text-xs font-medium sm:col-span-2">{es ? "¿Qué falla reporta el cliente?" : "What issue did the customer report?"}<input className={`${field} mt-1`} name="fallaReportada" defaultValue={fallaReportada ?? ""} required /></label>
       <label className="text-xs font-medium sm:col-span-2">{es ? "¿Qué encontraste al revisar?" : "What did you find?"}<input className={`${field} mt-1`} name="diagnostico" defaultValue={diagnostico ?? ""} /></label>
-      <details className="sm:col-span-2"><summary className="cursor-pointer text-xs font-semibold text-red-800">{es ? "Checklist del vehículo: daños, testigos y pertenencias" : "Vehicle checklist: damage, warning lights and belongings"}</summary><div className="mt-2 grid gap-2 sm:grid-cols-3">
+      <details className="sm:col-span-2"><summary className="cursor-pointer text-xs font-semibold text-blue-800">{es ? "Checklist del vehículo: daños, testigos y pertenencias" : "Vehicle checklist: damage, warning lights and belongings"}</summary><div className="mt-2 grid gap-2 sm:grid-cols-3">
         <label className="text-xs">{es ? "Daños previos" : "Prior damage"}<input className={`${field} mt-1`} name="danosPrevios" defaultValue={checklist.danosPrevios ?? ""} /></label>
         <label className="text-xs">{es ? "Testigos encendidos" : "Warning lights"}<input className={`${field} mt-1`} name="testigos" defaultValue={checklist.testigos ?? ""} /></label>
         <label className="text-xs">{es ? "Pertenencias" : "Belongings"}<input className={`${field} mt-1`} name="pertenencias" defaultValue={checklist.pertenencias ?? ""} /></label>

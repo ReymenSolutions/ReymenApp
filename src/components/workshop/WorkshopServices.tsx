@@ -43,6 +43,6 @@ export function WorkshopServices({ services, lang }: { services: Service[]; lang
   const es = lang === "es";
   return <section className="rounded-xl border border-slate-200 bg-white p-4"><h2 className="font-semibold">{es ? "Servicios" : "Services"}</h2><p className="mt-1 text-xs text-slate-600">{es ? "Catálogo editable. Los conceptos iniciales son provisionales y no tienen precio ni costo hasta que captures los reales." : "Editable catalog. Initial concepts are provisional and have no price or cost until you enter actual values."}</p>
     <div className="mt-3">{services.map((service) => <ServiceForm key={service.id} service={service} lang={lang} />)}</div>
-    <details><summary className="cursor-pointer text-sm font-medium text-red-700">{es ? "Agregar servicio" : "Add service"}</summary><ServiceForm lang={lang} /></details>
+    <details><summary className="cursor-pointer text-sm font-medium text-blue-800">{es ? "Agregar servicio" : "Add service"}</summary><ServiceForm lang={lang} /></details>
   </section>;
 }
