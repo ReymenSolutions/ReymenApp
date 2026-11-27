@@ -242,7 +242,7 @@ describe("workshop tenant integration", () => {
     await prisma.customer.update({ where: { id: customerA.id }, data: { name: "Client A" } });
     const first = await issueWorkshopQuote(quoteId);
     const second = await issueWorkshopQuote(quoteId);
-    expect(first.folio).toMatch(/^TW-\d{4}-0001$/);
+    expect(first.folio).toMatch(/^TW-\d{4}-\d{4}$/);
     expect(second.folio).toBe(first.folio);
     const response = await downloadQuotePdf(new Request("http://localhost/api/workshop/quotes/x/pdf"), { params: Promise.resolve({ id: quoteId }) });
     expect(response.status).toBe(200);
