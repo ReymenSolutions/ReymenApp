@@ -47,7 +47,7 @@ export function CreateQuoteForm({ lang, vehicles, parts, services, initialVehicl
   }
 
   return <form onSubmit={submit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
-    <div><h2 className="font-semibold text-slate-900">{es ? "Nueva cotización" : "New quote"}</h2><p className="text-xs text-slate-500">{es ? "Se guarda como borrador sin folio. Captura precios y costos sin IVA." : "Saved as a draft without a reference number. Enter prices and costs before tax."}</p></div>
+    <div><p className="text-xs text-slate-600">{es ? "Se guarda como borrador sin folio. Captura precios y costos sin IVA." : "Saved as a draft without a reference number. Enter prices and costs before tax."}</p></div>
     <div className="grid gap-3 sm:grid-cols-2">
       <label className="text-sm">{es ? "Vehículo" : "Vehicle"}<select className={field} name="vehicleId" required defaultValue={initialVehicleId ?? ""}><option value="">{es ? "Seleccionar" : "Select"}</option>{vehicles.map((v) => <option key={v.id} value={v.id}>{v.placas ?? v.vin ?? "—"} · {v.customer.name ?? v.customer.phone}</option>)}</select></label>
       <label className="text-sm">{es ? "Servicio" : "Service"}<input className={field} name="servicioTitulo" required maxLength={160} defaultValue={initialService?.slice(0, 160)} /></label>

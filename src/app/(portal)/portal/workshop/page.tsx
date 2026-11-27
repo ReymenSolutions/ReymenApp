@@ -130,7 +130,7 @@ export default async function WorkshopPage({ searchParams }: { searchParams: Pro
     ...(vehicle ? { vehicle: { OR: [{ marca: { contains: vehicle, mode: "insensitive" } }, { modelo: { contains: vehicle, mode: "insensitive" } }, { placas: { contains: vehicle, mode: "insensitive" } }, { vin: { contains: vehicle, mode: "insensitive" } }] } } : {}),
     ...(q ? { OR: [{ folio: { contains: q, mode: "insensitive" } }, { servicioTitulo: { contains: q, mode: "insensitive" } }] } : {}),
   };
-  const quoteTotal = tab.id === "quotes" && quoteView === "mine" && ctx.canPrintQuotes ? await prisma.workshopQuote.count({ where: ctx.canManageFinancials ? quoteWhere : { ...quoteWhere, folio: { not: null } } }) : 0;
+  const quoteTotal = tab.id === "quotes" && quoteView === "mine" && ctx.canPrintQuotes ? await prisma.workshopQuote.count({ where: quoteWhere }) : 0;
   const quotePage = Math.min(requestPage, Math.max(1, Math.ceil(quoteTotal / 15)));
   const quoteSelect = { id: true, folio: true, estado: true, servicioTitulo: true, total: true, vigenciaDias: true, createdAt: true,
     customer: { select: { name: true, phone: true } }, vehicle: { select: { id: true, marca: true, modelo: true, anio: true, placas: true } } } as const;
@@ -138,7 +138,7 @@ export default async function WorkshopPage({ searchParams }: { searchParams: Pro
     ? await prisma.workshopQuote.findMany({ where: quoteWhere, select: quoteSelect, take: 15, skip: (quotePage - 1) * 15, orderBy: [{ createdAt: "desc" }, { id: "desc" }] })
     : [];
   const printableQuotes = tab.id === "quotes" && quoteView === "mine" && ctx.canPrintQuotes && !ctx.canManageFinancials
-    ? await prisma.workshopQuote.findMany({ where: { ...quoteWhere, folio: { not: null } }, select: { id: true, folio: true, estado: true, servicioTitulo: true, vigenciaDias: true, createdAt: true, customer: { select: { name: true, phone: true } }, vehicle: { select: { id: true, marca: true, modelo: true, anio: true, placas: true } } }, take: 15, skip: (quotePage - 1) * 15, orderBy: [{ createdAt: "desc" }, { id: "desc" }] })
+    ? await prisma.workshopQuote.findMany({ where: quoteWhere, select: { id: true, folio: true, estado: true, servicioTitulo: true, total: true, vigenciaDias: true, createdAt: true, customer: { select: { name: true, phone: true } }, vehicle: { select: { id: true, marca: true, modelo: true, anio: true, placas: true } } }, take: 15, skip: (quotePage - 1) * 15, orderBy: [{ createdAt: "desc" }, { id: "desc" }] })
     : [];
   const inventoryParts = tab.id === "inventory" && ctx.canManageFinancials
     ? await prisma.workshopPart.findMany({ where: { organizationId: ctx.organizationId, ...createdAt, ...(q ? { OR: [{ sku: { contains: q, mode: "insensitive" } }, { nombre: { contains: q, mode: "insensitive" } }] } : {}) }, select: { id: true, sku: true, nombre: true, unidad: true, costoNeto: true, precioVentaNeto: true, stockMinimo: true }, orderBy: { nombre: "asc" }, take: 200 })
