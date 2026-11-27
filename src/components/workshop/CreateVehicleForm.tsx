@@ -49,12 +49,12 @@ export function CreateVehicleForm({ lang, customers }: { lang: string; customers
     <p className="mt-1 text-xs text-slate-500">{es ? "Selecciona primero un cliente registrado en el CRM." : "Select a customer already registered in the CRM."}</p>
     <div className="mt-3 grid gap-3 sm:grid-cols-2">
       <label className="text-sm text-slate-700">{es ? "Cliente" : "Customer"}<select className={field} name="customerId" required defaultValue=""><option value="">{es ? "Seleccionar" : "Select"}</option>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name ?? customer.phone} · {customer.phone}</option>)}</select></label>
-      <label className="text-sm text-slate-700">{es ? "Placas" : "Plates"}<input className={field} name="placas" required maxLength={20} /></label>
-      <label className="text-sm text-slate-700">VIN<input className={field} name="vin" required minLength={11} maxLength={17} /></label>
+      <label className="text-sm text-slate-700">{es ? "Placas (opcional)" : "Plates (optional)"}<input className={field} name="placas" maxLength={20} /></label>
+      <label className="text-sm text-slate-700">VIN {es ? "(opcional)" : "(optional)"}<input className={field} name="vin" maxLength={17} /></label>
       <VehicleCatalogPicker name="marca" label={es ? "Marca" : "Make"} value={make} onChange={(next) => { setMake(next); setModel(""); }} options={Object.keys(vehicleCatalog)} placeholder={es ? "Busca o elige la marca" : "Search or choose a make"} />
       <VehicleCatalogPicker name="modelo" label={es ? "Modelo" : "Model"} value={model} onChange={setModel} options={models} placeholder={es ? "Busca o elige el modelo" : "Search or choose a model"} />
       <label className="text-sm text-slate-700">{es ? "Año" : "Year"}<input className={field} name="anio" type="number" min={1900} max={2100} required /></label>
-      <label className="text-sm text-slate-700">{es ? "Kilometraje actual" : "Current mileage"}<input className={field} name="kilometrajeActual" type="number" min={0} required /></label>
+      <label className="text-sm text-slate-700">{es ? "Kilometraje actual (opcional)" : "Current mileage (optional)"}<input className={field} name="kilometrajeActual" type="number" min={0} /></label>
     </div>
     <button disabled={busy || customers.length === 0} className="mt-4 rounded-md bg-[#B91C1C] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? (es ? "Guardando…" : "Saving…") : (es ? "Guardar vehículo" : "Save vehicle")}</button>
   </form>;

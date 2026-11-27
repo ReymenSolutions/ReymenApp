@@ -71,6 +71,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         description={es ? "Aquí encuentras a las personas registradas en tu caja o en Lealtad. Abre su historial para consultar sus compras y recompensas." : "Find people registered at checkout or in Loyalty. Open their history to see purchases and rewards."}
       />
       <CrmTabs />
+      {crm && <div className="mb-4 flex justify-end"><Link href="/portal/leads/duplicates" className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50">{es ? "Revisar duplicados y fusionar contactos" : "Review duplicates and merge contacts"}</Link></div>}
       <div className="mb-5 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:grid-cols-2">
         <p><strong>{es ? "Clientes" : "Customers"}</strong><br />{es ? "Personas que compran contigo o ya tienen una tarjeta de Lealtad. Aquí consultas sus compras." : "People who buy from you or have a Loyalty card. See their purchases here."}</p>
         <p><strong>{es ? "Contactos" : "Contacts"}</strong><br />{es ? "Personas con las que conversas o a quienes das seguimiento, aunque todavía no hayan comprado. Un cliente también puede tener un contacto." : "People you talk to or follow up with, even before they buy. A customer can also have a contact record."}</p>

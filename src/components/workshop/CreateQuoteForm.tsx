@@ -9,7 +9,7 @@ import { getErrorMessage } from "@/lib/user-error";
 type Line = { tipo: "REFACCION" | "MANO_DE_OBRA" | "SERVICIO"; partId: string; concepto: string; cantidad: string; unidad: string; precioUnitarioNeto: string; costoUnitarioNeto: string };
 const blankLine = (): Line => ({ tipo: "SERVICIO", partId: "", concepto: "", cantidad: "1", unidad: "serv.", precioUnitarioNeto: "", costoUnitarioNeto: "" });
 
-export function CreateQuoteForm({ lang, vehicles, parts, services, initialVehicleId, initialService }: { lang: string; vehicles: { id: string; placas: string | null; vin: string | null; customer: { name: string | null; phone: string } }[]; parts: { id: string; nombre: string; sku: string; unidad: string; precioVentaNeto: string; costoNeto: string }[]; services: { id: string; nameEs: string; nameEn: string; precioVentaNeto: string; costoNeto: string }[]; initialVehicleId?: string; initialService?: string }) {
+export function CreateQuoteForm({ lang, vehicles, parts, services, initialVehicleId, initialService, requestId }: { lang: string; vehicles: { id: string; placas: string | null; vin: string | null; customer: { name: string | null; phone: string } }[]; parts: { id: string; nombre: string; sku: string; unidad: string; precioVentaNeto: string; costoNeto: string }[]; services: { id: string; nameEs: string; nameEn: string; precioVentaNeto: string; costoNeto: string }[]; initialVehicleId?: string; initialService?: string; requestId?: string }) {
   const [items, setItems] = useState<Line[]>([blankLine()]);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -28,6 +28,7 @@ export function CreateQuoteForm({ lang, vehicles, parts, services, initialVehicl
     try {
       await createWorkshopQuote({
         vehicleId: String(data.get("vehicleId") ?? ""),
+        requestId,
         servicioTitulo: String(data.get("servicioTitulo") ?? ""),
         tiempoEstimado: String(data.get("tiempoEstimado") ?? ""),
         notas: String(data.get("notas") ?? ""),
@@ -36,6 +37,7 @@ export function CreateQuoteForm({ lang, vehicles, parts, services, initialVehicl
       toast.success(es ? "Borrador de cotización guardado" : "Quote draft saved");
       form.reset();
       setItems([blankLine()]);
+      router.push("/portal/workshop?tab=quotes&view=mine");
       router.refresh();
     } catch (error) {
       toast.error(getErrorMessage(error, es ? "No se pudo guardar" : "Could not save"));
