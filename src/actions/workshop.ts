@@ -93,7 +93,11 @@ export async function createWorkshopVehicle(input: z.input<typeof vehicleInput>)
 
 /** Convierte una solicitud pública tras verificar los datos que exige una ficha completa. */
 export async function markWorkshopRequestViewed(requestId: string) {
-  const { orgId, userId } = await requireWorkshopOwner();
+  const session = await auth();
+  const orgId = session?.user.organizationId;
+  if (!orgId || !["OWNER", "ADMIN", "SUPER_ADMIN", "MANAGER", "AGENT"].includes(session.user.role)) throw new UserError("No autorizado");
+  await assertModuleEnabled(orgId, "WORKSHOP");
+  const userId = session.user.id;
   const result = await prisma.workshopLeadRequest.updateMany({
     where: { id: requestId, organizationId: orgId, viewedAt: null },
     data: { viewedAt: new Date(), viewedById: userId },

@@ -110,13 +110,14 @@ describe("workshop tenant integration", () => {
     expect(request.placas).toBe("WOLF9");
     expect(request.lead.source).toBe("landing");
     expect((request.lead.metadata as { consent?: { maintenanceReminders?: boolean } })?.consent?.maintenanceReminders).toBe(true);
-    auth.mockResolvedValue({ user: { id: ownerId, role: "AGENT", organizationId: orgA.id } });
+    auth.mockResolvedValue({ user: { id: ownerId, role: "VIEWER", organizationId: orgA.id } });
     await expect(markWorkshopRequestViewed(request.id)).rejects.toThrow(/autorizado/i);
+    auth.mockResolvedValue({ user: { id: ownerId, role: "AGENT", organizationId: orgA.id } });
+    expect((await markWorkshopRequestViewed(request.id)).updated).toBe(true);
     auth.mockResolvedValue({ user: { id: ownerId, role: "OWNER", organizationId: orgB.id } });
     expect((await markWorkshopRequestViewed(request.id)).updated).toBe(false);
     await expect(createWorkshopVehicleFromRequest(request.id, "3N1CN7AP9ML812345", true)).rejects.toThrow();
     auth.mockResolvedValue({ user: { id: ownerId, role: "OWNER", organizationId: orgA.id } });
-    expect((await markWorkshopRequestViewed(request.id)).updated).toBe(true);
     expect((await markWorkshopRequestViewed(request.id)).updated).toBe(false);
     expect((await prisma.workshopLeadRequest.findUniqueOrThrow({ where: { id: request.id } })).viewedById).toBe(ownerId);
     await expect(createWorkshopVehicleFromRequest(request.id, "3N1CN7AP9ML812345", false)).rejects.toThrow(/identidad/i);
