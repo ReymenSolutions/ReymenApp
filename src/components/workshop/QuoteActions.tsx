@@ -27,8 +27,8 @@ export function QuoteActions({ id, folio, estado, lang }: { id: string; folio: s
   }
 
   return <div className="flex flex-wrap items-center gap-2">
-    {estado === "BORRADOR" && !folio && <button className={button} disabled={busy} onClick={() => run(() => issueWorkshopQuote(id), es ? "Folio emitido" : "Reference number issued")}>{es ? "Emitir folio y PDF" : "Issue number and PDF"}</button>}
-    {folio && <a href={`/api/workshop/quotes/${id}/pdf`} target="_blank" rel="noopener noreferrer" className={button}>{es ? "Descargar PDF" : "Download PDF"}</a>}
+    {estado === "BORRADOR" && !folio && <button className={button} disabled={busy} onClick={() => run(() => issueWorkshopQuote(id), es ? "Folio emitido; ya puedes descargar el PDF" : "Reference number issued; you can now download the PDF")}>{es ? "Emitir folio" : "Issue reference number"}</button>}
+    {folio && <a href={`/api/workshop/quotes/${id}/pdf`} target="_blank" rel="noopener noreferrer" className={button}>{es ? "Descargar PDF para el cliente" : "Download customer PDF"}</a>}
     {estado === "BORRADOR" && folio && <button className={button} disabled={busy} onClick={() => run(() => markWorkshopQuoteSent(id), es ? "Marcada como enviada" : "Marked as sent")}>{es ? "Marcar enviada" : "Mark sent"}</button>}
     {estado === "ENVIADA" && <><select aria-label={es ? "Medio de aprobación" : "Approval method"} value={via} onChange={(event) => setVia(event.target.value)} className={button}><option>WhatsApp</option><option>{es ? "En persona" : "In person"}</option><option>{es ? "Llamada" : "Phone call"}</option></select><button className={button} disabled={busy} onClick={() => run(() => approveWorkshopQuote(id, via), es ? "Aprobación registrada" : "Approval recorded")}>{es ? "Registrar aprobación" : "Record approval"}</button></>}
     {estado === "APROBADA" && <button className={button} disabled={busy} onClick={() => run(() => convertWorkshopQuote(id), es ? "Orden creada" : "Order created")}>{es ? "Convertir a orden" : "Convert to order"}</button>}

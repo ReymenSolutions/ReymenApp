@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { createTestOrg, createTestUser, cleanupOrg } from "@/test/helpers";
 import sharp from "sharp";
+import { PDFDocument } from "pdf-lib";
 
 const auth = vi.fn();
 vi.mock("@/lib/auth", () => ({ auth }));
@@ -201,6 +202,13 @@ describe("workshop tenant integration", () => {
     const response = await downloadQuotePdf(new Request("http://localhost/api/workshop/quotes/x/pdf"), { params: Promise.resolve({ id: quoteId }) });
     expect(response.status).toBe(200);
     expect(Buffer.from(await response.arrayBuffer()).subarray(0, 4).toString()).toBe("%PDF");
+    process.env.WORKSHOP_WOLF_ORG_ID = orgA.id;
+    try {
+      const branded = await downloadQuotePdf(new Request("http://localhost/api/workshop/quotes/x/pdf"), { params: Promise.resolve({ id: quoteId }) });
+      expect(branded.status).toBe(200);
+      expect(branded.headers.get("content-disposition")).toContain("cotizacion-cambio-de-aceite-honda-accord-2020-tallerwolf.pdf");
+      expect((await PDFDocument.load(await branded.arrayBuffer())).getTitle()).toBe("cotizacion-cambio-de-aceite-honda-accord-2020-tallerwolf");
+    } finally { delete process.env.WORKSHOP_WOLF_ORG_ID; }
     const otherResponse = await downloadQuotePdf(new Request("http://localhost/api/workshop/quotes/x/pdf"), { params: Promise.resolve({ id: "does-not-belong-here" }) });
     expect(otherResponse.status).toBe(404);
   });
@@ -307,6 +315,7 @@ describe("workshop tenant integration", () => {
     try {
       auth.mockResolvedValue({ user: { id: ownerId, role: "AGENT", organizationId: orgA.id } });
       expect((await downloadQuotePdf(new Request("http://localhost/quote"), { params: Promise.resolve({ id: quote.id }) })).status).toBe(200);
+      expect((await downloadQuotePdf(new Request("http://localhost/quote?print=1"), { params: Promise.resolve({ id: quote.id }) })).headers.get("content-disposition")).toMatch(/^inline;/);
       expect((await downloadOrderPdf(new Request("http://localhost/order"), { params: Promise.resolve({ id: order.id }) })).status).toBe(403);
       await expect(issueWorkshopQuote(quote.id)).rejects.toThrow(/No autorizado/i);
       await expect(setWorkshopInvoiceRequested(order.id, false)).rejects.toThrow(/No autorizado/i);

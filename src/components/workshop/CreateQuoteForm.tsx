@@ -50,7 +50,7 @@ export function CreateQuoteForm({ lang, vehicles, parts, services, initialVehicl
       <label className="text-sm">{es ? "Vehículo" : "Vehicle"}<select className={field} name="vehicleId" required defaultValue={initialVehicleId ?? ""}><option value="">{es ? "Seleccionar" : "Select"}</option>{vehicles.map((v) => <option key={v.id} value={v.id}>{v.placas ?? v.vin ?? "—"} · {v.customer.name ?? v.customer.phone}</option>)}</select></label>
       <label className="text-sm">{es ? "Servicio" : "Service"}<input className={field} name="servicioTitulo" required maxLength={160} defaultValue={initialService?.slice(0, 160)} /></label>
       <label className="text-sm">{es ? "Tiempo estimado" : "Estimated time"}<input className={field} name="tiempoEstimado" maxLength={100} /></label>
-      <label className="text-sm sm:col-span-2">{es ? "Falla reportada / notas" : "Reported issue / notes"}<textarea className={field} name="notas" maxLength={2000} rows={2} defaultValue={initialService} /></label>
+      <label className="text-sm sm:col-span-2">{es ? "Notas para el cliente (aparecen en el PDF)" : "Customer notes (shown in the PDF)"}<textarea className={field} name="notas" maxLength={2000} rows={2} defaultValue={initialService} /></label>
     </div>
     <div className="space-y-3">{items.map((item, index) => <div key={index} className="grid gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-4">
       <select aria-label={es ? "Tipo" : "Type"} className={field} value={item.tipo} onChange={(e) => change(index, "tipo", e.target.value)}><option value="SERVICIO">{es ? "Servicio" : "Service"}</option><option value="MANO_DE_OBRA">{es ? "Mano de obra" : "Labor"}</option><option value="REFACCION">{es ? "Refacción" : "Part"}</option></select>
@@ -70,6 +70,6 @@ export function CreateQuoteForm({ lang, vehicles, parts, services, initialVehicl
       <input aria-label={es ? "Costo unitario neto" : "Net unit cost"} className={field} type="number" min="0" step="0.01" placeholder={es ? "Costo neto interno" : "Internal net cost"} value={item.costoUnitarioNeto} onChange={(e) => change(index, "costoUnitarioNeto", e.target.value)} />
       {items.length > 1 && <button type="button" className="text-left text-xs text-red-700" onClick={() => setItems((current) => current.filter((_, i) => i !== index))}>{es ? "Quitar línea" : "Remove line"}</button>}
     </div>)}</div>
-    <div className="flex flex-wrap gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => setItems((current) => [...current, blankLine()])}>{es ? "Agregar línea" : "Add line"}</button><button disabled={busy || vehicles.length === 0} className="rounded-md bg-[#063C82] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? (es ? "Guardando…" : "Saving…") : (es ? "Guardar borrador" : "Save draft")}</button></div>
+    <div className="flex flex-wrap gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => setItems((current) => [...current, blankLine()])}>{es ? "Agregar línea" : "Add line"}</button><button disabled={busy || vehicles.length === 0} className="rounded-md bg-[#B91C1C] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? (es ? "Guardando…" : "Saving…") : (es ? "Guardar borrador" : "Save draft")}</button></div>
   </form>;
 }

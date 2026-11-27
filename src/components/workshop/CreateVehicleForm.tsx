@@ -56,6 +56,6 @@ export function CreateVehicleForm({ lang, customers }: { lang: string; customers
       <label className="text-sm text-slate-700">{es ? "Año" : "Year"}<input className={field} name="anio" type="number" min={1900} max={2100} required /></label>
       <label className="text-sm text-slate-700">{es ? "Kilometraje actual" : "Current mileage"}<input className={field} name="kilometrajeActual" type="number" min={0} required /></label>
     </div>
-    <button disabled={busy || customers.length === 0} className="mt-4 rounded-md bg-[#063C82] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? (es ? "Guardando…" : "Saving…") : (es ? "Guardar vehículo" : "Save vehicle")}</button>
+    <button disabled={busy || customers.length === 0} className="mt-4 rounded-md bg-[#B91C1C] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? (es ? "Guardando…" : "Saving…") : (es ? "Guardar vehículo" : "Save vehicle")}</button>
   </form>;
 }

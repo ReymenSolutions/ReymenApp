@@ -1,6 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
-type ClientQuote = {
+export type ClientQuote = {
   folio: string;
   servicioTitulo: string;
   tiempoEstimado: string | null;
